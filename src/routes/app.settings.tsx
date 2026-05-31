@@ -1,6 +1,17 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
+import { KeyboardShortcutsDialog } from "@/components/app/AppTopbar";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -14,6 +25,10 @@ export const Route = createFileRoute("/app/settings")({
 });
 
 function SettingsPage() {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [seatsOpen, setSeatsOpen] = useState(false);
+  const [cardOpen, setCardOpen] = useState(false);
+
   return (
     <AppShell title="Settings">
       <div className="mb-6">
@@ -45,7 +60,18 @@ function SettingsPage() {
           <Card title="Your profile" description="This is how others see you in the workspace.">
             <div className="flex items-center gap-4">
               <div className="grid size-16 place-items-center rounded-2xl bg-gradient-brand text-lg font-semibold text-white shadow-glow">AM</div>
-              <Button variant="outline" size="sm">Upload new photo</Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => {
+                  if (event.target.files?.[0]) toast.success("Photo selected");
+                }}
+              />
+              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                Upload new photo
+              </Button>
             </div>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <Field label="Full name"><Input defaultValue="Alex Morgan" /></Field>
@@ -95,8 +121,15 @@ function SettingsPage() {
                 <div className="text-xs text-muted-foreground">$72 / month · Renews on Jul 14, 2026</div>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline">Change plan</Button>
-                <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">Add seats</Button>
+                <Button variant="outline" asChild>
+                  <Link to="/app/billing">Change plan</Link>
+                </Button>
+                <Button
+                  onClick={() => setSeatsOpen(true)}
+                  className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
+                >
+                  Add seats
+                </Button>
               </div>
             </div>
 
@@ -106,7 +139,7 @@ function SettingsPage() {
                   <CreditCard className="size-4" /> Payment method
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">Visa ending in 4242 · Exp 09/28</p>
-                <Button variant="outline" size="sm" className="mt-3">Update card</Button>
+                <Button variant="outline" size="sm" className="mt-3" onClick={() => setCardOpen(true)}>Update card</Button>
               </div>
               <div className="rounded-2xl border border-border p-5">
                 <div className="text-sm font-semibold">What's included</div>
@@ -120,6 +153,9 @@ function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <SeatsDialog open={seatsOpen} onOpenChange={setSeatsOpen} />
+      <PaymentMethodDialog open={cardOpen} onOpenChange={setCardOpen} />
     </AppShell>
   );
 }
@@ -144,10 +180,74 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 function SaveBar() {
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
   return (
-    <div className="mt-6 flex justify-end gap-2">
+    <div className="mt-6 flex flex-wrap justify-end gap-2">
+      <Button variant="outline" onClick={() => setShortcutsOpen(true)}>Keyboard shortcuts</Button>
       <Button variant="outline">Cancel</Button>
-      <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">Save changes</Button>
+      <Button onClick={() => toast.success("Changes saved")} className="bg-gradient-brand text-white shadow-glow hover:opacity-95">Save changes</Button>
+      <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
+  );
+}
+
+function SeatsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add seats</DialogTitle>
+          <DialogDescription>Mock billing action. No payment is charged.</DialogDescription>
+        </DialogHeader>
+        <Field label="Additional seats">
+          <Input type="number" min="1" defaultValue="2" />
+        </Field>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              onOpenChange(false);
+              toast.success("Seats added");
+            }}
+            className="bg-gradient-brand text-white"
+          >
+            Add seats
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PaymentMethodDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Update payment method</DialogTitle>
+          <DialogDescription>Use mock card details for the frontend demo.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <Field label="Card number"><Input defaultValue="4242 4242 4242 4242" /></Field>
+          </div>
+          <Field label="Expiry"><Input defaultValue="09 / 28" /></Field>
+          <Field label="CVC"><Input defaultValue="123" /></Field>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              onOpenChange(false);
+              toast.success("Payment method updated");
+            }}
+            className="bg-gradient-brand text-white"
+          >
+            Save card
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

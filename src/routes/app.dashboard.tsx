@@ -19,6 +19,7 @@ import {
   projectStatusMeta,
 } from "@/lib/mock-data";
 import { Avatar, AvatarStack } from "@/components/app/Avatar";
+import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -61,9 +62,11 @@ function Dashboard() {
             Here's what's moving across your workspace today.
           </p>
         </div>
-        <Button asChild className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-          <Link to="/app/projects">New project <ArrowUpRight className="size-4" /></Link>
-        </Button>
+        <NewProjectDialog>
+          <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+            New project <ArrowUpRight className="size-4" />
+          </Button>
+        </NewProjectDialog>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -162,7 +165,9 @@ function Dashboard() {
               body="A standup summary has been drafted for the team."
             />
           </div>
-          <Button variant="outline" className="mt-4 w-full">Open AI assistant</Button>
+          <Button variant="outline" className="mt-4 w-full" asChild>
+            <Link to="/app/ai">Open AI assistant</Link>
+          </Button>
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-5 shadow-soft xl:col-span-2">
@@ -200,7 +205,7 @@ function Dashboard() {
       <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-soft">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold">Recent activity</h2>
-          <button className="text-xs text-primary hover:underline">See all</button>
+          <Link to="/app/tasks" className="text-xs text-primary hover:underline">See all</Link>
         </div>
         <ul className="divide-y divide-border">
           {activity.map((a) => {

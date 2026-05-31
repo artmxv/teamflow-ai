@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { tasks as allTasks, getMember, projects, type Task, type TaskStatus, type Priority } from "@/lib/mock-data";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
 import { Avatar } from "@/components/app/Avatar";
+import { NewTaskDialog } from "@/components/app/QuickActionDialogs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -33,16 +34,17 @@ function TasksPage() {
   const [status, setStatus] = useState<TaskStatus | "all">("all");
   const [priority, setPriority] = useState<Priority | "all">("all");
   const [selected, setSelected] = useState<Task | null>(null);
+  const [taskList, setTaskList] = useState(allTasks);
 
   const filtered = useMemo(
     () =>
-      allTasks.filter(
+      taskList.filter(
         (t) =>
           (status === "all" || t.status === status) &&
           (priority === "all" || t.priority === priority) &&
           (q === "" || t.title.toLowerCase().includes(q.toLowerCase()) || t.key.toLowerCase().includes(q.toLowerCase())),
       ),
-    [q, status, priority],
+    [q, status, priority, taskList],
   );
 
   return (
@@ -52,9 +54,11 @@ function TasksPage() {
           <h1 className="text-2xl font-semibold tracking-tight">All tasks</h1>
           <p className="text-sm text-muted-foreground">{filtered.length} tasks across {projects.length} projects</p>
         </div>
-        <Button size="sm" className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-          <Plus className="size-4" /> New task
-        </Button>
+        <NewTaskDialog onCreate={(task) => setTaskList((current) => [task, ...current])}>
+          <Button size="sm" className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+            <Plus className="size-4" /> New task
+          </Button>
+        </NewTaskDialog>
       </div>
 
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">

@@ -30,10 +30,60 @@ const seed: Msg[] = [
   },
 ];
 
+const histories: { title: string; messages: Msg[] }[] = [
+  { title: "Weekly digest · Orion", messages: seed },
+  {
+    title: "Risk report · Mobile v3",
+    messages: [
+      { role: "user", content: "What risks are blocking Mobile App v3?" },
+      {
+        role: "assistant",
+        content:
+          "Mobile App v3 has 3 high-priority tasks without owners and the offline sync milestone is trending 2 days late.",
+        sources: [{ title: "Mobile App v3", meta: "3 risks · Active" }],
+      },
+    ],
+  },
+  {
+    title: "Standup draft · 11:00",
+    messages: [
+      { role: "user", content: "Draft today's standup update" },
+      {
+        role: "assistant",
+        content:
+          "Yesterday the team closed dashboard polish and billing copy. Today the focus is QA on board filters and member invites.",
+      },
+    ],
+  },
+  {
+    title: "Backlog grooming",
+    messages: [
+      { role: "user", content: "Find stale backlog items" },
+      {
+        role: "assistant",
+        content:
+          "I found 5 backlog tasks older than 30 days. Two look like duplicates and one needs product clarification.",
+      },
+    ],
+  },
+  {
+    title: "Onboarding outline",
+    messages: [
+      { role: "user", content: "Outline onboarding for new admins" },
+      {
+        role: "assistant",
+        content:
+          "Start with workspace setup, invite flow, project templates, and notification preferences. Add AI assistant examples at the end.",
+      },
+    ],
+  },
+];
+
 function AssistantPage() {
   const [messages, setMessages] = useState<Msg[]>(seed);
   const [input, setInput] = useState("");
   const [project, setProject] = useState(projects[0].id);
+  const [activeHistory, setActiveHistory] = useState(0);
 
   function send(text: string) {
     if (!text.trim()) return;
@@ -62,27 +112,35 @@ function AssistantPage() {
             <History className="size-3.5" /> History
           </div>
           <ul className="flex-1 space-y-0.5 overflow-y-auto">
-            {[
-              "Weekly digest · Orion",
-              "Risk report · Mobile v3",
-              "Standup draft · 11:00",
-              "Backlog grooming",
-              "Onboarding outline",
-            ].map((h, i) => (
-              <li key={h}>
+            {histories.map((history, i) => (
+              <li key={history.title}>
                 <button
+                  onClick={() => {
+                    setActiveHistory(i);
+                    setMessages(history.messages);
+                  }}
                   className={
-                    "flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-sm transition hover:bg-secondary " +
-                    (i === 0 ? "bg-secondary text-foreground" : "text-muted-foreground")
+                    "group flex w-full items-center justify-between rounded-lg px-2 py-2 text-left text-sm transition hover:bg-secondary " +
+                    (activeHistory === i ? "bg-secondary text-foreground" : "text-muted-foreground")
                   }
                 >
-                  <span className="truncate">{h}</span>
+                  <span className="truncate">{history.title}</span>
                   <ArrowUpRight className="size-3 opacity-0 transition group-hover:opacity-100" />
                 </button>
               </li>
             ))}
           </ul>
-          <Button variant="outline" size="sm" className="mt-2">New chat</Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-2"
+            onClick={() => {
+              setActiveHistory(-1);
+              setMessages([]);
+            }}
+          >
+            New chat
+          </Button>
         </aside>
 
         {/* Chat area */}

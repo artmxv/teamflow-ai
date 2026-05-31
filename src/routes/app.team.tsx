@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
-import { members, type Role } from "@/lib/mock-data";
+import { members, type Member, type Role } from "@/lib/mock-data";
 import { Avatar } from "@/components/app/Avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -43,6 +50,7 @@ const statusStyles = {
 
 function TeamPage() {
   const [open, setOpen] = useState(false);
+  const [profileMember, setProfileMember] = useState<Member | null>(null);
 
   return (
     <AppShell title="Team">
@@ -118,15 +126,61 @@ function TeamPage() {
                 </td>
                 <td className="px-5 py-3 text-muted-foreground">{m.joinedAt}</td>
                 <td className="px-5 py-3 text-right">
-                  <button className="rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-foreground">
-                    <MoreHorizontal className="size-4" />
-                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-foreground">
+                        <MoreHorizontal className="size-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setProfileMember(m)}>View profile</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => toast.success(`Role change opened for ${m.name}`)}>
+                        Change role
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => toast.info(`${m.name} was not removed in this mock demo`)}>
+                        Remove member
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <Dialog open={profileMember != null} onOpenChange={(next) => !next && setProfileMember(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{profileMember?.name}</DialogTitle>
+            <DialogDescription>{profileMember?.email}</DialogDescription>
+          </DialogHeader>
+          {profileMember && (
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center gap-3 rounded-xl border border-border p-3">
+                <Avatar id={profileMember.id} initials={profileMember.avatar} />
+                <div>
+                  <div className="font-medium">{profileMember.name}</div>
+                  <div className="text-xs text-muted-foreground">{profileMember.role}</div>
+                </div>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Info label="Status" value={profileMember.status} />
+                <Info label="Joined" value={profileMember.joinedAt} />
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </AppShell>
+  );
+}
+
+function Info({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 text-sm font-medium capitalize">{value}</div>
+    </div>
   );
 }
