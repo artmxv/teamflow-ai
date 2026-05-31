@@ -70,11 +70,11 @@ function SiteHeader() {
         <div className="ml-auto flex items-center gap-2">
           <LanguageSwitcher className="hidden sm:inline-flex" />
           <ThemeToggle />
-          <Link to="/signin" className="hidden text-sm font-medium text-muted-foreground hover:text-foreground sm:block">
+          <Link to="/app/dashboard" className="hidden text-sm font-medium text-muted-foreground hover:text-foreground sm:block">
             Sign in
           </Link>
           <Button asChild size="sm" className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-            <Link to="/signup">
+            <Link to="/app/dashboard">
               Start free <ArrowRight className="size-3.5" />
             </Link>
           </Button>
@@ -106,8 +106,8 @@ function Hero() {
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Button asChild size="lg" className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-            <Link to="/signup">
-              Start free <ArrowRight className="size-4" />
+            <Link to="/app/dashboard">
+              Open live demo <ArrowRight className="size-4" />
             </Link>
           </Button>
           <Button asChild size="lg" variant="outline">
@@ -363,7 +363,7 @@ function Pricing() {
       blurb: "For tiny teams trying things out.",
       features: ["Up to 5 members", "3 active projects", "Basic AI (50 prompts/mo)"],
       cta: "Start free",
-      to: "/signup" as const,
+      to: "/app/dashboard" as const,
       featured: false,
     },
     {
@@ -372,7 +372,7 @@ function Pricing() {
       blurb: "Per user / month. Most popular for product teams.",
       features: ["Unlimited projects", "Advanced AI assistant", "Custom workflows", "SSO with Google"],
       cta: "Start 14-day trial",
-      to: "/signup" as const,
+      to: "/app/dashboard" as const,
       featured: true,
     },
     {
@@ -381,7 +381,7 @@ function Pricing() {
       blurb: "For growing companies with compliance needs.",
       features: ["SAML SSO + SCIM", "Audit logs", "Priority support", "Unlimited AI seats"],
       cta: "Contact sales",
-      to: "/signup" as const,
+      to: "/app/dashboard" as const,
       featured: false,
     },
   ];
@@ -458,7 +458,7 @@ function CTA() {
           </div>
           <div className="flex gap-3">
             <Button asChild size="lg" className="bg-white text-primary hover:bg-white/90">
-              <Link to="/signup">Start free</Link>
+              <Link to="/app/dashboard">Start free</Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/15 hover:text-white">
               <Link to="/app/dashboard">View demo</Link>

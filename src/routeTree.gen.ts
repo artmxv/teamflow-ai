@@ -21,7 +21,7 @@ import { Route as AppProjectsRouteImport } from './routes/app.projects'
 import { Route as AppDashboardRouteImport } from './routes/app.dashboard'
 import { Route as AppBoardRouteImport } from './routes/app.board'
 import { Route as AppBillingRouteImport } from './routes/app.billing'
-import { Route as AppAssistantRouteImport } from './routes/app.assistant'
+import { Route as AppAiRouteImport } from './routes/app.ai'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -83,9 +83,9 @@ const AppBillingRoute = AppBillingRouteImport.update({
   path: '/app/billing',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppAssistantRoute = AppAssistantRouteImport.update({
-  id: '/app/assistant',
-  path: '/app/assistant',
+const AppAiRoute = AppAiRouteImport.update({
+  id: '/app/ai',
+  path: '/app/ai',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -94,7 +94,7 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof ForgotPasswordRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
-  '/app/assistant': typeof AppAssistantRoute
+  '/app/ai': typeof AppAiRoute
   '/app/billing': typeof AppBillingRoute
   '/app/board': typeof AppBoardRoute
   '/app/dashboard': typeof AppDashboardRoute
@@ -109,7 +109,7 @@ export interface FileRoutesByTo {
   '/forgot-password': typeof ForgotPasswordRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
-  '/app/assistant': typeof AppAssistantRoute
+  '/app/ai': typeof AppAiRoute
   '/app/billing': typeof AppBillingRoute
   '/app/board': typeof AppBoardRoute
   '/app/dashboard': typeof AppDashboardRoute
@@ -125,7 +125,7 @@ export interface FileRoutesById {
   '/forgot-password': typeof ForgotPasswordRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
-  '/app/assistant': typeof AppAssistantRoute
+  '/app/ai': typeof AppAiRoute
   '/app/billing': typeof AppBillingRoute
   '/app/board': typeof AppBoardRoute
   '/app/dashboard': typeof AppDashboardRoute
@@ -142,7 +142,7 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/signin'
     | '/signup'
-    | '/app/assistant'
+    | '/app/ai'
     | '/app/billing'
     | '/app/board'
     | '/app/dashboard'
@@ -157,7 +157,7 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/signin'
     | '/signup'
-    | '/app/assistant'
+    | '/app/ai'
     | '/app/billing'
     | '/app/board'
     | '/app/dashboard'
@@ -172,7 +172,7 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/signin'
     | '/signup'
-    | '/app/assistant'
+    | '/app/ai'
     | '/app/billing'
     | '/app/board'
     | '/app/dashboard'
@@ -188,7 +188,7 @@ export interface RootRouteChildren {
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
-  AppAssistantRoute: typeof AppAssistantRoute
+  AppAiRoute: typeof AppAiRoute
   AppBillingRoute: typeof AppBillingRoute
   AppBoardRoute: typeof AppBoardRoute
   AppDashboardRoute: typeof AppDashboardRoute
@@ -285,11 +285,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBillingRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/app/assistant': {
-      id: '/app/assistant'
-      path: '/app/assistant'
-      fullPath: '/app/assistant'
-      preLoaderRoute: typeof AppAssistantRouteImport
+    '/app/ai': {
+      id: '/app/ai'
+      path: '/app/ai'
+      fullPath: '/app/ai'
+      preLoaderRoute: typeof AppAiRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -300,7 +300,7 @@ const rootRouteChildren: RootRouteChildren = {
   ForgotPasswordRoute: ForgotPasswordRoute,
   SigninRoute: SigninRoute,
   SignupRoute: SignupRoute,
-  AppAssistantRoute: AppAssistantRoute,
+  AppAiRoute: AppAiRoute,
   AppBillingRoute: AppBillingRoute,
   AppBoardRoute: AppBoardRoute,
   AppDashboardRoute: AppDashboardRoute,
@@ -313,3 +313,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
