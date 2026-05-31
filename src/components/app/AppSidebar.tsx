@@ -26,6 +26,7 @@ const nav: { to: string; key: TKey; icon: typeof LayoutDashboard }[] = [
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { t } = useI18n();
 
   return (
     <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
@@ -53,7 +54,7 @@ export function AppSidebar() {
 
       <nav className="mt-6 flex-1 px-3">
         <div className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Workspace
+          {t("side.workspace")}
         </div>
         <ul className="space-y-0.5">
           {nav.map((item) => {
@@ -71,7 +72,7 @@ export function AppSidebar() {
                   )}
                 >
                   <Icon className={cn("size-4", active ? "text-primary" : "text-muted-foreground")} />
-                  {item.label}
+                  {t(item.key)}
                 </Link>
               </li>
             );
@@ -79,7 +80,7 @@ export function AppSidebar() {
         </ul>
 
         <div className="mt-8 px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Projects
+          {t("side.projects")}
         </div>
         <ul className="space-y-0.5">
           {["Orion Web App", "Mobile App v3", "Marketing Site"].map((p) => (
