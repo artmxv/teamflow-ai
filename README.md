@@ -291,28 +291,48 @@ Formats the project with Prettier.
 
 ### Stage 2 — Frontend cleanup
 
-- [ ] Improve folder structure
-- [ ] Clean mock data
-- [ ] Improve EN/RU translations
-- [ ] Improve task drawer interactions
-- [ ] Add create project modal logic
-- [ ] Add create task modal logic
-- [ ] Add local state for task status changes
+- [x] Add frontend mock interactions
+- [x] Add create project modal logic
+- [x] Add create task modal logic
+- [x] Add local state for quick actions
+- [x] Add React Hook Form and Zod validation
+- [x] Improve EN/RU translations
+- [x] Add notifications dropdown
+- [x] Add workspace switcher interactions
+- [x] Add billing/settings/team mock actions
+- [ ] Clean mock data structure
 - [ ] Improve responsive layout
 - [ ] Add screenshots to README
+
+### Stage 2.5 — Backend preparation
+
+- [ ] Review current mock data structure
+- [ ] Align frontend types with future backend models
+- [ ] Design database schema
+- [ ] Define API endpoints
+- [ ] Prepare server folder structure
+- [ ] Decide environment variables
+- [ ] Prepare local PostgreSQL setup
 
 ### Stage 3 — Backend API
 
 - [ ] Add Express server
-- [ ] Add Prisma
-- [ ] Add PostgreSQL
+- [ ] Add Prisma ORM
+- [ ] Add PostgreSQL database
+- [ ] Add environment config
 - [ ] Add User model
 - [ ] Add Workspace model
+- [ ] Add WorkspaceMember model
 - [ ] Add Project model
 - [ ] Add Task model
-- [ ] Add authentication
-- [ ] Add protected routes
-- [ ] Add CRUD API for projects and tasks
+- [ ] Add TaskComment model
+- [ ] Add ActivityLog model
+- [ ] Add authentication routes
+- [ ] Add JWT access token flow
+- [ ] Add protected routes middleware
+- [ ] Add CRUD API for projects
+- [ ] Add CRUD API for tasks
+- [ ] Add validation with Zod
 
 ### Stage 4 — Frontend and backend integration
 
