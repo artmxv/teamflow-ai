@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
 import {
   members,
-  tasks as allTasks,
   statusColumns,
   type Priority,
   type Task,
@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { fetchTasks, type TaskApiItem, type TaskApiPriority, type TaskApiStatus } from "@/lib/api/tasks";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { Filter, Plus } from "lucide-react";
 
@@ -28,12 +29,38 @@ export const Route = createFileRoute("/app/board")({
   component: Board,
 });
 
+const apiStatusMap: Record<TaskApiStatus, TaskStatus> = {
+  BACKLOG: "backlog",
+  TODO: "todo",
+  IN_PROGRESS: "in_progress",
+  REVIEW: "review",
+  DONE: "done",
+};
+
+const apiPriorityMap: Record<TaskApiPriority, Priority> = {
+  LOW: "low",
+  MEDIUM: "medium",
+  HIGH: "high",
+  URGENT: "urgent",
+};
+
 function Board() {
   const { t } = useI18n();
   const [selected, setSelected] = useState<Task | null>(null);
-  const [taskList, setTaskList] = useState(allTasks);
+  const [localTasks, setLocalTasks] = useState<Task[]>([]);
   const [priority, setPriority] = useState<Priority | "all">("all");
   const [assignee, setAssignee] = useState<string>("all");
+  const {
+    data: apiTasks = [],
+    error,
+    isError,
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ["tasks"],
+    queryFn: fetchTasks,
+  });
+  const taskList = [...localTasks, ...apiTasks.map(mapApiTaskToTask)];
 
   const filteredTasks = taskList.filter(
     (task) =>
@@ -49,7 +76,7 @@ function Board() {
           <p className="text-sm text-muted-foreground">Orion Web App · 12 tasks active</p>
         </div>
         <div className="flex gap-2">
-          <NewTaskDialog onCreate={(task) => setTaskList((current) => [task, ...current])}>
+          <NewTaskDialog onCreate={(task) => setLocalTasks((current) => [task, ...current])}>
             <Button size="sm" className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
               <Plus className="size-4" /> {t("common.newTask")}
             </Button>
@@ -100,34 +127,113 @@ function Board() {
         </div>
       </div>
 
-      <div className="-mx-2 flex gap-3 overflow-x-auto px-2 pb-4">
-        {statusColumns.map((col) => {
-          const colTasks = filteredTasks.filter((t) => t.status === col.key);
-          return (
-            <Column key={col.key} title={statusLabel(col.key, t)} status={col.key} count={colTasks.length}>
-              {colTasks.map((t) => (
-                <TaskCard key={t.id} task={t} onOpen={setSelected} />
-              ))}
-              {colTasks.length === 0 && (
-                <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
-                  Drop tasks here
-                </div>
-              )}
-              <NewTaskDialog
-                initialStatus={col.key}
-                onCreate={(task) => setTaskList((current) => [task, ...current])}
-              >
-                <button className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-border py-2 text-xs text-muted-foreground transition hover:border-primary/30 hover:text-foreground">
-                  <Plus className="size-3.5" /> {t("board.addNewCard")}
-                </button>
-              </NewTaskDialog>
-            </Column>
-          );
-        })}
-      </div>
+      {isError ? (
+        <ErrorState error={error} onRetry={() => void refetch()} />
+      ) : (
+        <div className="-mx-2 flex gap-3 overflow-x-auto px-2 pb-4">
+          {statusColumns.map((col) => {
+            const colTasks = filteredTasks.filter((task) => task.status === col.key);
+            return (
+              <Column key={col.key} title={statusLabel(col.key, t)} status={col.key} count={isLoading ? 0 : colTasks.length}>
+                {isLoading ? (
+                  <LoadingCards />
+                ) : (
+                  <>
+                    {colTasks.map((task) => (
+                      <TaskCard key={task.id} task={task} onOpen={setSelected} />
+                    ))}
+                    {colTasks.length === 0 && (
+                      <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+                        No tasks in this column
+                      </div>
+                    )}
+                  </>
+                )}
+                <NewTaskDialog
+                  initialStatus={col.key}
+                  onCreate={(task) => setLocalTasks((current) => [task, ...current])}
+                >
+                  <button className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-border py-2 text-xs text-muted-foreground transition hover:border-primary/30 hover:text-foreground">
+                    <Plus className="size-3.5" /> {t("board.addNewCard")}
+                  </button>
+                </NewTaskDialog>
+              </Column>
+            );
+          })}
+        </div>
+      )}
 
       <TaskDrawer task={selected} onOpenChange={(o) => !o && setSelected(null)} />
     </AppShell>
+  );
+}
+
+function mapApiTaskToTask(task: TaskApiItem): Task {
+  return {
+    id: task.id,
+    key: task.key,
+    title: task.title,
+    description: task.description ?? "",
+    status: apiStatusMap[task.status],
+    priority: apiPriorityMap[task.priority],
+    assigneeId: task.assigneeId,
+    projectId: task.projectId,
+    dueDate: formatDate(task.dueDate),
+    labels: [task.project.name],
+    comments: Array.from({ length: task.commentsCount }, (_, index) => ({
+      id: `${task.id}-comment-${index}`,
+      authorId: task.assigneeId ?? "",
+      body: "",
+      createdAt: "",
+    })),
+    checklist: Array.from({ length: task.checklistTotal }, (_, index) => ({
+      id: `${task.id}-checklist-${index}`,
+      label: `Checklist item ${index + 1}`,
+      done: index < task.checklistDone,
+    })),
+    activity: [],
+    attachments: Array.from({ length: task.attachmentsCount }, (_, index) => ({
+      id: `${task.id}-attachment-${index}`,
+      name: `Attachment ${index + 1}`,
+      size: "",
+    })),
+  };
+}
+
+function formatDate(value: string | null) {
+  if (!value) return null;
+  return new Date(value).toLocaleDateString();
+}
+
+function LoadingCards() {
+  return (
+    <>
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div key={index} className="rounded-2xl border border-border bg-card p-3.5 shadow-soft">
+          <div className="h-3 w-16 animate-pulse rounded bg-muted" />
+          <div className="mt-3 h-4 w-3/4 animate-pulse rounded bg-muted" />
+          <div className="mt-2 h-4 w-1/2 animate-pulse rounded bg-muted" />
+          <div className="mt-4 flex items-center justify-between">
+            <div className="h-5 w-20 animate-pulse rounded-full bg-muted" />
+            <div className="size-7 animate-pulse rounded-md bg-muted" />
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
+  return (
+    <div className="rounded-2xl border border-destructive/20 bg-card p-8 text-center shadow-soft">
+      <h3 className="text-base font-semibold">Board tasks could not load</h3>
+      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+        {error?.message ?? "Check that the backend is running and try again."}
+      </p>
+      <Button onClick={onRetry} className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
+        Retry
+      </Button>
+    </div>
   );
 }
 
