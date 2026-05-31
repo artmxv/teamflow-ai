@@ -46,7 +46,7 @@ export function AppTopbar({
 
   function markAllAsRead() {
     setUnread(0);
-    toast.success("Notifications marked as read");
+    toast.success(t("top.notifications"));
   }
 
   return (
@@ -67,7 +67,7 @@ export function AppTopbar({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-64">
-          <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+          <DropdownMenuLabel>{t("top.workspaceSwitcher")}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {workspaces.map((w) => (
             <DropdownMenuItem key={w.id} onClick={() => onWorkspaceChange(w)} className="gap-2">
@@ -112,7 +112,7 @@ export function AppTopbar({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80">
             <DropdownMenuLabel className="flex items-center justify-between">
-              Notifications
+              {t("top.notifications")}
               <span className="text-[11px] font-normal text-muted-foreground">{unread} unread</span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -131,7 +131,7 @@ export function AppTopbar({
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={markAllAsRead}>Mark all as read</DropdownMenuItem>
+            <DropdownMenuItem onClick={markAllAsRead}>{t("top.markAllAsRead")}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -151,10 +151,10 @@ export function AppTopbar({
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>alex@teamflow.ai</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild><Link to="/app/settings">Profile settings</Link></DropdownMenuItem>
-            <DropdownMenuItem asChild><Link to="/app/settings">Workspace settings</Link></DropdownMenuItem>
-            <DropdownMenuItem asChild><Link to="/app/billing">Billing</Link></DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setShortcutsOpen(true)}>Keyboard shortcuts</DropdownMenuItem>
+            <DropdownMenuItem asChild><Link to="/app/settings">{t("settings.profileSettings")}</Link></DropdownMenuItem>
+            <DropdownMenuItem asChild><Link to="/app/settings">{t("settings.workspaceSettings")}</Link></DropdownMenuItem>
+            <DropdownMenuItem asChild><Link to="/app/billing">{t("side.billing")}</Link></DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setShortcutsOpen(true)}>{t("top.keyboardShortcuts")}</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild><Link to="/signin">Sign out</Link></DropdownMenuItem>
           </DropdownMenuContent>
@@ -164,7 +164,7 @@ export function AppTopbar({
       <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>TeamFlow help</DialogTitle>
+            <DialogTitle>TeamFlow {t("top.help")}</DialogTitle>
             <DialogDescription>
               This demo runs on mock data. Use the sidebar to explore projects, tasks, billing, and AI assistant flows.
             </DialogDescription>
@@ -187,19 +187,21 @@ export function KeyboardShortcutsDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Keyboard shortcuts</DialogTitle>
+          <DialogTitle>{t("top.keyboardShortcuts")}</DialogTitle>
           <DialogDescription>Quick actions available in the mock workspace.</DialogDescription>
         </DialogHeader>
         <div className="space-y-2 text-sm">
           {[
-            ["Cmd/Ctrl + K", "Search"],
-            ["N", "New task"],
-            ["G then D", "Dashboard"],
-            ["G then B", "Board"],
+            ["Cmd/Ctrl + K", t("top.search")],
+            ["N", t("common.newTask")],
+            ["G then D", t("side.dashboard")],
+            ["G then B", t("side.kanban")],
           ].map(([keys, label]) => (
             <div key={keys} className="flex items-center justify-between rounded-xl border border-border p-3">
               <span className="text-muted-foreground">{label}</span>

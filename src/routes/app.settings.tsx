@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { useI18n } from "@/lib/i18n";
 import { CreditCard, Check } from "lucide-react";
 
 export const Route = createFileRoute("/app/settings")({
@@ -25,23 +26,24 @@ export const Route = createFileRoute("/app/settings")({
 });
 
 function SettingsPage() {
+  const { t } = useI18n();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [seatsOpen, setSeatsOpen] = useState(false);
   const [cardOpen, setCardOpen] = useState(false);
 
   return (
-    <AppShell title="Settings">
+    <AppShell title={t("side.settings")}>
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("side.settings")}</h1>
         <p className="text-sm text-muted-foreground">Manage your workspace, profile and billing.</p>
       </div>
 
       <Tabs defaultValue="workspace" className="w-full">
         <TabsList>
-          <TabsTrigger value="workspace">Workspace</TabsTrigger>
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="billing">Billing</TabsTrigger>
+          <TabsTrigger value="workspace">{t("side.workspace")}</TabsTrigger>
+          <TabsTrigger value="profile">{t("settings.profileSettings")}</TabsTrigger>
+          <TabsTrigger value="notifications">{t("settings.notificationSettings")}</TabsTrigger>
+          <TabsTrigger value="billing">{t("side.billing")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="workspace" className="mt-5">
@@ -70,7 +72,7 @@ function SettingsPage() {
                 }}
               />
               <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-                Upload new photo
+                {t("common.uploadNewPhoto")}
               </Button>
             </div>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -116,19 +118,19 @@ function SettingsPage() {
           >
             <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-border bg-gradient-to-br from-primary/8 to-card p-5 sm:flex-row sm:items-center">
               <div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-primary">Current plan</div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-primary">{t("billing.currentPlan")}</div>
                 <div className="mt-1 text-xl font-semibold">Team · 6 seats</div>
                 <div className="text-xs text-muted-foreground">$72 / month · Renews on Jul 14, 2026</div>
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" asChild>
-                  <Link to="/app/billing">Change plan</Link>
+                  <Link to="/app/billing">{t("common.changePlan")}</Link>
                 </Button>
                 <Button
                   onClick={() => setSeatsOpen(true)}
                   className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
                 >
-                  Add seats
+                  {t("common.addSeats")}
                 </Button>
               </div>
             </div>
@@ -139,7 +141,7 @@ function SettingsPage() {
                   <CreditCard className="size-4" /> Payment method
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">Visa ending in 4242 · Exp 09/28</p>
-                <Button variant="outline" size="sm" className="mt-3" onClick={() => setCardOpen(true)}>Update card</Button>
+                <Button variant="outline" size="sm" className="mt-3" onClick={() => setCardOpen(true)}>{t("common.updateCard")}</Button>
               </div>
               <div className="rounded-2xl border border-border p-5">
                 <div className="text-sm font-semibold">What's included</div>
@@ -180,13 +182,14 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 function SaveBar() {
+  const { t } = useI18n();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   return (
     <div className="mt-6 flex flex-wrap justify-end gap-2">
-      <Button variant="outline" onClick={() => setShortcutsOpen(true)}>Keyboard shortcuts</Button>
-      <Button variant="outline">Cancel</Button>
-      <Button onClick={() => toast.success("Changes saved")} className="bg-gradient-brand text-white shadow-glow hover:opacity-95">Save changes</Button>
+      <Button variant="outline" onClick={() => setShortcutsOpen(true)}>{t("top.keyboardShortcuts")}</Button>
+      <Button variant="outline">{t("common.cancel")}</Button>
+      <Button onClick={() => toast.success("Changes saved")} className="bg-gradient-brand text-white shadow-glow hover:opacity-95">{t("common.saveChanges")}</Button>
       <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
   );

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { AvatarStack } from "@/components/app/Avatar";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import { projects, members, projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
+import { useI18n, type TKey } from "@/lib/i18n";
 import { Plus, Search, Calendar, ListTodo } from "lucide-react";
 
 export const Route = createFileRoute("/app/projects")({
@@ -16,15 +17,16 @@ export const Route = createFileRoute("/app/projects")({
 
 const initialsMap = Object.fromEntries(members.map((m) => [m.id, m.avatar]));
 
-const filters: { key: "all" | ProjectStatus; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "active", label: "Active" },
-  { key: "planning", label: "Planning" },
-  { key: "on_hold", label: "On hold" },
-  { key: "completed", label: "Completed" },
+const filters: { key: "all" | ProjectStatus; labelKey: TKey }[] = [
+  { key: "all", labelKey: "projects.all" },
+  { key: "active", labelKey: "projects.active" },
+  { key: "planning", labelKey: "projects.planning" },
+  { key: "on_hold", labelKey: "projects.onHold" },
+  { key: "completed", labelKey: "projects.completed" },
 ];
 
 function ProjectsPage() {
+  const { t } = useI18n();
   const [filter, setFilter] = useState<"all" | ProjectStatus>("all");
   const [q, setQ] = useState("");
   const [projectList, setProjectList] = useState(projects);
@@ -35,15 +37,15 @@ function ProjectsPage() {
   );
 
   return (
-    <AppShell title="Projects">
+    <AppShell title={t("projects.projects")}>
       <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
-          <p className="text-sm text-muted-foreground">All projects across your workspace.</p>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("projects.projects")}</h1>
+          <p className="text-sm text-muted-foreground">{t("projects.allProjects")} across your workspace.</p>
         </div>
         <NewProjectDialog onCreate={(project) => setProjectList((current) => [project, ...current])}>
           <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-            <Plus className="size-4" /> New project
+            <Plus className="size-4" /> {t("common.newProject")}
           </Button>
         </NewProjectDialog>
       </div>
@@ -61,7 +63,7 @@ function ProjectsPage() {
                   : "bg-secondary text-secondary-foreground hover:bg-secondary/70")
               }
             >
-              {f.label}
+              {t(f.labelKey)}
             </button>
           ))}
         </div>
@@ -70,7 +72,7 @@ function ProjectsPage() {
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search projects…"
+            placeholder={t("projects.searchProjects")}
             className="pl-9"
           />
         </div>
@@ -116,6 +118,8 @@ function ProjectsPage() {
 }
 
 function EmptyState({ onCreate }: { onCreate: (project: (typeof projects)[number]) => void }) {
+  const { t } = useI18n();
+
   return (
     <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
       <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-accent text-accent-foreground">
@@ -127,7 +131,7 @@ function EmptyState({ onCreate }: { onCreate: (project: (typeof projects)[number
       </p>
       <NewProjectDialog onCreate={onCreate}>
         <Button className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
-          <Plus className="size-4" /> Create project
+          <Plus className="size-4" /> {t("common.createProject")}
         </Button>
       </NewProjectDialog>
     </div>

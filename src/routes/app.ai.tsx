@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Sparkles, Send, History, FolderKanban, FileText, ArrowUpRight } from "lucide-react";
 import { suggestedPrompts, projects } from "@/lib/mock-data";
+import { useI18n } from "@/lib/i18n";
 
 export const Route = createFileRoute("/app/ai")({
   head: () => ({ meta: [{ title: "AI Assistant — TeamFlow AI" }] }),
@@ -80,6 +81,7 @@ const histories: { title: string; messages: Msg[] }[] = [
 ];
 
 function AssistantPage() {
+  const { t } = useI18n();
   const [messages, setMessages] = useState<Msg[]>(seed);
   const [input, setInput] = useState("");
   const [project, setProject] = useState(projects[0].id);
@@ -104,7 +106,7 @@ function AssistantPage() {
   }
 
   return (
-    <AppShell title="AI Assistant">
+    <AppShell title={t("ai.assistant")}>
       <div className="grid h-[calc(100vh-7rem)] gap-4 lg:grid-cols-[260px_1fr]">
         {/* History sidebar */}
         <aside className="hidden flex-col rounded-2xl border border-border bg-card p-3 shadow-soft lg:flex">
@@ -174,7 +176,7 @@ function AssistantPage() {
 
             <div>
               <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Suggested prompts
+                {t("ai.suggestedPrompts")}
               </div>
               <div className="flex flex-wrap gap-2">
                 {suggestedPrompts.map((p) => (
@@ -200,7 +202,7 @@ function AssistantPage() {
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask anything about your projects, tasks, or team…"
+              placeholder={t("ai.askAnything")}
               className="min-h-12 max-h-40 flex-1 resize-none rounded-xl"
             />
             <Button type="submit" className="bg-gradient-brand text-white shadow-glow hover:opacity-95">

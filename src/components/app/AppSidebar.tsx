@@ -106,7 +106,7 @@ export function AppSidebar({ activeWorkspace }: { activeWorkspace: Workspace }) 
           <li>
             <NewProjectDialog>
               <button className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground">
-                <Plus className="size-3.5" /> New project
+                <Plus className="size-3.5" /> {t("common.newProject")}
               </button>
             </NewProjectDialog>
           </li>
@@ -123,7 +123,7 @@ export function AppSidebar({ activeWorkspace }: { activeWorkspace: Workspace }) 
         </div>
         <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
           <span>1,340 / 2,000</span>
-          <Link className="text-primary hover:underline" to="/app/billing">Upgrade</Link>
+          <Link className="text-primary hover:underline" to="/app/billing">{t("billing.changePlan")}</Link>
         </div>
       </div>
     </aside>
