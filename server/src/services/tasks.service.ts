@@ -1,5 +1,15 @@
 import { prisma } from "../lib/prisma.js";
 
+type CreateTaskInput = {
+  projectId: string;
+  title: string;
+  description?: string;
+  status?: "BACKLOG" | "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE";
+  priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+  assigneeId?: string | null;
+  dueDate?: string | null;
+};
+
 export async function getTasks() {
   const tasks = await prisma.task.findMany({
     orderBy: { updatedAt: "desc" },
@@ -75,4 +85,57 @@ export async function getTasks() {
       attachmentsCount,
     };
   });
+}
+
+export async function createTask(input: CreateTaskInput) {
+  const taskCount = await prisma.task.count();
+
+  const task = await prisma.task.create({
+    data: {
+      key: `TF-${taskCount + 101}`,
+      projectId: input.projectId,
+      title: input.title,
+      description: input.description ?? null,
+      status: input.status ?? "BACKLOG",
+      priority: input.priority ?? "MEDIUM",
+      assigneeId: input.assigneeId ?? null,
+      dueDate: input.dueDate ? new Date(input.dueDate) : null,
+    },
+    select: {
+      id: true,
+      key: true,
+      projectId: true,
+      title: true,
+      description: true,
+      status: true,
+      priority: true,
+      assigneeId: true,
+      dueDate: true,
+      createdAt: true,
+      updatedAt: true,
+      project: {
+        select: {
+          id: true,
+          name: true,
+          status: true,
+        },
+      },
+      assignee: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatar: true,
+        },
+      },
+    },
+  });
+
+  return {
+    ...task,
+    commentsCount: 0,
+    checklistTotal: 0,
+    checklistDone: 0,
+    attachmentsCount: 0,
+  };
 }
