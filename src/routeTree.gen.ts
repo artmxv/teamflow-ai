@@ -15,10 +15,12 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppTeamRouteImport } from './routes/app.team'
+import { Route as AppTasksRouteImport } from './routes/app.tasks'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppProjectsRouteImport } from './routes/app.projects'
 import { Route as AppDashboardRouteImport } from './routes/app.dashboard'
 import { Route as AppBoardRouteImport } from './routes/app.board'
+import { Route as AppBillingRouteImport } from './routes/app.billing'
 import { Route as AppAssistantRouteImport } from './routes/app.assistant'
 
 const SignupRoute = SignupRouteImport.update({
@@ -51,6 +53,11 @@ const AppTeamRoute = AppTeamRouteImport.update({
   path: '/app/team',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppTasksRoute = AppTasksRouteImport.update({
+  id: '/app/tasks',
+  path: '/app/tasks',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/app/settings',
   path: '/app/settings',
@@ -71,6 +78,11 @@ const AppBoardRoute = AppBoardRouteImport.update({
   path: '/app/board',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppBillingRoute = AppBillingRouteImport.update({
+  id: '/app/billing',
+  path: '/app/billing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppAssistantRoute = AppAssistantRouteImport.update({
   id: '/app/assistant',
   path: '/app/assistant',
@@ -83,10 +95,12 @@ export interface FileRoutesByFullPath {
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/app/assistant': typeof AppAssistantRoute
+  '/app/billing': typeof AppBillingRoute
   '/app/board': typeof AppBoardRoute
   '/app/dashboard': typeof AppDashboardRoute
   '/app/projects': typeof AppProjectsRoute
   '/app/settings': typeof AppSettingsRoute
+  '/app/tasks': typeof AppTasksRoute
   '/app/team': typeof AppTeamRoute
   '/app/': typeof AppIndexRoute
 }
@@ -96,10 +110,12 @@ export interface FileRoutesByTo {
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/app/assistant': typeof AppAssistantRoute
+  '/app/billing': typeof AppBillingRoute
   '/app/board': typeof AppBoardRoute
   '/app/dashboard': typeof AppDashboardRoute
   '/app/projects': typeof AppProjectsRoute
   '/app/settings': typeof AppSettingsRoute
+  '/app/tasks': typeof AppTasksRoute
   '/app/team': typeof AppTeamRoute
   '/app': typeof AppIndexRoute
 }
@@ -110,10 +126,12 @@ export interface FileRoutesById {
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
   '/app/assistant': typeof AppAssistantRoute
+  '/app/billing': typeof AppBillingRoute
   '/app/board': typeof AppBoardRoute
   '/app/dashboard': typeof AppDashboardRoute
   '/app/projects': typeof AppProjectsRoute
   '/app/settings': typeof AppSettingsRoute
+  '/app/tasks': typeof AppTasksRoute
   '/app/team': typeof AppTeamRoute
   '/app/': typeof AppIndexRoute
 }
@@ -125,10 +143,12 @@ export interface FileRouteTypes {
     | '/signin'
     | '/signup'
     | '/app/assistant'
+    | '/app/billing'
     | '/app/board'
     | '/app/dashboard'
     | '/app/projects'
     | '/app/settings'
+    | '/app/tasks'
     | '/app/team'
     | '/app/'
   fileRoutesByTo: FileRoutesByTo
@@ -138,10 +158,12 @@ export interface FileRouteTypes {
     | '/signin'
     | '/signup'
     | '/app/assistant'
+    | '/app/billing'
     | '/app/board'
     | '/app/dashboard'
     | '/app/projects'
     | '/app/settings'
+    | '/app/tasks'
     | '/app/team'
     | '/app'
   id:
@@ -151,10 +173,12 @@ export interface FileRouteTypes {
     | '/signin'
     | '/signup'
     | '/app/assistant'
+    | '/app/billing'
     | '/app/board'
     | '/app/dashboard'
     | '/app/projects'
     | '/app/settings'
+    | '/app/tasks'
     | '/app/team'
     | '/app/'
   fileRoutesById: FileRoutesById
@@ -165,10 +189,12 @@ export interface RootRouteChildren {
   SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
   AppAssistantRoute: typeof AppAssistantRoute
+  AppBillingRoute: typeof AppBillingRoute
   AppBoardRoute: typeof AppBoardRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppProjectsRoute: typeof AppProjectsRoute
   AppSettingsRoute: typeof AppSettingsRoute
+  AppTasksRoute: typeof AppTasksRoute
   AppTeamRoute: typeof AppTeamRoute
   AppIndexRoute: typeof AppIndexRoute
 }
@@ -217,6 +243,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTeamRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/tasks': {
+      id: '/app/tasks'
+      path: '/app/tasks'
+      fullPath: '/app/tasks'
+      preLoaderRoute: typeof AppTasksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app/settings': {
       id: '/app/settings'
       path: '/app/settings'
@@ -245,6 +278,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBoardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/billing': {
+      id: '/app/billing'
+      path: '/app/billing'
+      fullPath: '/app/billing'
+      preLoaderRoute: typeof AppBillingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app/assistant': {
       id: '/app/assistant'
       path: '/app/assistant'
@@ -261,13 +301,25 @@ const rootRouteChildren: RootRouteChildren = {
   SigninRoute: SigninRoute,
   SignupRoute: SignupRoute,
   AppAssistantRoute: AppAssistantRoute,
+  AppBillingRoute: AppBillingRoute,
   AppBoardRoute: AppBoardRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppProjectsRoute: AppProjectsRoute,
   AppSettingsRoute: AppSettingsRoute,
+  AppTasksRoute: AppTasksRoute,
   AppTeamRoute: AppTeamRoute,
   AppIndexRoute: AppIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
