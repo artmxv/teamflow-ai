@@ -8,6 +8,7 @@ import { errorMiddleware } from "./middleware/error.middleware.js";
 import { notFoundMiddleware } from "./middleware/not-found.middleware.js";
 import { healthRouter } from "./routes/health.routes.js";
 import { projectsRouter } from "./routes/projects.routes.js";
+import { tasksRouter } from "./routes/tasks.routes.js";
 
 export const app = express();
 
@@ -21,6 +22,7 @@ if (env.NODE_ENV !== "production") {
 
 app.use("/api/health", healthRouter);
 app.use("/api/projects", projectsRouter);
+app.use("/api/tasks", tasksRouter);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
