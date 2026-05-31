@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Sparkles, Send, History, FolderKanban, FileText, ArrowUpRight } from "lucide-react";
 import { suggestedPrompts, projects } from "@/lib/mock-data";
 
-export const Route = createFileRoute("/app/assistant")({
+export const Route = createFileRoute("/app/ai")({
   head: () => ({ meta: [{ title: "AI Assistant — TeamFlow AI" }] }),
   component: AssistantPage,
 });
