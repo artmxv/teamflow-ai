@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { AvatarStack } from "@/components/app/Avatar";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
-import { projects, members, projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
+import { members, projectStatusMeta, type Project, type ProjectStatus } from "@/lib/mock-data";
+import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { Plus, Search, Calendar, ListTodo } from "lucide-react";
 
@@ -25,11 +27,34 @@ const filters: { key: "all" | ProjectStatus; labelKey: TKey }[] = [
   { key: "completed", labelKey: "projects.completed" },
 ];
 
+type ProjectCard = Pick<
+  Project,
+  "id" | "name" | "description" | "status" | "progress" | "openTasks" | "totalTasks" | "members" | "color" | "dueDate" | "updatedAt"
+>;
+
+const apiStatusMap: Record<ProjectApiStatus, ProjectStatus> = {
+  ACTIVE: "active",
+  PLANNING: "planning",
+  ON_HOLD: "on_hold",
+  COMPLETED: "completed",
+};
+
 function ProjectsPage() {
   const { t } = useI18n();
   const [filter, setFilter] = useState<"all" | ProjectStatus>("all");
   const [q, setQ] = useState("");
-  const [projectList, setProjectList] = useState(projects);
+  const [localProjects, setLocalProjects] = useState<ProjectCard[]>([]);
+  const {
+    data: apiProjects = [],
+    error,
+    isError,
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ["projects"],
+    queryFn: fetchProjects,
+  });
+  const projectList = [...localProjects, ...apiProjects.map(mapApiProjectToCard)];
   const filtered = projectList.filter(
     (p) =>
       (filter === "all" || p.status === filter) &&
@@ -43,7 +68,7 @@ function ProjectsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">{t("projects.projects")}</h1>
           <p className="text-sm text-muted-foreground">{t("projects.allProjects")} across your workspace.</p>
         </div>
-        <NewProjectDialog onCreate={(project) => setProjectList((current) => [project, ...current])}>
+        <NewProjectDialog onCreate={(project) => setLocalProjects((current) => [project, ...current])}>
           <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
             <Plus className="size-4" /> {t("common.newProject")}
           </Button>
@@ -78,8 +103,12 @@ function ProjectsPage() {
         </div>
       </div>
 
-      {filtered.length === 0 ? (
-        <EmptyState onCreate={(project) => setProjectList((current) => [project, ...current])} />
+      {isLoading ? (
+        <LoadingGrid />
+      ) : isError ? (
+        <ErrorState error={error} onRetry={() => void refetch()} />
+      ) : filtered.length === 0 ? (
+        <EmptyState onCreate={(project) => setLocalProjects((current) => [project, ...current])} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((p) => {
@@ -117,7 +146,58 @@ function ProjectsPage() {
   );
 }
 
-function EmptyState({ onCreate }: { onCreate: (project: (typeof projects)[number]) => void }) {
+function mapApiProjectToCard(project: ProjectApiItem): ProjectCard {
+  return {
+    id: project.id,
+    name: project.name,
+    description: project.description,
+    status: apiStatusMap[project.status],
+    progress: project.progress,
+    openTasks: project.openTasks,
+    totalTasks: project.totalTasks,
+    members: [],
+    color: project.color ?? "from-indigo-500 to-violet-500",
+    dueDate: formatDate(project.dueDate),
+    updatedAt: formatDate(project.updatedAt),
+  };
+}
+
+function formatDate(value: string | null) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString();
+}
+
+function LoadingGrid() {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+          <div className="h-2 w-12 animate-pulse rounded-full bg-muted" />
+          <div className="mt-4 h-5 w-2/3 animate-pulse rounded bg-muted" />
+          <div className="mt-2 h-4 w-full animate-pulse rounded bg-muted" />
+          <div className="mt-5 h-1.5 animate-pulse rounded-full bg-muted" />
+          <div className="mt-4 h-4 w-1/2 animate-pulse rounded bg-muted" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
+  return (
+    <div className="rounded-2xl border border-destructive/20 bg-card p-8 text-center shadow-soft">
+      <h3 className="text-base font-semibold">Projects could not load</h3>
+      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+        {error?.message ?? "Check that the backend is running and try again."}
+      </p>
+      <Button onClick={onRetry} className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
+        Retry
+      </Button>
+    </div>
+  );
+}
+
+function EmptyState({ onCreate }: { onCreate: (project: Project) => void }) {
   const { t } = useI18n();
 
   return (
