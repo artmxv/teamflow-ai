@@ -7,17 +7,22 @@ import {
   Settings,
   Sparkles,
   Plus,
+  ListChecks,
+  CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n, type TKey } from "@/lib/i18n";
 
-const nav = [
-  { to: "/app/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/app/projects", label: "Projects", icon: FolderKanban },
-  { to: "/app/board", label: "Kanban", icon: Trello },
-  { to: "/app/team", label: "Team", icon: Users },
-  { to: "/app/assistant", label: "AI Assistant", icon: Sparkles },
-  { to: "/app/settings", label: "Settings", icon: Settings },
-] as const;
+const nav: { to: string; key: TKey; icon: typeof LayoutDashboard }[] = [
+  { to: "/app/dashboard", key: "side.dashboard", icon: LayoutDashboard },
+  { to: "/app/projects", key: "side.projects", icon: FolderKanban },
+  { to: "/app/board", key: "side.kanban", icon: Trello },
+  { to: "/app/tasks", key: "side.tasks", icon: ListChecks },
+  { to: "/app/team", key: "side.team", icon: Users },
+  { to: "/app/assistant", key: "side.assistant", icon: Sparkles },
+  { to: "/app/settings", key: "side.settings", icon: Settings },
+  { to: "/app/billing", key: "side.billing", icon: CreditCard },
+];
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
