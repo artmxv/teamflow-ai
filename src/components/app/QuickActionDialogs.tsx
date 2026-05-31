@@ -1,5 +1,8 @@
 import { useState, type ReactNode } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +34,25 @@ import {
   type TaskStatus,
 } from "@/lib/mock-data";
 
+const projectSchema = z.object({
+  name: z.string().trim().min(2, "Project name must be at least 2 characters"),
+  description: z.string().max(300, "Description must be 300 characters or less").optional(),
+  status: z.enum(["planning", "active", "on_hold", "completed"]),
+});
+
+type ProjectFormValues = z.infer<typeof projectSchema>;
+
+const taskSchema = z.object({
+  title: z.string().trim().min(2, "Task title must be at least 2 characters"),
+  description: z.string().max(500, "Description must be 500 characters or less").optional(),
+  priority: z.enum(["low", "medium", "high", "urgent"]),
+  status: z.enum(["backlog", "todo", "in_progress", "review", "done"]),
+  assigneeId: z.string().min(1, "Assignee is required"),
+  dueDate: z.string().optional(),
+});
+
+type TaskFormValues = z.infer<typeof taskSchema>;
+
 type NewProjectDialogProps = {
   children: ReactNode;
   onCreate?: (project: Project) => void;
@@ -38,22 +60,28 @@ type NewProjectDialogProps = {
 
 export function NewProjectDialog({ children, onCreate }: NewProjectDialogProps) {
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [status, setStatus] = useState<ProjectStatus>("planning");
+  const {
+    control,
+    formState: { errors, isValid },
+    handleSubmit,
+    register,
+    reset,
+  } = useForm<ProjectFormValues>({
+    resolver: zodResolver(projectSchema),
+    mode: "onChange",
+    defaultValues: {
+      name: "",
+      description: "",
+      status: "planning",
+    },
+  });
 
-  function submit() {
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-      toast.error("Project name is required");
-      return;
-    }
-
+  function submit(values: ProjectFormValues) {
     onCreate?.({
       id: `p-${Date.now()}`,
-      name: trimmedName,
-      description: description.trim() || "New project created from the mock UI.",
-      status,
+      name: values.name.trim(),
+      description: values.description?.trim() || "New project created from the mock UI.",
+      status: values.status,
       progress: 0,
       openTasks: 0,
       totalTasks: 0,
@@ -63,9 +91,7 @@ export function NewProjectDialog({ children, onCreate }: NewProjectDialogProps) 
       updatedAt: "just now",
     });
     toast.success("Project created");
-    setName("");
-    setDescription("");
-    setStatus("planning");
+    reset();
     setOpen(false);
   }
 
@@ -77,39 +103,48 @@ export function NewProjectDialog({ children, onCreate }: NewProjectDialogProps) 
           <DialogTitle>New project</DialogTitle>
           <DialogDescription>Create a mock project for this browser session.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <Field label="Project name">
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Orion launch" />
+        <form onSubmit={handleSubmit(submit)} className="space-y-4">
+          <Field label="Project name" error={errors.name?.message}>
+            <Input {...register("name")} placeholder="Orion launch" />
           </Field>
-          <Field label="Description">
+          <Field label="Description" error={errors.description?.message}>
             <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              {...register("description")}
               placeholder="What is this project about?"
             />
           </Field>
-          <Field label="Status">
-            <Select value={status} onValueChange={(value) => setStatus(value as ProjectStatus)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="planning">Planning</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="on_hold">On hold</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-              </SelectContent>
-            </Select>
+          <Field label="Status" error={errors.status?.message}>
+            <Controller
+              control={control}
+              name="status"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={(value) => field.onChange(value as ProjectStatus)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="planning">Planning</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="on_hold">On hold</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
           </Field>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={submit} className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-            Create project
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={!isValid}
+              className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
+            >
+              Create project
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
@@ -123,30 +158,36 @@ type NewTaskDialogProps = {
 
 export function NewTaskDialog({ children, initialStatus = "todo", onCreate }: NewTaskDialogProps) {
   const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState<Priority>("medium");
-  const [status, setStatus] = useState<TaskStatus>(initialStatus);
-  const [assigneeId, setAssigneeId] = useState<string>(members[0].id);
-  const [dueDate, setDueDate] = useState("");
+  const {
+    control,
+    formState: { errors, isValid },
+    handleSubmit,
+    register,
+    reset,
+  } = useForm<TaskFormValues>({
+    resolver: zodResolver(taskSchema),
+    mode: "onChange",
+    defaultValues: {
+      title: "",
+      description: "",
+      priority: "medium",
+      status: initialStatus,
+      assigneeId: members[0].id,
+      dueDate: "",
+    },
+  });
 
-  function submit() {
-    const trimmedTitle = title.trim();
-    if (!trimmedTitle) {
-      toast.error("Task title is required");
-      return;
-    }
-
+  function submit(values: TaskFormValues) {
     onCreate?.({
       id: `t-${Date.now()}`,
       key: `TF-${Math.floor(Math.random() * 900 + 100)}`,
-      title: trimmedTitle,
-      description: description.trim() || "New task created from the mock UI.",
-      status,
-      priority,
-      assigneeId,
+      title: values.title.trim(),
+      description: values.description?.trim() || "New task created from the mock UI.",
+      status: values.status,
+      priority: values.priority,
+      assigneeId: values.assigneeId,
       projectId: projects[0].id,
-      dueDate: dueDate || null,
+      dueDate: values.dueDate || null,
       labels: ["New"],
       comments: [],
       checklist: [],
@@ -154,12 +195,14 @@ export function NewTaskDialog({ children, initialStatus = "todo", onCreate }: Ne
       attachments: [],
     });
     toast.success("Task created");
-    setTitle("");
-    setDescription("");
-    setPriority("medium");
-    setStatus(initialStatus);
-    setAssigneeId(members[0].id);
-    setDueDate("");
+    reset({
+      title: "",
+      description: "",
+      priority: "medium",
+      status: initialStatus,
+      assigneeId: members[0].id,
+      dueDate: "",
+    });
     setOpen(false);
   }
 
@@ -171,82 +214,106 @@ export function NewTaskDialog({ children, initialStatus = "todo", onCreate }: Ne
           <DialogTitle>New task</DialogTitle>
           <DialogDescription>Add a mock task to the current view.</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Title">
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Write release notes" />
+        <form onSubmit={handleSubmit(submit)} className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Title" error={errors.title?.message}>
+            <Input {...register("title")} placeholder="Write release notes" />
           </Field>
-          <Field label="Due date">
-            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          <Field label="Due date" error={errors.dueDate?.message}>
+            <Input type="date" {...register("dueDate")} />
           </Field>
           <div className="sm:col-span-2">
-            <Field label="Description">
+            <Field label="Description" error={errors.description?.message}>
               <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                {...register("description")}
                 placeholder="Add context for the team"
               />
             </Field>
           </div>
-          <Field label="Priority">
-            <Select value={priority} onValueChange={(value) => setPriority(value as Priority)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="urgent">Urgent</SelectItem>
-              </SelectContent>
-            </Select>
+          <Field label="Priority" error={errors.priority?.message}>
+            <Controller
+              control={control}
+              name="priority"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={(value) => field.onChange(value as Priority)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
           </Field>
-          <Field label="Status">
-            <Select value={status} onValueChange={(value) => setStatus(value as TaskStatus)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="backlog">Backlog</SelectItem>
-                <SelectItem value="todo">Todo</SelectItem>
-                <SelectItem value="in_progress">In progress</SelectItem>
-                <SelectItem value="review">Review</SelectItem>
-                <SelectItem value="done">Done</SelectItem>
-              </SelectContent>
-            </Select>
+          <Field label="Status" error={errors.status?.message}>
+            <Controller
+              control={control}
+              name="status"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={(value) => field.onChange(value as TaskStatus)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="backlog">Backlog</SelectItem>
+                    <SelectItem value="todo">Todo</SelectItem>
+                    <SelectItem value="in_progress">In progress</SelectItem>
+                    <SelectItem value="review">Review</SelectItem>
+                    <SelectItem value="done">Done</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
           </Field>
-          <Field label="Assignee">
-            <Select value={assigneeId} onValueChange={setAssigneeId}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {members.map((member) => (
-                  <SelectItem key={member.id} value={member.id}>
-                    {member.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Field label="Assignee" error={errors.assigneeId?.message}>
+            <Controller
+              control={control}
+              name="assigneeId"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select assignee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {members.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        {member.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
           </Field>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={submit} className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-            Create task
-          </Button>
-        </DialogFooter>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={!isValid}
+              className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
+            >
+              Create task
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
       {children}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
