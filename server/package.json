@@ -5,10 +5,18 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "db:seed": "tsx prisma/seed.ts",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit"
   },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
@@ -21,6 +29,7 @@
     "@types/express": "^5.0.0",
     "@types/morgan": "^1.9.9",
     "@types/node": "^22.16.5",
+    "prisma": "^6.19.3",
     "tsx": "^4.19.2",
     "typescript": "^5.8.3"
   }
