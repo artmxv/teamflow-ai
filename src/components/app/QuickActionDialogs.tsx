@@ -58,10 +58,11 @@ type TaskFormValues = z.infer<ReturnType<typeof getTaskSchema>>;
 
 type NewProjectDialogProps = {
   children: ReactNode;
-  onCreate?: (project: Project) => void;
+  isSubmitting?: boolean;
+  onCreate?: (project: Project) => void | Promise<void>;
 };
 
-export function NewProjectDialog({ children, onCreate }: NewProjectDialogProps) {
+export function NewProjectDialog({ children, isSubmitting = false, onCreate }: NewProjectDialogProps) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const {
@@ -80,23 +81,27 @@ export function NewProjectDialog({ children, onCreate }: NewProjectDialogProps) 
     },
   });
 
-  function submit(values: ProjectFormValues) {
-    onCreate?.({
-      id: `p-${Date.now()}`,
-      name: values.name.trim(),
-      description: values.description?.trim() || "New project created from the mock UI.",
-      status: values.status,
-      progress: 0,
-      openTasks: 0,
-      totalTasks: 0,
-      members: [members[0].id],
-      color: "from-indigo-500 to-violet-500",
-      dueDate: "2026-12-31",
-      updatedAt: "just now",
-    });
-    toast.success("Project created");
-    reset();
-    setOpen(false);
+  async function submit(values: ProjectFormValues) {
+    try {
+      await onCreate?.({
+        id: `p-${Date.now()}`,
+        name: values.name.trim(),
+        description: values.description?.trim() || "New project created from the mock UI.",
+        status: values.status,
+        progress: 0,
+        openTasks: 0,
+        totalTasks: 0,
+        members: [members[0].id],
+        color: "from-indigo-500 to-violet-500",
+        dueDate: "2026-12-31",
+        updatedAt: "just now",
+      });
+      toast.success("Project created");
+      reset();
+      setOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Project could not be created");
+    }
   }
 
   return (
@@ -142,7 +147,7 @@ export function NewProjectDialog({ children, onCreate }: NewProjectDialogProps) 
             </Button>
             <Button
               type="submit"
-              disabled={!isValid}
+              disabled={!isValid || isSubmitting}
               className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
             >
               {t("common.createProject")}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { AvatarStack } from "@/components/app/Avatar";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import { members, projectStatusMeta, type Project, type ProjectStatus } from "@/lib/mock-data";
-import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
+import {
+  createProject,
+  fetchProjects,
+  type ProjectApiItem,
+  type ProjectApiStatus,
+} from "@/lib/api/projects";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { Plus, Search, Calendar, ListTodo } from "lucide-react";
 
@@ -39,11 +44,18 @@ const apiStatusMap: Record<ProjectApiStatus, ProjectStatus> = {
   COMPLETED: "completed",
 };
 
+const projectStatusMap: Record<ProjectStatus, ProjectApiStatus> = {
+  active: "ACTIVE",
+  planning: "PLANNING",
+  on_hold: "ON_HOLD",
+  completed: "COMPLETED",
+};
+
 function ProjectsPage() {
   const { t } = useI18n();
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<"all" | ProjectStatus>("all");
   const [q, setQ] = useState("");
-  const [localProjects, setLocalProjects] = useState<ProjectCard[]>([]);
   const {
     data: apiProjects = [],
     error,
@@ -54,7 +66,14 @@ function ProjectsPage() {
     queryKey: ["projects"],
     queryFn: fetchProjects,
   });
-  const projectList = [...localProjects, ...apiProjects.map(mapApiProjectToCard)];
+  const createProjectMutation = useMutation({
+    mutationFn: createProject,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+  });
+  const workspaceId = apiProjects[0]?.workspace.id;
+  const projectList = apiProjects.map(mapApiProjectToCard);
   const filtered = projectList.filter(
     (p) =>
       (filter === "all" || p.status === filter) &&
@@ -68,7 +87,23 @@ function ProjectsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">{t("projects.projects")}</h1>
           <p className="text-sm text-muted-foreground">{t("projects.allProjects")} across your workspace.</p>
         </div>
-        <NewProjectDialog onCreate={(project) => setLocalProjects((current) => [project, ...current])}>
+        <NewProjectDialog
+          isSubmitting={createProjectMutation.isPending}
+          onCreate={async (project) => {
+            if (!workspaceId) {
+              throw new Error("Workspace is required. Load or seed a workspace before creating a project.");
+            }
+
+            await createProjectMutation.mutateAsync({
+              workspaceId,
+              name: project.name,
+              description: project.description,
+              status: projectStatusMap[project.status],
+              color: project.color,
+              dueDate: project.dueDate,
+            });
+          }}
+        >
           <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
             <Plus className="size-4" /> {t("common.newProject")}
           </Button>
@@ -108,7 +143,23 @@ function ProjectsPage() {
       ) : isError ? (
         <ErrorState error={error} onRetry={() => void refetch()} />
       ) : filtered.length === 0 ? (
-        <EmptyState onCreate={(project) => setLocalProjects((current) => [project, ...current])} />
+        <EmptyState
+          isSubmitting={createProjectMutation.isPending}
+          onCreate={async (project) => {
+            if (!workspaceId) {
+              throw new Error("Workspace is required. Load or seed a workspace before creating a project.");
+            }
+
+            await createProjectMutation.mutateAsync({
+              workspaceId,
+              name: project.name,
+              description: project.description,
+              status: projectStatusMap[project.status],
+              color: project.color,
+              dueDate: project.dueDate,
+            });
+          }}
+        />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((p) => {
@@ -197,7 +248,13 @@ function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => vo
   );
 }
 
-function EmptyState({ onCreate }: { onCreate: (project: Project) => void }) {
+function EmptyState({
+  isSubmitting,
+  onCreate,
+}: {
+  isSubmitting: boolean;
+  onCreate: (project: Project) => void | Promise<void>;
+}) {
   const { t } = useI18n();
 
   return (
@@ -209,7 +266,7 @@ function EmptyState({ onCreate }: { onCreate: (project: Project) => void }) {
       <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
         Create your first project to start tracking work, assigning owners, and shipping with your team.
       </p>
-      <NewProjectDialog onCreate={onCreate}>
+      <NewProjectDialog isSubmitting={isSubmitting} onCreate={onCreate}>
         <Button className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
           <Plus className="size-4" /> {t("common.createProject")}
         </Button>
