@@ -7,20 +7,47 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { LanguageSwitcher, useI18n } from "@/lib/i18n";
 import { ThemeToggle } from "@/lib/theme";
+import { toast } from "sonner";
+import type { Workspace } from "./AppShell";
 
-const workspaces = [
-  { id: "ws1", name: "Acme Studio", plan: "Pro", initials: "AC" },
-  { id: "ws2", name: "Northwind Labs", plan: "Free", initials: "NL" },
-  { id: "ws3", name: "Atlas Design Co.", plan: "Business", initials: "AD" },
+const notifications = [
+  { id: "n1", title: "Priya mentioned you", detail: "Review the billing edge case task." },
+  { id: "n2", title: "Sprint digest ready", detail: "12 tasks moved this week." },
+  { id: "n3", title: "Invite accepted", detail: "Lina joined Acme Studio." },
+  { id: "n4", title: "AI credits update", detail: "67% of monthly credits used." },
 ];
 
-export function AppTopbar({ title }: { title: string }) {
+export function AppTopbar({
+  title,
+  workspaces,
+  activeWorkspace,
+  onWorkspaceChange,
+}: {
+  title: string;
+  workspaces: Workspace[];
+  activeWorkspace: Workspace;
+  onWorkspaceChange: (workspace: Workspace) => void;
+}) {
   const { t } = useI18n();
-  const [active, setActive] = useState(workspaces[0]);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [unread, setUnread] = useState(notifications.length);
+
+  function markAllAsRead() {
+    setUnread(0);
+    toast.success("Notifications marked as read");
+  }
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur sm:gap-3 sm:px-6">
@@ -33,9 +60,9 @@ export function AppTopbar({ title }: { title: string }) {
         <DropdownMenuTrigger asChild>
           <button className="md:ml-2 flex items-center gap-2 rounded-lg border border-border bg-card px-2 py-1.5 text-sm transition hover:bg-secondary">
             <span className="grid size-6 place-items-center rounded-md bg-gradient-brand text-[10px] font-semibold text-white">
-              {active.initials}
+              {activeWorkspace.initials}
             </span>
-            <span className="hidden font-medium sm:inline">{active.name}</span>
+            <span className="hidden font-medium sm:inline">{activeWorkspace.name}</span>
             <ChevronDown className="size-3.5 text-muted-foreground" />
           </button>
         </DropdownMenuTrigger>
@@ -43,13 +70,13 @@ export function AppTopbar({ title }: { title: string }) {
           <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {workspaces.map((w) => (
-            <DropdownMenuItem key={w.id} onClick={() => setActive(w)} className="gap-2">
+            <DropdownMenuItem key={w.id} onClick={() => onWorkspaceChange(w)} className="gap-2">
               <span className="grid size-6 place-items-center rounded-md bg-gradient-brand text-[10px] font-semibold text-white">{w.initials}</span>
               <span className="flex-1">
                 <span className="block text-sm font-medium leading-tight">{w.name}</span>
                 <span className="block text-[11px] text-muted-foreground leading-tight">{w.plan}</span>
               </span>
-              {active.id === w.id && <Check className="size-4 text-primary" />}
+              {activeWorkspace.id === w.id && <Check className="size-4 text-primary" />}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
@@ -70,13 +97,43 @@ export function AppTopbar({ title }: { title: string }) {
       <div className="ml-auto flex items-center gap-1 lg:ml-0 lg:gap-2">
         <LanguageSwitcher />
         <ThemeToggle />
-        <button className="hidden sm:grid size-9 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground">
+        <button
+          onClick={() => setHelpOpen(true)}
+          className="hidden sm:grid size-9 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+        >
           <HelpCircle className="size-4" />
         </button>
-        <button className="relative grid size-9 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground">
-          <Bell className="size-4" />
-          <span className="absolute right-2 top-2 size-1.5 rounded-full bg-primary" />
-        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="relative grid size-9 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground">
+              <Bell className="size-4" />
+              {unread > 0 && <span className="absolute right-2 top-2 size-1.5 rounded-full bg-primary" />}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-80">
+            <DropdownMenuLabel className="flex items-center justify-between">
+              Notifications
+              <span className="text-[11px] font-normal text-muted-foreground">{unread} unread</span>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {notifications.map((item, index) => (
+              <DropdownMenuItem key={item.id} className="items-start gap-2 py-2">
+                <span
+                  className={
+                    "mt-1 size-2 rounded-full " +
+                    (index < unread ? "bg-primary" : "bg-muted")
+                  }
+                />
+                <span>
+                  <span className="block text-sm font-medium">{item.title}</span>
+                  <span className="block text-xs text-muted-foreground">{item.detail}</span>
+                </span>
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={markAllAsRead}>Mark all as read</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -97,12 +154,60 @@ export function AppTopbar({ title }: { title: string }) {
             <DropdownMenuItem asChild><Link to="/app/settings">Profile settings</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link to="/app/settings">Workspace settings</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link to="/app/billing">Billing</Link></DropdownMenuItem>
-            <DropdownMenuItem>Keyboard shortcuts</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setShortcutsOpen(true)}>Keyboard shortcuts</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild><Link to="/signin">Sign out</Link></DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>TeamFlow help</DialogTitle>
+            <DialogDescription>
+              This demo runs on mock data. Use the sidebar to explore projects, tasks, billing, and AI assistant flows.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+            Need help? Try opening the task board, filtering by assignee, or using the AI suggested prompts.
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </header>
+  );
+}
+
+export function KeyboardShortcutsDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Keyboard shortcuts</DialogTitle>
+          <DialogDescription>Quick actions available in the mock workspace.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2 text-sm">
+          {[
+            ["Cmd/Ctrl + K", "Search"],
+            ["N", "New task"],
+            ["G then D", "Dashboard"],
+            ["G then B", "Board"],
+          ].map(([keys, label]) => (
+            <div key={keys} className="flex items-center justify-between rounded-xl border border-border p-3">
+              <span className="text-muted-foreground">{label}</span>
+              <kbd className="rounded border border-border bg-card px-2 py-1 text-xs font-medium">{keys}</kbd>
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

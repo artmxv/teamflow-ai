@@ -1,4 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useState } from "react";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -12,6 +13,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n, type TKey } from "@/lib/i18n";
+import { NewProjectDialog } from "./QuickActionDialogs";
+import type { Workspace } from "./AppShell";
 
 const nav: { to: string; key: TKey; icon: typeof LayoutDashboard }[] = [
   { to: "/app/dashboard", key: "side.dashboard", icon: LayoutDashboard },
@@ -24,9 +27,10 @@ const nav: { to: string; key: TKey; icon: typeof LayoutDashboard }[] = [
   { to: "/app/billing", key: "side.billing", icon: CreditCard },
 ];
 
-export function AppSidebar() {
+export function AppSidebar({ activeWorkspace }: { activeWorkspace: Workspace }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { t } = useI18n();
+  const [selectedProject, setSelectedProject] = useState("Orion Web App");
 
   return (
     <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
@@ -44,11 +48,11 @@ export function AppSidebar() {
         <button className="flex w-full items-center justify-between rounded-xl border border-sidebar-border bg-card px-3 py-2 text-left text-sm transition hover:bg-sidebar-accent">
           <span className="flex items-center gap-2">
             <span className="grid size-6 place-items-center rounded-md bg-gradient-brand text-[10px] font-semibold text-white">
-              AC
+              {activeWorkspace.initials}
             </span>
-            <span className="font-medium">Acme Studio</span>
+            <span className="font-medium">{activeWorkspace.name}</span>
           </span>
-          <span className="text-xs text-muted-foreground">Pro</span>
+          <span className="text-xs text-muted-foreground">{activeWorkspace.plan}</span>
         </button>
       </div>
 
@@ -85,19 +89,26 @@ export function AppSidebar() {
         <ul className="space-y-0.5">
           {["Orion Web App", "Mobile App v3", "Marketing Site"].map((p) => (
             <li key={p}>
-              <a
-                href="#"
-                className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent/60"
+              <button
+                onClick={() => setSelectedProject(p)}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-sm hover:bg-sidebar-accent/60",
+                  selectedProject === p
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground/80",
+                )}
               >
                 <span className="size-2 rounded-full bg-gradient-brand" />
                 {p}
-              </a>
+              </button>
             </li>
           ))}
           <li>
-            <button className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground">
-              <Plus className="size-3.5" /> New project
-            </button>
+            <NewProjectDialog>
+              <button className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground">
+                <Plus className="size-3.5" /> New project
+              </button>
+            </NewProjectDialog>
           </li>
         </ul>
       </nav>
@@ -112,7 +123,7 @@ export function AppSidebar() {
         </div>
         <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
           <span>1,340 / 2,000</span>
-          <a className="text-primary hover:underline" href="#">Upgrade</a>
+          <Link className="text-primary hover:underline" to="/app/billing">Upgrade</Link>
         </div>
       </div>
     </aside>

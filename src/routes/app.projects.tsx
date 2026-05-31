@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { AvatarStack } from "@/components/app/Avatar";
+import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import { projects, members, projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
 import { Plus, Search, Calendar, ListTodo } from "lucide-react";
 
@@ -26,7 +27,8 @@ const filters: { key: "all" | ProjectStatus; label: string }[] = [
 function ProjectsPage() {
   const [filter, setFilter] = useState<"all" | ProjectStatus>("all");
   const [q, setQ] = useState("");
-  const filtered = projects.filter(
+  const [projectList, setProjectList] = useState(projects);
+  const filtered = projectList.filter(
     (p) =>
       (filter === "all" || p.status === filter) &&
       (q === "" || p.name.toLowerCase().includes(q.toLowerCase())),
@@ -39,9 +41,11 @@ function ProjectsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Projects</h1>
           <p className="text-sm text-muted-foreground">All projects across your workspace.</p>
         </div>
-        <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-          <Plus className="size-4" /> New project
-        </Button>
+        <NewProjectDialog onCreate={(project) => setProjectList((current) => [project, ...current])}>
+          <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+            <Plus className="size-4" /> New project
+          </Button>
+        </NewProjectDialog>
       </div>
 
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -73,7 +77,7 @@ function ProjectsPage() {
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyState />
+        <EmptyState onCreate={(project) => setProjectList((current) => [project, ...current])} />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((p) => {
@@ -111,7 +115,7 @@ function ProjectsPage() {
   );
 }
 
-function EmptyState() {
+function EmptyState({ onCreate }: { onCreate: (project: (typeof projects)[number]) => void }) {
   return (
     <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
       <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-accent text-accent-foreground">
@@ -121,9 +125,11 @@ function EmptyState() {
       <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
         Create your first project to start tracking work, assigning owners, and shipping with your team.
       </p>
-      <Button className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
-        <Plus className="size-4" /> Create project
-      </Button>
+      <NewProjectDialog onCreate={onCreate}>
+        <Button className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
+          <Plus className="size-4" /> Create project
+        </Button>
+      </NewProjectDialog>
     </div>
   );
 }

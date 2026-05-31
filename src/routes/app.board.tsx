@@ -1,10 +1,25 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/app/AppShell";
-import { tasks as allTasks, statusColumns, type Task, type TaskStatus } from "@/lib/mock-data";
+import {
+  members,
+  tasks as allTasks,
+  statusColumns,
+  type Priority,
+  type Task,
+  type TaskStatus,
+} from "@/lib/mock-data";
 import { TaskCard } from "@/components/app/TaskCard";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
+import { NewTaskDialog } from "@/components/app/QuickActionDialogs";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Filter, Plus } from "lucide-react";
 
 export const Route = createFileRoute("/app/board")({
@@ -14,6 +29,15 @@ export const Route = createFileRoute("/app/board")({
 
 function Board() {
   const [selected, setSelected] = useState<Task | null>(null);
+  const [taskList, setTaskList] = useState(allTasks);
+  const [priority, setPriority] = useState<Priority | "all">("all");
+  const [assignee, setAssignee] = useState<string>("all");
+
+  const filteredTasks = taskList.filter(
+    (task) =>
+      (priority === "all" || task.priority === priority) &&
+      (assignee === "all" || task.assigneeId === assignee),
+  );
 
   return (
     <AppShell title="Kanban board">
@@ -23,16 +47,60 @@ function Board() {
           <p className="text-sm text-muted-foreground">Orion Web App · 12 tasks active</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm"><Filter className="size-4" /> Filter</Button>
-          <Button size="sm" className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-            <Plus className="size-4" /> New task
+          <NewTaskDialog onCreate={(task) => setTaskList((current) => [task, ...current])}>
+            <Button size="sm" className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+              <Plus className="size-4" /> New task
+            </Button>
+          </NewTaskDialog>
+        </div>
+      </div>
+
+      <div className="mb-4 flex flex-col gap-2 rounded-2xl border border-border bg-card p-3 shadow-soft sm:flex-row sm:items-center">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Filter className="size-4 text-muted-foreground" /> Filters
+        </div>
+        <div className="grid gap-2 sm:ml-auto sm:grid-cols-3">
+          <Select value={priority} onValueChange={(value) => setPriority(value as Priority | "all")}>
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue placeholder="Priority" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All priority</SelectItem>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="urgent">Urgent</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={assignee} onValueChange={setAssignee}>
+            <SelectTrigger className="w-full sm:w-44">
+              <SelectValue placeholder="Assignee" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All assignees</SelectItem>
+              {members.map((member) => (
+                <SelectItem key={member.id} value={member.id}>
+                  {member.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setPriority("all");
+              setAssignee("all");
+            }}
+          >
+            Clear filters
           </Button>
         </div>
       </div>
 
       <div className="-mx-2 flex gap-3 overflow-x-auto px-2 pb-4">
         {statusColumns.map((col) => {
-          const colTasks = allTasks.filter((t) => t.status === col.key);
+          const colTasks = filteredTasks.filter((t) => t.status === col.key);
           return (
             <Column key={col.key} title={col.title} status={col.key} count={colTasks.length}>
               {colTasks.map((t) => (
@@ -43,9 +111,14 @@ function Board() {
                   Drop tasks here
                 </div>
               )}
-              <button className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-border py-2 text-xs text-muted-foreground transition hover:border-primary/30 hover:text-foreground">
-                <Plus className="size-3.5" /> Add task
-              </button>
+              <NewTaskDialog
+                initialStatus={col.key}
+                onCreate={(task) => setTaskList((current) => [task, ...current])}
+              >
+                <button className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-border py-2 text-xs text-muted-foreground transition hover:border-primary/30 hover:text-foreground">
+                  <Plus className="size-3.5" /> Add task
+                </button>
+              </NewTaskDialog>
             </Column>
           );
         })}
