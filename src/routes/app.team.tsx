@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useI18n } from "@/lib/i18n";
 import { Plus, MoreHorizontal } from "lucide-react";
 
 export const Route = createFileRoute("/app/team")({
@@ -49,20 +50,21 @@ const statusStyles = {
 } as const;
 
 function TeamPage() {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [profileMember, setProfileMember] = useState<Member | null>(null);
 
   return (
-    <AppShell title="Team">
+    <AppShell title={t("team.team")}>
       <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Team members</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("team.members")}</h1>
           <p className="text-sm text-muted-foreground">{members.length} people in Acme Studio.</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-              <Plus className="size-4" /> Invite member
+              <Plus className="size-4" /> {t("team.inviteMember")}
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -76,7 +78,7 @@ function TeamPage() {
                 <Input id="invite-email" placeholder="teammate@company.com" />
               </div>
               <div className="space-y-1.5">
-                <Label>Role</Label>
+                <Label>{t("team.role")}</Label>
                 <Select defaultValue="Member">
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -88,7 +90,7 @@ function TeamPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
               <Button onClick={() => setOpen(false)} className="bg-gradient-brand text-white">Send invite</Button>
             </DialogFooter>
           </DialogContent>
@@ -99,9 +101,9 @@ function TeamPage() {
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">
             <tr>
-              <th className="px-5 py-3 text-left">Member</th>
-              <th className="px-5 py-3 text-left">Role</th>
-              <th className="px-5 py-3 text-left">Status</th>
+              <th className="px-5 py-3 text-left">{t("team.members")}</th>
+              <th className="px-5 py-3 text-left">{t("team.role")}</th>
+              <th className="px-5 py-3 text-left">{t("team.status")}</th>
               <th className="px-5 py-3 text-left">Joined</th>
               <th className="px-5 py-3" />
             </tr>

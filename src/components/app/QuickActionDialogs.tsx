@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useI18n, type TKey } from "@/lib/i18n";
 import {
   members,
   projects,
@@ -34,24 +35,26 @@ import {
   type TaskStatus,
 } from "@/lib/mock-data";
 
-const projectSchema = z.object({
-  name: z.string().trim().min(2, "Project name must be at least 2 characters"),
-  description: z.string().max(300, "Description must be 300 characters or less").optional(),
+type Translate = (key: TKey) => string;
+
+const getProjectSchema = (t: Translate) => z.object({
+  name: z.string().trim().min(2, t("validation.projectNameMin")),
+  description: z.string().max(300, t("validation.projectDescriptionMax")).optional(),
   status: z.enum(["planning", "active", "on_hold", "completed"]),
 });
 
-type ProjectFormValues = z.infer<typeof projectSchema>;
+type ProjectFormValues = z.infer<ReturnType<typeof getProjectSchema>>;
 
-const taskSchema = z.object({
-  title: z.string().trim().min(2, "Task title must be at least 2 characters"),
-  description: z.string().max(500, "Description must be 500 characters or less").optional(),
+const getTaskSchema = (t: Translate) => z.object({
+  title: z.string().trim().min(2, t("validation.taskTitleMin")),
+  description: z.string().max(500, t("validation.taskDescriptionMax")).optional(),
   priority: z.enum(["low", "medium", "high", "urgent"]),
   status: z.enum(["backlog", "todo", "in_progress", "review", "done"]),
   assigneeId: z.string().min(1, "Assignee is required"),
   dueDate: z.string().optional(),
 });
 
-type TaskFormValues = z.infer<typeof taskSchema>;
+type TaskFormValues = z.infer<ReturnType<typeof getTaskSchema>>;
 
 type NewProjectDialogProps = {
   children: ReactNode;
@@ -59,6 +62,7 @@ type NewProjectDialogProps = {
 };
 
 export function NewProjectDialog({ children, onCreate }: NewProjectDialogProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const {
     control,
@@ -67,7 +71,7 @@ export function NewProjectDialog({ children, onCreate }: NewProjectDialogProps) 
     register,
     reset,
   } = useForm<ProjectFormValues>({
-    resolver: zodResolver(projectSchema),
+    resolver: zodResolver(getProjectSchema(t)),
     mode: "onChange",
     defaultValues: {
       name: "",
@@ -100,11 +104,11 @@ export function NewProjectDialog({ children, onCreate }: NewProjectDialogProps) 
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New project</DialogTitle>
+          <DialogTitle>{t("common.newProject")}</DialogTitle>
           <DialogDescription>Create a mock project for this browser session.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(submit)} className="space-y-4">
-          <Field label="Project name" error={errors.name?.message}>
+          <Field label={t("common.newProject")} error={errors.name?.message}>
             <Input {...register("name")} placeholder="Orion launch" />
           </Field>
           <Field label="Description" error={errors.description?.message}>
@@ -113,7 +117,7 @@ export function NewProjectDialog({ children, onCreate }: NewProjectDialogProps) 
               placeholder="What is this project about?"
             />
           </Field>
-          <Field label="Status" error={errors.status?.message}>
+          <Field label={t("tasks.status")} error={errors.status?.message}>
             <Controller
               control={control}
               name="status"
@@ -123,10 +127,10 @@ export function NewProjectDialog({ children, onCreate }: NewProjectDialogProps) 
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="planning">Planning</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="on_hold">On hold</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="planning">{t("projects.planning")}</SelectItem>
+                    <SelectItem value="active">{t("projects.active")}</SelectItem>
+                    <SelectItem value="on_hold">{t("projects.onHold")}</SelectItem>
+                    <SelectItem value="completed">{t("projects.completed")}</SelectItem>
                   </SelectContent>
                 </Select>
               )}
@@ -134,14 +138,14 @@ export function NewProjectDialog({ children, onCreate }: NewProjectDialogProps) 
           </Field>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               type="submit"
               disabled={!isValid}
               className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
             >
-              Create project
+              {t("common.createProject")}
             </Button>
           </DialogFooter>
         </form>
@@ -157,6 +161,7 @@ type NewTaskDialogProps = {
 };
 
 export function NewTaskDialog({ children, initialStatus = "todo", onCreate }: NewTaskDialogProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const {
     control,
@@ -165,7 +170,7 @@ export function NewTaskDialog({ children, initialStatus = "todo", onCreate }: Ne
     register,
     reset,
   } = useForm<TaskFormValues>({
-    resolver: zodResolver(taskSchema),
+    resolver: zodResolver(getTaskSchema(t)),
     mode: "onChange",
     defaultValues: {
       title: "",
@@ -211,15 +216,15 @@ export function NewTaskDialog({ children, initialStatus = "todo", onCreate }: Ne
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New task</DialogTitle>
+          <DialogTitle>{t("common.newTask")}</DialogTitle>
           <DialogDescription>Add a mock task to the current view.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(submit)} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Title" error={errors.title?.message}>
+          <Field label={t("tasks.task")} error={errors.title?.message}>
             <Input {...register("title")} placeholder="Write release notes" />
           </Field>
-          <Field label="Due date" error={errors.dueDate?.message}>
+          <Field label={t("tasks.dueDate")} error={errors.dueDate?.message}>
             <Input type="date" {...register("dueDate")} />
           </Field>
           <div className="sm:col-span-2">
@@ -230,7 +235,7 @@ export function NewTaskDialog({ children, initialStatus = "todo", onCreate }: Ne
               />
             </Field>
           </div>
-          <Field label="Priority" error={errors.priority?.message}>
+          <Field label={t("tasks.priority")} error={errors.priority?.message}>
             <Controller
               control={control}
               name="priority"
@@ -249,7 +254,7 @@ export function NewTaskDialog({ children, initialStatus = "todo", onCreate }: Ne
               )}
             />
           </Field>
-          <Field label="Status" error={errors.status?.message}>
+          <Field label={t("tasks.status")} error={errors.status?.message}>
             <Controller
               control={control}
               name="status"
@@ -259,17 +264,17 @@ export function NewTaskDialog({ children, initialStatus = "todo", onCreate }: Ne
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="backlog">Backlog</SelectItem>
-                    <SelectItem value="todo">Todo</SelectItem>
-                    <SelectItem value="in_progress">In progress</SelectItem>
-                    <SelectItem value="review">Review</SelectItem>
-                    <SelectItem value="done">Done</SelectItem>
+                    <SelectItem value="backlog">{t("board.backlog")}</SelectItem>
+                    <SelectItem value="todo">{t("board.todo")}</SelectItem>
+                    <SelectItem value="in_progress">{t("board.inProgress")}</SelectItem>
+                    <SelectItem value="review">{t("board.review")}</SelectItem>
+                    <SelectItem value="done">{t("board.done")}</SelectItem>
                   </SelectContent>
                 </Select>
               )}
             />
           </Field>
-          <Field label="Assignee" error={errors.assigneeId?.message}>
+          <Field label={t("tasks.assignee")} error={errors.assigneeId?.message}>
             <Controller
               control={control}
               name="assigneeId"
@@ -292,14 +297,14 @@ export function NewTaskDialog({ children, initialStatus = "todo", onCreate }: Ne
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               type="submit"
               disabled={!isValid}
               className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
             >
-              Create task
+              {t("common.createTask")}
             </Button>
           </DialogFooter>
         </form>

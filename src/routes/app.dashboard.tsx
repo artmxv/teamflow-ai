@@ -22,6 +22,7 @@ import { Avatar, AvatarStack } from "@/components/app/Avatar";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/lib/i18n";
 import {
   ChartContainer,
   ChartTooltip,
@@ -46,25 +47,26 @@ export const Route = createFileRoute("/app/dashboard")({
 const initialsMap = Object.fromEntries(members.map((m) => [m.id, m.avatar]));
 
 function Dashboard() {
+  const { t } = useI18n();
   const stats = [
-    { label: "Active projects", value: projects.filter((p) => p.status === "active").length, icon: FolderKanban, trend: "+2" },
-    { label: "Open tasks", value: 68, icon: ListTodo, trend: "+12" },
-    { label: "Completed", value: 142, icon: CheckCircle2, trend: "+27" },
-    { label: "Team members", value: members.length, icon: Users, trend: "+1" },
+    { label: t("dashboard.activeProjects"), value: projects.filter((p) => p.status === "active").length, icon: FolderKanban, trend: "+2" },
+    { label: t("dashboard.openTasks"), value: 68, icon: ListTodo, trend: "+12" },
+    { label: t("dashboard.completed"), value: 142, icon: CheckCircle2, trend: "+27" },
+    { label: t("dashboard.teamMembers"), value: members.length, icon: Users, trend: "+1" },
   ];
 
   return (
-    <AppShell title="Dashboard">
+    <AppShell title={t("side.dashboard")}>
       <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Good morning, Alex</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("dashboard.goodMorning")}</h1>
           <p className="text-sm text-muted-foreground">
             Here's what's moving across your workspace today.
           </p>
         </div>
         <NewProjectDialog>
           <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-            New project <ArrowUpRight className="size-4" />
+            {t("common.newProject")} <ArrowUpRight className="size-4" />
           </Button>
         </NewProjectDialog>
       </div>
@@ -90,17 +92,17 @@ function Dashboard() {
         <div className="rounded-2xl border border-border bg-card p-5 shadow-soft xl:col-span-2">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h2 className="text-base font-semibold">Weekly velocity</h2>
+              <h2 className="text-base font-semibold">{t("dashboard.weeklyVelocity")}</h2>
               <p className="text-xs text-muted-foreground">Tasks created vs completed</p>
             </div>
             <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-              <span className="flex items-center gap-1.5"><span className="size-2 rounded-sm bg-primary" /> Completed</span>
+              <span className="flex items-center gap-1.5"><span className="size-2 rounded-sm bg-primary" /> {t("dashboard.completed")}</span>
               <span className="flex items-center gap-1.5"><span className="size-2 rounded-sm bg-muted-foreground/40" /> Created</span>
             </div>
           </div>
           <ChartContainer
             config={{
-              completed: { label: "Completed", color: "var(--color-chart-1)" },
+              completed: { label: t("dashboard.completed"), color: "var(--color-chart-1)" },
               created: { label: "Created", color: "var(--color-muted-foreground)" },
             }}
             className="h-64 w-full"
@@ -117,7 +119,7 @@ function Dashboard() {
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-          <h2 className="text-base font-semibold">Task status</h2>
+          <h2 className="text-base font-semibold">{t("dashboard.taskStatus")}</h2>
           <p className="text-xs text-muted-foreground">Across all active projects</p>
           <ChartContainer config={{}} className="mx-auto h-56 w-full">
             <PieChart>
@@ -146,7 +148,7 @@ function Dashboard() {
       <div className="mt-6 grid gap-4 xl:grid-cols-3">
         <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/8 via-card to-card p-5 shadow-soft xl:col-span-1">
           <div className="flex items-center gap-2 text-sm font-semibold">
-            <Sparkles className="size-4 text-primary" /> AI insights
+            <Sparkles className="size-4 text-primary" /> {t("dashboard.aiInsights")}
           </div>
           <div className="mt-4 space-y-3 text-sm">
             <Insight
@@ -172,8 +174,8 @@ function Dashboard() {
 
         <div className="rounded-2xl border border-border bg-card p-5 shadow-soft xl:col-span-2">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-semibold">Project progress</h2>
-            <Link to="/app/projects" className="text-xs text-primary hover:underline">View all</Link>
+            <h2 className="text-base font-semibold">{t("dashboard.projectProgress")}</h2>
+            <Link to="/app/projects" className="text-xs text-primary hover:underline">{t("common.viewAll")}</Link>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {projects.slice(0, 4).map((p) => {
@@ -204,8 +206,8 @@ function Dashboard() {
 
       <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-soft">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-semibold">Recent activity</h2>
-          <Link to="/app/tasks" className="text-xs text-primary hover:underline">See all</Link>
+          <h2 className="text-base font-semibold">{t("dashboard.recentActivity")}</h2>
+          <Link to="/app/tasks" className="text-xs text-primary hover:underline">{t("common.seeAll")}</Link>
         </div>
         <ul className="divide-y divide-border">
           {activity.map((a) => {

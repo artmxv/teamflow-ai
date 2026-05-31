@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useI18n } from "@/lib/i18n";
 import { Check, CreditCard, Download, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/app/billing")({
@@ -30,14 +31,15 @@ const invoices = [
 ];
 
 function BillingPage() {
+  const { t } = useI18n();
   const [planOpen, setPlanOpen] = useState(false);
   const [seatsOpen, setSeatsOpen] = useState(false);
   const [cardOpen, setCardOpen] = useState(false);
 
   return (
-    <AppShell title="Billing">
+    <AppShell title={t("side.billing")}>
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Billing & plan</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("side.billing")}</h1>
         <p className="text-sm text-muted-foreground">Manage your workspace subscription, usage, and invoices.</p>
       </div>
 
@@ -52,9 +54,9 @@ function BillingPage() {
               <p className="text-sm text-muted-foreground">Billed monthly · 8 seats active</p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setPlanOpen(true)}>Change plan</Button>
+              <Button variant="outline" onClick={() => setPlanOpen(true)}>{t("common.changePlan")}</Button>
               <Button onClick={() => setSeatsOpen(true)} className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-                Add seats
+                {t("common.addSeats")}
               </Button>
             </div>
           </div>
@@ -86,8 +88,8 @@ function BillingPage() {
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         <div className="rounded-2xl border border-border bg-card p-6 shadow-soft lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-base font-semibold">Recent invoices</h3>
-            <Button variant="ghost" size="sm" onClick={() => toast.info("All mock invoices are already shown")}>View all</Button>
+            <h3 className="text-base font-semibold">{t("billing.billingHistory")}</h3>
+            <Button variant="ghost" size="sm" onClick={() => toast.info("All mock invoices are already shown")}>{t("common.viewAll")}</Button>
           </div>
           <ul className="divide-y divide-border">
             {invoices.map((inv) => (
