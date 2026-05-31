@@ -1,5 +1,14 @@
 import { prisma } from "../lib/prisma.js";
 
+type CreateProjectInput = {
+  workspaceId: string;
+  name: string;
+  description?: string;
+  status?: "PLANNING" | "ACTIVE" | "ON_HOLD" | "COMPLETED";
+  color?: string;
+  dueDate?: string | null;
+};
+
 export async function getProjects() {
   const projects = await prisma.project.findMany({
     orderBy: { updatedAt: "desc" },
@@ -42,4 +51,43 @@ export async function getProjects() {
       progress,
     };
   });
+}
+
+export async function createProject(input: CreateProjectInput) {
+  const project = await prisma.project.create({
+    data: {
+      workspaceId: input.workspaceId,
+      name: input.name,
+      description: input.description ?? "",
+      status: input.status ?? "PLANNING",
+      color: input.color,
+      dueDate: input.dueDate ? new Date(input.dueDate) : null,
+    },
+    select: {
+      id: true,
+      workspaceId: true,
+      name: true,
+      description: true,
+      status: true,
+      color: true,
+      dueDate: true,
+      createdAt: true,
+      updatedAt: true,
+      workspace: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+        },
+      },
+    },
+  });
+
+  return {
+    ...project,
+    tasks: [],
+    totalTasks: 0,
+    openTasks: 0,
+    progress: 0,
+  };
 }
