@@ -12,6 +12,9 @@ import {
   PlayCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LanguageSwitcher } from "@/lib/i18n";
+import { ThemeToggle } from "@/lib/theme";
+import { Github, Twitter, Linkedin } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -65,6 +68,8 @@ function SiteHeader() {
           <a href="#" className="hover:text-foreground">Docs</a>
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <LanguageSwitcher className="hidden sm:inline-flex" />
+          <ThemeToggle />
           <Link to="/signin" className="hidden text-sm font-medium text-muted-foreground hover:text-foreground sm:block">
             Sign in
           </Link>
