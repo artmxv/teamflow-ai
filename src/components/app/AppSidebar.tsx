@@ -7,20 +7,26 @@ import {
   Settings,
   Sparkles,
   Plus,
+  ListChecks,
+  CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n, type TKey } from "@/lib/i18n";
 
-const nav = [
-  { to: "/app/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/app/projects", label: "Projects", icon: FolderKanban },
-  { to: "/app/board", label: "Kanban", icon: Trello },
-  { to: "/app/team", label: "Team", icon: Users },
-  { to: "/app/assistant", label: "AI Assistant", icon: Sparkles },
-  { to: "/app/settings", label: "Settings", icon: Settings },
-] as const;
+const nav: { to: string; key: TKey; icon: typeof LayoutDashboard }[] = [
+  { to: "/app/dashboard", key: "side.dashboard", icon: LayoutDashboard },
+  { to: "/app/projects", key: "side.projects", icon: FolderKanban },
+  { to: "/app/board", key: "side.kanban", icon: Trello },
+  { to: "/app/tasks", key: "side.tasks", icon: ListChecks },
+  { to: "/app/team", key: "side.team", icon: Users },
+  { to: "/app/assistant", key: "side.assistant", icon: Sparkles },
+  { to: "/app/settings", key: "side.settings", icon: Settings },
+  { to: "/app/billing", key: "side.billing", icon: CreditCard },
+];
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { t } = useI18n();
 
   return (
     <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
@@ -48,7 +54,7 @@ export function AppSidebar() {
 
       <nav className="mt-6 flex-1 px-3">
         <div className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Workspace
+          {t("side.workspace")}
         </div>
         <ul className="space-y-0.5">
           {nav.map((item) => {
@@ -66,7 +72,7 @@ export function AppSidebar() {
                   )}
                 >
                   <Icon className={cn("size-4", active ? "text-primary" : "text-muted-foreground")} />
-                  {item.label}
+                  {t(item.key)}
                 </Link>
               </li>
             );
@@ -74,7 +80,7 @@ export function AppSidebar() {
         </ul>
 
         <div className="mt-8 px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Projects
+          {t("side.projects")}
         </div>
         <ul className="space-y-0.5">
           {["Orion Web App", "Mobile App v3", "Marketing Site"].map((p) => (

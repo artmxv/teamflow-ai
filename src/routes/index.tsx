@@ -12,6 +12,9 @@ import {
   PlayCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LanguageSwitcher } from "@/lib/i18n";
+import { ThemeToggle } from "@/lib/theme";
+import { Github, Twitter, Linkedin } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -65,6 +68,8 @@ function SiteHeader() {
           <a href="#" className="hover:text-foreground">Docs</a>
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <LanguageSwitcher className="hidden sm:inline-flex" />
+          <ThemeToggle />
           <Link to="/signin" className="hidden text-sm font-medium text-muted-foreground hover:text-foreground sm:block">
             Sign in
           </Link>
@@ -468,35 +473,58 @@ function CTA() {
 function SiteFooter() {
   return (
     <footer className="border-t border-border bg-muted/30">
-      <div className="mx-auto grid max-w-7xl gap-8 px-6 py-12 md:grid-cols-4">
-        <div>
-          <Link to="/" className="flex items-center gap-2">
-            <div className="grid size-8 place-items-center rounded-lg bg-gradient-brand">
-              <Sparkles className="size-4 text-white" />
-            </div>
-            <span className="text-base font-semibold tracking-tight">TeamFlow AI</span>
-          </Link>
-          <p className="mt-3 text-sm text-muted-foreground">
-            The AI-native project workspace for modern product teams.
-          </p>
-        </div>
-        {[
-          { h: "Product", links: ["Features", "Pricing", "Changelog", "Roadmap"] },
-          { h: "Company", links: ["About", "Careers", "Blog", "Contact"] },
-          { h: "Resources", links: ["Docs", "Guides", "Status", "Security"] },
-        ].map((col) => (
-          <div key={col.h}>
-            <div className="text-sm font-semibold">{col.h}</div>
-            <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-              {col.links.map((l) => (
-                <li key={l}><a href="#" className="hover:text-foreground">{l}</a></li>
+      <div className="mx-auto max-w-7xl px-6 py-12">
+        <div className="grid gap-10 md:grid-cols-12">
+          <div className="md:col-span-4">
+            <Link to="/" className="flex items-center gap-2">
+              <div className="grid size-8 place-items-center rounded-lg bg-gradient-brand">
+                <Sparkles className="size-4 text-white" />
+              </div>
+              <span className="text-base font-semibold tracking-tight">TeamFlow AI</span>
+            </Link>
+            <p className="mt-3 max-w-xs text-sm text-muted-foreground">
+              The AI-native project workspace for modern product teams.
+            </p>
+            <div className="mt-5 flex items-center gap-2">
+              {[Github, Twitter, Linkedin].map((Icon, i) => (
+                <a
+                  key={i}
+                  href="#"
+                  className="grid size-9 place-items-center rounded-lg border border-border bg-card text-muted-foreground transition hover:text-foreground"
+                >
+                  <Icon className="size-4" />
+                </a>
               ))}
-            </ul>
+            </div>
           </div>
-        ))}
+          <div className="grid grid-cols-2 gap-8 sm:grid-cols-4 md:col-span-8">
+            {[
+              { h: "Product", links: ["Features", "Pricing", "Changelog", "Roadmap"] },
+              { h: "Company", links: ["About", "Careers", "Blog", "Contact"] },
+              { h: "Resources", links: ["Docs", "Guides", "Status", "Security"] },
+              { h: "Legal", links: ["Privacy", "Terms", "DPA", "Cookies"] },
+            ].map((col) => (
+              <div key={col.h}>
+                <div className="text-sm font-semibold">{col.h}</div>
+                <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                  {col.links.map((l) => (
+                    <li key={l}><a href="#" className="hover:text-foreground">{l}</a></li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
-      <div className="border-t border-border py-5 text-center text-xs text-muted-foreground">
-        © 2026 TeamFlow Labs, Inc. · All rights reserved
+      <div className="border-t border-border">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-6 py-5 text-xs text-muted-foreground sm:flex-row">
+          <span>© 2026 TeamFlow Labs, Inc. · All rights reserved</span>
+          <span className="flex items-center gap-4">
+            <a href="#" className="hover:text-foreground">Privacy</a>
+            <a href="#" className="hover:text-foreground">Terms</a>
+            <a href="#" className="hover:text-foreground">Status</a>
+          </span>
+        </div>
       </div>
     </footer>
   );
