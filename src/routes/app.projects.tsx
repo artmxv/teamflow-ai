@@ -16,7 +16,7 @@ import {
   type ProjectApiStatus,
 } from "@/lib/api/projects";
 import { useI18n, type TKey } from "@/lib/i18n";
-import { Plus, Search, Calendar, ListTodo } from "lucide-react";
+import { Plus, Search, Calendar, ListTodo, FolderKanban, RotateCcw } from "lucide-react";
 
 export const Route = createFileRoute("/app/projects")({
   beforeLoad: requireAuth,
@@ -36,7 +36,17 @@ const filters: { key: "all" | ProjectStatus; labelKey: TKey }[] = [
 
 type ProjectCard = Pick<
   Project,
-  "id" | "name" | "description" | "status" | "progress" | "openTasks" | "totalTasks" | "members" | "color" | "dueDate" | "updatedAt"
+  | "id"
+  | "name"
+  | "description"
+  | "status"
+  | "progress"
+  | "openTasks"
+  | "totalTasks"
+  | "members"
+  | "color"
+  | "dueDate"
+  | "updatedAt"
 >;
 
 const apiStatusMap: Record<ProjectApiStatus, ProjectStatus> = {
@@ -81,19 +91,25 @@ function ProjectsPage() {
       (filter === "all" || p.status === filter) &&
       (q === "" || p.name.toLowerCase().includes(q.toLowerCase())),
   );
+  const hasActiveFilters = filter !== "all" || q !== "";
+  const isTrulyEmpty = projectList.length === 0;
 
   return (
     <AppShell title={t("projects.projects")}>
       <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{t("projects.projects")}</h1>
-          <p className="text-sm text-muted-foreground">{t("projects.allProjects")} across your workspace.</p>
+          <p className="text-sm text-muted-foreground">
+            {t("projects.allProjects")} across your workspace.
+          </p>
         </div>
         <NewProjectDialog
           isSubmitting={createProjectMutation.isPending}
           onCreate={async (project) => {
             if (!workspaceId) {
-              throw new Error("Workspace is required. Load or seed a workspace before creating a project.");
+              throw new Error(
+                "Workspace is required. Load or seed a workspace before creating a project.",
+              );
             }
 
             await createProjectMutation.mutateAsync({
@@ -145,23 +161,35 @@ function ProjectsPage() {
       ) : isError ? (
         <ErrorState error={error} onRetry={() => void refetch()} />
       ) : filtered.length === 0 ? (
-        <EmptyState
-          isSubmitting={createProjectMutation.isPending}
-          onCreate={async (project) => {
-            if (!workspaceId) {
-              throw new Error("Workspace is required. Load or seed a workspace before creating a project.");
-            }
+        isTrulyEmpty ? (
+          <EmptyState
+            isSubmitting={createProjectMutation.isPending}
+            onCreate={async (project) => {
+              if (!workspaceId) {
+                throw new Error(
+                  "Workspace is required. Load or seed a workspace before creating a project.",
+                );
+              }
 
-            await createProjectMutation.mutateAsync({
-              workspaceId,
-              name: project.name,
-              description: project.description,
-              status: projectStatusMap[project.status],
-              color: project.color,
-              dueDate: project.dueDate,
-            });
-          }}
-        />
+              await createProjectMutation.mutateAsync({
+                workspaceId,
+                name: project.name,
+                description: project.description,
+                status: projectStatusMap[project.status],
+                color: project.color,
+                dueDate: project.dueDate,
+              });
+            }}
+          />
+        ) : (
+          <NoResultsState
+            hasActiveFilters={hasActiveFilters}
+            onClearFilters={() => {
+              setFilter("all");
+              setQ("");
+            }}
+          />
+        )
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((p) => {
@@ -173,17 +201,26 @@ function ProjectsPage() {
               >
                 <div className="flex items-start justify-between">
                   <div className={"h-2 w-12 rounded-full bg-gradient-to-r " + p.color} />
-                  <Badge variant="secondary" className={meta.className + " border-0"}>{meta.label}</Badge>
+                  <Badge variant="secondary" className={meta.className + " border-0"}>
+                    {meta.label}
+                  </Badge>
                 </div>
                 <h3 className="mt-4 text-base font-semibold tracking-tight">{p.name}</h3>
                 <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{p.description}</p>
 
                 <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div className={"h-full rounded-full bg-gradient-to-r " + p.color} style={{ width: p.progress + "%" }} />
+                  <div
+                    className={"h-full rounded-full bg-gradient-to-r " + p.color}
+                    style={{ width: p.progress + "%" }}
+                  />
                 </div>
                 <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1"><ListTodo className="size-3" /> {p.openTasks} / {p.totalTasks}</span>
-                  <span className="inline-flex items-center gap-1"><Calendar className="size-3" /> Due {p.dueDate}</span>
+                  <span className="inline-flex items-center gap-1">
+                    <ListTodo className="size-3" /> {p.openTasks} / {p.totalTasks}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Calendar className="size-3" /> Due {p.dueDate}
+                  </span>
                 </div>
 
                 <div className="mt-4 flex items-center justify-between">
@@ -239,13 +276,42 @@ function LoadingGrid() {
 function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
   return (
     <div className="rounded-2xl border border-destructive/20 bg-card p-8 text-center shadow-soft">
-      <h3 className="text-base font-semibold">Projects could not load</h3>
+      <h3 className="text-base font-semibold">Could not load projects</h3>
       <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-        {error?.message ?? "Check that the backend is running and try again."}
+        {error?.message ??
+          "We could not reach the server. Check that the backend is running, then try again."}
       </p>
-      <Button onClick={onRetry} className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
+      <Button
+        onClick={onRetry}
+        className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95"
+      >
         Retry
       </Button>
+    </div>
+  );
+}
+
+function NoResultsState({
+  hasActiveFilters,
+  onClearFilters,
+}: {
+  hasActiveFilters: boolean;
+  onClearFilters: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
+      <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-muted text-muted-foreground">
+        <Search className="size-5" />
+      </div>
+      <h3 className="mt-4 text-base font-semibold">No projects match your search</h3>
+      <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+        Try a different keyword or status filter, or clear filters to see all projects.
+      </p>
+      {hasActiveFilters && (
+        <Button variant="outline" onClick={onClearFilters} className="mt-5">
+          <RotateCcw className="size-4" /> Clear filters
+        </Button>
+      )}
     </div>
   );
 }
@@ -262,11 +328,11 @@ function EmptyState({
   return (
     <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
       <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-accent text-accent-foreground">
-        <Plus className="size-5" />
+        <FolderKanban className="size-5" />
       </div>
       <h3 className="mt-4 text-base font-semibold">No projects yet</h3>
       <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-        Create your first project to start tracking work, assigning owners, and shipping with your team.
+        Create your first project to organize tasks, track progress, and collaborate with your team.
       </p>
       <NewProjectDialog isSubmitting={isSubmitting} onCreate={onCreate}>
         <Button className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
