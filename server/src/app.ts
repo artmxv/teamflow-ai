@@ -6,6 +6,7 @@ import morgan from "morgan";
 import { env } from "./config/env.js";
 import { errorMiddleware } from "./middleware/error.middleware.js";
 import { notFoundMiddleware } from "./middleware/not-found.middleware.js";
+import { dashboardRouter } from "./routes/dashboard.routes.js";
 import { healthRouter } from "./routes/health.routes.js";
 import { projectsRouter } from "./routes/projects.routes.js";
 import { tasksRouter } from "./routes/tasks.routes.js";
@@ -21,6 +22,7 @@ if (env.NODE_ENV !== "production") {
 }
 
 app.use("/api/health", healthRouter);
+app.use("/api/dashboard", dashboardRouter);
 app.use("/api/projects", projectsRouter);
 app.use("/api/tasks", tasksRouter);
 
