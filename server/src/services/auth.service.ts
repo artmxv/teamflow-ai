@@ -10,6 +10,9 @@ const BCRYPT_ROUNDS = 10;
 const publicUserSelect = {
   id: true,
   name: true,
+  displayName: true,
+  timezone: true,
+  bio: true,
   email: true,
   avatar: true,
   createdAt: true,
@@ -19,10 +22,20 @@ const publicUserSelect = {
 export type PublicUser = {
   id: string;
   name: string;
+  displayName: string | null;
+  timezone: string | null;
+  bio: string | null;
   email: string;
   avatar: string | null;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type UpdateUserProfileInput = {
+  name?: string;
+  displayName?: string;
+  timezone?: string;
+  bio?: string;
 };
 
 type JwtPayload = {
@@ -227,4 +240,45 @@ export async function getUserById(userId: string): Promise<PublicUser> {
   }
 
   return user;
+}
+
+function optionalStringToNull(value: string | undefined): string | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? null : trimmed;
+}
+
+export async function updateUserProfile(
+  userId: string,
+  input: UpdateUserProfileInput,
+): Promise<PublicUser> {
+  const data: Prisma.UserUpdateInput = {};
+
+  if (input.name !== undefined) {
+    data.name = input.name;
+  }
+  if (input.displayName !== undefined) {
+    data.displayName = optionalStringToNull(input.displayName);
+  }
+  if (input.timezone !== undefined) {
+    data.timezone = optionalStringToNull(input.timezone);
+  }
+  if (input.bio !== undefined) {
+    data.bio = optionalStringToNull(input.bio);
+  }
+
+  try {
+    return await prisma.user.update({
+      where: { id: userId },
+      data,
+      select: publicUserSelect,
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      throw new AuthError("Unauthorized", 401);
+    }
+    throw error;
+  }
 }
