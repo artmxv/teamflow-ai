@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { register } from "@/lib/api/auth";
 import { setAuthToken } from "@/lib/auth/token";
+import { PASSWORD_HELPER_TEXT, validatePassword } from "@/lib/validation/password";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [{ title: "Create account — TeamFlow AI" }] }),
@@ -21,6 +22,9 @@ function SignUp() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null);
 
   const registerMutation = useMutation({
     mutationFn: register,
@@ -59,6 +63,23 @@ function SignUp() {
             toast.error("Please enter your first and last name.");
             return;
           }
+
+          const passwordValidationError = validatePassword(password);
+          const passwordsMatch = password === confirmPassword;
+          setPasswordError(passwordValidationError);
+          setConfirmPasswordError(
+            passwordsMatch ? null : "Passwords do not match.",
+          );
+
+          if (passwordValidationError) {
+            toast.error(passwordValidationError);
+            return;
+          }
+          if (!passwordsMatch) {
+            toast.error("Passwords do not match.");
+            return;
+          }
+
           registerMutation.mutate({
             name,
             email: email.trim(),
@@ -118,11 +139,47 @@ function SignUp() {
             type="password"
             placeholder="At least 8 characters"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (passwordError) {
+                setPasswordError(validatePassword(e.target.value));
+              }
+            }}
+            onBlur={() => setPasswordError(validatePassword(password))}
             required
-            minLength={6}
+            minLength={8}
             autoComplete="new-password"
+            aria-invalid={passwordError ? true : undefined}
           />
+          <p className="text-xs text-muted-foreground">{PASSWORD_HELPER_TEXT}</p>
+          {passwordError && <p className="text-xs text-destructive">{passwordError}</p>}
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="confirm-password">Confirm password</Label>
+          <Input
+            id="confirm-password"
+            type="password"
+            placeholder="Re-enter your password"
+            value={confirmPassword}
+            onChange={(e) => {
+              setConfirmPassword(e.target.value);
+              if (confirmPasswordError && e.target.value === password) {
+                setConfirmPasswordError(null);
+              }
+            }}
+            onBlur={() => {
+              setConfirmPasswordError(
+                confirmPassword === password ? null : "Passwords do not match.",
+              );
+            }}
+            required
+            minLength={8}
+            autoComplete="new-password"
+            aria-invalid={confirmPasswordError ? true : undefined}
+          />
+          {confirmPasswordError && (
+            <p className="text-xs text-destructive">{confirmPasswordError}</p>
+          )}
         </div>
         <Button
           type="submit"

@@ -8,10 +8,26 @@ import {
   registerUser,
 } from "../services/auth.service.js";
 
+const registerPasswordSchema = z
+  .string()
+  .min(8, "password must be at least 8 characters")
+  .refine((value) => /[A-Z]/.test(value), {
+    message: "password must contain at least one uppercase letter",
+  })
+  .refine((value) => /[a-z]/.test(value), {
+    message: "password must contain at least one lowercase letter",
+  })
+  .refine((value) => /[0-9]/.test(value), {
+    message: "password must contain at least one number",
+  })
+  .refine((value) => /[^A-Za-z0-9]/.test(value), {
+    message: "password must contain at least one special character",
+  });
+
 const registerSchema = z.object({
   name: z.string().trim().min(2, "name must be at least 2 characters"),
   email: z.string().trim().email("email must be valid"),
-  password: z.string().min(6, "password must be at least 6 characters"),
+  password: registerPasswordSchema,
 });
 
 const loginSchema = z.object({
@@ -32,8 +48,9 @@ export async function registerController(req: Request, res: Response, next: Next
     const result = registerSchema.safeParse(req.body);
 
     if (!result.success) {
+      const firstIssue = result.error.issues[0];
       res.status(400).json({
-        message: "Invalid registration payload",
+        message: firstIssue?.message ?? "Invalid registration payload",
         issues: result.error.issues,
       });
       return;
