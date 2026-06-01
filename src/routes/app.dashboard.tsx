@@ -1,4 +1,6 @@
+import { useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
 import {
   FolderKanban,
@@ -7,22 +9,26 @@ import {
   Users,
   ArrowUpRight,
   Sparkles,
-  TrendingUp,
 } from "lucide-react";
 import {
   projects,
-  activity,
   members,
-  getMember,
   weeklyVelocity,
-  taskStatusCounts,
   projectStatusMeta,
 } from "@/lib/mock-data";
+import {
+  fetchDashboardSummary,
+  mapTaskStatusCountsForChart,
+  type DashboardRecentTask,
+  type DashboardTaskPriority,
+  type DashboardTaskStatus,
+} from "@/lib/api/dashboard";
 import { Avatar, AvatarStack } from "@/components/app/Avatar";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useI18n } from "@/lib/i18n";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useI18n, type TKey } from "@/lib/i18n";
 import {
   ChartContainer,
   ChartTooltip,
@@ -46,14 +52,48 @@ export const Route = createFileRoute("/app/dashboard")({
 
 const initialsMap = Object.fromEntries(members.map((m) => [m.id, m.avatar]));
 
+const recentStatusMeta: Record<DashboardTaskStatus, { labelKey: TKey; tone: string }> = {
+  BACKLOG: { labelKey: "board.backlog", tone: "bg-muted text-muted-foreground" },
+  TODO: { labelKey: "tasks.todo", tone: "bg-info/15 text-info" },
+  IN_PROGRESS: { labelKey: "tasks.inProgress", tone: "bg-primary/15 text-primary" },
+  REVIEW: { labelKey: "tasks.review", tone: "bg-warning/20 text-warning-foreground" },
+  DONE: { labelKey: "tasks.done", tone: "bg-success/15 text-success" },
+};
+
+const recentPriorityTone: Record<DashboardTaskPriority, string> = {
+  LOW: "bg-muted text-muted-foreground",
+  MEDIUM: "bg-info/15 text-info",
+  HIGH: "bg-warning/20 text-warning-foreground",
+  URGENT: "bg-destructive/15 text-destructive",
+};
+
+const recentPriorityLabel: Record<DashboardTaskPriority, string> = {
+  LOW: "low",
+  MEDIUM: "medium",
+  HIGH: "high",
+  URGENT: "urgent",
+};
+
 function Dashboard() {
   const { t } = useI18n();
-  const stats = [
-    { label: t("dashboard.activeProjects"), value: projects.filter((p) => p.status === "active").length, icon: FolderKanban, trend: "+2" },
-    { label: t("dashboard.openTasks"), value: 68, icon: ListTodo, trend: "+12" },
-    { label: t("dashboard.completed"), value: 142, icon: CheckCircle2, trend: "+27" },
-    { label: t("dashboard.teamMembers"), value: members.length, icon: Users, trend: "+1" },
-  ];
+  const { data, error, isError, isLoading, refetch } = useQuery({
+    queryKey: ["dashboard-summary"],
+    queryFn: fetchDashboardSummary,
+  });
+
+  const taskStatusChartData = useMemo(
+    () => (data ? mapTaskStatusCountsForChart(data.taskStatusCounts) : []),
+    [data],
+  );
+
+  const stats = data
+    ? [
+        { label: t("dashboard.activeProjects"), value: data.activeProjects, icon: FolderKanban },
+        { label: t("dashboard.openTasks"), value: data.openTasks, icon: ListTodo },
+        { label: t("dashboard.completed"), value: data.completedTasks, icon: CheckCircle2 },
+        { label: t("dashboard.teamMembers"), value: data.teamMembers, icon: Users },
+      ]
+    : [];
 
   return (
     <AppShell title={t("side.dashboard")}>
@@ -71,22 +111,23 @@ function Dashboard() {
         </NewProjectDialog>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {stats.map((s) => (
-          <div key={s.label} className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-            <div className="flex items-center justify-between">
+      {isLoading ? (
+        <StatCardSkeletons />
+      ) : isError ? (
+        <DashboardErrorState error={error} onRetry={() => void refetch()} />
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {stats.map((s) => (
+            <div key={s.label} className="rounded-2xl border border-border bg-card p-5 shadow-soft">
               <div className="grid size-9 place-items-center rounded-xl bg-accent text-accent-foreground">
                 <s.icon className="size-4" />
               </div>
-              <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">
-                <TrendingUp className="size-3" /> {s.trend}
-              </span>
+              <div className="mt-4 text-3xl font-semibold tracking-tight">{s.value}</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">{s.label}</div>
             </div>
-            <div className="mt-4 text-3xl font-semibold tracking-tight">{s.value}</div>
-            <div className="mt-0.5 text-xs text-muted-foreground">{s.label}</div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       <div className="mt-6 grid gap-4 xl:grid-cols-3">
         <div className="rounded-2xl border border-border bg-card p-5 shadow-soft xl:col-span-2">
@@ -121,27 +162,33 @@ function Dashboard() {
         <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
           <h2 className="text-base font-semibold">{t("dashboard.taskStatus")}</h2>
           <p className="text-xs text-muted-foreground">Across all active projects</p>
-          <ChartContainer config={{}} className="mx-auto h-56 w-full">
-            <PieChart>
-              <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-              <Pie data={taskStatusCounts} dataKey="value" nameKey="status" innerRadius={50} outerRadius={80} paddingAngle={2}>
-                {taskStatusCounts.map((entry, i) => (
-                  <Cell key={i} fill={entry.fill} />
+          {isLoading ? (
+            <TaskStatusChartSkeleton />
+          ) : isError ? null : (
+            <>
+              <ChartContainer config={{}} className="mx-auto h-56 w-full">
+                <PieChart>
+                  <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+                  <Pie data={taskStatusChartData} dataKey="value" nameKey="status" innerRadius={50} outerRadius={80} paddingAngle={2}>
+                    {taskStatusChartData.map((entry, i) => (
+                      <Cell key={i} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ChartContainer>
+              <ul className="space-y-1.5 text-xs">
+                {taskStatusChartData.map((s) => (
+                  <li key={s.status} className="flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <span className="size-2.5 rounded-sm" style={{ background: s.fill }} />
+                      {s.status}
+                    </span>
+                    <span className="font-medium text-muted-foreground">{s.value}</span>
+                  </li>
                 ))}
-              </Pie>
-            </PieChart>
-          </ChartContainer>
-          <ul className="space-y-1.5 text-xs">
-            {taskStatusCounts.map((s) => (
-              <li key={s.status} className="flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <span className="size-2.5 rounded-sm" style={{ background: s.fill }} />
-                  {s.status}
-                </span>
-                <span className="font-medium text-muted-foreground">{s.value}</span>
-              </li>
-            ))}
-          </ul>
+              </ul>
+            </>
+          )}
         </div>
       </div>
 
@@ -209,27 +256,132 @@ function Dashboard() {
           <h2 className="text-base font-semibold">{t("dashboard.recentActivity")}</h2>
           <Link to="/app/tasks" className="text-xs text-primary hover:underline">{t("common.seeAll")}</Link>
         </div>
-        <ul className="divide-y divide-border">
-          {activity.map((a) => {
-            const m = getMember(a.who);
-            return (
-              <li key={a.id} className="flex items-center gap-3 py-3 text-sm">
-                {m && <Avatar id={m.id} initials={m.avatar} />}
-                <div className="min-w-0 flex-1">
-                  <div className="truncate">
-                    <span className="font-medium">{m?.name}</span>{" "}
-                    <span className="text-muted-foreground">{a.action}</span>{" "}
-                    <span className="font-medium">{a.target}</span>
-                  </div>
-                  <div className="text-xs text-muted-foreground">{a.project}</div>
-                </div>
-                <div className="text-xs text-muted-foreground">{a.at}</div>
-              </li>
-            );
-          })}
-        </ul>
+        {isLoading ? (
+          <RecentTasksSkeleton />
+        ) : isError ? null : data && data.recentTasks.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            No recent task updates yet. Create or update a task to see activity here.
+          </p>
+        ) : (
+          <ul className="divide-y divide-border">
+            {data?.recentTasks.map((task) => (
+              <RecentTaskRow key={task.id} task={task} t={t} />
+            ))}
+          </ul>
+        )}
       </div>
     </AppShell>
+  );
+}
+
+function RecentTaskRow({ task, t }: { task: DashboardRecentTask; t: (key: TKey) => string }) {
+  const status = recentStatusMeta[task.status];
+  const assigneeInitials =
+    task.assignee?.avatar ?? (task.assignee ? initialsFromName(task.assignee.name) : null);
+
+  return (
+    <li className="flex items-center gap-3 py-3 text-sm">
+      {assigneeInitials ? (
+        <Avatar id={task.assignee!.id} initials={assigneeInitials} />
+      ) : (
+        <div className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
+          —
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">{task.key}</span>
+          <span className="truncate font-medium">{task.title}</span>
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span>{task.project.name}</span>
+          <Badge variant="secondary" className={status.tone + " border-0 capitalize"}>
+            {t(status.labelKey)}
+          </Badge>
+          <Badge variant="secondary" className={recentPriorityTone[task.priority] + " border-0 capitalize"}>
+            {recentPriorityLabel[task.priority]}
+          </Badge>
+        </div>
+      </div>
+      <div className="shrink-0 text-xs text-muted-foreground">{formatUpdatedAt(task.updatedAt)}</div>
+    </li>
+  );
+}
+
+function initialsFromName(name: string) {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function formatUpdatedAt(value: string) {
+  return new Date(value).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function StatCardSkeletons() {
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+          <Skeleton className="size-9 rounded-xl" />
+          <Skeleton className="mt-4 h-9 w-16" />
+          <Skeleton className="mt-2 h-3 w-24" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TaskStatusChartSkeleton() {
+  return (
+    <div className="mt-4 space-y-3">
+      <Skeleton className="mx-auto h-56 w-56 rounded-full" />
+      {Array.from({ length: 5 }).map((_, index) => (
+        <div key={index} className="flex items-center justify-between">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-3 w-8" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RecentTasksSkeleton() {
+  return (
+    <ul className="divide-y divide-border">
+      {Array.from({ length: 5 }).map((_, index) => (
+        <li key={index} className="flex items-center gap-3 py-3">
+          <Skeleton className="size-8 rounded-full" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-3 w-1/2" />
+          </div>
+          <Skeleton className="h-3 w-20" />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function DashboardErrorState({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
+  return (
+    <div className="rounded-2xl border border-destructive/20 bg-card p-8 text-center shadow-soft">
+      <h3 className="text-base font-semibold">Dashboard could not load</h3>
+      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+        {error?.message ?? "Check that the backend is running and try again."}
+      </p>
+      <Button onClick={onRetry} className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
+        Retry
+      </Button>
+    </div>
   );
 }
 
