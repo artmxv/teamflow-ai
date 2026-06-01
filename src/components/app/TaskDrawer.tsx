@@ -25,15 +25,20 @@ import {
   Paperclip,
   Plus,
   Check,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function TaskDrawer({
   task,
   onOpenChange,
+  onDelete,
+  isDeleting = false,
 }: {
   task: Task | null;
   onOpenChange: (open: boolean) => void;
+  onDelete?: (taskId: string) => void;
+  isDeleting?: boolean;
 }) {
   const [aiOpen, setAiOpen] = useState(false);
   if (!task) return null;
@@ -218,6 +223,27 @@ export function TaskDrawer({
                 ))}
               </div>
             </Field>
+            {onDelete && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                disabled={isDeleting}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Delete task "${task.title}"? This action cannot be undone.`,
+                    )
+                  ) {
+                    onDelete(task.id);
+                  }
+                }}
+              >
+                <Trash2 className="size-4" />
+                {isDeleting ? "Deleting…" : "Delete task"}
+              </Button>
+            )}
           </aside>
         </div>
       </SheetContent>
