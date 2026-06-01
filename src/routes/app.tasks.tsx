@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { requireAuth } from "@/lib/auth/route-guards";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
@@ -24,6 +25,7 @@ import { useI18n, type TKey } from "@/lib/i18n";
 import { Search, Plus, MessageSquare, Paperclip, Calendar } from "lucide-react";
 
 export const Route = createFileRoute("/app/tasks")({
+  beforeLoad: requireAuth,
   head: () => ({ meta: [{ title: "Tasks — TeamFlow AI" }] }),
   component: TasksPage,
 });

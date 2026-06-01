@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { requireAuth } from "@/lib/auth/route-guards";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { useI18n, type TKey } from "@/lib/i18n";
 import { Plus, Search, Calendar, ListTodo } from "lucide-react";
 
 export const Route = createFileRoute("/app/projects")({
+  beforeLoad: requireAuth,
   head: () => ({ meta: [{ title: "Projects — TeamFlow AI" }] }),
   component: ProjectsPage,
 });

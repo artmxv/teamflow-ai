@@ -1,16 +1,31 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
 import { getMe } from "@/lib/api/auth";
-import { getAuthToken } from "./token";
+import { clearAuthToken, getAuthToken } from "./token";
 
 export function useCurrentUser() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const hasToken = typeof window !== "undefined" && !!getAuthToken();
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ["auth", "me"],
     queryFn: getMe,
     enabled: hasToken,
     retry: false,
   });
+
+  useEffect(() => {
+    if (!hasToken || !query.isError) {
+      return;
+    }
+    clearAuthToken();
+    void queryClient.removeQueries({ queryKey: ["auth"] });
+    void router.navigate({ to: "/signin", replace: true });
+  }, [hasToken, query.isError, queryClient, router]);
+
+  return query;
 }
 
 export function nameToInitials(name: string): string {

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { requireAuth } from "@/lib/auth/route-guards";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
 import {
@@ -46,6 +47,7 @@ import {
 } from "recharts";
 
 export const Route = createFileRoute("/app/dashboard")({
+  beforeLoad: requireAuth,
   head: () => ({ meta: [{ title: "Dashboard — TeamFlow AI" }] }),
   component: Dashboard,
 });

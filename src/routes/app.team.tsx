@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { requireAuth } from "@/lib/auth/route-guards";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import { members, type Member, type Role } from "@/lib/mock-data";
@@ -34,6 +35,7 @@ import { useI18n } from "@/lib/i18n";
 import { Plus, MoreHorizontal } from "lucide-react";
 
 export const Route = createFileRoute("/app/team")({
+  beforeLoad: requireAuth,
   head: () => ({ meta: [{ title: "Team — TeamFlow AI" }] }),
   component: TeamPage,
 });
