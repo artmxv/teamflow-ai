@@ -1,376 +1,226 @@
 # TeamFlow AI
 
-Modern SaaS project management application with AI assistant, team workspaces, projects, tasks, Kanban board, analytics dashboard and team roles.
+Fullstack AI-native project workspace demo for product teams. TeamFlow AI combines a polished SaaS-style frontend with a real Express API, PostgreSQL, and seeded demo data so you can explore projects, tasks, a Kanban board, and dashboard metrics end to end.
 
-TeamFlow AI is a portfolio fullstack project focused on modern product development workflows. The current version includes a polished frontend prototype with mock data. The next development stages include real authentication, backend API, PostgreSQL database, Prisma ORM and AI integration.
+## Feature overview
 
-## Demo
+### Product and marketing
 
-Live demo: coming soon
-Repository: TeamFlow AI
+- Landing page with product overview sections
+- Auth screens (sign in, sign up, forgot password) as UI only
+- Dark/light theme toggle without a light flash on reload
+- EN/RU language toggle (UI)
 
-## Features
+### Workspace app (API-backed)
 
-### Marketing website
+- App shell with sidebar and topbar
+- **Projects**: list from API; create via **New Project**
+- **Tasks**: list from API; create via **New Task**
+- **Board**: Kanban columns from API; status changes persist via PATCH
+- **Task drawer**: view task details; delete task via API
+- **Dashboard**: summary metrics from API (active projects, open/done tasks, team count)
 
-- Landing page
-- Product overview
-- Feature sections
-- Pricing preview
-- Responsive layout
-- Dark/light theme support
-- EN/RU language switcher
+### Demo data
 
-### Application dashboard
+- Seed script loads a professional workspace with users, projects, and tasks
 
-- SaaS application layout
-- Sidebar navigation
-- Topbar with workspace controls
-- Dashboard metrics
-- Project progress widgets
-- Recent activity feed
-- AI insights section
-- Charts and analytics widgets
+### UI screens (not wired to the API yet)
 
-### Project management
+- AI Assistant, Team, Settings, and Billing pages use local/mock content for layout and UX exploration
 
-- Projects page
-- Project cards and list views
-- Project statuses
-- Progress indicators
-- Kanban board
-- Task cards
-- Task details drawer
-- Task priorities
-- Due dates
-- Assignees
-- Labels
-- Comments and attachments indicators
-
-### Team management
-
-- Team members page
-- User roles
-- Member status badges
-- Permissions overview
-- Invite member UI
-
-### AI Assistant
-
-- AI assistant page
-- Suggested prompts
-- Project context selector
-- AI answer cards
-- Weekly summary example
-- Generated checklist example
-
-### Settings and billing
-
-- Profile settings
-- Workspace settings
-- Language settings
-- Theme settings
-- Notification settings
-- Security settings
-- Billing page
-- Plan and usage cards
-- Billing history table
-
-## Tech Stack
+## Tech stack
 
 ### Frontend
 
-- React 19
-- TypeScript
-- TanStack Start
-- TanStack Router
-- TanStack Query
-- Vite
-- Tailwind CSS 4
-- shadcn/ui
-- Radix UI
-- Recharts
-- Lucide React
-- React Hook Form
-- Zod
+- TanStack Start, React 19, TypeScript
+- TanStack Router, TanStack Query
+- Tailwind CSS v4, shadcn/ui-style components (Radix UI)
+- Recharts, Sonner toasts
+- React Hook Form, Zod
+
+### Backend
+
+- Express, TypeScript
+- Prisma ORM, PostgreSQL
+- Docker Compose for local PostgreSQL
+- Zod request validation
 
 ### Tooling
 
-- ESLint
-- Prettier
-- npm
-- Git
-- GitHub
+- Vite, ESLint, Prettier, npm
 
-## Current Status
-
-The current version is a frontend prototype with mock data.
-
-Implemented:
-
-- Landing page
-- Auth pages
-- Internal app layout
-- Dashboard
-- Projects page
-- Kanban board
-- Tasks page
-- AI Assistant page
-- Team page
-- Settings page
-- Billing page
-- Theme toggle
-- Basic EN/RU language switcher
-- Mock data structure
-
-Not implemented yet:
-
-- Real authentication
-- Backend API
-- Database
-- Real user sessions
-- Real project/task CRUD
-- AI API integration
-- File uploads
-- Production deployment
-
-## Planned Backend Stack
-
-The next stage is to add a real backend:
-
-- Node.js
-- Express
-- PostgreSQL
-- Prisma ORM
-- JWT authentication
-- Zod validation
-- Docker
-- REST API
-- TanStack Query integration on frontend
-
-## Planned Database Models
-
-Planned main entities:
-
-- User
-- Workspace
-- WorkspaceMember
-- Project
-- Task
-- TaskComment
-- TaskActivity
-- Attachment
-- AiSummary
-- BillingPlan
-
-## Project Structure
+## Architecture overview
 
 ```text
-src/
-  components/
-    app/
-    auth/
-    ui/
-  hooks/
-  lib/
-  routes/
-  router.tsx
-  routeTree.gen.ts
-  server.ts
-  start.ts
-  styles.css
+Browser (TanStack Start + React)
+        |
+        |  HTTP (TanStack Query)
+        v
+Express REST API  (/api/*)
+        |
+        |  Prisma
+        v
+PostgreSQL (Docker, port 5433)
 ```
 
-Important files:
+- **Frontend** (`src/`): file-based routes, shared app components, API client in `src/lib/api/`. Default API base URL: `http://localhost:4000` (override with `VITE_API_URL`).
+- **Backend** (`server/`): Express app mounts routers under `/api`, services talk to Prisma, middleware handles errors and CORS.
+- **Database**: Prisma schema and migrations in `server/prisma/`; seed in `server/prisma/seed.ts`.
 
-```text
-src/routes/
-```
+Typical local ports: frontend **8080**, API **4000**, Postgres **5433**.
 
-Application pages and file-based routes.
+## API endpoints
 
-```text
-src/components/app/
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/health` | Health check |
+| GET | `/api/projects` | List projects |
+| POST | `/api/projects` | Create project |
+| GET | `/api/tasks` | List tasks |
+| POST | `/api/tasks` | Create task |
+| PATCH | `/api/tasks/:id` | Update task (e.g. status) |
+| DELETE | `/api/tasks/:id` | Delete task |
+| GET | `/api/dashboard/summary` | Dashboard summary metrics |
 
-Main reusable application components such as sidebar, topbar, app shell, task card and task drawer.
+## Local setup
 
-```text
-src/components/ui/
-```
+**Prerequisites:** Node.js 20+, npm, Docker (for PostgreSQL).
 
-shadcn/ui and Radix UI based components.
-
-```text
-src/lib/mock-data.ts
-```
-
-Mock data used by the current frontend prototype.
-
-```text
-src/lib/i18n.tsx
-```
-
-Basic language provider and EN/RU translation logic.
-
-```text
-src/lib/theme.tsx
-```
-
-Theme provider for dark/light mode.
-
-## Getting Started
-
-Install dependencies:
+From the repository root:
 
 ```bash
 npm install
 ```
 
-Run development server:
+Backend and database:
+
+```bash
+cd server
+cp .env.example .env
+npm install
+docker compose up -d
+npm run prisma:migrate
+npm run db:seed
+```
+
+Run the API (keep this terminal open):
 
 ```bash
 npm run dev
 ```
 
-Build for production:
-
-```bash
-npm run build
-```
-
-Preview production build:
-
-```bash
-npm run preview
-```
-
-## Available Scripts
+In a **second terminal**, from the repository root, start the frontend:
 
 ```bash
 npm run dev
 ```
 
-Starts the development server.
+Open the app at `http://localhost:8080`. The API runs at `http://localhost:4000`.
 
-```bash
-npm run build
+## Environment variables
+
+### Backend (`server/.env`)
+
+Copy from `server/.env.example`:
+
+| Variable | Description |
+|----------|-------------|
+| `PORT` | API port (default `4000`) |
+| `NODE_ENV` | e.g. `development` |
+| `CORS_ORIGIN` | Frontend origin (default `http://localhost:8080`) |
+| `DATABASE_URL` | PostgreSQL connection string for Prisma |
+
+Example `DATABASE_URL` (matches Docker Compose defaults):
+
+```text
+postgresql://teamflow:teamflow@localhost:5433/teamflow_ai?schema=public
 ```
 
-Builds the application for production.
+### Frontend (optional)
+
+| Variable | Description |
+|----------|-------------|
+| `VITE_API_URL` | API base URL if not `http://localhost:4000` |
+
+## Database setup and seed
+
+Start Postgres:
 
 ```bash
-npm run preview
+cd server
+docker compose up -d
 ```
 
-Runs a local preview of the production build.
+Apply migrations and load demo data:
 
 ```bash
-npm run lint
+cd server
+npm run prisma:migrate
+npm run db:seed
 ```
 
-Runs ESLint.
+Other useful commands (from `server/`):
 
 ```bash
-npm run format
+npm run prisma:generate   # Regenerate Prisma Client
+npm run prisma:studio     # Open Prisma Studio
 ```
 
-Formats the project with Prettier.
+## Available scripts
 
-## Roadmap
+### Root (frontend)
 
-### Stage 1 — Frontend prototype
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Start frontend dev server |
+| `npm run build` | Production build |
+| `npm run preview` | Preview production build |
+| `npm run lint` | Run ESLint |
+| `npm run format` | Format with Prettier |
 
-- [x] Generate initial UI prototype
-- [x] Add landing page
-- [x] Add internal app screens
-- [x] Add mock data
-- [x] Add dashboard, projects, tasks and Kanban pages
-- [x] Add AI Assistant mock page
-- [x] Add team, settings and billing pages
+### `server/` (backend)
 
-### Stage 2 — Frontend cleanup
+| Script | Description |
+|--------|-------------|
+| `npm run dev` | Start API with hot reload |
+| `npm run build` | Compile TypeScript |
+| `npm run start` | Run compiled server |
+| `npm run typecheck` | Typecheck without emit |
+| `npm run prisma:migrate` | Run Prisma migrations (dev) |
+| `npm run prisma:generate` | Generate Prisma Client |
+| `npm run prisma:studio` | Prisma Studio |
+| `npm run db:seed` | Seed demo workspace data |
 
-- [x] Add frontend mock interactions
-- [x] Add create project modal logic
-- [x] Add create task modal logic
-- [x] Add local state for quick actions
-- [x] Add React Hook Form and Zod validation
-- [x] Improve EN/RU translations
-- [x] Add notifications dropdown
-- [x] Add workspace switcher interactions
-- [x] Add billing/settings/team mock actions
-- [ ] Clean mock data structure
-- [ ] Improve responsive layout
-- [ ] Add screenshots to README
+## Current limitations and roadmap
 
-### Stage 2.5 — Backend preparation
+**Not implemented yet:**
 
-- [ ] Review current mock data structure
-- [ ] Align frontend types with future backend models
-- [ ] Design database schema
-- [ ] Define API endpoints
-- [ ] Prepare server folder structure
-- [ ] Decide environment variables
-- [ ] Prepare local PostgreSQL setup
+- Real authentication and sessions
+- Production authorization and workspace scoping per user
+- Real AI assistant integration (LLM/API)
+- Deployment configuration
+- Drag-and-drop Kanban
+- File uploads
 
-### Stage 3 — Backend API
+**Possible next steps:**
 
-- [ ] Add Express server
-- [ ] Add Prisma ORM
-- [ ] Add PostgreSQL database
-- [ ] Add environment config
-- [ ] Add User model
-- [ ] Add Workspace model
-- [ ] Add WorkspaceMember model
-- [ ] Add Project model
-- [ ] Add Task model
-- [ ] Add TaskComment model
-- [ ] Add ActivityLog model
-- [ ] Add authentication routes
-- [ ] Add JWT access token flow
-- [ ] Add protected routes middleware
-- [ ] Add CRUD API for projects
-- [ ] Add CRUD API for tasks
-- [ ] Add validation with Zod
+- JWT auth and protected routes
+- Wire remaining screens (Team, Settings, AI) to the API
+- Workspace-aware queries and multi-tenant safety
+- AI summaries backed by stored `AiSummary` records
+- CI, Docker for the API, and a hosted demo
 
-### Stage 4 — Frontend and backend integration
+## Portfolio note
 
-- [ ] Replace mock data with API calls
-- [ ] Add TanStack Query hooks
-- [ ] Add loading states
-- [ ] Add error states
-- [ ] Add form validation
-- [ ] Add optimistic updates
+This repository demonstrates fullstack TypeScript product work suitable for a portfolio or technical interview:
 
-### Stage 5 — AI features
+- Modern React app structure (TanStack Start, Router, Query)
+- SaaS dashboard UX (layout, forms, charts, toasts, theming)
+- REST API design with Express, validation, and clear route layering
+- PostgreSQL modeling with Prisma (migrations, seed, relations)
+- Frontend-to-backend integration for core CRUD flows (projects, tasks, board, dashboard)
+- Honest scoping: auth, AI, and deployment called out as future work rather than implied
 
-- [ ] Add AI summary endpoint
-- [ ] Add generated task checklist
-- [ ] Add project weekly summary
-- [ ] Add AI assistant chat history
+---
 
-### Stage 6 — Production
-
-- [ ] Add Docker configuration
-- [ ] Add environment variables
-- [ ] Add deployment
-- [ ] Add demo user
-- [ ] Add screenshots
-- [ ] Make repository public
-
-## Portfolio Goal
-
-This project is designed to demonstrate skills required for a Middle Fullstack JavaScript Developer role:
-
-- Modern React application architecture
-- TypeScript usage
-- File-based routing
-- SaaS dashboard UI
-- Component-based development
-- Mock-to-API migration plan
-- Backend API planning
-- Authentication planning
-- Database modeling
-- AI feature integration planning
-- Production-oriented project structure
+**Live demo:** coming soon
