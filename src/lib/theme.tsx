@@ -29,7 +29,11 @@ const Ctx = createContext<{ theme: Theme; toggle: () => void; setTheme: (t: Them
 });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(readThemeFromDocument);
+  // Important for SSR/hydration consistency:
+  // - SSR can't know user's theme, so the server-rendered tree is effectively "light".
+  // - THEME_INIT_SCRIPT applies the correct <html class="dark"> before hydration to avoid flash.
+  // - We keep the first client render aligned with SSR ("light") and then sync in an effect.
+  const [theme, setThemeState] = useState<Theme>("light");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -49,7 +53,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ theme, setTheme: apply, toggle: () => apply(theme === "dark" ? "light" : "dark") }}>
+    <Ctx.Provider
+      value={{ theme, setTheme: apply, toggle: () => apply(theme === "dark" ? "light" : "dark") }}
+    >
       {children}
     </Ctx.Provider>
   );
