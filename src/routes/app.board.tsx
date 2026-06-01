@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import {
   members,
@@ -11,7 +12,7 @@ import {
 } from "@/lib/mock-data";
 import { TaskCard } from "@/components/app/TaskCard";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
-import { NewTaskDialog } from "@/components/app/QuickActionDialogs";
+import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -20,7 +21,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { fetchTasks, type TaskApiItem, type TaskApiPriority, type TaskApiStatus } from "@/lib/api/tasks";
+import {
+  createTask,
+  fetchTasks,
+  taskPriorityToApi,
+  taskStatusToApi,
+  type TaskApiItem,
+  type TaskApiPriority,
+  type TaskApiStatus,
+} from "@/lib/api/tasks";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { Filter, Plus } from "lucide-react";
 
@@ -46,8 +55,8 @@ const apiPriorityMap: Record<TaskApiPriority, Priority> = {
 
 function Board() {
   const { t } = useI18n();
+  const queryClient = useQueryClient();
   const [selected, setSelected] = useState<Task | null>(null);
-  const [localTasks, setLocalTasks] = useState<Task[]>([]);
   const [priority, setPriority] = useState<Priority | "all">("all");
   const [assignee, setAssignee] = useState<string>("all");
   const {
@@ -60,7 +69,37 @@ function Board() {
     queryKey: ["tasks"],
     queryFn: fetchTasks,
   });
-  const taskList = [...localTasks, ...apiTasks.map(mapApiTaskToTask)];
+  const createTaskMutation = useMutation({
+    mutationFn: createTask,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      toast.success("Task created");
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Task could not be created",
+      );
+    },
+  });
+  const projectId = apiTasks[0]?.projectId;
+  const taskList = apiTasks.map(mapApiTaskToTask);
+
+  async function handleCreateTask(values: TaskFormValues) {
+    if (!projectId) {
+      toast.error("A project is required. Load tasks from the API or seed the database first.");
+      throw new Error("Project is required.");
+    }
+
+    await createTaskMutation.mutateAsync({
+      projectId,
+      title: values.title.trim(),
+      description: values.description?.trim() || undefined,
+      status: taskStatusToApi[values.status],
+      priority: taskPriorityToApi[values.priority],
+      assigneeId: values.assigneeId || null,
+      dueDate: values.dueDate || null,
+    });
+  }
 
   const filteredTasks = taskList.filter(
     (task) =>
@@ -76,7 +115,7 @@ function Board() {
           <p className="text-sm text-muted-foreground">Orion Web App · 12 tasks active</p>
         </div>
         <div className="flex gap-2">
-          <NewTaskDialog onCreate={(task) => setLocalTasks((current) => [task, ...current])}>
+          <NewTaskDialog isSubmitting={createTaskMutation.isPending} onSubmit={handleCreateTask}>
             <Button size="sm" className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
               <Plus className="size-4" /> {t("common.newTask")}
             </Button>
@@ -151,7 +190,8 @@ function Board() {
                 )}
                 <NewTaskDialog
                   initialStatus={col.key}
-                  onCreate={(task) => setLocalTasks((current) => [task, ...current])}
+                  isSubmitting={createTaskMutation.isPending}
+                  onSubmit={handleCreateTask}
                 >
                   <button className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-border py-2 text-xs text-muted-foreground transition hover:border-primary/30 hover:text-foreground">
                     <Plus className="size-3.5" /> {t("board.addNewCard")}
