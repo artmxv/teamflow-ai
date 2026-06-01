@@ -5,11 +5,14 @@ import {
   type TaskStatus,
   type WorkspaceRole,
 } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 const DEMO_WORKSPACE_SLUG = "acme-studio";
-const DEMO_PASSWORD_HASH = "demo-password-hash";
+const DEMO_PRIMARY_EMAIL = "alex@teamflow.ai";
+const DEMO_PRIMARY_PASSWORD = "Password123!";
+const BCRYPT_ROUNDS = 10;
 
 type DemoUserSeed = {
   name: string;
@@ -19,7 +22,7 @@ type DemoUserSeed = {
 };
 
 const DEMO_USERS: DemoUserSeed[] = [
-  { name: "Alex Morgan", email: "alex@acme.teamflow.ai", avatar: "AM", role: "OWNER" },
+  { name: "Alex Morgan", email: DEMO_PRIMARY_EMAIL, avatar: "AM", role: "OWNER" },
   { name: "Priya Shah", email: "priya@acme.teamflow.ai", avatar: "PS", role: "ADMIN" },
   { name: "Marcus Chen", email: "marcus@acme.teamflow.ai", avatar: "MC", role: "MEMBER" },
   { name: "Sofia Reyes", email: "sofia@acme.teamflow.ai", avatar: "SR", role: "MEMBER" },
@@ -94,7 +97,7 @@ const DEMO_TASKS: DemoTaskSeed[] = [
     description: "Document first-run steps for workspace owners and invited members.",
     status: "TODO",
     priority: "HIGH",
-    assigneeEmail: "alex@acme.teamflow.ai",
+    assigneeEmail: DEMO_PRIMARY_EMAIL,
     dueInDays: 7,
     updatedInDays: 0,
   },
@@ -175,7 +178,7 @@ const DEMO_TASKS: DemoTaskSeed[] = [
     title: "Update homepage hero messaging",
     status: "IN_PROGRESS",
     priority: "MEDIUM",
-    assigneeEmail: "alex@acme.teamflow.ai",
+    assigneeEmail: DEMO_PRIMARY_EMAIL,
     dueInDays: 8,
     updatedInDays: 0,
   },
@@ -212,7 +215,7 @@ const DEMO_TASKS: DemoTaskSeed[] = [
     title: "Migrate legacy job queue workers",
     status: "IN_PROGRESS",
     priority: "URGENT",
-    assigneeEmail: "alex@acme.teamflow.ai",
+    assigneeEmail: DEMO_PRIMARY_EMAIL,
     dueInDays: 9,
     updatedInDays: 0,
   },
@@ -255,15 +258,21 @@ async function resetDatabase() {
 
 async function seedDemoWorkspace() {
   const now = new Date();
+  const demoPrimaryPasswordHash = await bcrypt.hash(DEMO_PRIMARY_PASSWORD, BCRYPT_ROUNDS);
 
   const usersByEmail = new Map<string, { id: string; name: string }>();
 
   for (const member of DEMO_USERS) {
+    const passwordHash =
+      member.email === DEMO_PRIMARY_EMAIL
+        ? demoPrimaryPasswordHash
+        : await bcrypt.hash(`seed-only-${member.email}`, BCRYPT_ROUNDS);
+
     const user = await prisma.user.create({
       data: {
         name: member.name,
         email: member.email,
-        passwordHash: DEMO_PASSWORD_HASH,
+        passwordHash,
         avatar: member.avatar,
       },
       select: { id: true, name: true, email: true },
@@ -343,7 +352,7 @@ async function seedDemoWorkspace() {
     return task;
   };
 
-  const alex = usersByEmail.get("alex@acme.teamflow.ai")!;
+  const alex = usersByEmail.get(DEMO_PRIMARY_EMAIL)!;
   const priya = usersByEmail.get("priya@acme.teamflow.ai")!;
   const marcus = usersByEmail.get("marcus@acme.teamflow.ai")!;
 
