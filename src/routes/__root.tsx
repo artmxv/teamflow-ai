@@ -11,7 +11,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { ThemeProvider } from "../lib/theme";
+import { THEME_INIT_SCRIPT, ThemeProvider } from "../lib/theme";
 import { LanguageProvider } from "../lib/i18n";
 import { Toaster } from "../components/ui/sonner";
 
@@ -109,6 +109,7 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <HeadContent />
       </head>
       <body>
