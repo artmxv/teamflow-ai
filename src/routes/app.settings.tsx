@@ -1,6 +1,7 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { requireAuth } from "@/lib/auth/route-guards";
-import { useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import { KeyboardShortcutsDialog } from "@/components/app/AppTopbar";
@@ -19,9 +20,11 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@/lib/i18n";
+import { updateProfile } from "@/lib/api/auth";
+import { updateWorkspace } from "@/lib/api/workspace";
 import { nameToInitials, useCurrentUser } from "@/lib/auth/use-current-user";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CreditCard, Check } from "lucide-react";
+import { CreditCard, Check, Loader2 } from "lucide-react";
 
 function workspaceUrlFromSlug(slug: string): string {
   return `${slug}.teamflow.ai`;
@@ -37,15 +40,130 @@ export const Route = createFileRoute("/app/settings")({
   component: SettingsPage,
 });
 
+type ProfileFormState = {
+  name: string;
+  displayName: string;
+  timezone: string;
+  bio: string;
+};
+
+type WorkspaceFormState = {
+  name: string;
+  industry: string;
+  teamSize: string;
+};
+
 function SettingsPage() {
   const { t } = useI18n();
+  const queryClient = useQueryClient();
   const { data: me, isPending } = useCurrentUser();
   const user = me?.user;
   const workspace = me?.workspace;
   const userInitials = user ? nameToInitials(user.name) : "…";
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [seatsOpen, setSeatsOpen] = useState(false);
   const [cardOpen, setCardOpen] = useState(false);
+  const [profileForm, setProfileForm] = useState<ProfileFormState | null>(null);
+  const [workspaceForm, setWorkspaceForm] = useState<WorkspaceFormState | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+    setProfileForm({
+      name: user.name,
+      displayName: user.displayName ?? firstNameFromFullName(user.name),
+      timezone: user.timezone ?? "",
+      bio: user.bio ?? "",
+    });
+  }, [user]);
+
+  useEffect(() => {
+    if (!workspace) {
+      setWorkspaceForm(null);
+      return;
+    }
+    setWorkspaceForm({
+      name: workspace.name,
+      industry: workspace.industry ?? "",
+      teamSize: workspace.teamSize ?? "",
+    });
+  }, [workspace]);
+
+  const profileMutation = useMutation({
+    mutationFn: updateProfile,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+      toast.success("Profile saved");
+    },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error ? error.message : "Could not save profile. Please try again.",
+      );
+    },
+  });
+
+  const workspaceMutation = useMutation({
+    mutationFn: updateWorkspace,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+      toast.success("Workspace saved");
+    },
+    onError: (error) => {
+      toast.error(
+        error instanceof Error ? error.message : "Could not save workspace. Please try again.",
+      );
+    },
+  });
+
+  const handleProfileSave = () => {
+    if (!profileForm) {
+      return;
+    }
+    profileMutation.mutate({
+      name: profileForm.name.trim(),
+      displayName: profileForm.displayName.trim(),
+      timezone: profileForm.timezone.trim(),
+      bio: profileForm.bio.trim(),
+    });
+  };
+
+  const handleProfileCancel = () => {
+    if (!user) {
+      return;
+    }
+    setProfileForm({
+      name: user.name,
+      displayName: user.displayName ?? firstNameFromFullName(user.name),
+      timezone: user.timezone ?? "",
+      bio: user.bio ?? "",
+    });
+  };
+
+  const handleWorkspaceSave = () => {
+    if (!workspaceForm) {
+      return;
+    }
+    if (!workspace) {
+      toast.error("No workspace found");
+      return;
+    }
+    workspaceMutation.mutate({
+      name: workspaceForm.name.trim(),
+      industry: workspaceForm.industry.trim(),
+      teamSize: workspaceForm.teamSize.trim(),
+    });
+  };
+
+  const handleWorkspaceCancel = () => {
+    if (!workspace) {
+      return;
+    }
+    setWorkspaceForm({
+      name: workspace.name,
+      industry: workspace.industry ?? "",
+      teamSize: workspace.teamSize ?? "",
+    });
+  };
 
   return (
     <AppShell title={t("side.settings")}>
@@ -70,10 +188,13 @@ function SettingsPage() {
                   <Skeleton className="h-10 w-full rounded-md" />
                 ) : (
                   <Input
-                    key={workspace?.id ?? "workspace-name"}
-                    defaultValue={workspace?.name ?? ""}
-                    readOnly
-                    className="bg-muted/40"
+                    value={workspaceForm?.name ?? ""}
+                    onChange={(event) =>
+                      setWorkspaceForm((current) =>
+                        current ? { ...current, name: event.target.value } : current,
+                      )
+                    }
+                    disabled={!workspace || workspaceMutation.isPending}
                   />
                 )}
               </Field>
@@ -83,20 +204,43 @@ function SettingsPage() {
                 ) : (
                   <Input
                     key={workspace?.slug ?? "workspace-url"}
-                    defaultValue={workspace?.slug ? workspaceUrlFromSlug(workspace.slug) : ""}
+                    value={workspace?.slug ? workspaceUrlFromSlug(workspace.slug) : ""}
                     readOnly
                     className="bg-muted/40"
                   />
                 )}
               </Field>
               <Field label="Industry">
-                <Input defaultValue="Product / Software" />
+                <Input
+                  value={workspaceForm?.industry ?? ""}
+                  onChange={(event) =>
+                    setWorkspaceForm((current) =>
+                      current ? { ...current, industry: event.target.value } : current,
+                    )
+                  }
+                  disabled={!workspace || workspaceMutation.isPending}
+                  placeholder="e.g. Product / Software"
+                />
               </Field>
               <Field label="Team size">
-                <Input defaultValue="6 - 10" />
+                <Input
+                  value={workspaceForm?.teamSize ?? ""}
+                  onChange={(event) =>
+                    setWorkspaceForm((current) =>
+                      current ? { ...current, teamSize: event.target.value } : current,
+                    )
+                  }
+                  disabled={!workspace || workspaceMutation.isPending}
+                  placeholder="e.g. 6 - 10"
+                />
               </Field>
             </div>
-            <SaveBar />
+            <SaveBar
+              isSaving={workspaceMutation.isPending}
+              onSave={handleWorkspaceSave}
+              onCancel={handleWorkspaceCancel}
+              saveDisabled={!workspace || !workspaceForm}
+            />
           </Card>
         </TabsContent>
 
@@ -110,16 +254,7 @@ function SettingsPage() {
                   {userInitials}
                 </div>
               )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(event) => {
-                  if (event.target.files?.[0]) toast.success("Photo selected");
-                }}
-              />
-              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+              <Button variant="outline" size="sm" disabled>
                 {t("common.uploadNewPhoto")}
               </Button>
             </div>
@@ -129,10 +264,13 @@ function SettingsPage() {
                   <Skeleton className="h-10 w-full rounded-md" />
                 ) : (
                   <Input
-                    key={user?.id ?? "user-name"}
-                    defaultValue={user?.name ?? ""}
-                    readOnly
-                    className="bg-muted/40"
+                    value={profileForm?.name ?? ""}
+                    onChange={(event) =>
+                      setProfileForm((current) =>
+                        current ? { ...current, name: event.target.value } : current,
+                      )
+                    }
+                    disabled={profileMutation.isPending}
                   />
                 )}
               </Field>
@@ -141,10 +279,13 @@ function SettingsPage() {
                   <Skeleton className="h-10 w-full rounded-md" />
                 ) : (
                   <Input
-                    key={`${user?.id ?? "user"}-display`}
-                    defaultValue={user?.name ? firstNameFromFullName(user.name) : ""}
-                    readOnly
-                    className="bg-muted/40"
+                    value={profileForm?.displayName ?? ""}
+                    onChange={(event) =>
+                      setProfileForm((current) =>
+                        current ? { ...current, displayName: event.target.value } : current,
+                      )
+                    }
+                    disabled={profileMutation.isPending}
                   />
                 )}
               </Field>
@@ -154,7 +295,7 @@ function SettingsPage() {
                 ) : (
                   <Input
                     key={user?.id ?? "user-email"}
-                    defaultValue={user?.email ?? ""}
+                    value={user?.email ?? ""}
                     readOnly
                     type="email"
                     className="bg-muted/40"
@@ -162,15 +303,38 @@ function SettingsPage() {
                 )}
               </Field>
               <Field label="Time zone">
-                <Input defaultValue="Europe/Berlin" />
+                <Input
+                  value={profileForm?.timezone ?? ""}
+                  onChange={(event) =>
+                    setProfileForm((current) =>
+                      current ? { ...current, timezone: event.target.value } : current,
+                    )
+                  }
+                  disabled={profileMutation.isPending}
+                  placeholder="e.g. Europe/Berlin"
+                />
               </Field>
             </div>
             <div className="mt-4">
               <Field label="Bio">
-                <Textarea defaultValue="Product engineer, coffee enthusiast." />
+                <Textarea
+                  value={profileForm?.bio ?? ""}
+                  onChange={(event) =>
+                    setProfileForm((current) =>
+                      current ? { ...current, bio: event.target.value } : current,
+                    )
+                  }
+                  disabled={profileMutation.isPending}
+                  rows={3}
+                />
               </Field>
             </div>
-            <SaveBar />
+            <SaveBar
+              isSaving={profileMutation.isPending}
+              onSave={handleProfileSave}
+              onCancel={handleProfileCancel}
+              saveDisabled={!profileForm}
+            />
           </Card>
         </TabsContent>
 
@@ -296,21 +460,41 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </div>
   );
 }
-function SaveBar() {
+function SaveBar({
+  onSave,
+  onCancel,
+  isSaving = false,
+  saveDisabled = false,
+}: {
+  onSave: () => void;
+  onCancel: () => void;
+  isSaving?: boolean;
+  saveDisabled?: boolean;
+}) {
   const { t } = useI18n();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   return (
     <div className="mt-6 flex flex-wrap justify-end gap-2">
-      <Button variant="outline" onClick={() => setShortcutsOpen(true)}>
+      <Button variant="outline" onClick={() => setShortcutsOpen(true)} disabled={isSaving}>
         {t("top.keyboardShortcuts")}
       </Button>
-      <Button variant="outline">{t("common.cancel")}</Button>
+      <Button variant="outline" onClick={onCancel} disabled={isSaving || saveDisabled}>
+        {t("common.cancel")}
+      </Button>
       <Button
-        onClick={() => toast.success("Changes saved")}
+        onClick={onSave}
+        disabled={isSaving || saveDisabled}
         className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
       >
-        {t("common.saveChanges")}
+        {isSaving ? (
+          <>
+            <Loader2 className="size-4 animate-spin" />
+            Saving…
+          </>
+        ) : (
+          t("common.saveChanges")
+        )}
       </Button>
       <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
