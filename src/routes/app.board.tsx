@@ -26,6 +26,7 @@ import {
   fetchTasks,
   taskPriorityToApi,
   taskStatusToApi,
+  updateTask,
   type TaskApiItem,
   type TaskApiPriority,
   type TaskApiStatus,
@@ -81,6 +82,28 @@ function Board() {
       );
     },
   });
+  const updateTaskMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: TaskStatus }) =>
+      updateTask(id, { status: taskStatusToApi[status] }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      toast.success("Task status updated");
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Task status could not be updated",
+      );
+    },
+  });
+  const updatingTaskId =
+    updateTaskMutation.isPending && updateTaskMutation.variables
+      ? updateTaskMutation.variables.id
+      : null;
+
+  function handleStatusChange(taskId: string, currentStatus: TaskStatus, status: TaskStatus) {
+    if (status === currentStatus || updateTaskMutation.isPending) return;
+    updateTaskMutation.mutate({ id: taskId, status });
+  }
   const projectId = apiTasks[0]?.projectId;
   const taskList = apiTasks.map(mapApiTaskToTask);
 
@@ -179,7 +202,13 @@ function Board() {
                 ) : (
                   <>
                     {colTasks.map((task) => (
-                      <TaskCard key={task.id} task={task} onOpen={setSelected} />
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        onOpen={setSelected}
+                        onStatusChange={(status) => handleStatusChange(task.id, task.status, status)}
+                        isStatusUpdating={updatingTaskId === task.id}
+                      />
                     ))}
                     {colTasks.length === 0 && (
                       <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">

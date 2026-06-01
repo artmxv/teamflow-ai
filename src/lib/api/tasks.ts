@@ -68,6 +68,15 @@ export async function fetchTasks() {
   return response.data;
 }
 
+export interface UpdateTaskInput {
+  title?: string;
+  description?: string | null;
+  status?: TaskApiStatus;
+  priority?: TaskApiPriority;
+  assigneeId?: string | null;
+  dueDate?: string | null;
+}
+
 export async function createTask(input: CreateTaskInput) {
   const response = await fetch(`${API_BASE_URL}/api/tasks`, {
     method: "POST",
@@ -77,6 +86,32 @@ export async function createTask(input: CreateTaskInput) {
     body: JSON.stringify({
       ...input,
       dueDate: input.dueDate ? new Date(input.dueDate).toISOString() : input.dueDate,
+    }),
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(body?.message ?? `API request failed with status ${response.status}`);
+  }
+
+  const body = (await response.json()) as { data: TaskApiItem };
+  return body.data;
+}
+
+export async function updateTask(id: string, input: UpdateTaskInput) {
+  const response = await fetch(`${API_BASE_URL}/api/tasks/${id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      ...input,
+      dueDate:
+        input.dueDate !== undefined
+          ? input.dueDate
+            ? new Date(input.dueDate).toISOString()
+            : null
+          : undefined,
     }),
   });
 

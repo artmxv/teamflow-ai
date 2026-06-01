@@ -1,24 +1,37 @@
 import { GripVertical, MessageSquare, Paperclip, CheckSquare } from "lucide-react";
-import { type Task, getMember, priorityMeta } from "@/lib/mock-data";
+import { type Task, getMember, priorityMeta, statusColumns, type TaskStatus } from "@/lib/mock-data";
 import { Avatar } from "./Avatar";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export function TaskCard({
   task,
   onOpen,
+  onStatusChange,
+  isStatusUpdating,
 }: {
   task: Task;
   onOpen: (task: Task) => void;
+  onStatusChange?: (status: TaskStatus) => void;
+  isStatusUpdating?: boolean;
 }) {
   const assignee = getMember(task.assigneeId);
   const done = task.checklist.filter((c) => c.done).length;
   const prio = priorityMeta[task.priority];
 
   return (
-    <button
-      onClick={() => onOpen(task)}
-      className="group w-full rounded-2xl border border-border bg-card p-3.5 text-left shadow-soft transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card"
-    >
+    <div className="group w-full rounded-2xl border border-border bg-card p-3.5 text-left shadow-soft transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card">
+      <button
+        type="button"
+        onClick={() => onOpen(task)}
+        className="w-full text-left"
+      >
       <div className="flex items-start justify-between gap-2">
         <div className="text-[11px] font-mono text-muted-foreground">{task.key}</div>
         <GripVertical className="size-3.5 text-muted-foreground/60 opacity-0 transition group-hover:opacity-100" />
@@ -59,6 +72,32 @@ export function TaskCard({
         </div>
         {assignee && <Avatar id={assignee.id} initials={assignee.avatar} size="sm" />}
       </div>
-    </button>
+      </button>
+
+      {onStatusChange && (
+        <div
+          className="mt-2 border-t border-border/60 pt-2"
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <Select
+            value={task.status}
+            disabled={isStatusUpdating}
+            onValueChange={(value) => onStatusChange(value as TaskStatus)}
+          >
+            <SelectTrigger className="h-7 w-full text-xs">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              {statusColumns.map((col) => (
+                <SelectItem key={col.key} value={col.key}>
+                  {col.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+    </div>
   );
 }
