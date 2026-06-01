@@ -2,6 +2,24 @@
 
 Fullstack AI-native project workspace demo for product teams. TeamFlow AI combines a polished SaaS-style frontend with a real Express API, PostgreSQL, and seeded demo data so you can explore projects, tasks, a Kanban board, and dashboard metrics end to end.
 
+## Preview
+
+### Dashboard
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+### Projects
+
+![Projects](docs/screenshots/projects.png)
+
+### Kanban Board
+
+![Kanban Board](docs/screenshots/board.png)
+
+### Tasks
+
+![Tasks](docs/screenshots/tasks.png)
+
 ## Feature overview
 
 ### Product and marketing
