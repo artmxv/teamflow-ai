@@ -1,8 +1,13 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { login } from "@/lib/api/auth";
+import { setAuthToken } from "@/lib/auth/token";
 
 export const Route = createFileRoute("/signin")({
   head: () => ({ meta: [{ title: "Sign in — TeamFlow AI" }] }),
@@ -10,6 +15,24 @@ export const Route = createFileRoute("/signin")({
 });
 
 function SignIn() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const loginMutation = useMutation({
+    mutationFn: login,
+    onSuccess: ({ token, user }) => {
+      setAuthToken(token);
+      queryClient.setQueryData(["auth", "me"], user);
+      toast.success("Signed in successfully");
+      void router.navigate({ to: "/app/dashboard" });
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Could not sign in. Please try again.");
+    },
+  });
+
   return (
     <AuthShell
       title="Welcome back"
@@ -27,7 +50,7 @@ function SignIn() {
         className="space-y-4"
         onSubmit={(e) => {
           e.preventDefault();
-          window.location.href = "/app/dashboard";
+          loginMutation.mutate({ email: email.trim(), password });
         }}
       >
         <Button type="button" variant="outline" className="w-full">
@@ -39,17 +62,37 @@ function SignIn() {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="email">Work email</Label>
-          <Input id="email" type="email" placeholder="you@company.com" defaultValue="alex@teamflow.ai" />
+          <Input
+            id="email"
+            type="email"
+            placeholder="you@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+          />
         </div>
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <Label htmlFor="password">Password</Label>
             <Link to="/forgot-password" className="text-xs text-primary hover:underline">Forgot?</Link>
           </div>
-          <Input id="password" type="password" placeholder="••••••••" defaultValue="demo-password" />
+          <Input
+            id="password"
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoComplete="current-password"
+          />
         </div>
-        <Button type="submit" className="w-full bg-gradient-brand text-white shadow-glow hover:opacity-95">
-          Sign in
+        <Button
+          type="submit"
+          className="w-full bg-gradient-brand text-white shadow-glow hover:opacity-95"
+          disabled={loginMutation.isPending}
+        >
+          {loginMutation.isPending ? "Signing in…" : "Sign in"}
         </Button>
       </form>
     </AuthShell>

@@ -14,12 +14,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { LanguageSwitcher, useI18n } from "@/lib/i18n";
 import { ThemeToggle } from "@/lib/theme";
 import { toast } from "sonner";
+import { logout } from "@/lib/api/auth";
+import { clearAuthToken } from "@/lib/auth/token";
+import { nameToInitials, useCurrentUser } from "@/lib/auth/use-current-user";
+import { members } from "@/lib/mock-data";
 import type { Workspace } from "./AppShell";
+
+const mockUser = members[0];
 
 const notifications = [
   { id: "n1", title: "Priya mentioned you", detail: "Review the billing edge case task." },
@@ -40,9 +47,35 @@ export function AppTopbar({
   onWorkspaceChange: (workspace: Workspace) => void;
 }) {
   const { t } = useI18n();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { data: currentUser } = useCurrentUser();
+  const displayUser = currentUser ?? mockUser;
+  const displayInitials = currentUser
+    ? nameToInitials(currentUser.name)
+    : mockUser.avatar;
   const [helpOpen, setHelpOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [unread, setUnread] = useState(notifications.length);
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      try {
+        await logout();
+      } finally {
+        clearAuthToken();
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.removeQueries({ queryKey: ["auth"] });
+      void router.navigate({ to: "/signin" });
+    },
+    onError: () => {
+      clearAuthToken();
+      void queryClient.removeQueries({ queryKey: ["auth"] });
+      void router.navigate({ to: "/signin" });
+    },
+  });
 
   function markAllAsRead() {
     setUnread(0);
@@ -139,24 +172,31 @@ export function AppTopbar({
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2 rounded-lg p-1 pr-2 transition hover:bg-secondary">
               <span className="grid size-8 place-items-center rounded-md bg-gradient-brand text-xs font-semibold text-white">
-                AM
+                {displayInitials}
               </span>
               <span className="hidden text-left xl:block">
-                <span className="block text-sm font-medium leading-tight">Alex Morgan</span>
-                <span className="block text-[11px] text-muted-foreground leading-tight">Owner</span>
+                <span className="block text-sm font-medium leading-tight">{displayUser.name}</span>
+                <span className="block text-[11px] text-muted-foreground leading-tight">
+                  {currentUser ? "Member" : mockUser.role}
+                </span>
               </span>
               <ChevronDown className="hidden size-3.5 text-muted-foreground xl:block" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>alex@teamflow.ai</DropdownMenuLabel>
+            <DropdownMenuLabel>{displayUser.email}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild><Link to="/app/settings">{t("settings.profileSettings")}</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link to="/app/settings">{t("settings.workspaceSettings")}</Link></DropdownMenuItem>
             <DropdownMenuItem asChild><Link to="/app/billing">{t("side.billing")}</Link></DropdownMenuItem>
             <DropdownMenuItem onClick={() => setShortcutsOpen(true)}>{t("top.keyboardShortcuts")}</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild><Link to="/signin">Sign out</Link></DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => logoutMutation.mutate()}
+              disabled={logoutMutation.isPending}
+            >
+              Sign out
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
