@@ -230,3 +230,20 @@ export async function updateTask(id: string, input: UpdateTaskInput) {
 
   return mapTaskDetail(task);
 }
+
+export async function deleteTask(id: string) {
+  const existing = await prisma.task.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+
+  if (!existing) {
+    return null;
+  }
+
+  await prisma.task.delete({
+    where: { id },
+  });
+
+  return { id };
+}

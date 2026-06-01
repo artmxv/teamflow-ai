@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import {
   createTask,
+  deleteTask,
   fetchTasks,
   taskPriorityToApi,
   taskStatusToApi,
@@ -92,6 +93,19 @@ function Board() {
     onError: (mutationError) => {
       toast.error(
         mutationError instanceof Error ? mutationError.message : "Task status could not be updated",
+      );
+    },
+  });
+  const deleteTaskMutation = useMutation({
+    mutationFn: deleteTask,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      setSelected(null);
+      toast.success("Task deleted");
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Task could not be deleted",
       );
     },
   });
@@ -232,7 +246,12 @@ function Board() {
         </div>
       )}
 
-      <TaskDrawer task={selected} onOpenChange={(o) => !o && setSelected(null)} />
+      <TaskDrawer
+        task={selected}
+        onOpenChange={(o) => !o && setSelected(null)}
+        onDelete={(taskId) => deleteTaskMutation.mutate(taskId)}
+        isDeleting={deleteTaskMutation.isPending}
+      />
     </AppShell>
   );
 }

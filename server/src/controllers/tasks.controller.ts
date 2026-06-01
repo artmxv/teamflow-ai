@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 
-import { createTask, getTasks, updateTask } from "../services/tasks.service.js";
+import { createTask, deleteTask, getTasks, updateTask } from "../services/tasks.service.js";
 
 const createTaskSchema = z.object({
   projectId: z.string().min(1, "projectId is required"),
@@ -80,6 +80,31 @@ export async function updateTaskController(req: Request, res: Response, next: Ne
     }
 
     res.json({ data: task });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteTaskController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const taskId = req.params.id;
+    if (typeof taskId !== "string") {
+      res.status(404).json({
+        message: "Task not found",
+      });
+      return;
+    }
+
+    const deleted = await deleteTask(taskId);
+
+    if (!deleted) {
+      res.status(404).json({
+        message: "Task not found",
+      });
+      return;
+    }
+
+    res.json({ data: { id: deleted.id } });
   } catch (error) {
     next(error);
   }

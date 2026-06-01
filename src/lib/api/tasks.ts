@@ -123,3 +123,17 @@ export async function updateTask(id: string, input: UpdateTaskInput) {
   const body = (await response.json()) as { data: TaskApiItem };
   return body.data;
 }
+
+export async function deleteTask(id: string) {
+  const response = await fetch(`${API_BASE_URL}/api/tasks/${id}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(body?.message ?? `API request failed with status ${response.status}`);
+  }
+
+  const body = (await response.json()) as { data: { id: string } };
+  return body.data;
+}
