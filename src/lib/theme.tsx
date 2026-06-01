@@ -3,6 +3,25 @@ import { Moon, Sun } from "lucide-react";
 
 type Theme = "light" | "dark";
 
+/** Inline IIFE for <head>: applies theme before React/hydration. SSR-safe (runs only in browser). */
+export const THEME_INIT_SCRIPT = `
+(function () {
+  try {
+    var stored = localStorage.getItem("tf_theme");
+    var isDark;
+    if (stored === "dark") isDark = true;
+    else if (stored === "light") isDark = false;
+    else isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.classList.toggle("dark", isDark);
+  } catch (_) {}
+})();
+`.trim();
+
+function readThemeFromDocument(): Theme {
+  if (typeof document === "undefined") return "light";
+  return document.documentElement.classList.contains("dark") ? "dark" : "light";
+}
+
 const Ctx = createContext<{ theme: Theme; toggle: () => void; setTheme: (t: Theme) => void }>({
   theme: "light",
   toggle: () => {},
@@ -10,7 +29,7 @@ const Ctx = createContext<{ theme: Theme; toggle: () => void; setTheme: (t: Them
 });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("light");
+  const [theme, setThemeState] = useState<Theme>(readThemeFromDocument);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
