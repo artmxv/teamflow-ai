@@ -25,13 +25,21 @@ Fullstack AI-native project workspace demo for product teams. TeamFlow AI combin
 ### Product and marketing
 
 - Landing page with product overview sections
-- Auth screens (sign in, sign up, forgot password) as UI only
 - Dark/light theme toggle without a light flash on reload
 - EN/RU language toggle (UI)
+
+### Authentication (API-backed)
+
+- Email/password **sign up** and **sign in** wired to the backend
+- Passwords hashed; registration enforces strong password rules
+- JWT stored in `localStorage`; `GET /api/auth/me` returns the current user and workspace
+- `/app/*` routes require authentication; signed-in users are redirected away from sign-in/sign-up
+- New accounts get a starter workspace with a sample project and onboarding tasks
 
 ### Workspace app (API-backed)
 
 - App shell with sidebar and topbar
+- **Workspace-scoped** projects, tasks, board, and dashboard (data tied to the signed-in user's workspace)
 - **Projects**: list from API; create via **New Project**
 - **Tasks**: list from API; create via **New Task**
 - **Board**: Kanban columns from API; status changes persist via PATCH
@@ -40,7 +48,7 @@ Fullstack AI-native project workspace demo for product teams. TeamFlow AI combin
 
 ### Demo data
 
-- Seed script loads a professional workspace with users, projects, and tasks
+- Seed script loads a demo workspace with users, projects, and tasks (use demo login below)
 
 ### Demo credentials
 
@@ -99,6 +107,10 @@ Typical local ports: frontend **8080**, API **4000**, Postgres **5433**.
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/health` | Health check |
+| POST | `/api/auth/register` | Register (email/password) |
+| POST | `/api/auth/login` | Sign in |
+| GET | `/api/auth/me` | Current user and workspace |
+| POST | `/api/auth/logout` | Sign out |
 | GET | `/api/projects` | List projects |
 | POST | `/api/projects` | Create project |
 | GET | `/api/tasks` | List tasks |
@@ -222,20 +234,19 @@ npm run prisma:studio     # Open Prisma Studio
 
 **Not implemented yet:**
 
-- Real authentication and sessions
-- Production authorization and workspace scoping per user
+- Google OAuth
+- httpOnly cookies and refresh tokens (auth uses JWT in `localStorage`)
 - Real AI assistant integration (LLM/API)
-- Deployment configuration
+- Deployment and hosted demo
 - Drag-and-drop Kanban
 - File uploads
 
 **Possible next steps:**
 
-- JWT auth and protected routes
-- Wire remaining screens (Team, Settings, AI) to the API
-- Workspace-aware queries and multi-tenant safety
+- OAuth and more secure session handling (httpOnly cookies, refresh tokens)
+- Wire remaining screens (Team, Settings, AI, Billing) to the API
 - AI summaries backed by stored `AiSummary` records
-- CI, Docker for the API, and a hosted demo
+- CI, production Docker images, and deployment docs
 
 ## Portfolio note
 
@@ -245,8 +256,8 @@ This repository demonstrates fullstack TypeScript product work suitable for a po
 - SaaS dashboard UX (layout, forms, charts, toasts, theming)
 - REST API design with Express, validation, and clear route layering
 - PostgreSQL modeling with Prisma (migrations, seed, relations)
-- Frontend-to-backend integration for core CRUD flows (projects, tasks, board, dashboard)
-- Honest scoping: auth, AI, and deployment called out as future work rather than implied
+- Frontend-to-backend integration for auth and core CRUD flows (projects, tasks, board, dashboard)
+- Honest scoping: OAuth, hardened sessions, AI, and deployment called out as future work rather than implied
 
 ---
 
