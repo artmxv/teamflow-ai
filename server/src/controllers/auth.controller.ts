@@ -6,6 +6,7 @@ import {
   getUserById,
   loginUser,
   registerUser,
+  updateUserProfile,
 } from "../services/auth.service.js";
 import { getUserCurrentWorkspace } from "../services/workspace-context.service.js";
 
@@ -35,6 +36,17 @@ const loginSchema = z.object({
   email: z.string().trim().email("email must be valid"),
   password: z.string().min(1, "password is required"),
 });
+
+const updateProfileSchema = z
+  .object({
+    name: z.string().trim().min(1, "name cannot be empty").optional(),
+    displayName: z.string().trim().optional(),
+    timezone: z.string().trim().optional(),
+    bio: z.string().trim().optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "at least one field is required",
+  });
 
 function handleAuthError(error: unknown, res: Response, next: NextFunction) {
   if (error instanceof AuthError) {
@@ -102,4 +114,29 @@ export async function meController(req: Request, res: Response, next: NextFuncti
 
 export async function logoutController(_req: Request, res: Response) {
   res.json({ data: { success: true } });
+}
+
+export async function updateProfileController(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.userId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const result = updateProfileSchema.safeParse(req.body);
+
+    if (!result.success) {
+      const firstIssue = result.error.issues[0];
+      res.status(400).json({
+        message: firstIssue?.message ?? "Invalid profile payload",
+        issues: result.error.issues,
+      });
+      return;
+    }
+
+    const user = await updateUserProfile(req.userId, result.data);
+    res.json({ data: { user } });
+  } catch (error) {
+    handleAuthError(error, res, next);
+  }
 }

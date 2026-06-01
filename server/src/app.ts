@@ -12,6 +12,7 @@ import { dashboardRouter } from "./routes/dashboard.routes.js";
 import { healthRouter } from "./routes/health.routes.js";
 import { projectsRouter } from "./routes/projects.routes.js";
 import { tasksRouter } from "./routes/tasks.routes.js";
+import { workspaceRouter } from "./routes/workspace.routes.js";
 
 export const app = express();
 
@@ -25,6 +26,7 @@ if (env.NODE_ENV !== "production") {
 
 app.use("/api/health", healthRouter);
 app.use("/api/auth", authRouter);
+app.use("/api/workspace", workspaceRouter);
 app.use("/api/ai", aiRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/projects", projectsRouter);

@@ -51,6 +51,9 @@ enum AiSummaryType {
 model User {
   id          String   @id @default(cuid())
   name        String
+  displayName String?
+  timezone    String?
+  bio         String?
   email       String   @unique
   passwordHash String
   avatar      String?
@@ -67,6 +70,8 @@ model Workspace {
   id        String   @id @default(cuid())
   name      String
   slug      String   @unique
+  industry  String?
+  teamSize  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
