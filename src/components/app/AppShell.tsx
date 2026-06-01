@@ -1,11 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import type { AuthWorkspace } from "@/lib/api/auth";
-import {
-  nameToInitials,
-  useCurrentUser,
-  workspaceRoleLabel,
-} from "@/lib/auth/use-current-user";
+import { nameToInitials, useCurrentUser, workspaceRoleLabel } from "@/lib/auth/use-current-user";
 import { AppSidebar } from "./AppSidebar";
 import { AppTopbar } from "./AppTopbar";
 

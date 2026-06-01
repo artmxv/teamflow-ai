@@ -5,10 +5,9 @@ import { getAuthToken } from "@/lib/auth/token";
 type AuthStatus = "checking" | "authenticated" | "unauthenticated";
 
 function getInitialStatus(): AuthStatus {
-  if (typeof window === "undefined") {
-    return "checking";
-  }
-  return getAuthToken() ? "authenticated" : "unauthenticated";
+  // Keep SSR and the *first* client render consistent.
+  // We resolve localStorage-based auth only after mount.
+  return "checking";
 }
 
 /** Client-side guard: blocks protected UI until a token exists (SSR cannot read localStorage). */
@@ -17,17 +16,16 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>(getInitialStatus);
 
   useEffect(() => {
-    if (status === "checking") {
-      setStatus(getAuthToken() ? "authenticated" : "unauthenticated");
-      return;
-    }
-    if (status === "unauthenticated") {
+    const hasToken = !!getAuthToken();
+    setStatus(hasToken ? "authenticated" : "unauthenticated");
+    if (!hasToken) {
       void router.navigate({ to: "/signin", replace: true });
     }
-  }, [status, router]);
+  }, [router]);
 
   if (status !== "authenticated") {
-    return null;
+    // Small stable fallback avoids hydration mismatch and is OK UX-wise.
+    return <div className="min-h-screen bg-background" />;
   }
 
   return <>{children}</>;
