@@ -1,15 +1,24 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import { type Task, type TaskStatus, type Priority } from "@/lib/mock-data";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
 import { Avatar } from "@/components/app/Avatar";
-import { NewTaskDialog } from "@/components/app/QuickActionDialogs";
+import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { fetchTasks, type TaskApiItem, type TaskApiPriority, type TaskApiStatus } from "@/lib/api/tasks";
+import {
+  createTask,
+  fetchTasks,
+  taskPriorityToApi,
+  taskStatusToApi,
+  type TaskApiItem,
+  type TaskApiPriority,
+  type TaskApiStatus,
+} from "@/lib/api/tasks";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { Search, Plus, MessageSquare, Paperclip, Calendar } from "lucide-react";
 
@@ -59,11 +68,11 @@ const apiPriorityMap: Record<TaskApiPriority, Priority> = {
 
 function TasksPage() {
   const { t } = useI18n();
+  const queryClient = useQueryClient();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<TaskStatus | "all">("all");
   const [priority, setPriority] = useState<Priority | "all">("all");
   const [selected, setSelected] = useState<Task | null>(null);
-  const [localTasks, setLocalTasks] = useState<TaskRow[]>([]);
   const {
     data: apiTasks = [],
     error,
@@ -74,10 +83,20 @@ function TasksPage() {
     queryKey: ["tasks"],
     queryFn: fetchTasks,
   });
-  const taskList = useMemo(
-    () => [...localTasks, ...apiTasks.map(mapApiTaskToRow)],
-    [apiTasks, localTasks],
-  );
+  const createTaskMutation = useMutation({
+    mutationFn: createTask,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      toast.success("Task created");
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Task could not be created",
+      );
+    },
+  });
+  const projectId = apiTasks[0]?.projectId;
+  const taskList = useMemo(() => apiTasks.map(mapApiTaskToRow), [apiTasks]);
 
   const filtered = useMemo(
     () =>
@@ -90,6 +109,23 @@ function TasksPage() {
     [q, status, priority, taskList],
   );
 
+  async function handleCreateTask(values: TaskFormValues) {
+    if (!projectId) {
+      toast.error("A project is required. Load tasks from the API or seed the database first.");
+      throw new Error("Project is required.");
+    }
+
+    await createTaskMutation.mutateAsync({
+      projectId,
+      title: values.title.trim(),
+      description: values.description?.trim() || undefined,
+      status: taskStatusToApi[values.status],
+      priority: taskPriorityToApi[values.priority],
+      assigneeId: values.assigneeId || null,
+      dueDate: values.dueDate || null,
+    });
+  }
+
   return (
     <AppShell title={t("tasks.tasks")}>
       <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
@@ -97,7 +133,7 @@ function TasksPage() {
           <h1 className="text-2xl font-semibold tracking-tight">{t("tasks.tasks")}</h1>
           <p className="text-sm text-muted-foreground">{filtered.length} tasks</p>
         </div>
-        <NewTaskDialog onCreate={(task) => setLocalTasks((current) => [mapLocalTaskToRow(task), ...current])}>
+        <NewTaskDialog isSubmitting={createTaskMutation.isPending} onSubmit={handleCreateTask}>
           <Button size="sm" className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
             <Plus className="size-4" /> {t("common.newTask")}
           </Button>
@@ -205,19 +241,6 @@ function mapApiTaskToRow(task: TaskApiItem): TaskRow {
     checklistTotal: task.checklistTotal,
     checklistDone: task.checklistDone,
     attachmentsCount: task.attachmentsCount,
-  };
-}
-
-function mapLocalTaskToRow(task: Task): TaskRow {
-  return {
-    ...task,
-    projectName: "Local project",
-    assigneeName: null,
-    assigneeAvatar: null,
-    commentsCount: task.comments.length,
-    checklistTotal: task.checklist.length,
-    checklistDone: task.checklist.filter((item) => item.done).length,
-    attachmentsCount: task.attachments.length,
   };
 }
 

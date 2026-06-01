@@ -31,7 +31,6 @@ import {
   type Priority,
   type Project,
   type ProjectStatus,
-  type Task,
   type TaskStatus,
 } from "@/lib/mock-data";
 
@@ -50,11 +49,11 @@ const getTaskSchema = (t: Translate) => z.object({
   description: z.string().max(500, t("validation.taskDescriptionMax")).optional(),
   priority: z.enum(["low", "medium", "high", "urgent"]),
   status: z.enum(["backlog", "todo", "in_progress", "review", "done"]),
-  assigneeId: z.string().min(1, "Assignee is required"),
+  assigneeId: z.string().optional(),
   dueDate: z.string().optional(),
 });
 
-type TaskFormValues = z.infer<ReturnType<typeof getTaskSchema>>;
+export type TaskFormValues = z.infer<ReturnType<typeof getTaskSchema>>;
 
 type NewProjectDialogProps = {
   children: ReactNode;
@@ -162,10 +161,16 @@ export function NewProjectDialog({ children, isSubmitting = false, onCreate }: N
 type NewTaskDialogProps = {
   children: ReactNode;
   initialStatus?: TaskStatus;
-  onCreate?: (task: Task) => void;
+  isSubmitting?: boolean;
+  onSubmit: (values: TaskFormValues) => Promise<void>;
 };
 
-export function NewTaskDialog({ children, initialStatus = "todo", onCreate }: NewTaskDialogProps) {
+export function NewTaskDialog({
+  children,
+  initialStatus = "todo",
+  isSubmitting = false,
+  onSubmit,
+}: NewTaskDialogProps) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const {
@@ -187,33 +192,21 @@ export function NewTaskDialog({ children, initialStatus = "todo", onCreate }: Ne
     },
   });
 
-  function submit(values: TaskFormValues) {
-    onCreate?.({
-      id: `t-${Date.now()}`,
-      key: `TF-${Math.floor(Math.random() * 900 + 100)}`,
-      title: values.title.trim(),
-      description: values.description?.trim() || "New task created from the mock UI.",
-      status: values.status,
-      priority: values.priority,
-      assigneeId: values.assigneeId,
-      projectId: projects[0].id,
-      dueDate: values.dueDate || null,
-      labels: ["New"],
-      comments: [],
-      checklist: [],
-      activity: [{ id: "a1", text: "Task created from mock UI", at: "just now" }],
-      attachments: [],
-    });
-    toast.success("Task created");
-    reset({
-      title: "",
-      description: "",
-      priority: "medium",
-      status: initialStatus,
-      assigneeId: members[0].id,
-      dueDate: "",
-    });
-    setOpen(false);
+  async function submit(values: TaskFormValues) {
+    try {
+      await onSubmit(values);
+      reset({
+        title: "",
+        description: "",
+        priority: "medium",
+        status: initialStatus,
+        assigneeId: members[0].id,
+        dueDate: "",
+      });
+      setOpen(false);
+    } catch {
+      // Parent handles toasts and validation errors.
+    }
   }
 
   return (
@@ -306,10 +299,10 @@ export function NewTaskDialog({ children, initialStatus = "todo", onCreate }: Ne
             </Button>
             <Button
               type="submit"
-              disabled={!isValid}
+              disabled={!isValid || isSubmitting}
               className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
             >
-              {t("common.createTask")}
+              {isSubmitting ? "Creating..." : t("common.createTask")}
             </Button>
           </DialogFooter>
         </form>

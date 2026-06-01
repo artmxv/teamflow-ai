@@ -87,8 +87,22 @@ export async function getTasks() {
   });
 }
 
+async function resolveAssigneeId(assigneeId?: string | null) {
+  if (!assigneeId?.trim()) {
+    return null;
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: assigneeId },
+    select: { id: true },
+  });
+
+  return user?.id ?? null;
+}
+
 export async function createTask(input: CreateTaskInput) {
   const taskCount = await prisma.task.count();
+  const assigneeId = await resolveAssigneeId(input.assigneeId);
 
   const task = await prisma.task.create({
     data: {
@@ -98,7 +112,7 @@ export async function createTask(input: CreateTaskInput) {
       description: input.description ?? null,
       status: input.status ?? "BACKLOG",
       priority: input.priority ?? "MEDIUM",
-      assigneeId: input.assigneeId ?? null,
+      assigneeId,
       dueDate: input.dueDate ? new Date(input.dueDate) : null,
     },
     select: {
