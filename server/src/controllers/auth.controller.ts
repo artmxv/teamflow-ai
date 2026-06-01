@@ -1,0 +1,84 @@
+import type { NextFunction, Request, Response } from "express";
+import { z } from "zod";
+
+import {
+  AuthError,
+  getUserById,
+  loginUser,
+  registerUser,
+} from "../services/auth.service.js";
+
+const registerSchema = z.object({
+  name: z.string().trim().min(2, "name must be at least 2 characters"),
+  email: z.string().trim().email("email must be valid"),
+  password: z.string().min(6, "password must be at least 6 characters"),
+});
+
+const loginSchema = z.object({
+  email: z.string().trim().email("email must be valid"),
+  password: z.string().min(1, "password is required"),
+});
+
+function handleAuthError(error: unknown, res: Response, next: NextFunction) {
+  if (error instanceof AuthError) {
+    res.status(error.statusCode).json({ message: error.message });
+    return;
+  }
+  next(error);
+}
+
+export async function registerController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = registerSchema.safeParse(req.body);
+
+    if (!result.success) {
+      res.status(400).json({
+        message: "Invalid registration payload",
+        issues: result.error.issues,
+      });
+      return;
+    }
+
+    const { user, token } = await registerUser(result.data);
+    res.status(201).json({ data: { user, token } });
+  } catch (error) {
+    handleAuthError(error, res, next);
+  }
+}
+
+export async function loginController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = loginSchema.safeParse(req.body);
+
+    if (!result.success) {
+      res.status(400).json({
+        message: "Invalid login payload",
+        issues: result.error.issues,
+      });
+      return;
+    }
+
+    const { user, token } = await loginUser(result.data);
+    res.json({ data: { user, token } });
+  } catch (error) {
+    handleAuthError(error, res, next);
+  }
+}
+
+export async function meController(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.userId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const user = await getUserById(req.userId);
+    res.json({ data: { user } });
+  } catch (error) {
+    handleAuthError(error, res, next);
+  }
+}
+
+export async function logoutController(_req: Request, res: Response) {
+  res.json({ data: { success: true } });
+}
