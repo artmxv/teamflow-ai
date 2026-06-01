@@ -3,6 +3,7 @@ import { requireAuth } from "@/lib/auth/route-guards";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -16,7 +17,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/lib/i18n";
-import { Check, CreditCard, Download, Sparkles } from "lucide-react";
+import { Check, CreditCard, Download, Info, Sparkles } from "lucide-react";
+
+const DEMO_BILLING_NOTE =
+  "This page is a portfolio demo preview. Plans, usage, invoices, and payment details are sample data. No real payments are processed and nothing is saved to a billing provider.";
 
 export const Route = createFileRoute("/app/billing")({
   beforeLoad: requireAuth,
@@ -42,22 +46,43 @@ function BillingPage() {
     <AppShell title={t("side.billing")}>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">{t("side.billing")}</h1>
-        <p className="text-sm text-muted-foreground">Manage your workspace subscription, usage, and invoices.</p>
+        <p className="text-sm text-muted-foreground">
+          Preview subscription, usage, and invoices for this demo workspace.
+        </p>
       </div>
+
+      <Alert className="mb-6 border-primary/25 bg-primary/5">
+        <Info className="size-4 text-primary" />
+        <AlertTitle>Demo billing preview</AlertTitle>
+        <AlertDescription>{DEMO_BILLING_NOTE}</AlertDescription>
+      </Alert>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-card p-6 shadow-soft lg:col-span-2">
           <div className="flex items-center justify-between">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-semibold text-primary">
-                <Sparkles className="size-3.5" /> Pro plan
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-2 rounded-full bg-primary/15 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                  <Sparkles className="size-3.5" /> Pro plan
+                </div>
+                <Badge
+                  variant="outline"
+                  className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+                >
+                  Sample data
+                </Badge>
               </div>
               <h2 className="mt-3 text-2xl font-semibold tracking-tight">$12 / user / month</h2>
               <p className="text-sm text-muted-foreground">Billed monthly · 8 seats active</p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setPlanOpen(true)}>{t("common.changePlan")}</Button>
-              <Button onClick={() => setSeatsOpen(true)} className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+              <Button variant="outline" onClick={() => setPlanOpen(true)}>
+                {t("common.changePlan")}
+              </Button>
+              <Button
+                onClick={() => setSeatsOpen(true)}
+                className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
+              >
                 {t("common.addSeats")}
               </Button>
             </div>
@@ -73,17 +98,24 @@ function BillingPage() {
           <div className="flex items-center gap-2 text-sm font-semibold">
             <CreditCard className="size-4 text-primary" /> Payment method
           </div>
+          <p className="mt-1 text-xs text-muted-foreground">Placeholder card for UI demo only.</p>
           <div className="mt-4 flex items-center justify-between rounded-xl border border-border p-3">
             <div className="flex items-center gap-3">
-              <div className="grid h-8 w-12 place-items-center rounded-md bg-gradient-brand text-[10px] font-semibold text-white">VISA</div>
+              <div className="grid h-8 w-12 place-items-center rounded-md bg-gradient-brand text-[10px] font-semibold text-white">
+                VISA
+              </div>
               <div>
                 <div className="text-sm font-medium">•••• 4242</div>
                 <div className="text-xs text-muted-foreground">Expires 09 / 28</div>
               </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setCardOpen(true)}>Edit</Button>
+            <Button variant="ghost" size="sm" onClick={() => setCardOpen(true)}>
+              {t("billing.updateCard")}
+            </Button>
           </div>
-          <Button variant="outline" className="mt-3 w-full" onClick={() => setCardOpen(true)}>Add new card</Button>
+          <Button variant="outline" className="mt-3 w-full" onClick={() => setCardOpen(true)}>
+            Add new card
+          </Button>
         </div>
       </div>
 
@@ -91,7 +123,15 @@ function BillingPage() {
         <div className="rounded-2xl border border-border bg-card p-6 shadow-soft lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-base font-semibold">{t("billing.billingHistory")}</h3>
-            <Button variant="ghost" size="sm" onClick={() => toast.info("All mock invoices are already shown")}>{t("common.viewAll")}</Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                toast.info("Demo only: all sample invoices for this workspace are listed below.")
+              }
+            >
+              {t("common.viewAll")}
+            </Button>
           </div>
           <ul className="divide-y divide-border">
             {invoices.map((inv) => (
@@ -102,9 +142,17 @@ function BillingPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="font-medium">{inv.amount}</span>
-                  <Badge variant="secondary" className="border-0 bg-success/15 text-success">{inv.status}</Badge>
+                  <Badge variant="secondary" className="border-0 bg-success/15 text-success">
+                    {inv.status}
+                  </Badge>
                   <button
-                    onClick={() => toast.success(`${inv.id} downloaded`)}
+                    type="button"
+                    aria-label={`Download invoice ${inv.id} (demo)`}
+                    onClick={() =>
+                      toast.info(`Demo only: no PDF was generated for ${inv.id}.`, {
+                        description: "Invoice downloads are disabled in this portfolio preview.",
+                      })
+                    }
                     className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
                   >
                     <Download className="size-4" />
@@ -118,8 +166,17 @@ function BillingPage() {
         <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
           <h3 className="text-base font-semibold">What's included</h3>
           <ul className="mt-3 space-y-2 text-sm">
-            {["Unlimited projects", "AI standups & summaries", "Advanced roles & permissions", "Priority support", "Audit log"].map((f) => (
-              <li key={f} className="flex items-start gap-2"><Check className="mt-0.5 size-4 text-primary" />{f}</li>
+            {[
+              "Unlimited projects",
+              "AI standups & summaries",
+              "Advanced roles & permissions",
+              "Priority support",
+              "Audit log",
+            ].map((f) => (
+              <li key={f} className="flex items-start gap-2">
+                <Check className="mt-0.5 size-4 text-primary" />
+                {f}
+              </li>
             ))}
           </ul>
           <Button
@@ -148,13 +205,23 @@ function Stat({ label, value, sub }: { label: string; value: string; sub: string
   );
 }
 
-function PlanDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+function PlanDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { t } = useI18n();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Change plan</DialogTitle>
-          <DialogDescription>Select a mock plan for this demo session.</DialogDescription>
+          <DialogTitle>{t("billing.changePlan")}</DialogTitle>
+          <DialogDescription>
+            Pick a plan to preview the UI. Your selection is not charged and is not sent to Stripe
+            or any backend.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 sm:grid-cols-3">
           {["Free", "Pro", "Business"].map((plan) => (
@@ -162,7 +229,9 @@ function PlanDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open
               key={plan}
               onClick={() => {
                 onOpenChange(false);
-                toast.success(`${plan} plan selected`);
+                toast.info(`Demo only: ${plan} plan selected.`, {
+                  description: "No subscription change was made.",
+                });
               }}
               className="rounded-2xl border border-border p-4 text-left transition hover:border-primary/40 hover:bg-accent/40"
             >
@@ -176,23 +245,35 @@ function PlanDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open
   );
 }
 
-function SeatsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+function SeatsDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add seats</DialogTitle>
-          <DialogDescription>This only updates the demo interaction state.</DialogDescription>
+          <DialogDescription>
+            Seat changes are simulated for this preview. Nothing is billed or persisted.
+          </DialogDescription>
         </DialogHeader>
         <Field label="Seats to add">
           <Input type="number" min="1" defaultValue="2" />
         </Field>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
           <Button
             onClick={() => {
               onOpenChange(false);
-              toast.success("Seats added");
+              toast.info("Demo only: seats added in preview.", {
+                description: "No billing or seat limits were updated.",
+              });
             }}
             className="bg-gradient-brand text-white"
           >
@@ -204,27 +285,47 @@ function SeatsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
   );
 }
 
-function PaymentDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+function PaymentDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { t } = useI18n();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Payment method</DialogTitle>
-          <DialogDescription>Mock card fields for the frontend prototype.</DialogDescription>
+          <DialogTitle>{t("billing.updateCard")}</DialogTitle>
+          <DialogDescription>
+            Enter sample card details to preview the form. Card data is not validated, stored, or
+            sent to a payment processor.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <Field label="Card number"><Input defaultValue="4242 4242 4242 4242" /></Field>
+            <Field label="Card number">
+              <Input placeholder="4242 4242 4242 4242" inputMode="numeric" autoComplete="off" />
+            </Field>
           </div>
-          <Field label="Expiry"><Input defaultValue="09 / 28" /></Field>
-          <Field label="CVC"><Input defaultValue="123" /></Field>
+          <Field label="Expiry">
+            <Input placeholder="MM / YY" autoComplete="off" />
+          </Field>
+          <Field label="CVC">
+            <Input placeholder="123" inputMode="numeric" autoComplete="off" />
+          </Field>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
           <Button
             onClick={() => {
               onOpenChange(false);
-              toast.success("Payment method saved");
+              toast.info("Demo only: payment method saved in preview.", {
+                description: "No card was stored and no charge was attempted.",
+              });
             }}
             className="bg-gradient-brand text-white"
           >
