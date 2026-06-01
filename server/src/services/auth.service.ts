@@ -62,6 +62,65 @@ async function createUniqueWorkspaceSlug(base: string): Promise<string> {
   return candidate;
 }
 
+async function createStarterWorkspaceData(
+  tx: Prisma.TransactionClient,
+  workspaceId: string,
+  userId: string,
+): Promise<void> {
+  const project = await tx.project.create({
+    data: {
+      workspaceId,
+      name: "Getting Started",
+      description: "A starter project to help you explore TeamFlow AI.",
+      status: "ACTIVE",
+      color: "from-blue-500 to-cyan-500",
+    },
+  });
+
+  const taskCount = await tx.task.count();
+  const starterTasks = [
+    {
+      title: "Create your first project",
+      description: "Set up a project that reflects how your team plans and ships work.",
+      status: "TODO" as const,
+      priority: "HIGH" as const,
+    },
+    {
+      title: "Review the Kanban workflow",
+      description: "Move tasks across columns and confirm statuses update as expected.",
+      status: "IN_PROGRESS" as const,
+      priority: "MEDIUM" as const,
+    },
+    {
+      title: "Invite your first teammate",
+      description: "Add a colleague so you can collaborate on tasks in this workspace.",
+      status: "BACKLOG" as const,
+      priority: "MEDIUM" as const,
+    },
+    {
+      title: "Customize workspace settings",
+      description: "Update your workspace name and preferences to match your team.",
+      status: "DONE" as const,
+      priority: "LOW" as const,
+    },
+  ];
+
+  for (let index = 0; index < starterTasks.length; index += 1) {
+    const task = starterTasks[index];
+    await tx.task.create({
+      data: {
+        key: `TF-${taskCount + 101 + index}`,
+        projectId: project.id,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        priority: task.priority,
+        assigneeId: userId,
+      },
+    });
+  }
+}
+
 export function signAuthToken(userId: string): string {
   return jwt.sign({ sub: userId }, env.JWT_SECRET, { expiresIn: "7d" });
 }
@@ -114,6 +173,8 @@ export async function registerUser(input: {
           status: "ACTIVE",
         },
       });
+
+      await createStarterWorkspaceData(tx, workspace.id, createdUser.id);
 
       return createdUser;
     });
