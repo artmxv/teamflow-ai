@@ -2,7 +2,10 @@ import { prisma } from "../lib/prisma.js";
 
 const TASK_STATUSES = ["BACKLOG", "TODO", "IN_PROGRESS", "REVIEW", "DONE"] as const;
 
-export async function getDashboardSummary() {
+export async function getDashboardSummary(workspaceId: string) {
+  const projectWhere = { workspaceId };
+  const taskWhere = { project: { workspaceId } };
+
   const [
     activeProjects,
     openTasks,
@@ -11,15 +14,17 @@ export async function getDashboardSummary() {
     statusGroups,
     recentTasks,
   ] = await Promise.all([
-    prisma.project.count({ where: { status: "ACTIVE" } }),
-    prisma.task.count({ where: { status: { not: "DONE" } } }),
-    prisma.task.count({ where: { status: "DONE" } }),
-    prisma.workspaceMember.count({ where: { status: "ACTIVE" } }),
+    prisma.project.count({ where: { ...projectWhere, status: "ACTIVE" } }),
+    prisma.task.count({ where: { ...taskWhere, status: { not: "DONE" } } }),
+    prisma.task.count({ where: { ...taskWhere, status: "DONE" } }),
+    prisma.workspaceMember.count({ where: { workspaceId, status: "ACTIVE" } }),
     prisma.task.groupBy({
       by: ["status"],
+      where: taskWhere,
       _count: { status: true },
     }),
     prisma.task.findMany({
+      where: taskWhere,
       take: 5,
       orderBy: { updatedAt: "desc" },
       select: {

@@ -108,13 +108,30 @@ function mapTaskDetail(task: {
   };
 }
 
-export async function getTasks() {
+export async function getTasks(workspaceId: string) {
   const tasks = await prisma.task.findMany({
+    where: {
+      project: { workspaceId },
+    },
     orderBy: { updatedAt: "desc" },
     select: taskDetailSelect,
   });
 
   return tasks.map(mapTaskDetail);
+}
+
+async function findProjectInWorkspace(projectId: string, workspaceId: string) {
+  return prisma.project.findFirst({
+    where: { id: projectId, workspaceId },
+    select: { id: true },
+  });
+}
+
+async function findTaskInWorkspace(taskId: string, workspaceId: string) {
+  return prisma.task.findFirst({
+    where: { id: taskId, project: { workspaceId } },
+    select: { id: true },
+  });
 }
 
 async function resolveAssigneeId(assigneeId?: string | null) {
@@ -130,7 +147,12 @@ async function resolveAssigneeId(assigneeId?: string | null) {
   return user?.id ?? null;
 }
 
-export async function createTask(input: CreateTaskInput) {
+export async function createTask(workspaceId: string, input: CreateTaskInput) {
+  const project = await findProjectInWorkspace(input.projectId, workspaceId);
+  if (!project) {
+    return null;
+  }
+
   const taskCount = await prisma.task.count();
   const assigneeId = await resolveAssigneeId(input.assigneeId);
 
@@ -184,11 +206,8 @@ export async function createTask(input: CreateTaskInput) {
   };
 }
 
-export async function updateTask(id: string, input: UpdateTaskInput) {
-  const existing = await prisma.task.findUnique({
-    where: { id },
-    select: { id: true },
-  });
+export async function updateTask(workspaceId: string, id: string, input: UpdateTaskInput) {
+  const existing = await findTaskInWorkspace(id, workspaceId);
 
   if (!existing) {
     return null;
@@ -231,11 +250,8 @@ export async function updateTask(id: string, input: UpdateTaskInput) {
   return mapTaskDetail(task);
 }
 
-export async function deleteTask(id: string) {
-  const existing = await prisma.task.findUnique({
-    where: { id },
-    select: { id: true },
-  });
+export async function deleteTask(workspaceId: string, id: string) {
+  const existing = await findTaskInWorkspace(id, workspaceId);
 
   if (!existing) {
     return null;

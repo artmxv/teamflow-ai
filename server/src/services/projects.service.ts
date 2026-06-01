@@ -9,8 +9,9 @@ type CreateProjectInput = {
   dueDate?: string | null;
 };
 
-export async function getProjects() {
+export async function getProjects(workspaceId: string) {
   const projects = await prisma.project.findMany({
+    where: { workspaceId },
     orderBy: { updatedAt: "desc" },
     select: {
       id: true,

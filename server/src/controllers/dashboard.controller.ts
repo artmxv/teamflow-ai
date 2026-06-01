@@ -1,14 +1,21 @@
 import type { NextFunction, Request, Response } from "express";
 
 import { getDashboardSummary } from "../services/dashboard.service.js";
+import { getUserWorkspaceContext } from "../services/workspace-context.service.js";
 
 export async function getDashboardSummaryController(
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ) {
   try {
-    const summary = await getDashboardSummary();
+    const context = await getUserWorkspaceContext(req.userId!);
+    if (!context) {
+      res.status(403).json({ message: "Workspace not found" });
+      return;
+    }
+
+    const summary = await getDashboardSummary(context.workspaceId);
     res.json({ data: summary });
   } catch (error) {
     next(error);
