@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { requireAuth } from "@/lib/auth/route-guards";
 import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,6 +9,7 @@ import { suggestedPrompts, projects } from "@/lib/mock-data";
 import { useI18n } from "@/lib/i18n";
 
 export const Route = createFileRoute("/app/ai")({
+  beforeLoad: requireAuth,
   head: () => ({ meta: [{ title: "AI Assistant — TeamFlow AI" }] }),
   component: AssistantPage,
 });

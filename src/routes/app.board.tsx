@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { requireAuth } from "@/lib/auth/route-guards";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
@@ -36,6 +37,7 @@ import { useI18n, type TKey } from "@/lib/i18n";
 import { Filter, Plus } from "lucide-react";
 
 export const Route = createFileRoute("/app/board")({
+  beforeLoad: requireAuth,
   head: () => ({ meta: [{ title: "Kanban — TeamFlow AI" }] }),
   component: Board,
 });

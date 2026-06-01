@@ -21,12 +21,10 @@ import { LanguageSwitcher, useI18n } from "@/lib/i18n";
 import { ThemeToggle } from "@/lib/theme";
 import { toast } from "sonner";
 import { logout } from "@/lib/api/auth";
-import { clearAuthToken } from "@/lib/auth/token";
+import { clearAuthToken, getAuthToken } from "@/lib/auth/token";
 import { nameToInitials, useCurrentUser } from "@/lib/auth/use-current-user";
-import { members } from "@/lib/mock-data";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { Workspace } from "./AppShell";
-
-const mockUser = members[0];
 
 const notifications = [
   { id: "n1", title: "Priya mentioned you", detail: "Review the billing edge case task." },
@@ -49,11 +47,10 @@ export function AppTopbar({
   const { t } = useI18n();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: currentUser } = useCurrentUser();
-  const displayUser = currentUser ?? mockUser;
-  const displayInitials = currentUser
-    ? nameToInitials(currentUser.name)
-    : mockUser.avatar;
+  const hasToken = typeof window !== "undefined" && !!getAuthToken();
+  const { data: currentUser, isPending, isError } = useCurrentUser();
+  const showProfile = hasToken && !isError && !!currentUser;
+  const showProfilePlaceholder = hasToken && isPending && !currentUser;
   const [helpOpen, setHelpOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [unread, setUnread] = useState(notifications.length);
@@ -168,37 +165,49 @@ export function AppTopbar({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-2 rounded-lg p-1 pr-2 transition hover:bg-secondary">
-              <span className="grid size-8 place-items-center rounded-md bg-gradient-brand text-xs font-semibold text-white">
-                {displayInitials}
-              </span>
-              <span className="hidden text-left xl:block">
-                <span className="block text-sm font-medium leading-tight">{displayUser.name}</span>
-                <span className="block text-[11px] text-muted-foreground leading-tight">
-                  {currentUser ? "Member" : mockUser.role}
+        {showProfilePlaceholder && (
+          <div
+            className="flex items-center gap-2 rounded-lg p-1 pr-2"
+            aria-hidden
+          >
+            <Skeleton className="size-8 rounded-md" />
+            <span className="hidden space-y-1 xl:block">
+              <Skeleton className="h-3.5 w-24" />
+              <Skeleton className="h-3 w-16" />
+            </span>
+          </div>
+        )}
+        {showProfile && currentUser && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-2 rounded-lg p-1 pr-2 transition hover:bg-secondary">
+                <span className="grid size-8 place-items-center rounded-md bg-gradient-brand text-xs font-semibold text-white">
+                  {nameToInitials(currentUser.name)}
                 </span>
-              </span>
-              <ChevronDown className="hidden size-3.5 text-muted-foreground xl:block" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>{displayUser.email}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild><Link to="/app/settings">{t("settings.profileSettings")}</Link></DropdownMenuItem>
-            <DropdownMenuItem asChild><Link to="/app/settings">{t("settings.workspaceSettings")}</Link></DropdownMenuItem>
-            <DropdownMenuItem asChild><Link to="/app/billing">{t("side.billing")}</Link></DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setShortcutsOpen(true)}>{t("top.keyboardShortcuts")}</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => logoutMutation.mutate()}
-              disabled={logoutMutation.isPending}
-            >
-              Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+                <span className="hidden text-left xl:block">
+                  <span className="block text-sm font-medium leading-tight">{currentUser.name}</span>
+                  <span className="block text-[11px] text-muted-foreground leading-tight">Member</span>
+                </span>
+                <ChevronDown className="hidden size-3.5 text-muted-foreground xl:block" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>{currentUser.email}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild><Link to="/app/settings">{t("settings.profileSettings")}</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link to="/app/settings">{t("settings.workspaceSettings")}</Link></DropdownMenuItem>
+              <DropdownMenuItem asChild><Link to="/app/billing">{t("side.billing")}</Link></DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShortcutsOpen(true)}>{t("top.keyboardShortcuts")}</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => logoutMutation.mutate()}
+                disabled={logoutMutation.isPending}
+              >
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       <Dialog open={helpOpen} onOpenChange={setHelpOpen}>

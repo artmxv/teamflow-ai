@@ -1,4 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { requireAuth } from "@/lib/auth/route-guards";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
@@ -21,6 +22,7 @@ import { useI18n } from "@/lib/i18n";
 import { CreditCard, Check } from "lucide-react";
 
 export const Route = createFileRoute("/app/settings")({
+  beforeLoad: requireAuth,
   head: () => ({ meta: [{ title: "Settings — TeamFlow AI" }] }),
   component: SettingsPage,
 });

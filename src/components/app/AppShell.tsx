@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 import { AppSidebar } from "./AppSidebar";
 import { AppTopbar } from "./AppTopbar";
 
@@ -19,17 +20,19 @@ export function AppShell({ title, children }: { title: string; children: ReactNo
   const [activeWorkspace, setActiveWorkspace] = useState(workspaces[0]);
 
   return (
-    <div className="flex min-h-screen w-full bg-muted/30">
-      <AppSidebar activeWorkspace={activeWorkspace} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <AppTopbar
-          title={title}
-          workspaces={workspaces}
-          activeWorkspace={activeWorkspace}
-          onWorkspaceChange={setActiveWorkspace}
-        />
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+    <AuthGuard>
+      <div className="flex min-h-screen w-full bg-muted/30">
+        <AppSidebar activeWorkspace={activeWorkspace} />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <AppTopbar
+            title={title}
+            workspaces={workspaces}
+            activeWorkspace={activeWorkspace}
+            onWorkspaceChange={setActiveWorkspace}
+          />
+          <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+        </div>
       </div>
-    </div>
+    </AuthGuard>
   );
 }

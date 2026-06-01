@@ -7,10 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { register } from "@/lib/api/auth";
+import { redirectIfAuthenticated } from "@/lib/auth/route-guards";
 import { setAuthToken } from "@/lib/auth/token";
 import { PASSWORD_HELPER_TEXT, validatePassword } from "@/lib/validation/password";
 
 export const Route = createFileRoute("/signup")({
+  beforeLoad: redirectIfAuthenticated,
   head: () => ({ meta: [{ title: "Create account — TeamFlow AI" }] }),
   component: SignUp,
 });
