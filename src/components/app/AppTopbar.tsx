@@ -22,7 +22,12 @@ import { ThemeToggle } from "@/lib/theme";
 import { toast } from "sonner";
 import { logout } from "@/lib/api/auth";
 import { clearAuthToken, getAuthToken } from "@/lib/auth/token";
-import { nameToInitials, useCurrentUser } from "@/lib/auth/use-current-user";
+import {
+  nameToInitials,
+  useCurrentUser,
+  workspaceRoleLabel,
+} from "@/lib/auth/use-current-user";
+import type { WorkspaceRole } from "@/lib/api/auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Workspace } from "./AppShell";
 
@@ -38,19 +43,23 @@ export function AppTopbar({
   workspaces,
   activeWorkspace,
   onWorkspaceChange,
+  workspaceRole,
 }: {
   title: string;
   workspaces: Workspace[];
   activeWorkspace: Workspace;
   onWorkspaceChange: (workspace: Workspace) => void;
+  workspaceRole?: WorkspaceRole | null;
 }) {
   const { t } = useI18n();
   const router = useRouter();
   const queryClient = useQueryClient();
   const hasToken = typeof window !== "undefined" && !!getAuthToken();
-  const { data: currentUser, isPending, isError } = useCurrentUser();
+  const { data: me, isPending, isError } = useCurrentUser();
+  const currentUser = me?.user;
   const showProfile = hasToken && !isError && !!currentUser;
   const showProfilePlaceholder = hasToken && isPending && !currentUser;
+  const profileRoleLabel = workspaceRole ? workspaceRoleLabel(workspaceRole) : "Member";
   const [helpOpen, setHelpOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [unread, setUnread] = useState(notifications.length);
@@ -104,7 +113,9 @@ export function AppTopbar({
               <span className="grid size-6 place-items-center rounded-md bg-gradient-brand text-[10px] font-semibold text-white">{w.initials}</span>
               <span className="flex-1">
                 <span className="block text-sm font-medium leading-tight">{w.name}</span>
-                <span className="block text-[11px] text-muted-foreground leading-tight">{w.plan}</span>
+                <span className="block text-[11px] text-muted-foreground leading-tight">
+                  {w.slug ?? w.plan}
+                </span>
               </span>
               {activeWorkspace.id === w.id && <Check className="size-4 text-primary" />}
             </DropdownMenuItem>
@@ -186,7 +197,9 @@ export function AppTopbar({
                 </span>
                 <span className="hidden text-left xl:block">
                   <span className="block text-sm font-medium leading-tight">{currentUser.name}</span>
-                  <span className="block text-[11px] text-muted-foreground leading-tight">Member</span>
+                  <span className="block text-[11px] text-muted-foreground leading-tight">
+                  {profileRoleLabel}
+                </span>
                 </span>
                 <ChevronDown className="hidden size-3.5 text-muted-foreground xl:block" />
               </button>

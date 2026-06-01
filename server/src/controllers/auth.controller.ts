@@ -7,6 +7,7 @@ import {
   loginUser,
   registerUser,
 } from "../services/auth.service.js";
+import { getUserCurrentWorkspace } from "../services/workspace-context.service.js";
 
 const registerPasswordSchema = z
   .string()
@@ -89,8 +90,11 @@ export async function meController(req: Request, res: Response, next: NextFuncti
       return;
     }
 
-    const user = await getUserById(req.userId);
-    res.json({ data: { user } });
+    const [user, workspace] = await Promise.all([
+      getUserById(req.userId),
+      getUserCurrentWorkspace(req.userId),
+    ]);
+    res.json({ data: { user, workspace } });
   } catch (error) {
     handleAuthError(error, res, next);
   }

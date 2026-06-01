@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { getMe } from "@/lib/api/auth";
+import { getMe, type AuthWorkspace } from "@/lib/api/auth";
 import { clearAuthToken, getAuthToken } from "./token";
 
 export function useCurrentUser() {
@@ -26,6 +26,23 @@ export function useCurrentUser() {
   }, [hasToken, query.isError, queryClient, router]);
 
   return query;
+}
+
+export function useCurrentWorkspace() {
+  const query = useCurrentUser();
+  return {
+    ...query,
+    data: query.data?.workspace ?? null,
+  };
+}
+
+export function workspaceRoleLabel(role: AuthWorkspace["role"]): string {
+  const labels: Record<AuthWorkspace["role"], string> = {
+    OWNER: "Owner",
+    ADMIN: "Admin",
+    MEMBER: "Member",
+  };
+  return labels[role];
 }
 
 export function nameToInitials(name: string): string {

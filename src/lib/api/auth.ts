@@ -1,5 +1,7 @@
 import { apiRequest } from "./client";
 
+export type WorkspaceRole = "OWNER" | "ADMIN" | "MEMBER";
+
 export interface AuthUser {
   id: string;
   name: string;
@@ -7,6 +9,18 @@ export interface AuthUser {
   avatar: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AuthWorkspace {
+  id: string;
+  name: string;
+  slug: string;
+  role: WorkspaceRole;
+}
+
+export interface AuthMeData {
+  user: AuthUser;
+  workspace: AuthWorkspace | null;
 }
 
 export interface LoginInput {
@@ -28,9 +42,7 @@ interface AuthPayloadResponse {
 }
 
 interface MeResponse {
-  data: {
-    user: AuthUser;
-  };
+  data: AuthMeData;
 }
 
 interface LogoutResponse {
@@ -59,9 +71,9 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
   return response.data;
 }
 
-export async function getMe(): Promise<AuthUser> {
+export async function getMe(): Promise<AuthMeData> {
   const response = await apiRequest<MeResponse>("/api/auth/me");
-  return response.data.user;
+  return response.data;
 }
 
 export async function logout(): Promise<void> {
