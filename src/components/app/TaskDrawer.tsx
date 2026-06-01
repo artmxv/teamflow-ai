@@ -2,19 +2,14 @@ import { useState } from "react";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  type Task,
-  getMember,
-  getProject,
-  priorityMeta,
-  statusColumns,
-} from "@/lib/mock-data";
+import { type Task, getMember, getProject, priorityMeta, statusColumns } from "@/lib/mock-data";
 import { Avatar } from "./Avatar";
 import {
   Calendar,
@@ -57,6 +52,9 @@ export function TaskDrawer({
             <span>{project?.name}</span>
           </div>
           <SheetTitle className="text-xl leading-snug">{task.title}</SheetTitle>
+          <SheetDescription className="sr-only">
+            Task details, checklist, comments, and activity for {task.key}.
+          </SheetDescription>
         </SheetHeader>
 
         <div className="grid gap-6 py-4 lg:grid-cols-[1fr_220px]">
@@ -81,9 +79,12 @@ export function TaskDrawer({
               {aiOpen && (
                 <div className="mt-3 space-y-3 text-sm">
                   <div className="rounded-lg bg-card p-3 shadow-soft">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-primary">Summary</div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-primary">
+                      Summary
+                    </div>
                     <p className="mt-1 text-foreground/90">
-                      This task involves implementing the requested feature, validating with QA, and updating the documentation. Two open dependencies were detected in linked PRs.
+                      This task involves implementing the requested feature, validating with QA, and
+                      updating the documentation. Two open dependencies were detected in linked PRs.
                     </p>
                   </div>
                   <div className="rounded-lg bg-card p-3 shadow-soft">
@@ -121,12 +122,16 @@ export function TaskDrawer({
                     <span
                       className={cn(
                         "grid size-5 place-items-center rounded-md border",
-                        c.done ? "border-primary bg-primary text-primary-foreground" : "border-input",
+                        c.done
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-input",
                       )}
                     >
                       {c.done && <Check className="size-3" />}
                     </span>
-                    <span className={cn(c.done && "text-muted-foreground line-through")}>{c.label}</span>
+                    <span className={cn(c.done && "text-muted-foreground line-through")}>
+                      {c.label}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -138,7 +143,10 @@ export function TaskDrawer({
               </h3>
               <div className="grid gap-2 sm:grid-cols-2">
                 {task.attachments.map((a) => (
-                  <div key={a.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+                  <div
+                    key={a.id}
+                    className="flex items-center gap-3 rounded-xl border border-border bg-card p-3"
+                  >
                     <div className="grid size-9 place-items-center rounded-lg bg-secondary text-xs font-semibold">
                       {a.name.split(".").pop()?.toUpperCase()}
                     </div>
@@ -196,10 +204,14 @@ export function TaskDrawer({
 
           <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
             <Field icon={CircleDot} label="Status">
-              <Badge variant="secondary" className="border-0">{statusLabel}</Badge>
+              <Badge variant="secondary" className="border-0">
+                {statusLabel}
+              </Badge>
             </Field>
             <Field icon={Flag} label="Priority">
-              <Badge variant="secondary" className={prio.className + " border-0"}>{prio.label}</Badge>
+              <Badge variant="secondary" className={prio.className + " border-0"}>
+                {prio.label}
+              </Badge>
             </Field>
             <Field icon={UserIcon} label="Assignee">
               {assignee ? (
@@ -217,7 +229,10 @@ export function TaskDrawer({
             <Field icon={Flag} label="Labels">
               <div className="flex flex-wrap gap-1">
                 {task.labels.map((l) => (
-                  <span key={l} className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-medium">
+                  <span
+                    key={l}
+                    className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-medium"
+                  >
                     {l}
                   </span>
                 ))}
@@ -232,9 +247,7 @@ export function TaskDrawer({
                 disabled={isDeleting}
                 onClick={() => {
                   if (
-                    window.confirm(
-                      `Delete task "${task.title}"? This action cannot be undone.`,
-                    )
+                    window.confirm(`Delete task "${task.title}"? This action cannot be undone.`)
                   ) {
                     onDelete(task.id);
                   }

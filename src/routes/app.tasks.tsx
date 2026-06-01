@@ -22,7 +22,15 @@ import {
   type TaskApiStatus,
 } from "@/lib/api/tasks";
 import { useI18n, type TKey } from "@/lib/i18n";
-import { Search, Plus, MessageSquare, Paperclip, Calendar } from "lucide-react";
+import {
+  Search,
+  Plus,
+  MessageSquare,
+  Paperclip,
+  Calendar,
+  ListTodo,
+  RotateCcw,
+} from "lucide-react";
 
 export const Route = createFileRoute("/app/tasks")({
   beforeLoad: requireAuth,
@@ -120,10 +128,19 @@ function TasksPage() {
         (task) =>
           (status === "all" || task.status === status) &&
           (priority === "all" || task.priority === priority) &&
-          (q === "" || task.title.toLowerCase().includes(q.toLowerCase()) || task.key.toLowerCase().includes(q.toLowerCase())),
+          (q === "" ||
+            task.title.toLowerCase().includes(q.toLowerCase()) ||
+            task.key.toLowerCase().includes(q.toLowerCase())),
       ),
     [q, status, priority, taskList],
   );
+  const isTrulyEmpty = taskList.length === 0;
+
+  function clearFilters() {
+    setQ("");
+    setStatus("all");
+    setPriority("all");
+  }
 
   async function handleCreateTask(values: TaskFormValues) {
     if (!projectId) {
@@ -159,18 +176,31 @@ function TasksPage() {
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative w-full sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("tasks.searchTasks")} className="pl-9" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={t("tasks.searchTasks")}
+            className="pl-9"
+          />
         </div>
         <div className="flex flex-wrap gap-2">
-          <Pill active={status === "all"} onClick={() => setStatus("all")}>{t("tasks.allStatus")}</Pill>
+          <Pill active={status === "all"} onClick={() => setStatus("all")}>
+            {t("tasks.allStatus")}
+          </Pill>
           {(Object.keys(statusMeta) as TaskStatus[]).map((s) => (
-            <Pill key={s} active={status === s} onClick={() => setStatus(s)}>{t(statusMeta[s].labelKey)}</Pill>
+            <Pill key={s} active={status === s} onClick={() => setStatus(s)}>
+              {t(statusMeta[s].labelKey)}
+            </Pill>
           ))}
         </div>
         <div className="ml-auto flex flex-wrap gap-2">
-          <Pill active={priority === "all"} onClick={() => setPriority("all")}>{t("tasks.allPriorities")}</Pill>
+          <Pill active={priority === "all"} onClick={() => setPriority("all")}>
+            {t("tasks.allPriorities")}
+          </Pill>
           {(["low", "medium", "high", "urgent"] as Priority[]).map((p) => (
-            <Pill key={p} active={priority === p} onClick={() => setPriority(p)}>{p}</Pill>
+            <Pill key={p} active={priority === p} onClick={() => setPriority(p)}>
+              {p}
+            </Pill>
           ))}
         </div>
       </div>
@@ -188,43 +218,89 @@ function TasksPage() {
           <LoadingRows />
         ) : isError ? (
           <ErrorState error={error} onRetry={() => void refetch()} />
+        ) : filtered.length === 0 ? (
+          isTrulyEmpty ? (
+            <EmptyState isSubmitting={createTaskMutation.isPending} onCreate={handleCreateTask} />
+          ) : (
+            <NoResultsState onResetFilters={clearFilters} />
+          )
         ) : (
           <ul className="divide-y divide-border">
             {filtered.map((task) => (
-                <li
-                  key={task.id}
-                  onClick={() => setSelected(task)}
-                  className="grid cursor-pointer grid-cols-2 gap-3 px-4 py-3 text-sm transition hover:bg-muted/30 md:grid-cols-[1fr_120px_120px_140px_120px_120px]"
-                >
-                  <div className="col-span-2 md:col-span-1">
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">{task.key}</span>
-                      <span className="font-medium">{task.title}</span>
-                    </div>
-                    <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{task.projectName}</span>
-                      {task.labels.slice(0, 2).map((label) => (
-                        <Badge key={label} variant="secondary" className="h-4 rounded-md px-1.5 text-[10px] font-normal">{label}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                  <div><span className={"inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold " + statusMeta[task.status].tone}>{t(statusMeta[task.status].labelKey)}</span></div>
-                  <div><span className={"inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold capitalize " + priorityMeta[task.priority]}>{task.priority}</span></div>
+              <li
+                key={task.id}
+                onClick={() => setSelected(task)}
+                className="grid cursor-pointer grid-cols-2 gap-3 px-4 py-3 text-sm transition hover:bg-muted/30 md:grid-cols-[1fr_120px_120px_140px_120px_120px]"
+              >
+                <div className="col-span-2 md:col-span-1">
                   <div className="flex items-center gap-2">
-                    {task.assigneeName ? (<><Avatar id={task.assigneeId ?? task.id} initials={task.assigneeAvatar ?? initials(task.assigneeName)} size="sm" /><span className="truncate text-xs">{task.assigneeName}</span></>) : <span className="text-xs text-muted-foreground">—</span>}
+                    <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                      {task.key}
+                    </span>
+                    <span className="font-medium">{task.title}</span>
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Calendar className="size-3.5" /> {task.dueDate ?? "—"}
+                  <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{task.projectName}</span>
+                    {task.labels.slice(0, 2).map((label) => (
+                      <Badge
+                        key={label}
+                        variant="secondary"
+                        className="h-4 rounded-md px-1.5 text-[10px] font-normal"
+                      >
+                        {label}
+                      </Badge>
+                    ))}
                   </div>
-                  <div className="flex items-center justify-end gap-3 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1"><MessageSquare className="size-3.5" />{task.commentsCount}</span>
-                    <span className="inline-flex items-center gap-1"><Paperclip className="size-3.5" />{task.attachmentsCount}</span>
-                  </div>
-                </li>
-              ))}
-            {filtered.length === 0 && (
-              <li className="px-4 py-12 text-center text-sm text-muted-foreground">No tasks match your filters.</li>
-            )}
+                </div>
+                <div>
+                  <span
+                    className={
+                      "inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold " +
+                      statusMeta[task.status].tone
+                    }
+                  >
+                    {t(statusMeta[task.status].labelKey)}
+                  </span>
+                </div>
+                <div>
+                  <span
+                    className={
+                      "inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold capitalize " +
+                      priorityMeta[task.priority]
+                    }
+                  >
+                    {task.priority}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {task.assigneeName ? (
+                    <>
+                      <Avatar
+                        id={task.assigneeId ?? task.id}
+                        initials={task.assigneeAvatar ?? initials(task.assigneeName)}
+                        size="sm"
+                      />
+                      <span className="truncate text-xs">{task.assigneeName}</span>
+                    </>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Calendar className="size-3.5" /> {task.dueDate ?? "—"}
+                </div>
+                <div className="flex items-center justify-end gap-3 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <MessageSquare className="size-3.5" />
+                    {task.commentsCount}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Paperclip className="size-3.5" />
+                    {task.attachmentsCount}
+                  </span>
+                </div>
+              </li>
+            ))}
           </ul>
         )}
       </div>
@@ -283,7 +359,10 @@ function LoadingRows() {
   return (
     <ul className="divide-y divide-border">
       {Array.from({ length: 6 }).map((_, index) => (
-        <li key={index} className="grid grid-cols-2 gap-3 px-4 py-3 md:grid-cols-[1fr_120px_120px_140px_120px_120px]">
+        <li
+          key={index}
+          className="grid grid-cols-2 gap-3 px-4 py-3 md:grid-cols-[1fr_120px_120px_140px_120px_120px]"
+        >
           <div className="col-span-2 space-y-2 md:col-span-1">
             <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
             <div className="h-3 w-1/3 animate-pulse rounded bg-muted" />
@@ -301,19 +380,75 @@ function LoadingRows() {
 
 function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
   return (
-    <div className="px-4 py-12 text-center">
-      <h3 className="text-base font-semibold">Tasks could not load</h3>
+    <div className="px-4 py-12 text-center sm:px-8">
+      <h3 className="text-base font-semibold">Could not load tasks</h3>
       <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-        {error?.message ?? "Check that the backend is running and try again."}
+        {error?.message ??
+          "We could not reach the server. Check that the backend is running, then try again."}
       </p>
-      <Button onClick={onRetry} className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
+      <Button
+        onClick={onRetry}
+        className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95"
+      >
         Retry
       </Button>
     </div>
   );
 }
 
-function Pill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function EmptyState({
+  isSubmitting,
+  onCreate,
+}: {
+  isSubmitting: boolean;
+  onCreate: (values: TaskFormValues) => Promise<void>;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div className="px-4 py-12 text-center sm:px-8">
+      <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-accent text-accent-foreground">
+        <ListTodo className="size-5" />
+      </div>
+      <h3 className="mt-4 text-base font-semibold">No tasks yet</h3>
+      <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+        Create your first task to track work, set priorities, and keep your team aligned.
+      </p>
+      <NewTaskDialog isSubmitting={isSubmitting} onSubmit={onCreate}>
+        <Button className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
+          <Plus className="size-4" /> {t("common.newTask")}
+        </Button>
+      </NewTaskDialog>
+    </div>
+  );
+}
+
+function NoResultsState({ onResetFilters }: { onResetFilters: () => void }) {
+  return (
+    <div className="px-4 py-12 text-center sm:px-8">
+      <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-muted text-muted-foreground">
+        <Search className="size-5" />
+      </div>
+      <h3 className="mt-4 text-base font-semibold">No tasks match your filters</h3>
+      <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+        Try a different search term, status, or priority, or reset filters to see all tasks.
+      </p>
+      <Button variant="outline" onClick={onResetFilters} className="mt-5">
+        <RotateCcw className="size-4" /> Reset filters
+      </Button>
+    </div>
+  );
+}
+
+function Pill({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <button
       onClick={onClick}
