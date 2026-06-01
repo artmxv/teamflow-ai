@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 
 import { createTask, deleteTask, getTasks, updateTask } from "../services/tasks.service.js";
+import { getUserWorkspaceContext } from "../services/workspace-context.service.js";
 
 const createTaskSchema = z.object({
   projectId: z.string().min(1, "projectId is required"),
@@ -22,9 +23,23 @@ const updateTaskSchema = z.object({
   dueDate: z.string().datetime().nullable().optional(),
 });
 
-export async function getTasksController(_req: Request, res: Response, next: NextFunction) {
+async function resolveWorkspace(req: Request, res: Response) {
+  const context = await getUserWorkspaceContext(req.userId!);
+  if (!context) {
+    res.status(403).json({ message: "Workspace not found" });
+    return null;
+  }
+  return context;
+}
+
+export async function getTasksController(req: Request, res: Response, next: NextFunction) {
   try {
-    const tasks = await getTasks();
+    const context = await resolveWorkspace(req, res);
+    if (!context) {
+      return;
+    }
+
+    const tasks = await getTasks(context.workspaceId);
     res.json({ data: tasks });
   } catch (error) {
     next(error);
@@ -33,6 +48,11 @@ export async function getTasksController(_req: Request, res: Response, next: Nex
 
 export async function createTaskController(req: Request, res: Response, next: NextFunction) {
   try {
+    const context = await resolveWorkspace(req, res);
+    if (!context) {
+      return;
+    }
+
     const result = createTaskSchema.safeParse(req.body);
 
     if (!result.success) {
@@ -43,7 +63,15 @@ export async function createTaskController(req: Request, res: Response, next: Ne
       return;
     }
 
-    const task = await createTask(result.data);
+    const task = await createTask(context.workspaceId, result.data);
+
+    if (!task) {
+      res.status(404).json({
+        message: "Project not found",
+      });
+      return;
+    }
+
     res.status(201).json({ data: task });
   } catch (error) {
     next(error);
@@ -52,6 +80,11 @@ export async function createTaskController(req: Request, res: Response, next: Ne
 
 export async function updateTaskController(req: Request, res: Response, next: NextFunction) {
   try {
+    const context = await resolveWorkspace(req, res);
+    if (!context) {
+      return;
+    }
+
     const result = updateTaskSchema.safeParse(req.body);
 
     if (!result.success) {
@@ -70,7 +103,7 @@ export async function updateTaskController(req: Request, res: Response, next: Ne
       return;
     }
 
-    const task = await updateTask(taskId, result.data);
+    const task = await updateTask(context.workspaceId, taskId, result.data);
 
     if (!task) {
       res.status(404).json({
@@ -87,6 +120,11 @@ export async function updateTaskController(req: Request, res: Response, next: Ne
 
 export async function deleteTaskController(req: Request, res: Response, next: NextFunction) {
   try {
+    const context = await resolveWorkspace(req, res);
+    if (!context) {
+      return;
+    }
+
     const taskId = req.params.id;
     if (typeof taskId !== "string") {
       res.status(404).json({
@@ -95,7 +133,7 @@ export async function deleteTaskController(req: Request, res: Response, next: Ne
       return;
     }
 
-    const deleted = await deleteTask(taskId);
+    const deleted = await deleteTask(context.workspaceId, taskId);
 
     if (!deleted) {
       res.status(404).json({
