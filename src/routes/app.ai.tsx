@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import {
   AlertTriangle,
   ListChecks,
   Megaphone,
+  Copy,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { fetchWorkspaceAiSummary, type WorkspaceAiMetrics } from "@/lib/api/ai";
@@ -146,8 +148,23 @@ function AssistantPage() {
                 <div id="standup">
                   <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     <Megaphone className="size-3.5" /> Standup summary
+                    {data.standupSummary.trim() ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="ml-auto h-7 gap-1.5 text-xs font-medium normal-case tracking-normal"
+                        onClick={() => void copyStandupSummary(data.standupSummary)}
+                      >
+                        <Copy className="size-3.5" />
+                        Copy
+                      </Button>
+                    ) : null}
                   </div>
-                  <AssistantBubble content={data.standupSummary} />
+                  <AssistantBubble
+                    content={data.standupSummary}
+                    emptyMessage="No standup summary yet. Regenerate when your workspace has more activity."
+                  />
                 </div>
 
                 <div className="lg:hidden">
@@ -165,14 +182,29 @@ function AssistantPage() {
   );
 }
 
-function AssistantBubble({ content }: { content: string }) {
+async function copyStandupSummary(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success("Standup summary copied");
+  } catch {
+    toast.error("Could not copy to clipboard");
+  }
+}
+
+function AssistantBubble({ content, emptyMessage }: { content: string; emptyMessage?: string }) {
+  const isEmpty = !content.trim();
+
   return (
     <div className="flex max-w-[95%] gap-3">
       <div className="grid size-8 shrink-0 place-items-center rounded-xl bg-accent text-accent-foreground">
         <Sparkles className="size-4" />
       </div>
       <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md border border-border bg-card px-4 py-3 text-sm">
-        {content}
+        {isEmpty && emptyMessage ? (
+          <p className="text-muted-foreground">{emptyMessage}</p>
+        ) : (
+          content
+        )}
       </div>
     </div>
   );
