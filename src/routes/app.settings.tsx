@@ -19,7 +19,17 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@/lib/i18n";
+import { nameToInitials, useCurrentUser } from "@/lib/auth/use-current-user";
+import { Skeleton } from "@/components/ui/skeleton";
 import { CreditCard, Check } from "lucide-react";
+
+function workspaceUrlFromSlug(slug: string): string {
+  return `${slug}.teamflow.ai`;
+}
+
+function firstNameFromFullName(name: string): string {
+  return name.trim().split(/\s+/)[0] ?? name;
+}
 
 export const Route = createFileRoute("/app/settings")({
   beforeLoad: requireAuth,
@@ -29,6 +39,10 @@ export const Route = createFileRoute("/app/settings")({
 
 function SettingsPage() {
   const { t } = useI18n();
+  const { data: me, isPending } = useCurrentUser();
+  const user = me?.user;
+  const workspace = me?.workspace;
+  const userInitials = user ? nameToInitials(user.name) : "…";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [seatsOpen, setSeatsOpen] = useState(false);
   const [cardOpen, setCardOpen] = useState(false);
@@ -51,10 +65,36 @@ function SettingsPage() {
         <TabsContent value="workspace" className="mt-5">
           <Card title="Workspace details" description="Used across invites and emails.">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Workspace name"><Input defaultValue="Acme Studio" /></Field>
-              <Field label="Workspace URL"><Input defaultValue="acme.teamflow.ai" /></Field>
-              <Field label="Industry"><Input defaultValue="Product / Software" /></Field>
-              <Field label="Team size"><Input defaultValue="6 - 10" /></Field>
+              <Field label="Workspace name">
+                {isPending ? (
+                  <Skeleton className="h-10 w-full rounded-md" />
+                ) : (
+                  <Input
+                    key={workspace?.id ?? "workspace-name"}
+                    defaultValue={workspace?.name ?? ""}
+                    readOnly
+                    className="bg-muted/40"
+                  />
+                )}
+              </Field>
+              <Field label="Workspace URL">
+                {isPending ? (
+                  <Skeleton className="h-10 w-full rounded-md" />
+                ) : (
+                  <Input
+                    key={workspace?.slug ?? "workspace-url"}
+                    defaultValue={workspace?.slug ? workspaceUrlFromSlug(workspace.slug) : ""}
+                    readOnly
+                    className="bg-muted/40"
+                  />
+                )}
+              </Field>
+              <Field label="Industry">
+                <Input defaultValue="Product / Software" />
+              </Field>
+              <Field label="Team size">
+                <Input defaultValue="6 - 10" />
+              </Field>
             </div>
             <SaveBar />
           </Card>
@@ -63,7 +103,13 @@ function SettingsPage() {
         <TabsContent value="profile" className="mt-5">
           <Card title="Your profile" description="This is how others see you in the workspace.">
             <div className="flex items-center gap-4">
-              <div className="grid size-16 place-items-center rounded-2xl bg-gradient-brand text-lg font-semibold text-white shadow-glow">AM</div>
+              {isPending ? (
+                <Skeleton className="size-16 rounded-2xl" />
+              ) : (
+                <div className="grid size-16 place-items-center rounded-2xl bg-gradient-brand text-lg font-semibold text-white shadow-glow">
+                  {userInitials}
+                </div>
+              )}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -78,10 +124,46 @@ function SettingsPage() {
               </Button>
             </div>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <Field label="Full name"><Input defaultValue="Alex Morgan" /></Field>
-              <Field label="Display name"><Input defaultValue="Alex" /></Field>
-              <Field label="Email"><Input defaultValue="alex@teamflow.ai" /></Field>
-              <Field label="Time zone"><Input defaultValue="Europe/Berlin" /></Field>
+              <Field label="Full name">
+                {isPending ? (
+                  <Skeleton className="h-10 w-full rounded-md" />
+                ) : (
+                  <Input
+                    key={user?.id ?? "user-name"}
+                    defaultValue={user?.name ?? ""}
+                    readOnly
+                    className="bg-muted/40"
+                  />
+                )}
+              </Field>
+              <Field label="Display name">
+                {isPending ? (
+                  <Skeleton className="h-10 w-full rounded-md" />
+                ) : (
+                  <Input
+                    key={`${user?.id ?? "user"}-display`}
+                    defaultValue={user?.name ? firstNameFromFullName(user.name) : ""}
+                    readOnly
+                    className="bg-muted/40"
+                  />
+                )}
+              </Field>
+              <Field label="Email">
+                {isPending ? (
+                  <Skeleton className="h-10 w-full rounded-md" />
+                ) : (
+                  <Input
+                    key={user?.id ?? "user-email"}
+                    defaultValue={user?.email ?? ""}
+                    readOnly
+                    type="email"
+                    className="bg-muted/40"
+                  />
+                )}
+              </Field>
+              <Field label="Time zone">
+                <Input defaultValue="Europe/Berlin" />
+              </Field>
             </div>
             <div className="mt-4">
               <Field label="Bio">
@@ -93,7 +175,10 @@ function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="notifications" className="mt-5">
-          <Card title="Notification preferences" description="Choose what you want to be notified about.">
+          <Card
+            title="Notification preferences"
+            description="Choose what you want to be notified about."
+          >
             <div className="divide-y divide-border">
               {[
                 { l: "New comments on my tasks", d: "Email + in-app" },
@@ -120,9 +205,13 @@ function SettingsPage() {
           >
             <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-border bg-gradient-to-br from-primary/8 to-card p-5 sm:flex-row sm:items-center">
               <div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-primary">{t("billing.currentPlan")}</div>
+                <div className="text-xs font-semibold uppercase tracking-wider text-primary">
+                  {t("billing.currentPlan")}
+                </div>
                 <div className="mt-1 text-xl font-semibold">Team · 6 seats</div>
-                <div className="text-xs text-muted-foreground">$72 / month · Renews on Jul 14, 2026</div>
+                <div className="text-xs text-muted-foreground">
+                  $72 / month · Renews on Jul 14, 2026
+                </div>
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" asChild>
@@ -142,14 +231,30 @@ function SettingsPage() {
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   <CreditCard className="size-4" /> Payment method
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">Visa ending in 4242 · Exp 09/28</p>
-                <Button variant="outline" size="sm" className="mt-3" onClick={() => setCardOpen(true)}>{t("common.updateCard")}</Button>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Visa ending in 4242 · Exp 09/28
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => setCardOpen(true)}
+                >
+                  {t("common.updateCard")}
+                </Button>
               </div>
               <div className="rounded-2xl border border-border p-5">
                 <div className="text-sm font-semibold">What's included</div>
                 <ul className="mt-3 space-y-2 text-sm">
-                  {["Unlimited projects", "Advanced AI assistant", "Custom workflows", "SSO with Google"].map((f) => (
-                    <li key={f} className="flex items-center gap-2"><Check className="size-4 text-primary" /> {f}</li>
+                  {[
+                    "Unlimited projects",
+                    "Advanced AI assistant",
+                    "Custom workflows",
+                    "SSO with Google",
+                  ].map((f) => (
+                    <li key={f} className="flex items-center gap-2">
+                      <Check className="size-4 text-primary" /> {f}
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -164,7 +269,15 @@ function SettingsPage() {
   );
 }
 
-function Card({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+function Card({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
       <div className="mb-5">
@@ -189,15 +302,28 @@ function SaveBar() {
 
   return (
     <div className="mt-6 flex flex-wrap justify-end gap-2">
-      <Button variant="outline" onClick={() => setShortcutsOpen(true)}>{t("top.keyboardShortcuts")}</Button>
+      <Button variant="outline" onClick={() => setShortcutsOpen(true)}>
+        {t("top.keyboardShortcuts")}
+      </Button>
       <Button variant="outline">{t("common.cancel")}</Button>
-      <Button onClick={() => toast.success("Changes saved")} className="bg-gradient-brand text-white shadow-glow hover:opacity-95">{t("common.saveChanges")}</Button>
+      <Button
+        onClick={() => toast.success("Changes saved")}
+        className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
+      >
+        {t("common.saveChanges")}
+      </Button>
       <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
   );
 }
 
-function SeatsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+function SeatsDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -209,7 +335,9 @@ function SeatsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
           <Input type="number" min="1" defaultValue="2" />
         </Field>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
           <Button
             onClick={() => {
               onOpenChange(false);
@@ -225,7 +353,13 @@ function SeatsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
   );
 }
 
-function PaymentMethodDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+function PaymentMethodDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -235,13 +369,21 @@ function PaymentMethodDialog({ open, onOpenChange }: { open: boolean; onOpenChan
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <Field label="Card number"><Input defaultValue="4242 4242 4242 4242" /></Field>
+            <Field label="Card number">
+              <Input defaultValue="4242 4242 4242 4242" />
+            </Field>
           </div>
-          <Field label="Expiry"><Input defaultValue="09 / 28" /></Field>
-          <Field label="CVC"><Input defaultValue="123" /></Field>
+          <Field label="Expiry">
+            <Input defaultValue="09 / 28" />
+          </Field>
+          <Field label="CVC">
+            <Input defaultValue="123" />
+          </Field>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
           <Button
             onClick={() => {
               onOpenChange(false);
