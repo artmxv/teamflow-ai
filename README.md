@@ -42,6 +42,13 @@ Fullstack AI-native project workspace demo for product teams. TeamFlow AI combin
 
 - Seed script loads a professional workspace with users, projects, and tasks
 
+### Demo credentials
+
+After `npm run db:seed` in `server/`, sign in with:
+
+- **Email:** alex@teamflow.ai
+- **Password:** Password123!
+
 ### UI screens (not wired to the API yet)
 
 - AI Assistant, Team, Settings, and Billing pages use local/mock content for layout and UX exploration
@@ -176,6 +183,8 @@ cd server
 npm run prisma:migrate
 npm run db:seed
 ```
+
+**Demo login** (see [Demo credentials](#demo-credentials) above): `alex@teamflow.ai` / `Password123!`
 
 Other useful commands (from `server/`):
 
