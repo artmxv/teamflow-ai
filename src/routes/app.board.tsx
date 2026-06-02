@@ -424,12 +424,9 @@ function mapApiTaskToTask(task: TaskApiItem): Task {
     projectId: task.projectId,
     dueDate: formatDate(task.dueDate),
     labels: [task.project.name],
-    comments: Array.from({ length: task.commentsCount }, (_, index) => ({
-      id: `${task.id}-comment-${index}`,
-      authorId: task.assigneeId ?? "",
-      body: "",
-      createdAt: "",
-    })),
+    comments: [],
+    commentsCount: task.commentsCount,
+    attachmentsCount: task.attachmentsCount,
     checklist: Array.from({ length: task.checklistTotal }, (_, index) => ({
       id: `${task.id}-checklist-${index}`,
       label: `Checklist item ${index + 1}`,
