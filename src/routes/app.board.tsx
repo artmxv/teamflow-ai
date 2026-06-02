@@ -433,19 +433,7 @@ function mapApiTaskToTask(task: TaskApiItem): Task {
       done: index < task.checklistDone,
     })),
     activity: [],
-    attachments: Array.from({ length: task.attachmentsCount }, (_, index) => {
-      const demoFiles = [
-        { name: "spec-draft.pdf", size: "124 KB" },
-        { name: "ui-mockup.png", size: "890 KB" },
-        { name: "release-notes.md", size: "12 KB" },
-      ] as const;
-      const file = demoFiles[index % demoFiles.length];
-      return {
-        id: `${task.id}-attachment-${index}`,
-        name: file.name,
-        size: file.size,
-      };
-    }),
+    attachments: [],
   };
 }
 

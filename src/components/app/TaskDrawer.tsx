@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -36,6 +36,18 @@ import {
   updateTaskComment,
   type TaskCommentApiItem,
 } from "@/lib/api/task-comments";
+import {
+  deleteTaskAttachment,
+  downloadTaskAttachmentFile,
+  fetchTaskAttachmentBlob,
+  fetchTaskAttachments,
+  formatAttachmentSize,
+  getAttachmentFileTypeBadge,
+  isImageAttachment,
+  openTaskAttachment,
+  uploadTaskAttachment,
+  type TaskAttachmentApiItem,
+} from "@/lib/api/task-attachments";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { type Task, getMember, getProject, priorityMeta, statusColumns } from "@/lib/mock-data";
 import { Avatar } from "./Avatar";
@@ -51,7 +63,10 @@ import {
   Trash2,
   Pencil,
   X,
-  FileText,
+  Download,
+  ExternalLink,
+  Loader2,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -81,6 +96,7 @@ export function TaskDrawer({
   const [draftAssigneeId, setDraftAssigneeId] = useState<string | null>(null);
   const [draftDueDate, setDraftDueDate] = useState<string | null>(null);
   const [commentBody, setCommentBody] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!task) return;
@@ -137,6 +153,40 @@ export function TaskDrawer({
     onError: (mutationError) => {
       toast.error(
         mutationError instanceof Error ? mutationError.message : "Comment could not be deleted",
+      );
+    },
+  });
+
+  const attachmentsQuery = useQuery({
+    queryKey: ["task-attachments", task?.id],
+    queryFn: () => fetchTaskAttachments(task!.id),
+    enabled: !!task?.id,
+  });
+
+  const uploadAttachmentMutation = useMutation({
+    mutationFn: (file: File) => uploadTaskAttachment(task!.id, file),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["task-attachments", task!.id] });
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      toast.success("Attachment uploaded");
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Attachment could not be uploaded",
+      );
+    },
+  });
+
+  const deleteAttachmentMutation = useMutation({
+    mutationFn: (attachmentId: string) => deleteTaskAttachment(task!.id, attachmentId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["task-attachments", task!.id] });
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      toast.success("Attachment deleted");
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Attachment could not be deleted",
       );
     },
   });
@@ -255,25 +305,39 @@ export function TaskDrawer({
               </ul>
             </section>
 
-            <section>
-              <h3 className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                <Paperclip className="size-3.5" /> Attachments
-              </h3>
-              <p className="mb-3 text-xs text-muted-foreground">
-                Demo preview only — file upload is not available in this build.
-              </p>
-              {task.attachments.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                  No attachments on this task.
-                </p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {task.attachments.map((a) => (
-                    <DemoAttachmentChip key={a.id} name={a.name} size={a.size} />
-                  ))}
-                </div>
-              )}
-            </section>
+            <TaskAttachmentsSection
+              attachments={attachmentsQuery.data ?? []}
+              isLoading={attachmentsQuery.isLoading}
+              isError={attachmentsQuery.isError}
+              isUploading={uploadAttachmentMutation.isPending}
+              isDeletingId={
+                deleteAttachmentMutation.isPending
+                  ? (deleteAttachmentMutation.variables ?? null)
+                  : null
+              }
+              fileInputRef={fileInputRef}
+              onPickFile={() => fileInputRef.current?.click()}
+              onFileSelected={(file) => {
+                if (uploadAttachmentMutation.isPending) return;
+                uploadAttachmentMutation.mutate(file);
+              }}
+              onOpen={(attachment) => {
+                openTaskAttachment(attachment).catch(() => {
+                  toast.error("Could not open attachment");
+                });
+              }}
+              onDownload={(attachment) => {
+                downloadTaskAttachmentFile(attachment).catch(() => {
+                  toast.error("Could not download attachment");
+                });
+              }}
+              onDelete={(attachmentId) => {
+                if (deleteAttachmentMutation.isPending) {
+                  return Promise.reject(new Error("Delete already in progress"));
+                }
+                return deleteAttachmentMutation.mutateAsync(attachmentId);
+              }}
+            />
 
             <TaskCommentsSection
               comments={commentsQuery.data ?? []}
@@ -719,26 +783,261 @@ function TaskCommentRow({
   );
 }
 
-function attachmentExtension(name: string) {
-  const ext = name.includes(".") ? name.split(".").pop() : null;
-  return ext ? ext.toUpperCase().slice(0, 4) : "FILE";
+function TaskAttachmentsSection({
+  attachments,
+  isLoading,
+  isError,
+  isUploading,
+  isDeletingId,
+  fileInputRef,
+  onPickFile,
+  onFileSelected,
+  onOpen,
+  onDownload,
+  onDelete,
+}: {
+  attachments: TaskAttachmentApiItem[];
+  isLoading: boolean;
+  isError: boolean;
+  isUploading: boolean;
+  isDeletingId: string | null;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  onPickFile: () => void;
+  onFileSelected: (file: File) => void;
+  onOpen: (attachment: TaskAttachmentApiItem) => void;
+  onDownload: (attachment: TaskAttachmentApiItem) => void;
+  onDelete: (attachmentId: string) => Promise<unknown>;
+}) {
+  const [attachmentToDelete, setAttachmentToDelete] = useState<string | null>(null);
+  const isDeletingSelected = attachmentToDelete != null && isDeletingId === attachmentToDelete;
+
+  async function handleConfirmDelete() {
+    if (!attachmentToDelete || isDeletingSelected) return;
+    try {
+      await onDelete(attachmentToDelete);
+      setAttachmentToDelete(null);
+    } catch {
+      // Toast is shown by the parent mutation.
+    }
+  }
+
+  return (
+    <section>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <Paperclip className="size-3.5" /> Attachments
+        </h3>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-7 gap-1.5 px-2 text-xs"
+          disabled={isUploading}
+          onClick={onPickFile}
+        >
+          {isUploading ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <Upload className="size-3.5" />
+          )}
+          {isUploading ? "Uploading…" : "Upload"}
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.ppt,.pptx,application/pdf,image/png,image/jpeg,image/webp"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (file) {
+              onFileSelected(file);
+            }
+          }}
+        />
+      </div>
+      <div className="space-y-2">
+        {isLoading ? (
+          <p className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+            Loading attachments…
+          </p>
+        ) : isError ? (
+          <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-4 text-center text-xs text-destructive">
+            Could not load attachments. Try closing and reopening the task.
+          </p>
+        ) : attachments.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+            No attachments yet. Upload a PDF, image, or document.
+          </p>
+        ) : (
+          attachments.map((attachment) => (
+            <TaskAttachmentRow
+              key={attachment.id}
+              attachment={attachment}
+              isDeleting={isDeletingId === attachment.id}
+              onOpen={() => onOpen(attachment)}
+              onDownload={() => onDownload(attachment)}
+              onRequestDelete={() => setAttachmentToDelete(attachment.id)}
+            />
+          ))
+        )}
+      </div>
+      <AlertDialog
+        open={attachmentToDelete != null}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingSelected) {
+            setAttachmentToDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-sm gap-4">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete attachment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This file will be removed from the task.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingSelected}>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              className="gap-2"
+              disabled={isDeletingSelected}
+              onClick={() => void handleConfirmDelete()}
+            >
+              <Trash2 className="size-4" />
+              {isDeletingSelected ? "Deleting…" : "Delete attachment"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </section>
+  );
 }
 
-function DemoAttachmentChip({ name, size }: { name: string; size: string }) {
+function TaskAttachmentPreview({ attachment }: { attachment: TaskAttachmentApiItem }) {
+  const isImage = isImageAttachment(attachment);
+  const badge = getAttachmentFileTypeBadge(attachment.originalName, attachment.mimeType);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!isImage) {
+      return;
+    }
+
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    setPreviewUrl(null);
+    setFailed(false);
+
+    fetchTaskAttachmentBlob(attachment)
+      .then((blob) => {
+        if (cancelled) {
+          return;
+        }
+        objectUrl = URL.createObjectURL(blob);
+        setPreviewUrl(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFailed(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [attachment.id, attachment.downloadUrl, attachment.url, isImage]);
+
+  const previewClassName =
+    "size-8 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-secondary";
+
+  if (isImage && previewUrl && !failed) {
+    return (
+      <div className={previewClassName}>
+        <img src={previewUrl} alt="" className="size-full object-cover" loading="lazy" />
+      </div>
+    );
+  }
+
   return (
     <div
-      className="inline-flex max-w-full items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 shadow-soft"
-      title={name}
+      className={cn(
+        previewClassName,
+        "grid place-items-center text-[10px] font-semibold text-muted-foreground",
+      )}
     >
-      <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-secondary text-[10px] font-semibold text-muted-foreground">
-        {attachmentExtension(name)}
-      </div>
-      <div className="min-w-0">
-        <div className="flex items-center gap-1.5 truncate text-sm font-medium">
-          <FileText className="size-3.5 shrink-0 text-muted-foreground" />
-          <span className="truncate">{name}</span>
+      {isImage && !failed && !previewUrl ? <Loader2 className="size-3.5 animate-spin" /> : badge}
+    </div>
+  );
+}
+
+function TaskAttachmentRow({
+  attachment,
+  isDeleting,
+  onOpen,
+  onDownload,
+  onRequestDelete,
+}: {
+  attachment: TaskAttachmentApiItem;
+  isDeleting: boolean;
+  onOpen: () => void;
+  onDownload: () => void;
+  onRequestDelete: () => void;
+}) {
+  return (
+    <div className="flex items-start gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2">
+      <TaskAttachmentPreview attachment={attachment} />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium">{attachment.originalName}</div>
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+          <span>{formatAttachmentSize(attachment.size)}</span>
+          <span>·</span>
+          <span>{formatCommentDate(attachment.createdAt)}</span>
+          <span>·</span>
+          <span>{attachment.uploader.name}</span>
         </div>
-        {size ? <div className="text-[11px] text-muted-foreground">{size}</div> : null}
+      </div>
+      <div className="flex shrink-0 items-center gap-0.5">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-7 text-muted-foreground hover:text-foreground"
+          disabled={isDeleting}
+          aria-label="Open attachment"
+          onClick={onOpen}
+        >
+          <ExternalLink className="size-3.5" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-7 text-muted-foreground hover:text-foreground"
+          disabled={isDeleting}
+          aria-label="Download attachment"
+          onClick={onDownload}
+        >
+          <Download className="size-3.5" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-7 text-muted-foreground hover:text-destructive"
+          disabled={isDeleting}
+          aria-label="Delete attachment"
+          onClick={onRequestDelete}
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
       </div>
     </div>
   );
