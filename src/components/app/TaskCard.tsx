@@ -1,11 +1,6 @@
-import { GripVertical, MessageSquare, Paperclip, CheckSquare } from "lucide-react";
-import {
-  type Task,
-  getMember,
-  priorityMeta,
-  statusColumns,
-  type TaskStatus,
-} from "@/lib/mock-data";
+import { Calendar, GripVertical, MessageSquare, Paperclip } from "lucide-react";
+import { type Task, priorityMeta, statusColumns, type TaskStatus } from "@/lib/mock-data";
+import type { AssigneeOption } from "@/lib/assignee-options";
 import { Avatar } from "./Avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -18,18 +13,19 @@ import {
 
 export function TaskCard({
   task,
+  assignee,
   onOpen,
   onStatusChange,
   isStatusUpdating,
 }: {
   task: Task;
+  assignee?: AssigneeOption | null;
   onOpen: (task: Task) => void;
   onStatusChange?: (status: TaskStatus) => void;
   isStatusUpdating?: boolean;
 }) {
-  const assignee = getMember(task.assigneeId);
-  const done = task.checklist.filter((c) => c.done).length;
   const prio = priorityMeta[task.priority];
+  const dueDateLabel = task.dueDate ? formatTaskDueDate(task.dueDate) : null;
 
   return (
     <div className="group w-full rounded-2xl border border-border bg-card p-3.5 text-left shadow-soft transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card">
@@ -58,9 +54,12 @@ export function TaskCard({
             <Badge variant="secondary" className={prio.className + " border-0"}>
               {prio.label}
             </Badge>
-            <span className="inline-flex items-center gap-1">
-              <CheckSquare className="size-3" /> {done}/{task.checklist.length}
-            </span>
+            {dueDateLabel ? (
+              <span className="inline-flex items-center gap-1" title="Due date">
+                <Calendar className="size-3 shrink-0" />
+                <span className="truncate">{dueDateLabel}</span>
+              </span>
+            ) : null}
             {task.comments.length > 0 && (
               <span className="inline-flex items-center gap-1">
                 <MessageSquare className="size-3" /> {task.comments.length}
@@ -72,7 +71,11 @@ export function TaskCard({
               </span>
             )}
           </div>
-          {assignee && <Avatar id={assignee.id} initials={assignee.avatar} size="sm" />}
+          {assignee ? (
+            <span title={assignee.name} className="shrink-0">
+              <Avatar id={assignee.id} initials={assignee.avatar} size="sm" />
+            </span>
+          ) : null}
         </div>
       </button>
 
@@ -102,4 +105,16 @@ export function TaskCard({
       )}
     </div>
   );
+}
+
+function formatTaskDueDate(value: string) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split("-").map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  return value;
 }

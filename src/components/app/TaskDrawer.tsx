@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import {
   Sheet,
   SheetContent,
@@ -9,6 +10,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { type AssigneeOption, UNASSIGNED_ASSIGNEE_VALUE } from "@/lib/assignee-options";
 import { type Task, getMember, getProject, priorityMeta, statusColumns } from "@/lib/mock-data";
 import { Avatar } from "./Avatar";
 import {
@@ -21,26 +31,57 @@ import {
   Plus,
   Check,
   Trash2,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function TaskDrawer({
   task,
+  assignee,
+  assigneeOptions = [],
   onOpenChange,
+  onSaveChanges,
+  isSaving = false,
   onDelete,
   isDeleting = false,
 }: {
   task: Task | null;
+  assignee?: AssigneeOption | null;
+  assigneeOptions?: AssigneeOption[];
   onOpenChange: (open: boolean) => void;
+  onSaveChanges?: (updates: { assigneeId: string | null; dueDate: string | null }) => void;
+  isSaving?: boolean;
   onDelete?: (taskId: string) => void;
   isDeleting?: boolean;
 }) {
   const [aiOpen, setAiOpen] = useState(false);
+  const [draftAssigneeId, setDraftAssigneeId] = useState<string | null>(null);
+  const [draftDueDate, setDraftDueDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!task) return;
+    setDraftAssigneeId(task.assigneeId);
+    setDraftDueDate(task.dueDate);
+  }, [task?.id, task?.assigneeId, task?.dueDate]);
+
   if (!task) return null;
-  const assignee = getMember(task.assigneeId);
+
+  const resolvedAssignee = assignee ?? (task.assigneeId ? getMember(task.assigneeId) : null);
+  const draftSelectValue = draftAssigneeId ?? UNASSIGNED_ASSIGNEE_VALUE;
+  const savedSelectValue = task.assigneeId ?? UNASSIGNED_ASSIGNEE_VALUE;
+  const canEditTask = !!onSaveChanges;
+  const canEditAssignee = canEditTask && assigneeOptions.length > 0;
+  const hasAssigneeChanges = draftSelectValue !== savedSelectValue;
+  const hasDueDateChanges = (draftDueDate ?? null) !== (task.dueDate ?? null);
   const project = getProject(task.projectId);
   const prio = priorityMeta[task.priority];
   const statusLabel = statusColumns.find((s) => s.key === task.status)?.title ?? task.status;
+
+  function handleSaveAssignee() {
+    if (!onSaveChanges || isSaving) return;
+    if (!hasAssigneeChanges && !hasDueDateChanges) return;
+    onSaveChanges({ assigneeId: draftAssigneeId, dueDate: draftDueDate });
+  }
 
   return (
     <Sheet open={!!task} onOpenChange={onOpenChange}>
@@ -138,50 +179,61 @@ export function TaskDrawer({
             </section>
 
             <section>
-              <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <h3 className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 <Paperclip className="size-3.5" /> Attachments
               </h3>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {task.attachments.map((a) => (
-                  <div
-                    key={a.id}
-                    className="flex items-center gap-3 rounded-xl border border-border bg-card p-3"
-                  >
-                    <div className="grid size-9 place-items-center rounded-lg bg-secondary text-xs font-semibold">
-                      {a.name.split(".").pop()?.toUpperCase()}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">{a.name}</div>
-                      <div className="text-xs text-muted-foreground">{a.size}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Demo preview only — file upload is not available in this build.
+              </p>
+              {task.attachments.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                  No attachments on this task.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {task.attachments.map((a) => (
+                    <DemoAttachmentChip key={a.id} name={a.name} size={a.size} />
+                  ))}
+                </div>
+              )}
             </section>
 
             <section>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Comments
               </h3>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Demo only — comments are not saved. Use Save changes for assignee and due date.
+              </p>
               <div className="space-y-3">
-                {task.comments.map((c) => {
-                  const m = getMember(c.authorId);
-                  return (
-                    <div key={c.id} className="flex gap-3">
-                      {m && <Avatar id={m.id} initials={m.avatar} />}
-                      <div className="flex-1 rounded-2xl border border-border bg-card p-3">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-medium">{m?.name}</span>
-                          <span className="text-muted-foreground">{c.createdAt}</span>
-                        </div>
-                        <p className="mt-1 text-sm">{c.body}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-                <Textarea placeholder="Write a comment…" className="min-h-20 rounded-2xl" />
+                {task.comments.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                    No comments yet.
+                  </p>
+                ) : (
+                  task.comments.map((c, index) => (
+                    <DemoCommentPlaceholder key={c.id} index={index} authorId={c.authorId} />
+                  ))
+                )}
+                <Textarea
+                  placeholder="Preview only — comments are not saved"
+                  className="min-h-20 rounded-2xl opacity-80"
+                  disabled
+                  readOnly
+                />
                 <div className="flex justify-end">
-                  <Button size="sm">Comment</Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      toast.message("Comments are demo-only", {
+                        description: "Saving a task updates assignee and due date only.",
+                      })
+                    }
+                  >
+                    Comment (demo)
+                  </Button>
                 </div>
               </div>
             </section>
@@ -214,17 +266,53 @@ export function TaskDrawer({
               </Badge>
             </Field>
             <Field icon={UserIcon} label="Assignee">
-              {assignee ? (
+              {canEditAssignee ? (
+                <Select
+                  value={draftSelectValue}
+                  disabled={isSaving}
+                  onValueChange={(value) => {
+                    setDraftAssigneeId(value === UNASSIGNED_ASSIGNEE_VALUE ? null : value);
+                  }}
+                >
+                  <SelectTrigger className="h-9 w-full">
+                    <SelectValue placeholder="Select assignee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNASSIGNED_ASSIGNEE_VALUE}>Unassigned</SelectItem>
+                    {assigneeOptions.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        <span className="flex items-center gap-2">
+                          <Avatar id={member.id} initials={member.avatar} size="sm" />
+                          {member.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : resolvedAssignee ? (
                 <span className="flex items-center gap-2 text-sm">
-                  <Avatar id={assignee.id} initials={assignee.avatar} size="sm" />
-                  {assignee.name}
+                  <Avatar id={resolvedAssignee.id} initials={resolvedAssignee.avatar} size="sm" />
+                  {resolvedAssignee.name}
                 </span>
               ) : (
                 <span className="text-sm text-muted-foreground">Unassigned</span>
               )}
             </Field>
             <Field icon={Calendar} label="Due date">
-              <span className="text-sm">{task.dueDate ?? "—"}</span>
+              {canEditTask ? (
+                <Input
+                  type="date"
+                  className={cn("date-input-native h-9")}
+                  disabled={isSaving}
+                  value={draftDueDate ?? ""}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setDraftDueDate(next === "" ? null : next);
+                  }}
+                />
+              ) : (
+                <span className="text-sm">{task.dueDate ?? "—"}</span>
+              )}
             </Field>
             <Field icon={Flag} label="Labels">
               <div className="flex flex-wrap gap-1">
@@ -238,6 +326,17 @@ export function TaskDrawer({
                 ))}
               </div>
             </Field>
+            {canEditTask && (
+              <Button
+                type="button"
+                size="sm"
+                className="w-full bg-gradient-brand text-white shadow-glow hover:opacity-95"
+                disabled={(!hasAssigneeChanges && !hasDueDateChanges) || isSaving}
+                onClick={handleSaveAssignee}
+              >
+                {isSaving ? "Saving…" : "Save changes"}
+              </Button>
+            )}
             {onDelete && (
               <Button
                 type="button"
@@ -261,6 +360,60 @@ export function TaskDrawer({
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+const demoCommentBodies = [
+  "Looks good — can we align this with the API contract before merge?",
+  "Blocked on design review; will update once tokens land.",
+  "Added test notes in the linked doc.",
+];
+
+function attachmentExtension(name: string) {
+  const ext = name.includes(".") ? name.split(".").pop() : null;
+  return ext ? ext.toUpperCase().slice(0, 4) : "FILE";
+}
+
+function DemoAttachmentChip({ name, size }: { name: string; size: string }) {
+  return (
+    <div
+      className="inline-flex max-w-full items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 shadow-soft"
+      title={name}
+    >
+      <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-secondary text-[10px] font-semibold text-muted-foreground">
+        {attachmentExtension(name)}
+      </div>
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5 truncate text-sm font-medium">
+          <FileText className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className="truncate">{name}</span>
+        </div>
+        {size ? <div className="text-[11px] text-muted-foreground">{size}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+function DemoCommentPlaceholder({ index, authorId }: { index: number; authorId: string }) {
+  const m = getMember(authorId);
+  const body = demoCommentBodies[index % demoCommentBodies.length];
+  return (
+    <div className="flex gap-3">
+      {m ? (
+        <Avatar id={m.id} initials={m.avatar} />
+      ) : (
+        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground">
+          ?
+        </span>
+      )}
+      <div className="min-w-0 flex-1 rounded-2xl border border-border bg-card p-3">
+        <div className="flex items-center justify-between gap-2 text-xs">
+          <span className="font-medium">{m?.name ?? "Team member"}</span>
+          <span className="shrink-0 text-muted-foreground">Demo</span>
+        </div>
+        <p className="mt-1 text-sm leading-relaxed text-foreground/90">{body}</p>
+      </div>
+    </div>
   );
 }
 

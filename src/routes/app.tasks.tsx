@@ -17,6 +17,7 @@ import {
   fetchTasks,
   taskPriorityToApi,
   taskStatusToApi,
+  updateTask,
   type TaskApiItem,
   type TaskApiPriority,
   type TaskApiStatus,
@@ -31,6 +32,7 @@ import {
   ListTodo,
   RotateCcw,
 } from "lucide-react";
+import { buildAssigneeOptions, resolveTaskAssignee } from "@/lib/assignee-options";
 
 export const Route = createFileRoute("/app/tasks")({
   beforeLoad: requireAuth,
@@ -119,6 +121,34 @@ function TasksPage() {
       );
     },
   });
+  const updateAssigneeMutation = useMutation({
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: string;
+      input: { assigneeId: string | null; dueDate: string | null };
+    }) => updateTask(id, input),
+    onSuccess: async (updated) => {
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      setSelected((prev) => {
+        if (!prev || prev.id !== updated.id) return prev;
+        return mapApiTaskToRow(updated);
+      });
+      setSelected(null);
+      toast.success("Task updated");
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Task could not be updated",
+      );
+    },
+  });
+  const assigneeOptions = useMemo(() => buildAssigneeOptions(apiTasks), [apiTasks]);
+  const selectedAssignee = useMemo(
+    () => (selected ? resolveTaskAssignee(selected.assigneeId, apiTasks, selected.id) : null),
+    [selected, apiTasks],
+  );
   const projectId = apiTasks[0]?.projectId;
   const taskList = useMemo(() => apiTasks.map(mapApiTaskToRow), [apiTasks]);
 
@@ -166,7 +196,11 @@ function TasksPage() {
           <h1 className="text-2xl font-semibold tracking-tight">{t("tasks.tasks")}</h1>
           <p className="text-sm text-muted-foreground">{filtered.length} tasks</p>
         </div>
-        <NewTaskDialog isSubmitting={createTaskMutation.isPending} onSubmit={handleCreateTask}>
+        <NewTaskDialog
+          isSubmitting={createTaskMutation.isPending}
+          assigneeOptions={assigneeOptions}
+          onSubmit={handleCreateTask}
+        >
           <Button size="sm" className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
             <Plus className="size-4" /> {t("common.newTask")}
           </Button>
@@ -307,6 +341,13 @@ function TasksPage() {
 
       <TaskDrawer
         task={selected}
+        assignee={selectedAssignee}
+        assigneeOptions={assigneeOptions}
+        onSaveChanges={({ assigneeId, dueDate }) => {
+          if (!selected || updateAssigneeMutation.isPending) return;
+          updateAssigneeMutation.mutate({ id: selected.id, input: { assigneeId, dueDate } });
+        }}
+        isSaving={updateAssigneeMutation.isPending}
         onOpenChange={(o) => !o && setSelected(null)}
         onDelete={(taskId) => deleteTaskMutation.mutate(taskId)}
         isDeleting={deleteTaskMutation.isPending}
@@ -343,7 +384,8 @@ function mapApiTaskToRow(task: TaskApiItem): TaskRow {
 
 function formatDate(value: string | null) {
   if (!value) return null;
-  return new Date(value).toLocaleDateString();
+  // Keep YYYY-MM-DD so <input type="date" /> works consistently.
+  return value.slice(0, 10);
 }
 
 function initials(name: string) {
