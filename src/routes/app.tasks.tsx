@@ -31,8 +31,13 @@ import {
   Calendar,
   ListTodo,
   RotateCcw,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from "lucide-react";
 import { buildAssigneeOptions, resolveTaskAssignee } from "@/lib/assignee-options";
+import { cycleTaskSort, sortTasks, type TaskSortField, type TaskSortState } from "@/lib/task-sort";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/tasks")({
   beforeLoad: requireAuth,
@@ -85,6 +90,7 @@ function TasksPage() {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<TaskStatus | "all">("all");
   const [priority, setPriority] = useState<Priority | "all">("all");
+  const [sort, setSort] = useState<TaskSortState>(null);
   const [selected, setSelected] = useState<Task | null>(null);
   const {
     data: apiTasks = [],
@@ -164,12 +170,17 @@ function TasksPage() {
       ),
     [q, status, priority, taskList],
   );
+  const sorted = useMemo(() => sortTasks(filtered, sort), [filtered, sort]);
   const isTrulyEmpty = taskList.length === 0;
 
   function clearFilters() {
     setQ("");
     setStatus("all");
     setPriority("all");
+  }
+
+  function handleSort(field: TaskSortField) {
+    setSort((current) => cycleTaskSort(current, field));
   }
 
   async function handleCreateTask(values: TaskFormValues) {
@@ -242,10 +253,30 @@ function TasksPage() {
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
         <div className="hidden grid-cols-[1fr_120px_120px_140px_120px_120px] gap-3 border-b border-border bg-muted/30 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground md:grid">
           <div>{t("tasks.task")}</div>
-          <div>{t("tasks.status")}</div>
-          <div>{t("tasks.priority")}</div>
-          <div>{t("tasks.assignee")}</div>
-          <div>{t("tasks.due")}</div>
+          <SortableColumnHeader
+            label={t("tasks.status")}
+            field="status"
+            sort={sort}
+            onSort={handleSort}
+          />
+          <SortableColumnHeader
+            label={t("tasks.priority")}
+            field="priority"
+            sort={sort}
+            onSort={handleSort}
+          />
+          <SortableColumnHeader
+            label={t("tasks.assignee")}
+            field="assignee"
+            sort={sort}
+            onSort={handleSort}
+          />
+          <SortableColumnHeader
+            label={t("tasks.due")}
+            field="dueDate"
+            sort={sort}
+            onSort={handleSort}
+          />
           <div className="text-right">Activity</div>
         </div>
         {isLoading ? (
@@ -260,7 +291,7 @@ function TasksPage() {
           )
         ) : (
           <ul className="divide-y divide-border">
-            {filtered.map((task) => (
+            {sorted.map((task) => (
               <li
                 key={task.id}
                 onClick={() => setSelected(task)}
@@ -479,6 +510,51 @@ function NoResultsState({ onResetFilters }: { onResetFilters: () => void }) {
         <RotateCcw className="size-4" /> Reset filters
       </Button>
     </div>
+  );
+}
+
+function SortableColumnHeader({
+  label,
+  field,
+  sort,
+  onSort,
+  className,
+}: {
+  label: string;
+  field: TaskSortField;
+  sort: TaskSortState;
+  onSort: (field: TaskSortField) => void;
+  className?: string;
+}) {
+  const active = sort?.field === field;
+  const direction = active ? sort.direction : null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(field)}
+      aria-label={
+        direction === "asc"
+          ? `${label}, sorted ascending`
+          : direction === "desc"
+            ? `${label}, sorted descending`
+            : `${label}, not sorted`
+      }
+      className={cn(
+        "inline-flex items-center gap-1 rounded-sm transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        active ? "text-foreground" : "text-muted-foreground",
+        className,
+      )}
+    >
+      <span>{label}</span>
+      {direction === "asc" ? (
+        <ArrowUp className="size-3 shrink-0" aria-hidden />
+      ) : direction === "desc" ? (
+        <ArrowDown className="size-3 shrink-0" aria-hidden />
+      ) : (
+        <ArrowUpDown className="size-3 shrink-0 opacity-40" aria-hidden />
+      )}
+    </button>
   );
 }
 
