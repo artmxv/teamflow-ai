@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -15,6 +15,15 @@ import { cn } from "@/lib/utils";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { NewProjectDialog } from "./QuickActionDialogs";
 import type { Workspace } from "./AppShell";
+import { createProject, fetchProjects, type ProjectApiStatus } from "@/lib/api/projects";
+import type { ProjectStatus } from "@/lib/mock-data";
+
+const projectStatusMap: Record<ProjectStatus, ProjectApiStatus> = {
+  active: "ACTIVE",
+  planning: "PLANNING",
+  on_hold: "ON_HOLD",
+  completed: "COMPLETED",
+};
 
 const nav: { to: string; key: TKey; icon: typeof LayoutDashboard }[] = [
   { to: "/app/dashboard", key: "side.dashboard", icon: LayoutDashboard },
@@ -30,7 +39,19 @@ const nav: { to: string; key: TKey; icon: typeof LayoutDashboard }[] = [
 export function AppSidebar({ activeWorkspace }: { activeWorkspace: Workspace }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { t } = useI18n();
-  const [selectedProject, setSelectedProject] = useState("Orion Web App");
+  const queryClient = useQueryClient();
+  const { data: projects = [], isLoading: projectsLoading } = useQuery({
+    queryKey: ["projects"],
+    queryFn: fetchProjects,
+  });
+  const workspaceId = projects[0]?.workspace.id;
+  const createProjectMutation = useMutation({
+    mutationFn: createProject,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
+  });
+  const activeProjectId = pathname.match(/^\/app\/projects\/([^/]+)/)?.[1];
 
   return (
     <aside className="hidden md:flex w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
@@ -75,7 +96,9 @@ export function AppSidebar({ activeWorkspace }: { activeWorkspace: Workspace }) 
                       : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
                   )}
                 >
-                  <Icon className={cn("size-4", active ? "text-primary" : "text-muted-foreground")} />
+                  <Icon
+                    className={cn("size-4", active ? "text-primary" : "text-muted-foreground")}
+                  />
                   {t(item.key)}
                 </Link>
               </li>
@@ -87,24 +110,49 @@ export function AppSidebar({ activeWorkspace }: { activeWorkspace: Workspace }) 
           {t("side.projects")}
         </div>
         <ul className="space-y-0.5">
-          {["Orion Web App", "Mobile App v3", "Marketing Site"].map((p) => (
-            <li key={p}>
-              <button
-                onClick={() => setSelectedProject(p)}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-sm hover:bg-sidebar-accent/60",
-                  selectedProject === p
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/80",
-                )}
-              >
-                <span className="size-2 rounded-full bg-gradient-brand" />
-                {p}
-              </button>
-            </li>
-          ))}
+          {projectsLoading ? (
+            <li className="px-3 py-1.5 text-xs text-muted-foreground">Loading projects…</li>
+          ) : projects.length === 0 ? (
+            <li className="px-3 py-1.5 text-xs text-muted-foreground">No projects yet</li>
+          ) : (
+            projects.map((project) => (
+              <li key={project.id}>
+                <Link
+                  to="/app/projects/$projectId"
+                  params={{ projectId: project.id }}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-sm hover:bg-sidebar-accent/60",
+                    activeProjectId === project.id
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/80",
+                  )}
+                >
+                  <span className="size-2 rounded-full bg-gradient-brand" />
+                  <span className="truncate">{project.name}</span>
+                </Link>
+              </li>
+            ))
+          )}
           <li>
-            <NewProjectDialog>
+            <NewProjectDialog
+              isSubmitting={createProjectMutation.isPending}
+              onCreate={async (project) => {
+                if (!workspaceId) {
+                  throw new Error(
+                    "Workspace is required. Load or seed a workspace before creating a project.",
+                  );
+                }
+
+                await createProjectMutation.mutateAsync({
+                  workspaceId,
+                  name: project.name,
+                  description: project.description,
+                  status: projectStatusMap[project.status],
+                  color: project.color,
+                  dueDate: project.dueDate,
+                });
+              }}
+            >
               <button className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground">
                 <Plus className="size-3.5" /> {t("common.newProject")}
               </button>
@@ -123,7 +171,9 @@ export function AppSidebar({ activeWorkspace }: { activeWorkspace: Workspace }) 
         </div>
         <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
           <span>1,340 / 2,000</span>
-          <Link className="text-primary hover:underline" to="/app/billing">{t("billing.changePlan")}</Link>
+          <Link className="text-primary hover:underline" to="/app/billing">
+            {t("billing.changePlan")}
+          </Link>
         </div>
       </div>
     </aside>
