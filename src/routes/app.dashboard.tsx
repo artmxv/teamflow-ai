@@ -3,20 +3,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
-import {
-  FolderKanban,
-  CheckCircle2,
-  ListTodo,
-  Users,
-  ArrowUpRight,
-  Sparkles,
-} from "lucide-react";
-import {
-  projects,
-  members,
-  weeklyVelocity,
-  projectStatusMeta,
-} from "@/lib/mock-data";
+import { FolderKanban, CheckCircle2, ListTodo, Users, ArrowUpRight, Sparkles } from "lucide-react";
+import { projects, members, weeklyVelocity, projectStatusMeta } from "@/lib/mock-data";
 import {
   fetchDashboardSummary,
   mapTaskStatusCountsForChart,
@@ -30,21 +18,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n, type TKey } from "@/lib/i18n";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Cell,
-  Pie,
-  PieChart,
-} from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Cell, Pie, PieChart } from "recharts";
 
 export const Route = createFileRoute("/app/dashboard")({
   beforeLoad: requireAuth,
@@ -139,8 +114,12 @@ function Dashboard() {
               <p className="text-xs text-muted-foreground">Tasks created vs completed</p>
             </div>
             <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-              <span className="flex items-center gap-1.5"><span className="size-2 rounded-sm bg-primary" /> {t("dashboard.completed")}</span>
-              <span className="flex items-center gap-1.5"><span className="size-2 rounded-sm bg-muted-foreground/40" /> Created</span>
+              <span className="flex items-center gap-1.5">
+                <span className="size-2 rounded-sm bg-primary" /> {t("dashboard.completed")}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="size-2 rounded-sm bg-muted-foreground/40" /> Created
+              </span>
             </div>
           </div>
           <ChartContainer
@@ -171,7 +150,14 @@ function Dashboard() {
               <ChartContainer config={{}} className="mx-auto h-56 w-full">
                 <PieChart>
                   <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-                  <Pie data={taskStatusChartData} dataKey="value" nameKey="status" innerRadius={50} outerRadius={80} paddingAngle={2}>
+                  <Pie
+                    data={taskStatusChartData}
+                    dataKey="value"
+                    nameKey="status"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={2}
+                  >
                     {taskStatusChartData.map((entry, i) => (
                       <Cell key={i} fill={entry.fill} />
                     ))}
@@ -224,7 +210,9 @@ function Dashboard() {
         <div className="rounded-2xl border border-border bg-card p-5 shadow-soft xl:col-span-2">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-base font-semibold">{t("dashboard.projectProgress")}</h2>
-            <Link to="/app/projects" className="text-xs text-primary hover:underline">{t("common.viewAll")}</Link>
+            <Link to="/app/projects" className="text-xs text-primary hover:underline">
+              {t("common.viewAll")}
+            </Link>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {projects.slice(0, 4).map((p) => {
@@ -235,12 +223,19 @@ function Dashboard() {
                     <div>
                       <div className={"h-1.5 w-10 rounded-full bg-gradient-to-r " + p.color} />
                       <div className="mt-2 text-sm font-semibold">{p.name}</div>
-                      <div className="text-xs text-muted-foreground">{p.openTasks} open · {p.totalTasks} total</div>
+                      <div className="text-xs text-muted-foreground">
+                        {p.openTasks} open · {p.totalTasks} total
+                      </div>
                     </div>
-                    <Badge variant="secondary" className={meta.className + " border-0"}>{meta.label}</Badge>
+                    <Badge variant="secondary" className={meta.className + " border-0"}>
+                      {meta.label}
+                    </Badge>
                   </div>
                   <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div className={"h-full rounded-full bg-gradient-to-r " + p.color} style={{ width: p.progress + "%" }} />
+                    <div
+                      className={"h-full rounded-full bg-gradient-to-r " + p.color}
+                      style={{ width: p.progress + "%" }}
+                    />
                   </div>
                   <div className="mt-3 flex items-center justify-between">
                     <AvatarStack ids={p.members} initialsMap={initialsMap} size="sm" />
@@ -256,7 +251,9 @@ function Dashboard() {
       <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-soft">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold">{t("dashboard.recentActivity")}</h2>
-          <Link to="/app/tasks" className="text-xs text-primary hover:underline">{t("common.seeAll")}</Link>
+          <Link to="/app/tasks" className="text-xs text-primary hover:underline">
+            {t("common.seeAll")}
+          </Link>
         </div>
         {isLoading ? (
           <RecentTasksSkeleton />
@@ -292,7 +289,9 @@ function RecentTaskRow({ task, t }: { task: DashboardRecentTask; t: (key: TKey) 
       )}
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">{task.key}</span>
+          <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+            {task.key}
+          </span>
           <span className="truncate font-medium">{task.title}</span>
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -300,12 +299,17 @@ function RecentTaskRow({ task, t }: { task: DashboardRecentTask; t: (key: TKey) 
           <Badge variant="secondary" className={status.tone + " border-0 capitalize"}>
             {t(status.labelKey)}
           </Badge>
-          <Badge variant="secondary" className={recentPriorityTone[task.priority] + " border-0 capitalize"}>
+          <Badge
+            variant="secondary"
+            className={recentPriorityTone[task.priority] + " border-0 capitalize"}
+          >
             {recentPriorityLabel[task.priority]}
           </Badge>
         </div>
       </div>
-      <div className="shrink-0 text-xs text-muted-foreground">{formatUpdatedAt(task.updatedAt)}</div>
+      <div className="shrink-0 text-xs text-muted-foreground">
+        {formatUpdatedAt(task.updatedAt)}
+      </div>
     </li>
   );
 }
@@ -380,14 +384,25 @@ function DashboardErrorState({ error, onRetry }: { error: Error | null; onRetry:
       <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
         {error?.message ?? "Check that the backend is running and try again."}
       </p>
-      <Button onClick={onRetry} className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
+      <Button
+        onClick={onRetry}
+        className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95"
+      >
         Retry
       </Button>
     </div>
   );
 }
 
-function Insight({ tone, title, body }: { tone: "warn" | "ok" | "info"; title: string; body: string }) {
+function Insight({
+  tone,
+  title,
+  body,
+}: {
+  tone: "warn" | "ok" | "info";
+  title: string;
+  body: string;
+}) {
   const toneClass = {
     warn: "bg-warning/15 text-warning-foreground",
     ok: "bg-success/15 text-success",
@@ -396,7 +411,11 @@ function Insight({ tone, title, body }: { tone: "warn" | "ok" | "info"; title: s
   return (
     <div className="rounded-xl border border-border bg-card p-3">
       <div className="flex items-center gap-2">
-        <span className={"inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold " + toneClass}>
+        <span
+          className={
+            "inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold " + toneClass
+          }
+        >
           {tone === "warn" ? "At risk" : tone === "ok" ? "On track" : "FYI"}
         </span>
         <span className="text-sm font-medium">{title}</span>

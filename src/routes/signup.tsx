@@ -69,9 +69,7 @@ function SignUp() {
           const passwordValidationError = validatePassword(password);
           const passwordsMatch = password === confirmPassword;
           setPasswordError(passwordValidationError);
-          setConfirmPasswordError(
-            passwordsMatch ? null : "Passwords do not match.",
-          );
+          setConfirmPasswordError(passwordsMatch ? null : "Passwords do not match.");
 
           if (passwordValidationError) {
             toast.error(passwordValidationError);
@@ -89,7 +87,9 @@ function SignUp() {
           });
         }}
       >
-        <Button type="button" variant="outline" className="w-full">Continue with Google</Button>
+        <Button type="button" variant="outline" className="w-full">
+          Continue with Google
+        </Button>
         <div className="relative my-2 text-center text-xs text-muted-foreground">
           <span className="relative z-10 bg-background px-2">or with email</span>
           <span className="absolute inset-x-0 top-1/2 -z-0 h-px bg-border" />

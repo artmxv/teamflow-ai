@@ -30,10 +30,13 @@ export function AuthShell({
           <div className="space-y-6">
             <div className="rounded-2xl border border-white/15 bg-white/10 p-5 backdrop-blur">
               <p className="text-sm leading-relaxed text-white/90">
-                "TeamFlow's AI assistant gave us back two hours every standup. It's the project tool I always wanted."
+                "TeamFlow's AI assistant gave us back two hours every standup. It's the project tool
+                I always wanted."
               </p>
               <div className="mt-4 flex items-center gap-3">
-                <div className="grid size-9 place-items-center rounded-full bg-white/20 text-xs font-semibold">RB</div>
+                <div className="grid size-9 place-items-center rounded-full bg-white/20 text-xs font-semibold">
+                  RB
+                </div>
                 <div className="text-sm">
                   <div className="font-medium">Rita Bauer</div>
                   <div className="text-white/70 text-xs">Head of Product, Northwind</div>

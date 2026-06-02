@@ -47,21 +47,24 @@ const DEMO_PROJECTS: DemoProjectSeed[] = [
   },
   {
     name: "Mobile App v3",
-    description: "Native iOS and Android release with offline sync, push notifications, and biometric login.",
+    description:
+      "Native iOS and Android release with offline sync, push notifications, and biometric login.",
     status: "ACTIVE",
     color: "from-sky-500 to-cyan-500",
     dueInDays: 60,
   },
   {
     name: "Marketing Site",
-    description: "Launch-ready marketing pages, blog templates, and conversion-focused landing flows.",
+    description:
+      "Launch-ready marketing pages, blog templates, and conversion-focused landing flows.",
     status: "ACTIVE",
     color: "from-rose-500 to-orange-500",
     dueInDays: 30,
   },
   {
     name: "Data Pipeline",
-    description: "Event ingestion, analytics schema, and background job migration for reporting workloads.",
+    description:
+      "Event ingestion, analytics schema, and background job migration for reporting workloads.",
     status: "PLANNING",
     color: "from-emerald-500 to-teal-500",
     dueInDays: 90,
@@ -165,7 +168,8 @@ const DEMO_TASKS: DemoTaskSeed[] = [
     key: "TF-109",
     projectIndex: 2,
     title: "Draft launch email copy",
-    description: "Outline hero message, feature bullets, and CTA for the public launch announcement.",
+    description:
+      "Outline hero message, feature bullets, and CTA for the public launch announcement.",
     status: "TODO",
     priority: "LOW",
     assigneeEmail: "priya@acme.teamflow.ai",
@@ -325,7 +329,7 @@ async function seedDemoWorkspace() {
     }
 
     const assigneeId = task.assigneeEmail
-      ? usersByEmail.get(task.assigneeEmail)?.id ?? null
+      ? (usersByEmail.get(task.assigneeEmail)?.id ?? null)
       : null;
 
     const created = await prisma.task.create({

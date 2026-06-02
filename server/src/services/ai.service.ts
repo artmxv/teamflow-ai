@@ -2,10 +2,7 @@ import type { Project, Task, TaskStatus, User } from "@prisma/client";
 
 import { prisma } from "../lib/prisma.js";
 
-type TaskWithRelations = Pick<
-  Task,
-  "id" | "key" | "title" | "status" | "priority" | "dueDate"
-> & {
+type TaskWithRelations = Pick<Task, "id" | "key" | "title" | "status" | "priority" | "dueDate"> & {
   project: Pick<Project, "id" | "name" | "status">;
   assignee: Pick<User, "id" | "name" | "email"> | null;
 };
@@ -144,9 +141,7 @@ function buildRisks(metrics: WorkspaceAiMetrics, tasks: TaskWithRelations[], now
     );
   }
 
-  const urgentOpen = tasks.filter(
-    (task) => task.priority === "URGENT" && task.status !== "DONE",
-  );
+  const urgentOpen = tasks.filter((task) => task.priority === "URGENT" && task.status !== "DONE");
   if (urgentOpen.length > 0) {
     risks.push(
       `${urgentOpen.length} urgent open task${urgentOpen.length === 1 ? "" : "s"} may block delivery if not addressed soon.`,
@@ -307,9 +302,7 @@ function buildStandupSummary(
   return `${sentences.join(". ")}.`;
 }
 
-export async function getWorkspaceAiSummary(
-  workspaceId: string,
-): Promise<WorkspaceAiSummary> {
+export async function getWorkspaceAiSummary(workspaceId: string): Promise<WorkspaceAiSummary> {
   const now = new Date();
   const projectWhere = { workspaceId };
   const taskWhere = { project: { workspaceId } };

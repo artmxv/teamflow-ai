@@ -71,7 +71,11 @@ export function AvatarStack({
         <span
           className={cn(
             "inline-grid place-items-center rounded-full bg-muted font-semibold text-muted-foreground ring-2 ring-background",
-            size === "xs" ? "size-5 text-[9px]" : size === "sm" ? "size-6 text-[10px]" : "size-8 text-xs",
+            size === "xs"
+              ? "size-5 text-[9px]"
+              : size === "sm"
+                ? "size-6 text-[10px]"
+                : "size-8 text-xs",
             offset,
           )}
         >

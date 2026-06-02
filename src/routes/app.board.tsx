@@ -4,13 +4,7 @@ import { requireAuth } from "@/lib/auth/route-guards";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
-import {
-  members,
-  statusColumns,
-  type Priority,
-  type Task,
-  type TaskStatus,
-} from "@/lib/mock-data";
+import { members, statusColumns, type Priority, type Task, type TaskStatus } from "@/lib/mock-data";
 import { TaskCard } from "@/components/app/TaskCard";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
 import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
@@ -167,7 +161,10 @@ function Board() {
           <Filter className="size-4 text-muted-foreground" /> Filters
         </div>
         <div className="grid gap-2 sm:ml-auto sm:grid-cols-3">
-          <Select value={priority} onValueChange={(value) => setPriority(value as Priority | "all")}>
+          <Select
+            value={priority}
+            onValueChange={(value) => setPriority(value as Priority | "all")}
+          >
             <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder={t("tasks.priority")} />
             </SelectTrigger>
@@ -212,7 +209,12 @@ function Board() {
           {statusColumns.map((col) => {
             const colTasks = filteredTasks.filter((task) => task.status === col.key);
             return (
-              <Column key={col.key} title={statusLabel(col.key, t)} status={col.key} count={isLoading ? 0 : colTasks.length}>
+              <Column
+                key={col.key}
+                title={statusLabel(col.key, t)}
+                status={col.key}
+                count={isLoading ? 0 : colTasks.length}
+              >
                 {isLoading ? (
                   <LoadingCards />
                 ) : (
@@ -222,7 +224,9 @@ function Board() {
                         key={task.id}
                         task={task}
                         onOpen={setSelected}
-                        onStatusChange={(status) => handleStatusChange(task.id, task.status, status)}
+                        onStatusChange={(status) =>
+                          handleStatusChange(task.id, task.status, status)
+                        }
                         isStatusUpdating={updatingTaskId === task.id}
                       />
                     ))}
@@ -320,7 +324,10 @@ function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => vo
       <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
         {error?.message ?? "Check that the backend is running and try again."}
       </p>
-      <Button onClick={onRetry} className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
+      <Button
+        onClick={onRetry}
+        className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95"
+      >
         Retry
       </Button>
     </div>

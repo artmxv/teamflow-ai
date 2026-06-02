@@ -62,18 +62,33 @@ function SiteHeader() {
           <span className="text-base font-semibold tracking-tight">TeamFlow AI</span>
         </Link>
         <nav className="ml-6 hidden items-center gap-7 text-sm text-muted-foreground md:flex">
-          <a href="#features" className="hover:text-foreground">Features</a>
-          <a href="#preview" className="hover:text-foreground">Product</a>
-          <a href="#pricing" className="hover:text-foreground">Pricing</a>
-          <a href="#" className="hover:text-foreground">Docs</a>
+          <a href="#features" className="hover:text-foreground">
+            Features
+          </a>
+          <a href="#preview" className="hover:text-foreground">
+            Product
+          </a>
+          <a href="#pricing" className="hover:text-foreground">
+            Pricing
+          </a>
+          <a href="#" className="hover:text-foreground">
+            Docs
+          </a>
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <LanguageSwitcher className="hidden sm:inline-flex" />
           <ThemeToggle />
-          <Link to="/app/dashboard" className="hidden text-sm font-medium text-muted-foreground hover:text-foreground sm:block">
+          <Link
+            to="/app/dashboard"
+            className="hidden text-sm font-medium text-muted-foreground hover:text-foreground sm:block"
+          >
             Sign in
           </Link>
-          <Button asChild size="sm" className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+          <Button
+            asChild
+            size="sm"
+            className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
+          >
             <Link to="/app/dashboard">
               Start free <ArrowRight className="size-3.5" />
             </Link>
@@ -100,12 +115,15 @@ function Hero() {
           <span className="text-gradient-brand">modern product teams</span>
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground sm:text-lg">
-          TeamFlow AI brings projects, tasks, and team context into one calm,
-          fast workspace — with an AI partner that summarizes work, drafts
-          checklists, and keeps every sprint on track.
+          TeamFlow AI brings projects, tasks, and team context into one calm, fast workspace — with
+          an AI partner that summarizes work, drafts checklists, and keeps every sprint on track.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Button asChild size="lg" className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+          <Button
+            asChild
+            size="lg"
+            className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
+          >
             <Link to="/app/dashboard">
               Open live demo <ArrowRight className="size-4" />
             </Link>
@@ -176,7 +194,10 @@ function HeroPreview() {
                     <div className={"h-1.5 w-10 rounded-full bg-gradient-to-r " + p.c} />
                     <div className="mt-2 text-xs font-medium">{p.n}</div>
                     <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
-                      <div className={"h-full rounded-full bg-gradient-to-r " + p.c} style={{ width: p.p + "%" }} />
+                      <div
+                        className={"h-full rounded-full bg-gradient-to-r " + p.c}
+                        style={{ width: p.p + "%" }}
+                      />
                     </div>
                     <div className="mt-1 text-[10px] text-muted-foreground">{p.p}% complete</div>
                   </div>
@@ -188,7 +209,8 @@ function HeroPreview() {
                   AI insight
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  Mobile App v3 is trending 2 days behind schedule. 3 high-priority tasks are unassigned.
+                  Mobile App v3 is trending 2 days behind schedule. 3 high-priority tasks are
+                  unassigned.
                 </div>
               </div>
             </div>
@@ -209,7 +231,9 @@ function LogoCloud() {
         </div>
         <div className="mt-6 grid grid-cols-2 items-center gap-x-8 gap-y-4 text-sm font-semibold text-muted-foreground/70 sm:grid-cols-3 md:grid-cols-6">
           {logos.map((l) => (
-            <div key={l} className="tracking-tight">{l}</div>
+            <div key={l} className="tracking-tight">
+              {l}
+            </div>
           ))}
         </div>
       </div>
@@ -253,7 +277,9 @@ function Features() {
   return (
     <section id="features" className="mx-auto max-w-7xl px-6 py-24">
       <div className="mx-auto max-w-2xl text-center">
-        <div className="text-xs font-semibold uppercase tracking-wider text-primary">Why TeamFlow</div>
+        <div className="text-xs font-semibold uppercase tracking-wider text-primary">
+          Why TeamFlow
+        </div>
         <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
           Everything your team needs. Nothing they don't.
         </h2>
@@ -286,13 +312,15 @@ function DashboardPreview() {
       <div className="mx-auto max-w-7xl px-6">
         <div className="grid items-center gap-10 lg:grid-cols-2">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-primary">Product</div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-primary">
+              Product
+            </div>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
               A workspace that earns its place on your dock
             </h2>
             <p className="mt-4 text-muted-foreground">
-              From the daily standup view to the deep-focus kanban, TeamFlow is
-              designed for product teams that ship every week.
+              From the daily standup view to the deep-focus kanban, TeamFlow is designed for product
+              teams that ship every week.
             </p>
             <ul className="mt-6 space-y-3 text-sm">
               {[
@@ -334,11 +362,16 @@ function DashboardPreview() {
                     </div>
                     <div className="space-y-2">
                       {Array.from({ length: col.n }).map((_, i) => (
-                        <div key={i} className="rounded-lg border border-border bg-card p-2 shadow-soft">
+                        <div
+                          key={i}
+                          className="rounded-lg border border-border bg-card p-2 shadow-soft"
+                        >
                           <div className="text-[10px] text-muted-foreground">TF-{200 + i}</div>
                           <div className="text-xs font-medium">Polish onboarding copy</div>
                           <div className="mt-1.5 flex items-center justify-between">
-                            <span className="rounded bg-accent/60 px-1 py-0.5 text-[9px] text-accent-foreground">design</span>
+                            <span className="rounded bg-accent/60 px-1 py-0.5 text-[9px] text-accent-foreground">
+                              design
+                            </span>
                             <span className="size-4 rounded-full bg-gradient-brand" />
                           </div>
                         </div>
@@ -370,7 +403,12 @@ function Pricing() {
       name: "Team",
       price: "$12",
       blurb: "Per user / month. Most popular for product teams.",
-      features: ["Unlimited projects", "Advanced AI assistant", "Custom workflows", "SSO with Google"],
+      features: [
+        "Unlimited projects",
+        "Advanced AI assistant",
+        "Custom workflows",
+        "SSO with Google",
+      ],
       cta: "Start 14-day trial",
       to: "/app/dashboard" as const,
       featured: true,
@@ -392,7 +430,9 @@ function Pricing() {
         <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
           Simple pricing, scales with your team
         </h2>
-        <p className="mt-4 text-muted-foreground">Start free. Upgrade when you need more AI or seats.</p>
+        <p className="mt-4 text-muted-foreground">
+          Start free. Upgrade when you need more AI or seats.
+        </p>
       </div>
 
       <div className="mt-12 grid gap-5 md:grid-cols-3">
@@ -429,7 +469,8 @@ function Pricing() {
             <Button
               asChild
               className={
-                "mt-6 w-full " + (t.featured ? "bg-gradient-brand text-white shadow-glow hover:opacity-95" : "")
+                "mt-6 w-full " +
+                (t.featured ? "bg-gradient-brand text-white shadow-glow hover:opacity-95" : "")
               }
               variant={t.featured ? "default" : "outline"}
             >
@@ -460,7 +501,12 @@ function CTA() {
             <Button asChild size="lg" className="bg-white text-primary hover:bg-white/90">
               <Link to="/app/dashboard">Start free</Link>
             </Button>
-            <Button asChild size="lg" variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/15 hover:text-white">
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="border-white/30 bg-white/10 text-white hover:bg-white/15 hover:text-white"
+            >
               <Link to="/app/dashboard">View demo</Link>
             </Button>
           </div>
@@ -508,7 +554,11 @@ function SiteFooter() {
                 <div className="text-sm font-semibold">{col.h}</div>
                 <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
                   {col.links.map((l) => (
-                    <li key={l}><a href="#" className="hover:text-foreground">{l}</a></li>
+                    <li key={l}>
+                      <a href="#" className="hover:text-foreground">
+                        {l}
+                      </a>
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -520,9 +570,15 @@ function SiteFooter() {
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-6 py-5 text-xs text-muted-foreground sm:flex-row">
           <span>© 2026 TeamFlow Labs, Inc. · All rights reserved</span>
           <span className="flex items-center gap-4">
-            <a href="#" className="hover:text-foreground">Privacy</a>
-            <a href="#" className="hover:text-foreground">Terms</a>
-            <a href="#" className="hover:text-foreground">Status</a>
+            <a href="#" className="hover:text-foreground">
+              Privacy
+            </a>
+            <a href="#" className="hover:text-foreground">
+              Terms
+            </a>
+            <a href="#" className="hover:text-foreground">
+              Status
+            </a>
           </span>
         </div>
       </div>
