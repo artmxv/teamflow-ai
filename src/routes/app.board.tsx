@@ -1,11 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  TouchSensor,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
 import { createFileRoute } from "@tanstack/react-router";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import { statusColumns, type Priority, type Task, type TaskStatus } from "@/lib/mock-data";
-import { TaskCard } from "@/components/app/TaskCard";
+import { TaskCard, type TaskDragData } from "@/components/app/TaskCard";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
 import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
 import { Button } from "@/components/ui/button";
@@ -83,14 +94,32 @@ function Board() {
   const updateTaskMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: TaskStatus }) =>
       updateTask(id, { status: taskStatusToApi[status] }),
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["tasks"] });
+      const previous = queryClient.getQueryData<TaskApiItem[]>(["tasks"]);
+      if (!previous) return { previous: undefined };
+      queryClient.setQueryData<TaskApiItem[]>(
+        ["tasks"],
+        previous.map((task) =>
+          task.id === id ? { ...task, status: taskStatusToApi[status] } : task,
+        ),
+      );
+      return { previous };
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
       toast.success("Task status updated");
     },
-    onError: (mutationError) => {
+    onError: (mutationError, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["tasks"], context.previous);
+      }
       toast.error(
         mutationError instanceof Error ? mutationError.message : "Task status could not be updated",
       );
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
     },
   });
   const deleteTaskMutation = useMutation({
@@ -135,13 +164,57 @@ function Board() {
     updateTaskMutation.isPending && updateTaskMutation.variables
       ? updateTaskMutation.variables.id
       : null;
+  const [activeDragTask, setActiveDragTask] = useState<Task | null>(null);
+  const suppressCardClickRef = useRef(false);
+  const projectId = apiTasks[0]?.projectId;
+  const taskList = apiTasks.map(mapApiTaskToTask);
+
+  const dragSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+  );
 
   function handleStatusChange(taskId: string, currentStatus: TaskStatus, status: TaskStatus) {
     if (status === currentStatus || updateTaskMutation.isPending) return;
     updateTaskMutation.mutate({ id: taskId, status });
   }
-  const projectId = apiTasks[0]?.projectId;
-  const taskList = apiTasks.map(mapApiTaskToTask);
+
+  function handleDragStart(event: DragStartEvent) {
+    suppressCardClickRef.current = true;
+    const data = event.active.data.current as TaskDragData | undefined;
+    if (!data || data.type !== "task") return;
+    const task = taskList.find((item) => item.id === data.taskId);
+    if (task) setActiveDragTask(task);
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    setActiveDragTask(null);
+    window.setTimeout(() => {
+      suppressCardClickRef.current = false;
+    }, 0);
+    const { active, over } = event;
+    if (!over) return;
+
+    const data = active.data.current as TaskDragData | undefined;
+    if (!data || data.type !== "task") return;
+
+    const targetStatus = parseColumnStatus(over.id);
+    if (!targetStatus) return;
+
+    handleStatusChange(data.taskId, data.status, targetStatus);
+  }
+
+  function handleDragCancel() {
+    setActiveDragTask(null);
+    window.setTimeout(() => {
+      suppressCardClickRef.current = false;
+    }, 0);
+  }
+
+  function handleOpenTask(task: Task) {
+    if (suppressCardClickRef.current) return;
+    setSelected(task);
+  }
 
   async function handleCreateTask(values: TaskFormValues) {
     if (!projectId) {
@@ -235,69 +308,91 @@ function Board() {
       {isError ? (
         <ErrorState error={error} onRetry={() => void refetch()} />
       ) : (
-        <KanbanBoardViewport>
-          {statusColumns.map((col) => {
-            const colTasks = filteredTasks.filter((task) => task.status === col.key);
-            const columnTitle = statusLabel(col.key, t);
-            const newTaskDialogProps = {
-              initialStatus: col.key,
-              isSubmitting: createTaskMutation.isPending,
-              assigneeOptions,
-              onSubmit: handleCreateTask,
-            } as const;
-            return (
-              <Column
-                key={col.key}
-                title={columnTitle}
-                status={col.key}
-                count={isLoading ? 0 : colTasks.length}
-                headerAction={
+        <DndContext
+          sensors={dragSensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={handleDragCancel}
+        >
+          <KanbanBoardViewport>
+            {statusColumns.map((col) => {
+              const colTasks = filteredTasks.filter((task) => task.status === col.key);
+              const columnTitle = statusLabel(col.key, t);
+              const newTaskDialogProps = {
+                initialStatus: col.key,
+                isSubmitting: createTaskMutation.isPending,
+                assigneeOptions,
+                onSubmit: handleCreateTask,
+              } as const;
+              return (
+                <BoardColumn
+                  key={col.key}
+                  title={columnTitle}
+                  status={col.key}
+                  count={isLoading ? 0 : colTasks.length}
+                  headerAction={
+                    <NewTaskDialog {...newTaskDialogProps}>
+                      <button
+                        type="button"
+                        className="rounded-md p-1 text-muted-foreground hover:bg-card hover:text-foreground"
+                        aria-label={`${t("common.newTask")} — ${columnTitle}`}
+                      >
+                        <Plus className="size-3.5" />
+                      </button>
+                    </NewTaskDialog>
+                  }
+                >
+                  {isLoading ? (
+                    <LoadingCards />
+                  ) : (
+                    <>
+                      {colTasks.map((task) => (
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          draggable
+                          assignee={resolveTaskAssignee(task.assigneeId, apiTasks, task.id)}
+                          onOpen={handleOpenTask}
+                          onStatusChange={(status) =>
+                            handleStatusChange(task.id, task.status, status)
+                          }
+                          isStatusUpdating={updatingTaskId === task.id}
+                        />
+                      ))}
+                      {colTasks.length === 0 && (
+                        <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+                          No tasks in this column
+                        </div>
+                      )}
+                    </>
+                  )}
                   <NewTaskDialog {...newTaskDialogProps}>
                     <button
                       type="button"
-                      className="rounded-md p-1 text-muted-foreground hover:bg-card hover:text-foreground"
-                      aria-label={`${t("common.newTask")} — ${columnTitle}`}
+                      className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-border py-2 text-xs text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
                     >
-                      <Plus className="size-3.5" />
+                      <Plus className="size-3.5" /> {t("board.addNewCard")}
                     </button>
                   </NewTaskDialog>
-                }
-              >
-                {isLoading ? (
-                  <LoadingCards />
-                ) : (
-                  <>
-                    {colTasks.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        assignee={resolveTaskAssignee(task.assigneeId, apiTasks, task.id)}
-                        onOpen={setSelected}
-                        onStatusChange={(status) =>
-                          handleStatusChange(task.id, task.status, status)
-                        }
-                        isStatusUpdating={updatingTaskId === task.id}
-                      />
-                    ))}
-                    {colTasks.length === 0 && (
-                      <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
-                        No tasks in this column
-                      </div>
-                    )}
-                  </>
+                </BoardColumn>
+              );
+            })}
+          </KanbanBoardViewport>
+          <DragOverlay dropAnimation={null}>
+            {activeDragTask ? (
+              <TaskCard
+                task={activeDragTask}
+                dragOverlay
+                assignee={resolveTaskAssignee(
+                  activeDragTask.assigneeId,
+                  apiTasks,
+                  activeDragTask.id,
                 )}
-                <NewTaskDialog {...newTaskDialogProps}>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-border py-2 text-xs text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
-                  >
-                    <Plus className="size-3.5" /> {t("board.addNewCard")}
-                  </button>
-                </NewTaskDialog>
-              </Column>
-            );
-          })}
-        </KanbanBoardViewport>
+                onOpen={() => {}}
+              />
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       )}
 
       <TaskDrawer
@@ -463,7 +558,14 @@ function statusLabel(status: TaskStatus, t: (key: TKey) => string) {
   return t(labels[status]);
 }
 
-function Column({
+const columnStatusIds = new Set<TaskStatus>(statusColumns.map((col) => col.key));
+
+function parseColumnStatus(id: string | number): TaskStatus | null {
+  const key = String(id);
+  return columnStatusIds.has(key as TaskStatus) ? (key as TaskStatus) : null;
+}
+
+function BoardColumn({
   title,
   status,
   count,
@@ -476,6 +578,11 @@ function Column({
   headerAction?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: status,
+    data: { type: "column", status },
+  });
+
   const tone: Record<TaskStatus, string> = {
     backlog: "bg-muted-foreground/50",
     todo: "bg-info",
@@ -483,8 +590,14 @@ function Column({
     review: "bg-warning",
     done: "bg-success",
   };
+
   return (
-    <div className="flex w-80 shrink-0 flex-col gap-3 rounded-2xl bg-muted/40 p-3">
+    <div
+      className={
+        "flex w-80 shrink-0 flex-col gap-3 rounded-2xl bg-muted/40 p-3 transition-colors " +
+        (isOver ? "bg-primary/10 ring-1 ring-primary/25" : "")
+      }
+    >
       <div className="flex shrink-0 items-center justify-between px-1">
         <div className="flex items-center gap-2 text-sm font-semibold">
           <span className={"size-2 rounded-full " + tone[status]} />
@@ -495,7 +608,9 @@ function Column({
         </div>
         {headerAction}
       </div>
-      <div className="flex flex-col gap-2">{children}</div>
+      <div ref={setNodeRef} className="flex min-h-16 flex-col gap-2">
+        {children}
+      </div>
     </div>
   );
 }
