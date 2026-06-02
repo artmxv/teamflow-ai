@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import type { AuthWorkspace } from "@/lib/api/auth";
 import { nameToInitials, useCurrentUser, workspaceRoleLabel } from "@/lib/auth/use-current-user";
+import { useSidebarCollapsed } from "@/lib/sidebar-preference";
 import { AppSidebar } from "./AppSidebar";
 import { AppTopbar } from "./AppTopbar";
 
@@ -39,6 +40,7 @@ function authWorkspaceToShell(workspace: AuthWorkspace): Workspace {
 export function AppShell({ title, children }: { title: string; children: ReactNode }) {
   const { data: me, isPending } = useCurrentUser();
   const [activeWorkspace, setActiveWorkspace] = useState(loadingWorkspace);
+  const { collapsed: sidebarCollapsed, toggle: toggleSidebarCollapsed } = useSidebarCollapsed();
 
   const workspaces = useMemo(() => {
     if (me?.workspace) {
@@ -69,7 +71,11 @@ export function AppShell({ title, children }: { title: string; children: ReactNo
   return (
     <AuthGuard>
       <div className="flex min-h-screen w-full bg-muted/30">
-        <AppSidebar activeWorkspace={displayWorkspace} />
+        <AppSidebar
+          activeWorkspace={displayWorkspace}
+          collapsed={sidebarCollapsed}
+          onToggleCollapsed={toggleSidebarCollapsed}
+        />
         <div className="flex min-w-0 flex-1 flex-col">
           <AppTopbar
             title={title}
