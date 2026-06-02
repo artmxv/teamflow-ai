@@ -179,4 +179,98 @@
   .shadow-soft { box-shadow: var(--shadow-soft); }
   .shadow-card { box-shadow: var(--shadow-card); }
   .shadow-glow { box-shadow: var(--shadow-glow); }
+
+  /* Kanban: top horizontal scrollbar + natural vertical page scroll */
+  .kanban-board-viewport {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .kanban-board-scroll-top {
+    overflow-x: scroll;
+    overflow-y: hidden;
+    flex: none;
+    height: 14px;
+    margin-bottom: 0.25rem;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable both-edges;
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.55 0.22 277 / 0.55) oklch(0.9 0.01 270 / 0.35);
+  }
+
+  .kanban-board-scroll-top::-webkit-scrollbar {
+    height: 12px;
+  }
+
+  .kanban-board-scroll-top::-webkit-scrollbar-track {
+    margin-inline: 0.25rem;
+    border-radius: 9999px;
+    background: oklch(0.9 0.01 270 / 0.45);
+  }
+
+  .kanban-board-scroll-top::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background: oklch(0.55 0.22 277 / 0.55);
+    background-clip: padding-box;
+  }
+
+  .kanban-board-scroll-top::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.5 0.22 277 / 0.75);
+    background-clip: padding-box;
+  }
+
+  .dark .kanban-board-scroll-top {
+    scrollbar-color: oklch(0.7 0.18 277 / 0.7) oklch(0.28 0.03 270 / 0.85);
+  }
+
+  .dark .kanban-board-scroll-top::-webkit-scrollbar-track {
+    background: oklch(0.28 0.03 270 / 0.85);
+  }
+
+  .dark .kanban-board-scroll-top::-webkit-scrollbar-thumb {
+    background: oklch(0.7 0.18 277 / 0.7);
+    background-clip: padding-box;
+  }
+
+  /* Horizontal scroll only; height grows with columns (page scrolls vertically) */
+  .kanban-board-scroll-main {
+    overflow-x: scroll;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .kanban-board-scroll-main::-webkit-scrollbar {
+    display: none;
+    height: 0;
+  }
+
+  /* Native date inputs: readable field + calendar icon in light and dark */
+  .date-input-native {
+    color-scheme: light;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+
+  .date-input-native::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.75;
+  }
+
+  .dark .date-input-native {
+    color-scheme: dark;
+    background-color: var(--color-card);
+    color: var(--color-card-foreground);
+    border-color: var(--color-border);
+  }
+
+  .dark .date-input-native::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.85;
+    /* Force a light icon regardless of native color-scheme styling */
+    filter: brightness(0) invert(1);
+  }
 }

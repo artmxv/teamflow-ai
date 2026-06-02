@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -33,6 +33,7 @@ import {
   type ProjectStatus,
   type TaskStatus,
 } from "@/lib/mock-data";
+import { type AssigneeOption, UNASSIGNED_ASSIGNEE_VALUE } from "@/lib/assignee-options";
 
 type Translate = (key: TKey) => string;
 
@@ -168,6 +169,7 @@ type NewTaskDialogProps = {
   children: ReactNode;
   initialStatus?: TaskStatus;
   isSubmitting?: boolean;
+  assigneeOptions?: AssigneeOption[];
   onSubmit: (values: TaskFormValues) => Promise<void>;
 };
 
@@ -175,6 +177,7 @@ export function NewTaskDialog({
   children,
   initialStatus = "todo",
   isSubmitting = false,
+  assigneeOptions = [],
   onSubmit,
 }: NewTaskDialogProps) {
   const { t } = useI18n();
@@ -193,20 +196,37 @@ export function NewTaskDialog({
       description: "",
       priority: "medium",
       status: initialStatus,
-      assigneeId: members[0].id,
+      assigneeId: undefined,
       dueDate: "",
     },
   });
 
+  useEffect(() => {
+    if (!open) return;
+    reset({
+      title: "",
+      description: "",
+      priority: "medium",
+      status: initialStatus,
+      assigneeId: undefined,
+      dueDate: "",
+    });
+  }, [open, initialStatus, reset]);
+
   async function submit(values: TaskFormValues) {
     try {
-      await onSubmit(values);
+      // New tasks must use real API user ids (backend rejects mock ids).
+      const normalizedAssigneeId =
+        values.assigneeId && assigneeOptions.some((option) => option.id === values.assigneeId)
+          ? values.assigneeId
+          : undefined;
+      await onSubmit({ ...values, assigneeId: normalizedAssigneeId });
       reset({
         title: "",
         description: "",
         priority: "medium",
         status: initialStatus,
-        assigneeId: members[0].id,
+        assigneeId: undefined,
         dueDate: "",
       });
       setOpen(false);
@@ -229,7 +249,7 @@ export function NewTaskDialog({
               <Input {...register("title")} placeholder="Write release notes" />
             </Field>
             <Field label={t("tasks.dueDate")} error={errors.dueDate?.message}>
-              <Input type="date" {...register("dueDate")} />
+              <Input type="date" className="date-input-native" {...register("dueDate")} />
             </Field>
             <div className="sm:col-span-2">
               <Field label="Description" error={errors.description?.message}>
@@ -286,14 +306,20 @@ export function NewTaskDialog({
                 control={control}
                 name="assigneeId"
                 render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
+                  <Select
+                    value={field.value ?? UNASSIGNED_ASSIGNEE_VALUE}
+                    onValueChange={(value) => {
+                      field.onChange(value === UNASSIGNED_ASSIGNEE_VALUE ? undefined : value);
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select assignee" />
                     </SelectTrigger>
                     <SelectContent>
-                      {members.map((member) => (
-                        <SelectItem key={member.id} value={member.id}>
-                          {member.name}
+                      <SelectItem value={UNASSIGNED_ASSIGNEE_VALUE}>Unassigned</SelectItem>
+                      {assigneeOptions.map((option) => (
+                        <SelectItem key={option.id} value={option.id}>
+                          {option.name}
                         </SelectItem>
                       ))}
                     </SelectContent>

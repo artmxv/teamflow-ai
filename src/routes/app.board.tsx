@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
-import { members, statusColumns, type Priority, type Task, type TaskStatus } from "@/lib/mock-data";
+import { statusColumns, type Priority, type Task, type TaskStatus } from "@/lib/mock-data";
 import { TaskCard } from "@/components/app/TaskCard";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
 import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
@@ -29,6 +29,7 @@ import {
 } from "@/lib/api/tasks";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { Filter, Plus } from "lucide-react";
+import { buildAssigneeOptions, resolveTaskAssignee } from "@/lib/assignee-options";
 
 export const Route = createFileRoute("/app/board")({
   beforeLoad: requireAuth,
@@ -105,6 +106,31 @@ function Board() {
       );
     },
   });
+  const updateAssigneeMutation = useMutation({
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: string;
+      input: { assigneeId: string | null; dueDate: string | null };
+    }) => updateTask(id, input),
+    onSuccess: async (updated) => {
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      setSelected((prev) => (prev?.id === updated.id ? mapApiTaskToTask(updated) : prev));
+      setSelected(null);
+      toast.success("Task updated");
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Task could not be updated",
+      );
+    },
+  });
+  const assigneeOptions = useMemo(() => buildAssigneeOptions(apiTasks), [apiTasks]);
+  const selectedAssignee = useMemo(
+    () => (selected ? resolveTaskAssignee(selected.assigneeId, apiTasks, selected.id) : null),
+    [selected, apiTasks],
+  );
   const updatingTaskId =
     updateTaskMutation.isPending && updateTaskMutation.variables
       ? updateTaskMutation.variables.id
@@ -148,7 +174,11 @@ function Board() {
           <p className="text-sm text-muted-foreground">Orion Web App · 12 tasks active</p>
         </div>
         <div className="flex gap-2">
-          <NewTaskDialog isSubmitting={createTaskMutation.isPending} onSubmit={handleCreateTask}>
+          <NewTaskDialog
+            isSubmitting={createTaskMutation.isPending}
+            assigneeOptions={assigneeOptions}
+            onSubmit={handleCreateTask}
+          >
             <Button size="sm" className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
               <Plus className="size-4" /> {t("common.newTask")}
             </Button>
@@ -182,9 +212,9 @@ function Board() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{t("tasks.assignee")}</SelectItem>
-              {members.map((member) => (
-                <SelectItem key={member.id} value={member.id}>
-                  {member.name}
+              {assigneeOptions.map((option) => (
+                <SelectItem key={option.id} value={option.id}>
+                  {option.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -205,15 +235,33 @@ function Board() {
       {isError ? (
         <ErrorState error={error} onRetry={() => void refetch()} />
       ) : (
-        <div className="-mx-2 flex gap-3 overflow-x-auto px-2 pb-4">
+        <KanbanBoardViewport>
           {statusColumns.map((col) => {
             const colTasks = filteredTasks.filter((task) => task.status === col.key);
+            const columnTitle = statusLabel(col.key, t);
+            const newTaskDialogProps = {
+              initialStatus: col.key,
+              isSubmitting: createTaskMutation.isPending,
+              assigneeOptions,
+              onSubmit: handleCreateTask,
+            } as const;
             return (
               <Column
                 key={col.key}
-                title={statusLabel(col.key, t)}
+                title={columnTitle}
                 status={col.key}
                 count={isLoading ? 0 : colTasks.length}
+                headerAction={
+                  <NewTaskDialog {...newTaskDialogProps}>
+                    <button
+                      type="button"
+                      className="rounded-md p-1 text-muted-foreground hover:bg-card hover:text-foreground"
+                      aria-label={`${t("common.newTask")} — ${columnTitle}`}
+                    >
+                      <Plus className="size-3.5" />
+                    </button>
+                  </NewTaskDialog>
+                }
               >
                 {isLoading ? (
                   <LoadingCards />
@@ -223,6 +271,7 @@ function Board() {
                       <TaskCard
                         key={task.id}
                         task={task}
+                        assignee={resolveTaskAssignee(task.assigneeId, apiTasks, task.id)}
                         onOpen={setSelected}
                         onStatusChange={(status) =>
                           handleStatusChange(task.id, task.status, status)
@@ -237,23 +286,29 @@ function Board() {
                     )}
                   </>
                 )}
-                <NewTaskDialog
-                  initialStatus={col.key}
-                  isSubmitting={createTaskMutation.isPending}
-                  onSubmit={handleCreateTask}
-                >
-                  <button className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-border py-2 text-xs text-muted-foreground transition hover:border-primary/30 hover:text-foreground">
+                <NewTaskDialog {...newTaskDialogProps}>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-border py-2 text-xs text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
+                  >
                     <Plus className="size-3.5" /> {t("board.addNewCard")}
                   </button>
                 </NewTaskDialog>
               </Column>
             );
           })}
-        </div>
+        </KanbanBoardViewport>
       )}
 
       <TaskDrawer
         task={selected}
+        assignee={selectedAssignee}
+        assigneeOptions={assigneeOptions}
+        onSaveChanges={({ assigneeId, dueDate }) => {
+          if (!selected || updateAssigneeMutation.isPending) return;
+          updateAssigneeMutation.mutate({ id: selected.id, input: { assigneeId, dueDate } });
+        }}
+        isSaving={updateAssigneeMutation.isPending}
         onOpenChange={(o) => !o && setSelected(null)}
         onDelete={(taskId) => deleteTaskMutation.mutate(taskId)}
         isDeleting={deleteTaskMutation.isPending}
@@ -286,17 +341,80 @@ function mapApiTaskToTask(task: TaskApiItem): Task {
       done: index < task.checklistDone,
     })),
     activity: [],
-    attachments: Array.from({ length: task.attachmentsCount }, (_, index) => ({
-      id: `${task.id}-attachment-${index}`,
-      name: `Attachment ${index + 1}`,
-      size: "",
-    })),
+    attachments: Array.from({ length: task.attachmentsCount }, (_, index) => {
+      const demoFiles = [
+        { name: "spec-draft.pdf", size: "124 KB" },
+        { name: "ui-mockup.png", size: "890 KB" },
+        { name: "release-notes.md", size: "12 KB" },
+      ] as const;
+      const file = demoFiles[index % demoFiles.length];
+      return {
+        id: `${task.id}-attachment-${index}`,
+        name: file.name,
+        size: file.size,
+      };
+    }),
   };
 }
 
 function formatDate(value: string | null) {
   if (!value) return null;
-  return new Date(value).toLocaleDateString();
+  // Keep YYYY-MM-DD so <input type="date" /> works consistently.
+  return value.slice(0, 10);
+}
+
+function KanbanBoardViewport({ children }: { children: React.ReactNode }) {
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const mainScrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [contentWidth, setContentWidth] = useState(0);
+  const isSyncingScroll = useRef(false);
+
+  useEffect(() => {
+    const content = contentRef.current;
+    if (!content) return;
+
+    const updateWidth = () => setContentWidth(content.scrollWidth);
+    updateWidth();
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [children]);
+
+  function syncScroll(from: "top" | "main") {
+    if (isSyncingScroll.current) return;
+    const top = topScrollRef.current;
+    const main = mainScrollRef.current;
+    if (!top || !main) return;
+
+    isSyncingScroll.current = true;
+    if (from === "top") main.scrollLeft = top.scrollLeft;
+    else top.scrollLeft = main.scrollLeft;
+    isSyncingScroll.current = false;
+  }
+
+  return (
+    <div className="kanban-board-viewport w-full min-w-0">
+      <div
+        ref={topScrollRef}
+        className="kanban-board-scroll-top -mx-2 px-2"
+        onScroll={() => syncScroll("top")}
+        aria-hidden="true"
+      >
+        <div style={{ width: contentWidth, height: 1 }} />
+      </div>
+      <div
+        ref={mainScrollRef}
+        className="kanban-board-scroll-main -mx-2 px-2 pb-2"
+        onScroll={() => syncScroll("main")}
+      >
+        <div ref={contentRef} className="flex items-stretch gap-3">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function LoadingCards() {
@@ -349,11 +467,13 @@ function Column({
   title,
   status,
   count,
+  headerAction,
   children,
 }: {
   title: string;
   status: TaskStatus;
   count: number;
+  headerAction?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const tone: Record<TaskStatus, string> = {
@@ -365,7 +485,7 @@ function Column({
   };
   return (
     <div className="flex w-80 shrink-0 flex-col gap-3 rounded-2xl bg-muted/40 p-3">
-      <div className="flex items-center justify-between px-1">
+      <div className="flex shrink-0 items-center justify-between px-1">
         <div className="flex items-center gap-2 text-sm font-semibold">
           <span className={"size-2 rounded-full " + tone[status]} />
           {title}
@@ -373,9 +493,7 @@ function Column({
             {count}
           </span>
         </div>
-        <button className="rounded-md p-1 text-muted-foreground hover:bg-card hover:text-foreground">
-          <Plus className="size-3.5" />
-        </button>
+        {headerAction}
       </div>
       <div className="flex flex-col gap-2">{children}</div>
     </div>
