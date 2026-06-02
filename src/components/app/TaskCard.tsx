@@ -1,6 +1,9 @@
+import { useDraggable } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
 import { Calendar, GripVertical, MessageSquare, Paperclip } from "lucide-react";
 import { type Task, priorityMeta, statusColumns, type TaskStatus } from "@/lib/mock-data";
 import type { AssigneeOption } from "@/lib/assignee-options";
+import { cn } from "@/lib/utils";
 import { Avatar } from "./Avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -11,28 +14,64 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+export type TaskDragData = {
+  type: "task";
+  taskId: string;
+  status: TaskStatus;
+};
+
 export function TaskCard({
   task,
   assignee,
   onOpen,
   onStatusChange,
   isStatusUpdating,
+  draggable = false,
+  dragOverlay = false,
 }: {
   task: Task;
   assignee?: AssigneeOption | null;
   onOpen: (task: Task) => void;
   onStatusChange?: (status: TaskStatus) => void;
   isStatusUpdating?: boolean;
+  draggable?: boolean;
+  /** Rendered inside DragOverlay (no drag hooks). */
+  dragOverlay?: boolean;
 }) {
   const prio = priorityMeta[task.priority];
   const dueDateLabel = task.dueDate ? formatTaskDueDate(task.dueDate) : null;
 
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: task.id,
+    data: { type: "task", taskId: task.id, status: task.status } satisfies TaskDragData,
+    disabled: !draggable || dragOverlay,
+  });
+
+  const style =
+    draggable && !dragOverlay && transform
+      ? { transform: CSS.Translate.toString(transform) }
+      : undefined;
+
   return (
-    <div className="group w-full rounded-2xl border border-border bg-card p-3.5 text-left shadow-soft transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card">
+    <div
+      ref={draggable && !dragOverlay ? setNodeRef : undefined}
+      style={style}
+      className={cn(
+        "group w-full rounded-2xl border border-border bg-card p-3.5 text-left shadow-soft transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card",
+        draggable && !dragOverlay && isDragging && "z-50 opacity-40",
+        dragOverlay && "cursor-grabbing shadow-card ring-2 ring-primary/25",
+      )}
+      {...(draggable && !dragOverlay ? { ...attributes, ...listeners } : {})}
+    >
       <button type="button" onClick={() => onOpen(task)} className="w-full text-left">
         <div className="flex items-start justify-between gap-2">
           <div className="text-[11px] font-mono text-muted-foreground">{task.key}</div>
-          <GripVertical className="size-3.5 text-muted-foreground/60 opacity-0 transition group-hover:opacity-100" />
+          <GripVertical
+            className={cn(
+              "size-3.5 shrink-0 text-muted-foreground/60",
+              draggable ? "opacity-70" : "opacity-0 transition group-hover:opacity-100",
+            )}
+          />
         </div>
         <div className="mt-1 text-sm font-medium leading-snug">{task.title}</div>
 
