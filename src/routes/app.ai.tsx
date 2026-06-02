@@ -43,6 +43,22 @@ function AssistantPage() {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  async function handleRegenerate() {
+    try {
+      const result = await refetch();
+      if (result.error) {
+        throw result.error;
+      }
+      toast.success(t("ai.summaryRefreshed"));
+    } catch (regenerateError) {
+      toast.error(
+        regenerateError instanceof Error
+          ? regenerateError.message
+          : "Workspace summary could not be refreshed",
+      );
+    }
+  }
+
   return (
     <AppShell title={t("ai.assistant")}>
       <div className="grid h-[calc(100vh-7rem)] gap-4 lg:grid-cols-[260px_1fr]">
@@ -81,10 +97,10 @@ function AssistantPage() {
             size="sm"
             className="mt-2"
             disabled={isLoading || isFetching}
-            onClick={() => void refetch()}
+            onClick={() => void handleRegenerate()}
           >
             <RefreshCw className={"mr-1.5 size-3.5 " + (isFetching ? "animate-spin" : "")} />
-            Regenerate
+            {isFetching ? t("ai.regenerating") : t("ai.regenerate")}
           </Button>
         </aside>
 
@@ -104,10 +120,10 @@ function AssistantPage() {
               size="sm"
               className="ml-auto"
               disabled={isLoading || isFetching}
-              onClick={() => void refetch()}
+              onClick={() => void handleRegenerate()}
             >
               <RefreshCw className={"mr-1.5 size-3.5 " + (isFetching ? "animate-spin" : "")} />
-              Regenerate
+              {isFetching ? t("ai.regenerating") : t("ai.regenerate")}
             </Button>
           </div>
 

@@ -254,9 +254,17 @@ function SettingsPage() {
                   {userInitials}
                 </div>
               )}
-              <Button variant="outline" size="sm" disabled>
-                {t("common.uploadNewPhoto")}
-              </Button>
+              <div className="space-y-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  onClick={() => toast.message(t("settings.avatarUploadUnavailable"))}
+                >
+                  {t("common.uploadNewPhoto")}
+                </Button>
+                <p className="text-xs text-muted-foreground">{t("settings.avatarUploadHelper")}</p>
+              </div>
             </div>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <Field label="Full name">

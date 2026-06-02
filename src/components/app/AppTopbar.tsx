@@ -22,11 +22,7 @@ import { ThemeToggle } from "@/lib/theme";
 import { toast } from "sonner";
 import { logout } from "@/lib/api/auth";
 import { clearAuthToken, getAuthToken } from "@/lib/auth/token";
-import {
-  nameToInitials,
-  useCurrentUser,
-  workspaceRoleLabel,
-} from "@/lib/auth/use-current-user";
+import { nameToInitials, useCurrentUser, workspaceRoleLabel } from "@/lib/auth/use-current-user";
 import type { WorkspaceRole } from "@/lib/api/auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Workspace } from "./AppShell";
@@ -85,7 +81,7 @@ export function AppTopbar({
 
   function markAllAsRead() {
     setUnread(0);
-    toast.success(t("top.notifications"));
+    toast.success(t("top.allMarkedAsRead"));
   }
 
   return (
@@ -110,7 +106,9 @@ export function AppTopbar({
           <DropdownMenuSeparator />
           {workspaces.map((w) => (
             <DropdownMenuItem key={w.id} onClick={() => onWorkspaceChange(w)} className="gap-2">
-              <span className="grid size-6 place-items-center rounded-md bg-gradient-brand text-[10px] font-semibold text-white">{w.initials}</span>
+              <span className="grid size-6 place-items-center rounded-md bg-gradient-brand text-[10px] font-semibold text-white">
+                {w.initials}
+              </span>
               <span className="flex-1">
                 <span className="block text-sm font-medium leading-tight">{w.name}</span>
                 <span className="block text-[11px] text-muted-foreground leading-tight">
@@ -148,7 +146,9 @@ export function AppTopbar({
           <DropdownMenuTrigger asChild>
             <button className="relative grid size-9 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground">
               <Bell className="size-4" />
-              {unread > 0 && <span className="absolute right-2 top-2 size-1.5 rounded-full bg-primary" />}
+              {unread > 0 && (
+                <span className="absolute right-2 top-2 size-1.5 rounded-full bg-primary" />
+              )}
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80">
@@ -156,13 +156,15 @@ export function AppTopbar({
               {t("top.notifications")}
               <span className="text-[11px] font-normal text-muted-foreground">{unread} unread</span>
             </DropdownMenuLabel>
+            <p className="px-2 py-1.5 text-[11px] text-muted-foreground">
+              {t("top.notificationsDemoPreview")}
+            </p>
             <DropdownMenuSeparator />
             {notifications.map((item, index) => (
               <DropdownMenuItem key={item.id} className="items-start gap-2 py-2">
                 <span
                   className={
-                    "mt-1 size-2 rounded-full " +
-                    (index < unread ? "bg-primary" : "bg-muted")
+                    "mt-1 size-2 rounded-full " + (index < unread ? "bg-primary" : "bg-muted")
                   }
                 />
                 <span>
@@ -177,10 +179,7 @@ export function AppTopbar({
         </DropdownMenu>
 
         {showProfilePlaceholder && (
-          <div
-            className="flex items-center gap-2 rounded-lg p-1 pr-2"
-            aria-hidden
-          >
+          <div className="flex items-center gap-2 rounded-lg p-1 pr-2" aria-hidden>
             <Skeleton className="size-8 rounded-md" />
             <span className="hidden space-y-1 xl:block">
               <Skeleton className="h-3.5 w-24" />
@@ -196,10 +195,12 @@ export function AppTopbar({
                   {nameToInitials(currentUser.name)}
                 </span>
                 <span className="hidden text-left xl:block">
-                  <span className="block text-sm font-medium leading-tight">{currentUser.name}</span>
+                  <span className="block text-sm font-medium leading-tight">
+                    {currentUser.name}
+                  </span>
                   <span className="block text-[11px] text-muted-foreground leading-tight">
-                  {profileRoleLabel}
-                </span>
+                    {profileRoleLabel}
+                  </span>
                 </span>
                 <ChevronDown className="hidden size-3.5 text-muted-foreground xl:block" />
               </button>
@@ -207,10 +208,18 @@ export function AppTopbar({
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>{currentUser.email}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild><Link to="/app/settings">{t("settings.profileSettings")}</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link to="/app/settings">{t("settings.workspaceSettings")}</Link></DropdownMenuItem>
-              <DropdownMenuItem asChild><Link to="/app/billing">{t("side.billing")}</Link></DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShortcutsOpen(true)}>{t("top.keyboardShortcuts")}</DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/app/settings">{t("settings.profileSettings")}</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/app/settings">{t("settings.workspaceSettings")}</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/app/billing">{t("side.billing")}</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShortcutsOpen(true)}>
+                {t("top.keyboardShortcuts")}
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => logoutMutation.mutate()}
@@ -228,11 +237,13 @@ export function AppTopbar({
           <DialogHeader>
             <DialogTitle>TeamFlow {t("top.help")}</DialogTitle>
             <DialogDescription>
-              This demo runs on mock data. Use the sidebar to explore projects, tasks, billing, and AI assistant flows.
+              This demo runs on mock data. Use the sidebar to explore projects, tasks, billing, and
+              AI assistant flows.
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
-            Need help? Try opening the task board, filtering by assignee, or using the AI suggested prompts.
+            Need help? Try opening the task board, filtering by assignee, or using the AI suggested
+            prompts.
           </div>
         </DialogContent>
       </Dialog>
@@ -265,9 +276,14 @@ export function KeyboardShortcutsDialog({
             ["G then D", t("side.dashboard")],
             ["G then B", t("side.kanban")],
           ].map(([keys, label]) => (
-            <div key={keys} className="flex items-center justify-between rounded-xl border border-border p-3">
+            <div
+              key={keys}
+              className="flex items-center justify-between rounded-xl border border-border p-3"
+            >
               <span className="text-muted-foreground">{label}</span>
-              <kbd className="rounded border border-border bg-card px-2 py-1 text-xs font-medium">{keys}</kbd>
+              <kbd className="rounded border border-border bg-card px-2 py-1 text-xs font-medium">
+                {keys}
+              </kbd>
             </div>
           ))}
         </div>

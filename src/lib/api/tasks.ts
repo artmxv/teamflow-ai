@@ -1,4 +1,4 @@
-import { API_BASE_URL, apiRequest } from "./client";
+import { apiRequest } from "./client";
 import type { Priority, TaskStatus } from "@/lib/mock-data";
 import type { ProjectApiStatus } from "./projects";
 
@@ -78,33 +78,20 @@ export interface UpdateTaskInput {
 }
 
 export async function createTask(input: CreateTaskInput) {
-  const response = await fetch(`${API_BASE_URL}/api/tasks`, {
+  const response = await apiRequest<{ data: TaskApiItem }>("/api/tasks", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+    body: {
       ...input,
       dueDate: input.dueDate ? new Date(input.dueDate).toISOString() : input.dueDate,
-    }),
+    },
   });
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { message?: string } | null;
-    throw new Error(body?.message ?? `API request failed with status ${response.status}`);
-  }
-
-  const body = (await response.json()) as { data: TaskApiItem };
-  return body.data;
+  return response.data;
 }
 
 export async function updateTask(id: string, input: UpdateTaskInput) {
-  const response = await fetch(`${API_BASE_URL}/api/tasks/${id}`, {
+  const response = await apiRequest<{ data: TaskApiItem }>(`/api/tasks/${id}`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+    body: {
       ...input,
       dueDate:
         input.dueDate !== undefined
@@ -112,28 +99,14 @@ export async function updateTask(id: string, input: UpdateTaskInput) {
             ? new Date(input.dueDate).toISOString()
             : null
           : undefined,
-    }),
+    },
   });
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { message?: string } | null;
-    throw new Error(body?.message ?? `API request failed with status ${response.status}`);
-  }
-
-  const body = (await response.json()) as { data: TaskApiItem };
-  return body.data;
+  return response.data;
 }
 
 export async function deleteTask(id: string) {
-  const response = await fetch(`${API_BASE_URL}/api/tasks/${id}`, {
+  const response = await apiRequest<{ data: { id: string } }>(`/api/tasks/${id}`, {
     method: "DELETE",
   });
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { message?: string } | null;
-    throw new Error(body?.message ?? `API request failed with status ${response.status}`);
-  }
-
-  const body = (await response.json()) as { data: { id: string } };
-  return body.data;
+  return response.data;
 }
