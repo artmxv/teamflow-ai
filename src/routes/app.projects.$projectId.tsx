@@ -1,13 +1,39 @@
-import type { ReactNode } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { requireAuth } from "@/lib/auth/route-guards";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { AvatarStack } from "@/components/app/Avatar";
 import { projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
-import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
+import {
+  deleteProject,
+  fetchProjects,
+  updateProject,
+  type ProjectApiItem,
+  type ProjectApiStatus,
+} from "@/lib/api/projects";
 import {
   fetchTasks,
   type TaskApiItem,
@@ -61,6 +87,8 @@ const taskPriorityTone: Record<TaskApiPriority, string> = {
 
 function ProjectDetailPage() {
   const { projectId } = Route.useParams();
+  const router = useRouter();
+  const queryClient = useQueryClient();
 
   const projectsQuery = useQuery({
     queryKey: ["projects"],
@@ -81,6 +109,45 @@ function ProjectDetailPage() {
 
   const project = apiProjects.find((p) => p.id === projectId) ?? null;
   const projectTasks = apiTasks.filter((t) => t.projectId === projectId);
+
+  const updateProjectMutation = useMutation({
+    mutationFn: (input: {
+      projectId: string;
+      name: string;
+      description: string;
+      status: ProjectApiStatus;
+      dueDate: string | null;
+    }) =>
+      updateProject(input.projectId, {
+        name: input.name,
+        description: input.description,
+        status: input.status,
+        dueDate: input.dueDate,
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast.success("Project updated");
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Project could not be updated",
+      );
+    },
+  });
+
+  const deleteProjectMutation = useMutation({
+    mutationFn: (id: string) => deleteProject(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast.success("Project deleted");
+      await router.navigate({ to: "/app/projects" });
+    },
+    onError: (mutationError) => {
+      const message =
+        mutationError instanceof Error ? mutationError.message : "Project could not be deleted";
+      toast.error(message);
+    },
+  });
 
   const memberIds = Array.from(
     new Set(projectTasks.map((t) => t.assignee?.id).filter(Boolean) as string[]),
@@ -110,6 +177,27 @@ function ProjectDetailPage() {
             </p>
           </div>
         </div>
+        {project ? (
+          <div className="flex items-center gap-2">
+            <EditProjectDialog
+              project={project}
+              isSubmitting={updateProjectMutation.isPending}
+              onSubmit={async (values) => {
+                await updateProjectMutation.mutateAsync({
+                  projectId: project.id,
+                  ...values,
+                });
+              }}
+            />
+            <DeleteProjectDialog
+              projectName={project.name}
+              isSubmitting={deleteProjectMutation.isPending}
+              onConfirm={async () => {
+                await deleteProjectMutation.mutateAsync(project.id);
+              }}
+            />
+          </div>
+        ) : null}
       </div>
 
       {isLoading ? (
@@ -133,6 +221,184 @@ function ProjectDetailPage() {
         />
       )}
     </AppShell>
+  );
+}
+
+function EditProjectDialog({
+  project,
+  isSubmitting,
+  onSubmit,
+}: {
+  project: ProjectApiItem;
+  isSubmitting: boolean;
+  onSubmit: (values: {
+    name: string;
+    description: string;
+    status: ProjectApiStatus;
+    dueDate: string | null;
+  }) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const initial = useMemo(
+    () => ({
+      name: project.name,
+      description: project.description ?? "",
+      status: project.status,
+      dueDate: project.dueDate ? project.dueDate.slice(0, 10) : "",
+    }),
+    [project.description, project.dueDate, project.name, project.status],
+  );
+
+  const [name, setName] = useState(initial.name);
+  const [description, setDescription] = useState(initial.description);
+  const [status, setStatus] = useState<ProjectApiStatus>(initial.status);
+  const [dueDate, setDueDate] = useState(initial.dueDate);
+
+  useEffect(() => {
+    if (!open) return;
+    setName(initial.name);
+    setDescription(initial.description);
+    setStatus(initial.status);
+    setDueDate(initial.dueDate);
+  }, [initial.description, initial.dueDate, initial.name, initial.status, open]);
+
+  const isValid = name.trim().length >= 2;
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          Edit
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit project</DialogTitle>
+          <DialogDescription>Update safe project fields in your workspace.</DialogDescription>
+        </DialogHeader>
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void onSubmit({
+              name: name.trim(),
+              description: description.trim(),
+              status,
+              dueDate: dueDate ? dueDate : null,
+            }).then(() => setOpen(false));
+          }}
+        >
+          <div className="space-y-1.5">
+            <Label>Name</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Project name"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Description</Label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What is this project about?"
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <Select
+                value={status}
+                onValueChange={(value) => setStatus(value as ProjectApiStatus)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PLANNING">Planning</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="ON_HOLD">On hold</SelectItem>
+                  <SelectItem value="COMPLETED">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Due date</Label>
+              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={!isValid || isSubmitting}
+              className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
+            >
+              {isSubmitting ? "Saving..." : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteProjectDialog({
+  projectName,
+  isSubmitting,
+  onConfirm,
+}: {
+  projectName: string;
+  isSubmitting: boolean;
+  onConfirm: () => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="destructive" size="sm" disabled={isSubmitting}>
+          Delete
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete project</DialogTitle>
+          <DialogDescription>
+            This will permanently delete <span className="font-medium">{projectName}</span>. If the
+            project has tasks, you will be asked to delete or move them first.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setOpen(false)}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={isSubmitting}
+            onClick={() => {
+              void onConfirm().then(() => setOpen(false));
+            }}
+          >
+            {isSubmitting ? "Deleting..." : "Delete project"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
