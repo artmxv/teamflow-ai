@@ -46,6 +46,9 @@ export interface Task {
   dueDate: string | null;
   labels: string[];
   comments: Comment[];
+  /** From API when task list includes counts without full comment bodies. */
+  commentsCount?: number;
+  attachmentsCount?: number;
   checklist: { id: string; label: string; done: boolean }[];
   activity: { id: string; text: string; at: string }[];
   attachments: { id: string; name: string; size: string }[];

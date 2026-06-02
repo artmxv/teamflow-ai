@@ -99,14 +99,14 @@ export function TaskCard({
                 <span className="truncate">{dueDateLabel}</span>
               </span>
             ) : null}
-            {task.comments.length > 0 && (
+            {(task.commentsCount ?? task.comments.length) > 0 && (
               <span className="inline-flex items-center gap-1">
-                <MessageSquare className="size-3" /> {task.comments.length}
+                <MessageSquare className="size-3" /> {task.commentsCount ?? task.comments.length}
               </span>
             )}
-            {task.attachments.length > 0 && (
+            {(task.attachmentsCount ?? task.attachments.length) > 0 && (
               <span className="inline-flex items-center gap-1">
-                <Paperclip className="size-3" /> {task.attachments.length}
+                <Paperclip className="size-3" /> {task.attachmentsCount ?? task.attachments.length}
               </span>
             )}
           </div>

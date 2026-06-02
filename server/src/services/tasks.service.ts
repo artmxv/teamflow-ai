@@ -127,7 +127,7 @@ async function findProjectInWorkspace(projectId: string, workspaceId: string) {
   });
 }
 
-async function findTaskInWorkspace(taskId: string, workspaceId: string) {
+export async function findTaskInWorkspace(taskId: string, workspaceId: string) {
   return prisma.task.findFirst({
     where: { id: taskId, project: { workspaceId } },
     select: { id: true },

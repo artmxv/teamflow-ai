@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Sheet,
@@ -7,6 +8,15 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +29,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { type AssigneeOption, UNASSIGNED_ASSIGNEE_VALUE } from "@/lib/assignee-options";
+import {
+  createTaskComment,
+  deleteTaskComment,
+  fetchTaskComments,
+  updateTaskComment,
+  type TaskCommentApiItem,
+} from "@/lib/api/task-comments";
+import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { type Task, getMember, getProject, priorityMeta, statusColumns } from "@/lib/mock-data";
 import { Avatar } from "./Avatar";
 import {
@@ -31,6 +49,8 @@ import {
   Plus,
   Check,
   Trash2,
+  Pencil,
+  X,
   FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -54,15 +74,72 @@ export function TaskDrawer({
   onDelete?: (taskId: string) => void;
   isDeleting?: boolean;
 }) {
+  const queryClient = useQueryClient();
+  const { data: me } = useCurrentUser();
+  const currentUserId = me?.user.id;
   const [aiOpen, setAiOpen] = useState(false);
   const [draftAssigneeId, setDraftAssigneeId] = useState<string | null>(null);
   const [draftDueDate, setDraftDueDate] = useState<string | null>(null);
+  const [commentBody, setCommentBody] = useState("");
 
   useEffect(() => {
     if (!task) return;
     setDraftAssigneeId(task.assigneeId);
     setDraftDueDate(task.dueDate);
   }, [task?.id, task?.assigneeId, task?.dueDate]);
+
+  useEffect(() => {
+    setCommentBody("");
+  }, [task?.id]);
+
+  const commentsQuery = useQuery({
+    queryKey: ["task-comments", task?.id],
+    queryFn: () => fetchTaskComments(task!.id),
+    enabled: !!task?.id,
+  });
+
+  const createCommentMutation = useMutation({
+    mutationFn: (body: string) => createTaskComment(task!.id, body),
+    onSuccess: async () => {
+      setCommentBody("");
+      await queryClient.invalidateQueries({ queryKey: ["task-comments", task!.id] });
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      toast.success("Comment added");
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Comment could not be saved",
+      );
+    },
+  });
+
+  const updateCommentMutation = useMutation({
+    mutationFn: ({ commentId, body }: { commentId: string; body: string }) =>
+      updateTaskComment(task!.id, commentId, body),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["task-comments", task!.id] });
+      toast.success("Comment updated");
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Comment could not be updated",
+      );
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: (commentId: string) => deleteTaskComment(task!.id, commentId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["task-comments", task!.id] });
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      toast.success("Comment deleted");
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Comment could not be deleted",
+      );
+    },
+  });
 
   if (!task) return null;
 
@@ -198,45 +275,40 @@ export function TaskDrawer({
               )}
             </section>
 
-            <section>
-              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Comments
-              </h3>
-              <p className="mb-3 text-xs text-muted-foreground">
-                Demo only — comments are not saved. Use Save changes for assignee and due date.
-              </p>
-              <div className="space-y-3">
-                {task.comments.length === 0 ? (
-                  <p className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                    No comments yet.
-                  </p>
-                ) : (
-                  task.comments.map((c, index) => (
-                    <DemoCommentPlaceholder key={c.id} index={index} authorId={c.authorId} />
-                  ))
-                )}
-                <Textarea
-                  placeholder="Preview only — comments are not saved"
-                  className="min-h-20 rounded-2xl opacity-80"
-                  disabled
-                  readOnly
-                />
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      toast.message("Comments are demo-only", {
-                        description: "Saving a task updates assignee and due date only.",
-                      })
-                    }
-                  >
-                    Comment (demo)
-                  </Button>
-                </div>
-              </div>
-            </section>
+            <TaskCommentsSection
+              comments={commentsQuery.data ?? []}
+              currentUserId={currentUserId}
+              isLoading={commentsQuery.isLoading}
+              isError={commentsQuery.isError}
+              commentBody={commentBody}
+              onCommentBodyChange={setCommentBody}
+              isSubmitting={createCommentMutation.isPending}
+              onSubmit={() => {
+                const trimmed = commentBody.trim();
+                if (!trimmed || createCommentMutation.isPending) return;
+                createCommentMutation.mutate(trimmed);
+              }}
+              onUpdateComment={(commentId, body) => {
+                if (updateCommentMutation.isPending) {
+                  return Promise.reject(new Error("Update already in progress"));
+                }
+                return updateCommentMutation.mutateAsync({ commentId, body });
+              }}
+              onDeleteComment={(commentId) => {
+                if (deleteCommentMutation.isPending) {
+                  return Promise.reject(new Error("Delete already in progress"));
+                }
+                return deleteCommentMutation.mutateAsync(commentId);
+              }}
+              updatingCommentId={
+                updateCommentMutation.isPending
+                  ? (updateCommentMutation.variables?.commentId ?? null)
+                  : null
+              }
+              deletingCommentId={
+                deleteCommentMutation.isPending ? (deleteCommentMutation.variables ?? null) : null
+              }
+            />
 
             <section>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -363,11 +435,289 @@ export function TaskDrawer({
   );
 }
 
-const demoCommentBodies = [
-  "Looks good — can we align this with the API contract before merge?",
-  "Blocked on design review; will update once tokens land.",
-  "Added test notes in the linked doc.",
-];
+function authorInitials(author: TaskCommentApiItem["author"]) {
+  if (author.avatar) return author.avatar;
+  return author.name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function formatCommentDate(value: string) {
+  return new Date(value).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function TaskCommentsSection({
+  comments,
+  currentUserId,
+  isLoading,
+  isError,
+  commentBody,
+  onCommentBodyChange,
+  isSubmitting,
+  onSubmit,
+  onUpdateComment,
+  onDeleteComment,
+  updatingCommentId,
+  deletingCommentId,
+}: {
+  comments: TaskCommentApiItem[];
+  currentUserId?: string;
+  isLoading: boolean;
+  isError: boolean;
+  commentBody: string;
+  onCommentBodyChange: (value: string) => void;
+  isSubmitting: boolean;
+  onSubmit: () => void;
+  onUpdateComment: (commentId: string, body: string) => Promise<unknown>;
+  onDeleteComment: (commentId: string) => Promise<unknown>;
+  updatingCommentId: string | null;
+  deletingCommentId: string | null;
+}) {
+  const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
+  const isDeletingSelected = commentToDelete != null && deletingCommentId === commentToDelete;
+
+  const trimmedLength = commentBody.trim().length;
+  const canSubmit = trimmedLength > 0 && trimmedLength <= 1000 && !isSubmitting;
+
+  async function handleConfirmDelete() {
+    if (!commentToDelete || isDeletingSelected) return;
+    try {
+      await onDeleteComment(commentToDelete);
+      setCommentToDelete(null);
+    } catch {
+      // Toast is shown by the parent mutation; keep dialog open.
+    }
+  }
+
+  return (
+    <section>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        Comments
+      </h3>
+      <div className="space-y-3">
+        {isLoading ? (
+          <p className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+            Loading comments…
+          </p>
+        ) : isError ? (
+          <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-4 text-center text-xs text-destructive">
+            Could not load comments. Try closing and reopening the task.
+          </p>
+        ) : comments.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+            No comments yet. Be the first to leave a note.
+          </p>
+        ) : (
+          comments.map((comment) => (
+            <TaskCommentRow
+              key={comment.id}
+              comment={comment}
+              isOwn={!!currentUserId && comment.author.id === currentUserId}
+              isUpdating={updatingCommentId === comment.id}
+              isDeleting={deletingCommentId === comment.id}
+              onUpdate={onUpdateComment}
+              onRequestDelete={setCommentToDelete}
+            />
+          ))
+        )}
+        <AlertDialog
+          open={commentToDelete != null}
+          onOpenChange={(open) => {
+            if (!open && !isDeletingSelected) {
+              setCommentToDelete(null);
+            }
+          }}
+        >
+          <AlertDialogContent className="max-w-sm gap-4">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete comment?</AlertDialogTitle>
+              <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeletingSelected}>Cancel</AlertDialogCancel>
+              <Button
+                type="button"
+                variant="destructive"
+                className="gap-2"
+                disabled={isDeletingSelected}
+                onClick={() => void handleConfirmDelete()}
+              >
+                <Trash2 className="size-4" />
+                {isDeletingSelected ? "Deleting…" : "Delete comment"}
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <Textarea
+          placeholder="Write a comment…"
+          className="min-h-20 rounded-2xl"
+          value={commentBody}
+          maxLength={1000}
+          disabled={isSubmitting}
+          onChange={(event) => onCommentBodyChange(event.target.value)}
+          onKeyDown={(event) => {
+            if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && canSubmit) {
+              event.preventDefault();
+              onSubmit();
+            }
+          }}
+        />
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] text-muted-foreground">{trimmedLength}/1000</span>
+          <Button type="button" size="sm" disabled={!canSubmit} onClick={onSubmit}>
+            {isSubmitting ? "Posting…" : "Comment"}
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TaskCommentRow({
+  comment,
+  isOwn,
+  isUpdating,
+  isDeleting,
+  onUpdate,
+  onRequestDelete,
+}: {
+  comment: TaskCommentApiItem;
+  isOwn: boolean;
+  isUpdating: boolean;
+  isDeleting: boolean;
+  onUpdate: (commentId: string, body: string) => Promise<unknown>;
+  onRequestDelete: (commentId: string) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editBody, setEditBody] = useState(comment.body);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setEditBody(comment.body);
+    }
+  }, [comment.body, isEditing]);
+
+  const trimmedEdit = editBody.trim();
+  const canSaveEdit =
+    trimmedEdit.length > 0 &&
+    trimmedEdit.length <= 1000 &&
+    trimmedEdit !== comment.body &&
+    !isUpdating;
+
+  function startEditing() {
+    setEditBody(comment.body);
+    setIsEditing(true);
+  }
+
+  function cancelEditing() {
+    setEditBody(comment.body);
+    setIsEditing(false);
+  }
+
+  async function saveEditing() {
+    if (!canSaveEdit) return;
+    try {
+      await onUpdate(comment.id, trimmedEdit);
+      setIsEditing(false);
+    } catch {
+      // Toast is shown by the parent mutation; keep edit mode open.
+    }
+  }
+
+  function handleDelete() {
+    if (isDeleting) return;
+    onRequestDelete(comment.id);
+  }
+
+  return (
+    <div className="flex gap-2.5">
+      <Avatar id={comment.author.id} initials={authorInitials(comment.author)} size="sm" />
+      <div className="min-w-0 flex-1 rounded-xl border border-border bg-card px-2.5 py-2">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+              <span className="font-medium">{comment.author.name}</span>
+              <span className="text-muted-foreground">{formatCommentDate(comment.createdAt)}</span>
+            </div>
+          </div>
+          {isOwn && !isEditing && (
+            <div className="flex shrink-0 items-center gap-0.5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7 text-muted-foreground hover:text-foreground"
+                disabled={isUpdating || isDeleting}
+                aria-label="Edit comment"
+                onClick={startEditing}
+              >
+                <Pencil className="size-3.5" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7 text-muted-foreground hover:text-destructive"
+                disabled={isUpdating || isDeleting}
+                aria-label="Delete comment"
+                onClick={handleDelete}
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            </div>
+          )}
+        </div>
+        {isEditing ? (
+          <div className="mt-1.5 space-y-1.5">
+            <Textarea
+              value={editBody}
+              maxLength={1000}
+              disabled={isUpdating}
+              className="min-h-14 resize-none rounded-lg py-2 text-sm"
+              onChange={(event) => setEditBody(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  cancelEditing();
+                }
+              }}
+            />
+            <div className="flex items-center justify-end gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                disabled={isUpdating}
+                onClick={cancelEditing}
+              >
+                <X className="mr-1 size-3" />
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                disabled={!canSaveEdit}
+                onClick={saveEditing}
+              >
+                {isUpdating ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-1 text-sm leading-snug text-foreground/90">{comment.body}</p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function attachmentExtension(name: string) {
   const ext = name.includes(".") ? name.split(".").pop() : null;
@@ -389,29 +739,6 @@ function DemoAttachmentChip({ name, size }: { name: string; size: string }) {
           <span className="truncate">{name}</span>
         </div>
         {size ? <div className="text-[11px] text-muted-foreground">{size}</div> : null}
-      </div>
-    </div>
-  );
-}
-
-function DemoCommentPlaceholder({ index, authorId }: { index: number; authorId: string }) {
-  const m = getMember(authorId);
-  const body = demoCommentBodies[index % demoCommentBodies.length];
-  return (
-    <div className="flex gap-3">
-      {m ? (
-        <Avatar id={m.id} initials={m.avatar} />
-      ) : (
-        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground">
-          ?
-        </span>
-      )}
-      <div className="min-w-0 flex-1 rounded-2xl border border-border bg-card p-3">
-        <div className="flex items-center justify-between gap-2 text-xs">
-          <span className="font-medium">{m?.name ?? "Team member"}</span>
-          <span className="shrink-0 text-muted-foreground">Demo</span>
-        </div>
-        <p className="mt-1 text-sm leading-relaxed text-foreground/90">{body}</p>
       </div>
     </div>
   );
