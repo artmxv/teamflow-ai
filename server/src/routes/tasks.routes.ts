@@ -7,6 +7,12 @@ import {
   updateTaskCommentController,
 } from "../controllers/task-comments.controller.js";
 import {
+  deleteTaskAttachmentController,
+  downloadTaskAttachmentController,
+  getTaskAttachmentsController,
+  uploadTaskAttachmentController,
+} from "../controllers/task-attachments.controller.js";
+import {
   createTaskController,
   deleteTaskController,
   getTasksController,
@@ -24,5 +30,9 @@ tasksRouter.get("/:id/comments", getTaskCommentsController);
 tasksRouter.post("/:id/comments", createTaskCommentController);
 tasksRouter.patch("/:id/comments/:commentId", updateTaskCommentController);
 tasksRouter.delete("/:id/comments/:commentId", deleteTaskCommentController);
+tasksRouter.get("/:id/attachments", getTaskAttachmentsController);
+tasksRouter.post("/:id/attachments", uploadTaskAttachmentController);
+tasksRouter.get("/:id/attachments/:attachmentId/file", downloadTaskAttachmentController);
+tasksRouter.delete("/:id/attachments/:attachmentId", deleteTaskAttachmentController);
 tasksRouter.patch("/:id", updateTaskController);
 tasksRouter.delete("/:id", deleteTaskController);

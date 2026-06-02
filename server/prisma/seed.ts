@@ -251,7 +251,7 @@ async function resetDatabase() {
     prisma.taskComment.deleteMany(),
     prisma.taskChecklistItem.deleteMany(),
     prisma.taskActivity.deleteMany(),
-    prisma.attachment.deleteMany(),
+    prisma.taskAttachment.deleteMany(),
     prisma.task.deleteMany(),
     prisma.project.deleteMany(),
     prisma.workspaceMember.deleteMany(),
@@ -419,16 +419,6 @@ async function seedDemoWorkspace() {
         metadata: { assignee: "Alex Morgan" },
       },
     ],
-  });
-
-  await prisma.attachment.create({
-    data: {
-      taskId: taskByKey("TF-110").id,
-      name: "homepage-hero-v3.png",
-      url: "https://cdn.example.com/acme/homepage-hero-v3.png",
-      mimeType: "image/png",
-      size: 248_320,
-    },
   });
 
   console.log(`Seeded workspace "${workspace.name}" (${DEMO_WORKSPACE_SLUG})`);

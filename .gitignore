@@ -35,3 +35,6 @@ dist-ssr
 .env
 .env.local
 server/.env
+
+# Local task file uploads (development)
+server/uploads/

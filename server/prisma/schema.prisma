@@ -60,10 +60,11 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  workspaceMemberships WorkspaceMember[]
-  assignedTasks        Task[]
-  comments             TaskComment[]
-  activities           TaskActivity[]
+  workspaceMemberships    WorkspaceMember[]
+  assignedTasks           Task[]
+  comments                TaskComment[]
+  activities              TaskActivity[]
+  uploadedTaskAttachments TaskAttachment[]
 }
 
 model Workspace {
@@ -133,7 +134,7 @@ model Task {
   comments       TaskComment[]
   checklistItems TaskChecklistItem[]
   activities     TaskActivity[]
-  attachments    Attachment[]
+  attachments    TaskAttachment[]
   aiSummaries    AiSummary[]
 
   @@index([projectId])
@@ -185,18 +186,22 @@ model TaskActivity {
   @@index([userId])
 }
 
-model Attachment {
-  id        String   @id @default(cuid())
-  taskId    String
-  name      String
-  url       String
-  mimeType  String?
-  size      Int?
-  createdAt DateTime @default(now())
+model TaskAttachment {
+  id           String   @id @default(cuid())
+  taskId       String
+  uploaderId   String
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  url          String
+  createdAt    DateTime @default(now())
 
-  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploader User @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
+  @@index([uploaderId])
 }
 
 model AiSummary {
