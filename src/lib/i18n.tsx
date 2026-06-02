@@ -70,7 +70,8 @@ const dict = {
     "settings.themeSettings": "Theme settings",
     "settings.workspaceSettings": "Workspace settings",
     "settings.avatarUploadUnavailable": "Profile photo upload is not available in this demo",
-    "settings.avatarUploadHelper": "Avatar upload needs file storage and is not wired up yet. Your initials are shown instead.",
+    "settings.avatarUploadHelper":
+      "Avatar upload needs file storage and is not wired up yet. Your initials are shown instead.",
     "side.workspace": "Workspace",
     "side.projects": "Projects",
     "side.dashboard": "Dashboard",
@@ -104,7 +105,8 @@ const dict = {
     "top.keyboardShortcuts": "Keyboard shortcuts",
     "top.markAllAsRead": "Mark all as read",
     "top.allMarkedAsRead": "All demo notifications marked as read",
-    "top.notificationsDemoPreview": "Demo preview — sample notifications only, not synced to a backend",
+    "top.notificationsDemoPreview":
+      "Demo preview — sample notifications only, not synced to a backend",
     "top.notifications": "Notifications",
     "top.search": "Search tasks, projects, people…",
     "top.workspaceSwitcher": "Workspaces",
@@ -186,7 +188,8 @@ const dict = {
     "settings.themeSettings": "Настройки темы",
     "settings.workspaceSettings": "Настройки пространства",
     "settings.avatarUploadUnavailable": "Загрузка фото профиля недоступна в этой демо-версии",
-    "settings.avatarUploadHelper": "Для аватара нужно хранилище файлов — пока показываются инициалы.",
+    "settings.avatarUploadHelper":
+      "Для аватара нужно хранилище файлов — пока показываются инициалы.",
     "side.workspace": "Рабочее пространство",
     "side.projects": "Проекты",
     "side.dashboard": "Обзор",

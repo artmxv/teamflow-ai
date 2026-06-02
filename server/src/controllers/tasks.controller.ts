@@ -16,7 +16,11 @@ const createTaskSchema = z.object({
 
 const updateTaskSchema = z.object({
   title: z.string().trim().min(2, "title must be at least 2 characters").optional(),
-  description: z.string().max(500, "description must be at most 500 characters").nullable().optional(),
+  description: z
+    .string()
+    .max(500, "description must be at most 500 characters")
+    .nullable()
+    .optional(),
   status: z.enum(["BACKLOG", "TODO", "IN_PROGRESS", "REVIEW", "DONE"]).optional(),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
   assigneeId: z.string().nullable().optional(),

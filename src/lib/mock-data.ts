@@ -52,12 +52,60 @@ export interface Task {
 }
 
 export const members: Member[] = [
-  { id: "u1", name: "Alex Morgan", email: "alex@teamflow.ai", role: "Owner", avatar: "AM", status: "active", joinedAt: "2024-01-12" },
-  { id: "u2", name: "Priya Shah", email: "priya@teamflow.ai", role: "Admin", avatar: "PS", status: "active", joinedAt: "2024-02-03" },
-  { id: "u3", name: "Marcus Chen", email: "marcus@teamflow.ai", role: "Member", avatar: "MC", status: "active", joinedAt: "2024-03-21" },
-  { id: "u4", name: "Sofia Reyes", email: "sofia@teamflow.ai", role: "Member", avatar: "SR", status: "offline", joinedAt: "2024-04-09" },
-  { id: "u5", name: "Jonas Weber", email: "jonas@teamflow.ai", role: "Member", avatar: "JW", status: "active", joinedAt: "2024-05-17" },
-  { id: "u6", name: "Lina Park", email: "lina@teamflow.ai", role: "Member", avatar: "LP", status: "invited", joinedAt: "2025-09-02" },
+  {
+    id: "u1",
+    name: "Alex Morgan",
+    email: "alex@teamflow.ai",
+    role: "Owner",
+    avatar: "AM",
+    status: "active",
+    joinedAt: "2024-01-12",
+  },
+  {
+    id: "u2",
+    name: "Priya Shah",
+    email: "priya@teamflow.ai",
+    role: "Admin",
+    avatar: "PS",
+    status: "active",
+    joinedAt: "2024-02-03",
+  },
+  {
+    id: "u3",
+    name: "Marcus Chen",
+    email: "marcus@teamflow.ai",
+    role: "Member",
+    avatar: "MC",
+    status: "active",
+    joinedAt: "2024-03-21",
+  },
+  {
+    id: "u4",
+    name: "Sofia Reyes",
+    email: "sofia@teamflow.ai",
+    role: "Member",
+    avatar: "SR",
+    status: "offline",
+    joinedAt: "2024-04-09",
+  },
+  {
+    id: "u5",
+    name: "Jonas Weber",
+    email: "jonas@teamflow.ai",
+    role: "Member",
+    avatar: "JW",
+    status: "active",
+    joinedAt: "2024-05-17",
+  },
+  {
+    id: "u6",
+    name: "Lina Park",
+    email: "lina@teamflow.ai",
+    role: "Member",
+    avatar: "LP",
+    status: "invited",
+    joinedAt: "2025-09-02",
+  },
 ];
 
 export const projects: Project[] = [
@@ -157,15 +205,8 @@ const sampleTitles: Record<TaskStatus, string[]> = {
     "Integrate AI summary endpoint",
     "Migrate avatars to new storage",
   ],
-  review: [
-    "PR: task drawer accessibility",
-    "PR: invite member modal",
-  ],
-  done: [
-    "Set up design tokens",
-    "Wire workspace switcher",
-    "Ship landing page hero",
-  ],
+  review: ["PR: task drawer accessibility", "PR: invite member modal"],
+  done: ["Set up design tokens", "Wire workspace switcher", "Ship landing page hero"],
 };
 
 const labelsPool = ["frontend", "backend", "design", "ai", "infra", "bug", "docs"];
@@ -187,14 +228,31 @@ function makeTask(projectId: string, status: TaskStatus, title: string): Task {
     assigneeId: assignee,
     projectId,
     dueDate: `2026-0${(counter % 9) + 1}-1${counter % 9}`,
-    labels: [labelsPool[counter % labelsPool.length], labelsPool[(counter + 2) % labelsPool.length]],
+    labels: [
+      labelsPool[counter % labelsPool.length],
+      labelsPool[(counter + 2) % labelsPool.length],
+    ],
     comments: [
-      { id: `c${counter}-1`, authorId: "u2", body: "Pulled in latest mocks, looks good.", createdAt: "2h ago" },
-      { id: `c${counter}-2`, authorId: "u3", body: "I'll pair on the tricky part tomorrow.", createdAt: "30m ago" },
+      {
+        id: `c${counter}-1`,
+        authorId: "u2",
+        body: "Pulled in latest mocks, looks good.",
+        createdAt: "2h ago",
+      },
+      {
+        id: `c${counter}-2`,
+        authorId: "u3",
+        body: "I'll pair on the tricky part tomorrow.",
+        createdAt: "30m ago",
+      },
     ],
     checklist: [
       { id: `ck${counter}-1`, label: "Define API contract", done: true },
-      { id: `ck${counter}-2`, label: "Implement happy path", done: status === "done" || status === "review" },
+      {
+        id: `ck${counter}-2`,
+        label: "Implement happy path",
+        done: status === "done" || status === "review",
+      },
       { id: `ck${counter}-3`, label: "Write tests", done: status === "done" },
       { id: `ck${counter}-4`, label: "Update docs", done: false },
     ],
@@ -222,12 +280,54 @@ export const tasks: Task[] = (() => {
 })();
 
 export const activity = [
-  { id: "ac1", who: "u2", action: "completed", target: "Wire workspace switcher", project: "Orion Web App", at: "12m ago" },
-  { id: "ac2", who: "u3", action: "commented on", target: "Build kanban drag-and-drop", project: "Orion Web App", at: "34m ago" },
-  { id: "ac3", who: "u5", action: "created", target: "Spike: realtime presence", project: "Mobile App v3", at: "1h ago" },
-  { id: "ac4", who: "u1", action: "moved to review", target: "PR: invite member modal", project: "Marketing Site", at: "2h ago" },
-  { id: "ac5", who: "u4", action: "assigned", target: "Audit accessibility", project: "Mobile App v3", at: "3h ago" },
-  { id: "ac6", who: "u2", action: "uploaded", target: "spec-v2.pdf", project: "Orion Web App", at: "5h ago" },
+  {
+    id: "ac1",
+    who: "u2",
+    action: "completed",
+    target: "Wire workspace switcher",
+    project: "Orion Web App",
+    at: "12m ago",
+  },
+  {
+    id: "ac2",
+    who: "u3",
+    action: "commented on",
+    target: "Build kanban drag-and-drop",
+    project: "Orion Web App",
+    at: "34m ago",
+  },
+  {
+    id: "ac3",
+    who: "u5",
+    action: "created",
+    target: "Spike: realtime presence",
+    project: "Mobile App v3",
+    at: "1h ago",
+  },
+  {
+    id: "ac4",
+    who: "u1",
+    action: "moved to review",
+    target: "PR: invite member modal",
+    project: "Marketing Site",
+    at: "2h ago",
+  },
+  {
+    id: "ac5",
+    who: "u4",
+    action: "assigned",
+    target: "Audit accessibility",
+    project: "Mobile App v3",
+    at: "3h ago",
+  },
+  {
+    id: "ac6",
+    who: "u2",
+    action: "uploaded",
+    target: "spec-v2.pdf",
+    project: "Orion Web App",
+    at: "5h ago",
+  },
 ];
 
 export const suggestedPrompts = [

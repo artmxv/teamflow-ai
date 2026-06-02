@@ -30,9 +30,7 @@ export async function getWorkspaceAiSummaryController(
         overview: normalizeAiResponseText(summary.overview),
         highlights: summary.highlights.map(normalizeAiResponseText),
         risks: summary.risks.map(normalizeAiResponseText),
-        recommendedNextActions: summary.recommendedNextActions.map(
-          normalizeAiResponseText,
-        ),
+        recommendedNextActions: summary.recommendedNextActions.map(normalizeAiResponseText),
         standupSummary: normalizeAiResponseText(summary.standupSummary),
       },
     });

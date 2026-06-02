@@ -36,22 +36,24 @@ import {
 
 type Translate = (key: TKey) => string;
 
-const getProjectSchema = (t: Translate) => z.object({
-  name: z.string().trim().min(2, t("validation.projectNameMin")),
-  description: z.string().max(300, t("validation.projectDescriptionMax")).optional(),
-  status: z.enum(["planning", "active", "on_hold", "completed"]),
-});
+const getProjectSchema = (t: Translate) =>
+  z.object({
+    name: z.string().trim().min(2, t("validation.projectNameMin")),
+    description: z.string().max(300, t("validation.projectDescriptionMax")).optional(),
+    status: z.enum(["planning", "active", "on_hold", "completed"]),
+  });
 
 type ProjectFormValues = z.infer<ReturnType<typeof getProjectSchema>>;
 
-const getTaskSchema = (t: Translate) => z.object({
-  title: z.string().trim().min(2, t("validation.taskTitleMin")),
-  description: z.string().max(500, t("validation.taskDescriptionMax")).optional(),
-  priority: z.enum(["low", "medium", "high", "urgent"]),
-  status: z.enum(["backlog", "todo", "in_progress", "review", "done"]),
-  assigneeId: z.string().optional(),
-  dueDate: z.string().optional(),
-});
+const getTaskSchema = (t: Translate) =>
+  z.object({
+    title: z.string().trim().min(2, t("validation.taskTitleMin")),
+    description: z.string().max(500, t("validation.taskDescriptionMax")).optional(),
+    priority: z.enum(["low", "medium", "high", "urgent"]),
+    status: z.enum(["backlog", "todo", "in_progress", "review", "done"]),
+    assigneeId: z.string().optional(),
+    dueDate: z.string().optional(),
+  });
 
 export type TaskFormValues = z.infer<ReturnType<typeof getTaskSchema>>;
 
@@ -61,7 +63,11 @@ type NewProjectDialogProps = {
   onCreate?: (project: Project) => void | Promise<void>;
 };
 
-export function NewProjectDialog({ children, isSubmitting = false, onCreate }: NewProjectDialogProps) {
+export function NewProjectDialog({
+  children,
+  isSubmitting = false,
+  onCreate,
+}: NewProjectDialogProps) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const {
@@ -116,17 +122,17 @@ export function NewProjectDialog({ children, isSubmitting = false, onCreate }: N
             <Input {...register("name")} placeholder="Orion launch" />
           </Field>
           <Field label="Description" error={errors.description?.message}>
-            <Textarea
-              {...register("description")}
-              placeholder="What is this project about?"
-            />
+            <Textarea {...register("description")} placeholder="What is this project about?" />
           </Field>
           <Field label={t("tasks.status")} error={errors.status?.message}>
             <Controller
               control={control}
               name="status"
               render={({ field }) => (
-                <Select value={field.value} onValueChange={(value) => field.onChange(value as ProjectStatus)}>
+                <Select
+                  value={field.value}
+                  onValueChange={(value) => field.onChange(value as ProjectStatus)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
@@ -219,79 +225,82 @@ export function NewTaskDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit(submit)} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t("tasks.task")} error={errors.title?.message}>
-            <Input {...register("title")} placeholder="Write release notes" />
-          </Field>
-          <Field label={t("tasks.dueDate")} error={errors.dueDate?.message}>
-            <Input type="date" {...register("dueDate")} />
-          </Field>
-          <div className="sm:col-span-2">
-            <Field label="Description" error={errors.description?.message}>
-              <Textarea
-                {...register("description")}
-                placeholder="Add context for the team"
+            <Field label={t("tasks.task")} error={errors.title?.message}>
+              <Input {...register("title")} placeholder="Write release notes" />
+            </Field>
+            <Field label={t("tasks.dueDate")} error={errors.dueDate?.message}>
+              <Input type="date" {...register("dueDate")} />
+            </Field>
+            <div className="sm:col-span-2">
+              <Field label="Description" error={errors.description?.message}>
+                <Textarea {...register("description")} placeholder="Add context for the team" />
+              </Field>
+            </div>
+            <Field label={t("tasks.priority")} error={errors.priority?.message}>
+              <Controller
+                control={control}
+                name="priority"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) => field.onChange(value as Priority)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="urgent">Urgent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               />
             </Field>
-          </div>
-          <Field label={t("tasks.priority")} error={errors.priority?.message}>
-            <Controller
-              control={control}
-              name="priority"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={(value) => field.onChange(value as Priority)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </Field>
-          <Field label={t("tasks.status")} error={errors.status?.message}>
-            <Controller
-              control={control}
-              name="status"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={(value) => field.onChange(value as TaskStatus)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="backlog">{t("board.backlog")}</SelectItem>
-                    <SelectItem value="todo">{t("board.todo")}</SelectItem>
-                    <SelectItem value="in_progress">{t("board.inProgress")}</SelectItem>
-                    <SelectItem value="review">{t("board.review")}</SelectItem>
-                    <SelectItem value="done">{t("board.done")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </Field>
-          <Field label={t("tasks.assignee")} error={errors.assigneeId?.message}>
-            <Controller
-              control={control}
-              name="assigneeId"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select assignee" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {members.map((member) => (
-                      <SelectItem key={member.id} value={member.id}>
-                        {member.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </Field>
+            <Field label={t("tasks.status")} error={errors.status?.message}>
+              <Controller
+                control={control}
+                name="status"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) => field.onChange(value as TaskStatus)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="backlog">{t("board.backlog")}</SelectItem>
+                      <SelectItem value="todo">{t("board.todo")}</SelectItem>
+                      <SelectItem value="in_progress">{t("board.inProgress")}</SelectItem>
+                      <SelectItem value="review">{t("board.review")}</SelectItem>
+                      <SelectItem value="done">{t("board.done")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
+            <Field label={t("tasks.assignee")} error={errors.assigneeId?.message}>
+              <Controller
+                control={control}
+                name="assigneeId"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select assignee" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {members.map((member) => (
+                        <SelectItem key={member.id} value={member.id}>
+                          {member.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>

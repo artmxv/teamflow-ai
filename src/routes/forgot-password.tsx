@@ -34,7 +34,10 @@ function Forgot() {
           <Label htmlFor="email">Work email</Label>
           <Input id="email" type="email" placeholder="you@company.com" />
         </div>
-        <Button type="submit" className="w-full bg-gradient-brand text-white shadow-glow hover:opacity-95">
+        <Button
+          type="submit"
+          className="w-full bg-gradient-brand text-white shadow-glow hover:opacity-95"
+        >
           Send reset link
         </Button>
       </form>

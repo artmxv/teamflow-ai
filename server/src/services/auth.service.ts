@@ -63,7 +63,7 @@ function slugify(value: string): string {
 }
 
 async function createUniqueWorkspaceSlug(base: string): Promise<string> {
-  let slug = slugify(base);
+  const slug = slugify(base);
   let candidate = slug;
   let suffix = 0;
 

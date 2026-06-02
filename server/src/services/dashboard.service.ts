@@ -6,55 +6,47 @@ export async function getDashboardSummary(workspaceId: string) {
   const projectWhere = { workspaceId };
   const taskWhere = { project: { workspaceId } };
 
-  const [
-    activeProjects,
-    openTasks,
-    completedTasks,
-    teamMembers,
-    statusGroups,
-    recentTasks,
-  ] = await Promise.all([
-    prisma.project.count({ where: { ...projectWhere, status: "ACTIVE" } }),
-    prisma.task.count({ where: { ...taskWhere, status: { not: "DONE" } } }),
-    prisma.task.count({ where: { ...taskWhere, status: "DONE" } }),
-    prisma.workspaceMember.count({ where: { workspaceId, status: "ACTIVE" } }),
-    prisma.task.groupBy({
-      by: ["status"],
-      where: taskWhere,
-      _count: { status: true },
-    }),
-    prisma.task.findMany({
-      where: taskWhere,
-      take: 5,
-      orderBy: { updatedAt: "desc" },
-      select: {
-        id: true,
-        key: true,
-        title: true,
-        status: true,
-        priority: true,
-        updatedAt: true,
-        project: {
-          select: {
-            id: true,
-            name: true,
+  const [activeProjects, openTasks, completedTasks, teamMembers, statusGroups, recentTasks] =
+    await Promise.all([
+      prisma.project.count({ where: { ...projectWhere, status: "ACTIVE" } }),
+      prisma.task.count({ where: { ...taskWhere, status: { not: "DONE" } } }),
+      prisma.task.count({ where: { ...taskWhere, status: "DONE" } }),
+      prisma.workspaceMember.count({ where: { workspaceId, status: "ACTIVE" } }),
+      prisma.task.groupBy({
+        by: ["status"],
+        where: taskWhere,
+        _count: { status: true },
+      }),
+      prisma.task.findMany({
+        where: taskWhere,
+        take: 5,
+        orderBy: { updatedAt: "desc" },
+        select: {
+          id: true,
+          key: true,
+          title: true,
+          status: true,
+          priority: true,
+          updatedAt: true,
+          project: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          assignee: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              avatar: true,
+            },
           },
         },
-        assignee: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            avatar: true,
-          },
-        },
-      },
-    }),
-  ]);
+      }),
+    ]);
 
-  const countByStatus = new Map(
-    statusGroups.map((group) => [group.status, group._count.status]),
-  );
+  const countByStatus = new Map(statusGroups.map((group) => [group.status, group._count.status]));
 
   const taskStatusCounts = TASK_STATUSES.map((status) => ({
     status,
