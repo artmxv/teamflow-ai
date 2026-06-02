@@ -220,12 +220,32 @@ npm install
 
 ### 2. Configure environment
 
+**Backend (required)**
+
 ```bash
 cd server
 cp .env.example .env
 ```
 
-Edit `server/.env` if needed (defaults work with Docker Compose below). Set `JWT_SECRET` to a non-default value before any shared or production-like environment.
+Edit `server/.env` as needed:
+
+| Variable | Local default | Notes |
+|----------|---------------|-------|
+| `DATABASE_URL` | Matches Docker Compose below | Required for Prisma migrations, seed, and the API |
+| `JWT_SECRET` | Placeholder in `.env.example` | Change before shared or production-like use |
+| `CORS_ORIGIN` | `http://localhost:8080` | Must match the URL where you open the frontend |
+| `PORT` | `4000` | API listen port |
+| `NODE_ENV` | `development` | Use `production` when deploying the API |
+
+**Frontend (optional)**
+
+Only if the API is not at `http://localhost:4000`, from the repository root:
+
+```bash
+cp .env.example .env
+```
+
+Set `VITE_API_URL` to your API base URL (for example `https://api.example.com`). If you skip this step, the app uses `http://localhost:4000`.
 
 ### 3. Start database, migrate, and seed
 
@@ -257,29 +277,65 @@ Sign in with [demo credentials](#demo-credentials): `alex@teamflow.ai` / `Passwo
 
 ## Environment variables
 
+Example files (safe to commit; no real secrets):
+
+| File | Purpose |
+|------|---------|
+| `server/.env.example` | Required backend variables for local dev and deployment |
+| `.env.example` | Optional frontend `VITE_API_URL` |
+
+Copy each to `.env` in the same directory and edit. Never commit `server/.env` or a filled-in root `.env` with deployment-specific values.
+
 ### Backend (`server/.env`)
 
-Copy from `server/.env.example`:
+Validated at API startup in `server/src/config/env.ts`. Prisma reads `DATABASE_URL` from the environment separately.
 
-| Variable | Description |
-|----------|-------------|
-| `PORT` | API port (default `4000`) |
-| `NODE_ENV` | e.g. `development` |
-| `CORS_ORIGIN` | Frontend origin (default `http://localhost:8080`) |
-| `DATABASE_URL` | PostgreSQL connection string for Prisma |
-| `JWT_SECRET` | Secret for signing JWTs (change from example in production) |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | Yes | PostgreSQL connection string for Prisma |
+| `JWT_SECRET` | Yes | Secret for signing JWTs |
+| `PORT` | No | API port (default `4000`) |
+| `NODE_ENV` | No | `development`, `test`, or `production` (default `development`) |
+| `CORS_ORIGIN` | No | Frontend origin for CORS (default `http://localhost:8080`) |
 
-Example `DATABASE_URL` (matches Docker Compose defaults):
+Example `DATABASE_URL` for local Docker Compose:
 
 ```text
 postgresql://teamflow:teamflow@localhost:5433/teamflow_ai?schema=public
 ```
 
-### Frontend (optional)
+### Frontend (optional, repo root `.env`)
 
-| Variable | Description |
-|----------|-------------|
-| `VITE_API_URL` | API base URL if not `http://localhost:4000` |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `VITE_API_URL` | No | API base URL if not `http://localhost:4000` (see `src/lib/api/client.ts`) |
+
+No Stripe, OpenAI, or other third-party API keys are required for the current feature set.
+
+## Deployment notes
+
+These notes describe what a production-like deploy needs today. They do not replace a full hosting guide (Docker images, CI, and a live demo URL are still future work).
+
+**Backend**
+
+- Provision **PostgreSQL** and set `DATABASE_URL` to a reachable connection string.
+- Set **`JWT_SECRET`** to a long, random value. Do not reuse the placeholder from `server/.env.example`.
+- Set **`CORS_ORIGIN`** to the exact origin of the deployed frontend (scheme + host + port if non-default), for example `https://app.example.com`.
+- Run **Prisma migrations** against that database before starting the API, for example `npm run prisma:migrate` from `server/` (use your host’s equivalent for non-interactive deploys).
+- Start the API with `npm run build` then `npm run start` (or your process manager). Set `NODE_ENV=production`.
+- Optional: `PORT` if the platform does not inject it.
+
+**Frontend**
+
+- Build from the repository root (`npm run build`). Serve the static output from your host.
+- If the API is on a different origin than the default, set **`VITE_API_URL`** at **build time** to the public API URL.
+
+**Not required for current features**
+
+- **AI Assistant:** summaries are deterministic from database data; no OpenAI, GigaChat, or other LLM API keys.
+- **Billing (demo):** UI only; no Stripe or payment processor keys or webhooks.
+
+After deploy, run migrations and seed only if you want demo data; use a strong `JWT_SECRET` and unique admin credentials in real production.
 
 ## Database commands
 
@@ -327,7 +383,7 @@ npm run prisma:studio     # Open Prisma Studio
 - External LLM providers (OpenAI, GigaChat, and similar)
 - Real Stripe or other payment processing
 - Real team invites, email delivery, or member lifecycle APIs
-- Hosted production deployment and live demo URL
+- Hosted production deployment and live demo URL (see [Deployment notes](#deployment-notes) for env and migration checklist)
 - Drag-and-drop Kanban
 - File uploads
 
@@ -336,7 +392,7 @@ npm run prisma:studio     # Open Prisma Studio
 - OAuth and hardened sessions (httpOnly cookies, refresh tokens)
 - Optional LLM-backed summaries behind the same API shape
 - Billing and team flows backed by real APIs and providers
-- CI, production Docker images, and deployment documentation
+- CI, production Docker images, and step-by-step hosting guides
 
 ## Portfolio note
 

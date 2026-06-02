@@ -31,8 +31,7 @@ dist-ssr
 *.sln
 *.sw?
 
-# Local backend environment
-server/.env
-
-# Local backend environment
+# Local environment (never commit secrets)
+.env
+.env.local
 server/.env
