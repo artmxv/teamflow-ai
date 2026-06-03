@@ -1,10 +1,13 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { Avatar } from "@/components/app/Avatar";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -24,16 +27,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useI18n, type TKey } from "@/lib/i18n";
-import {
-  members,
-  projects,
-  type Priority,
-  type Project,
-  type ProjectStatus,
-  type TaskStatus,
-} from "@/lib/mock-data";
+import { addProjectMember } from "@/lib/api/project-members";
+import { createProject, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
+import { fetchWorkspaceMembers } from "@/lib/api/workspace-members";
+import { nameToInitials, useCurrentWorkspace } from "@/lib/auth/use-current-user";
 import { type AssigneeOption, UNASSIGNED_ASSIGNEE_VALUE } from "@/lib/assignee-options";
+import { useI18n, type TKey } from "@/lib/i18n";
+import { type Priority, type ProjectStatus, type TaskStatus } from "@/lib/mock-data";
+import { cn } from "@/lib/utils";
 
 type Translate = (key: TKey) => string;
 
@@ -42,9 +43,21 @@ const getProjectSchema = (t: Translate) =>
     name: z.string().trim().min(2, t("validation.projectNameMin")),
     description: z.string().max(300, t("validation.projectDescriptionMax")).optional(),
     status: z.enum(["planning", "active", "on_hold", "completed"]),
+    dueDate: z.string().optional(),
   });
 
+export type NewProjectFormValues = z.infer<ReturnType<typeof getProjectSchema>> & {
+  memberUserIds: string[];
+};
+
 type ProjectFormValues = z.infer<ReturnType<typeof getProjectSchema>>;
+
+const projectStatusToApi: Record<ProjectStatus, ProjectApiStatus> = {
+  active: "ACTIVE",
+  planning: "PLANNING",
+  on_hold: "ON_HOLD",
+  completed: "COMPLETED",
+};
 
 const getTaskSchema = (t: Translate) =>
   z.object({
@@ -60,17 +73,17 @@ export type TaskFormValues = z.infer<ReturnType<typeof getTaskSchema>>;
 
 type NewProjectDialogProps = {
   children: ReactNode;
-  isSubmitting?: boolean;
-  onCreate?: (project: Project) => void | Promise<void>;
+  workspaceId?: string;
+  onCreated?: (project: ProjectApiItem) => void | Promise<void>;
 };
 
-export function NewProjectDialog({
-  children,
-  isSubmitting = false,
-  onCreate,
-}: NewProjectDialogProps) {
+export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjectDialogProps) {
   const { t } = useI18n();
+  const queryClient = useQueryClient();
+  const { data: authWorkspace } = useCurrentWorkspace();
+  const resolvedWorkspaceId = workspaceId ?? authWorkspace?.id;
   const [open, setOpen] = useState(false);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const {
     control,
     formState: { errors, isValid },
@@ -84,79 +97,202 @@ export function NewProjectDialog({
       name: "",
       description: "",
       status: "planning",
+      dueDate: "",
     },
   });
 
-  async function submit(values: ProjectFormValues) {
-    try {
-      await onCreate?.({
-        id: `p-${Date.now()}`,
+  const workspaceMembersQuery = useQuery({
+    queryKey: ["workspace-members"],
+    queryFn: fetchWorkspaceMembers,
+    enabled: open,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (values: ProjectFormValues) => {
+      if (!resolvedWorkspaceId) {
+        throw new Error(t("projects.new.workspaceRequired"));
+      }
+
+      const project = await createProject({
+        workspaceId: resolvedWorkspaceId,
         name: values.name.trim(),
-        description: values.description?.trim() || "New project created from the mock UI.",
-        status: values.status,
-        progress: 0,
-        openTasks: 0,
-        totalTasks: 0,
-        members: [members[0].id],
-        color: "from-indigo-500 to-violet-500",
-        dueDate: "2026-12-31",
-        updatedAt: "just now",
+        description: values.description?.trim() ?? "",
+        status: projectStatusToApi[values.status],
+        dueDate: values.dueDate?.trim() ? values.dueDate.trim() : null,
       });
-      toast.success("Project created");
-      reset();
+
+      const memberResults = await Promise.allSettled(
+        selectedMemberIds.map((userId) => addProjectMember(project.id, userId)),
+      );
+      const failedCount = memberResults.filter((result) => result.status === "rejected").length;
+
+      return { project, failedCount, memberCount: selectedMemberIds.length };
+    },
+    onSuccess: async ({ project, failedCount, memberCount }) => {
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+
+      if (memberCount > 0 && failedCount > 0) {
+        toast.warning(t("projects.new.membersPartialWarning"));
+      } else {
+        toast.success(t("projects.new.created"));
+      }
+
+      await onCreated?.(project);
+      resetForm();
       setOpen(false);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Project could not be created");
-    }
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : t("projects.new.createFailed"));
+    },
+  });
+
+  function resetForm() {
+    reset({
+      name: "",
+      description: "",
+      status: "planning",
+      dueDate: "",
+    });
+    setSelectedMemberIds([]);
   }
+
+  useEffect(() => {
+    if (!open) return;
+    reset({
+      name: "",
+      description: "",
+      status: "planning",
+      dueDate: "",
+    });
+    setSelectedMemberIds([]);
+  }, [open, reset]);
+
+  function toggleMember(userId: string, checked: boolean) {
+    setSelectedMemberIds((current) =>
+      checked ? [...current, userId] : current.filter((id) => id !== userId),
+    );
+  }
+
+  async function submit(values: ProjectFormValues) {
+    await createMutation.mutateAsync(values);
+  }
+
+  const workspaceMembers = workspaceMembersQuery.data ?? [];
+  const isSubmitting = createMutation.isPending;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t("common.newProject")}</DialogTitle>
-          <DialogDescription>Create a mock project for this browser session.</DialogDescription>
+          <DialogDescription>{t("projects.new.dialogDesc")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(submit)} className="space-y-4">
-          <Field label={t("common.newProject")} error={errors.name?.message}>
+          <Field label={t("projects.new.projectName")} error={errors.name?.message}>
             <Input {...register("name")} placeholder="Orion launch" />
           </Field>
-          <Field label="Description" error={errors.description?.message}>
-            <Textarea {...register("description")} placeholder="What is this project about?" />
-          </Field>
-          <Field label={t("tasks.status")} error={errors.status?.message}>
-            <Controller
-              control={control}
-              name="status"
-              render={({ field }) => (
-                <Select
-                  value={field.value}
-                  onValueChange={(value) => field.onChange(value as ProjectStatus)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="planning">{t("projects.statusPlanning")}</SelectItem>
-                    <SelectItem value="active">{t("projects.statusActive")}</SelectItem>
-                    <SelectItem value="on_hold">{t("projects.statusOnHold")}</SelectItem>
-                    <SelectItem value="completed">{t("projects.statusCompleted")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
+          <Field label={t("projects.new.description")} error={errors.description?.message}>
+            <Textarea
+              {...register("description")}
+              placeholder={t("projects.new.description")}
+              rows={3}
             />
           </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={t("projects.new.status")} error={errors.status?.message}>
+              <Controller
+                control={control}
+                name="status"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) => field.onChange(value as ProjectStatus)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t("projects.new.status")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="planning">{t("projects.statusPlanning")}</SelectItem>
+                      <SelectItem value="active">{t("projects.statusActive")}</SelectItem>
+                      <SelectItem value="on_hold">{t("projects.statusOnHold")}</SelectItem>
+                      <SelectItem value="completed">{t("projects.statusCompleted")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
+            <Field label={t("projects.new.dueDate")} error={errors.dueDate?.message}>
+              <Input type="date" className="date-input-native" {...register("dueDate")} />
+            </Field>
+          </div>
+          <div className="space-y-2">
+            <div>
+              <Label>{t("projects.new.members")}</Label>
+              <p className="text-xs text-muted-foreground">{t("projects.new.selectMembers")}</p>
+            </div>
+            <div className="app-scrollbar max-h-44 overflow-y-auto rounded-xl border border-border">
+              {workspaceMembersQuery.isLoading ? (
+                <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  {t("common.loading")}
+                </p>
+              ) : workspaceMembers.length === 0 ? (
+                <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  {t("projects.new.noTeammates")}
+                </p>
+              ) : (
+                <ul className="divide-y divide-border p-1">
+                  {workspaceMembers.map((member) => {
+                    const checked = selectedMemberIds.includes(member.id);
+                    const checkboxId = `new-project-member-${member.id}`;
+                    return (
+                      <li key={member.id}>
+                        <label
+                          htmlFor={checkboxId}
+                          className={cn(
+                            "flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-muted/50",
+                            checked && "bg-muted/40",
+                          )}
+                        >
+                          <Checkbox
+                            id={checkboxId}
+                            checked={checked}
+                            disabled={isSubmitting}
+                            onCheckedChange={(value) => toggleMember(member.id, value === true)}
+                          />
+                          <Avatar
+                            id={member.id}
+                            initials={member.avatar ?? nameToInitials(member.name)}
+                            size="sm"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium">
+                              {member.name}
+                            </span>
+                            <span className="block truncate text-[11px] text-muted-foreground">
+                              {member.email}
+                            </span>
+                          </span>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">{t("projects.new.membersHintLater")}</p>
+          </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
             <Button
               type="submit"
-              disabled={!isValid || isSubmitting}
+              disabled={!isValid || isSubmitting || !resolvedWorkspaceId}
               className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
             >
-              {t("common.createProject")}
+              {isSubmitting ? t("projects.new.creating") : t("common.createProject")}
             </Button>
           </DialogFooter>
         </form>

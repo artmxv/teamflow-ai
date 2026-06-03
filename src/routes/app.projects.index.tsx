@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { requireAuth } from "@/lib/auth/route-guards";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,12 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { AvatarStack } from "@/components/app/Avatar";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import { members, projectStatusMeta, type Project, type ProjectStatus } from "@/lib/mock-data";
-import {
-  createProject,
-  fetchProjects,
-  type ProjectApiItem,
-  type ProjectApiStatus,
-} from "@/lib/api/projects";
+import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
 import { projectStatusLabel, useI18n, type TKey } from "@/lib/i18n";
 import {
   parseProjectsUrlStatus,
@@ -65,18 +60,10 @@ const apiStatusMap: Record<ProjectApiStatus, ProjectStatus> = {
   COMPLETED: "completed",
 };
 
-const projectStatusMap: Record<ProjectStatus, ProjectApiStatus> = {
-  active: "ACTIVE",
-  planning: "PLANNING",
-  on_hold: "ON_HOLD",
-  completed: "COMPLETED",
-};
-
 function ProjectsIndexPage() {
   const { t } = useI18n();
   const { status: statusFromUrl } = Route.useSearch();
   const navigate = Route.useNavigate();
-  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<"all" | ProjectStatus>(() =>
     projectListStatusFromUrl(statusFromUrl),
   );
@@ -109,13 +96,6 @@ function ProjectsIndexPage() {
     queryKey: ["projects"],
     queryFn: fetchProjects,
   });
-  const createProjectMutation = useMutation({
-    mutationFn: createProject,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["projects"] });
-    },
-  });
-  const workspaceId = apiProjects[0]?.workspace.id;
   const projectList = apiProjects.map(mapApiProjectToCard);
   const filtered = projectList.filter(
     (p) =>
@@ -132,25 +112,7 @@ function ProjectsIndexPage() {
           <h1 className="text-2xl font-semibold tracking-tight">{t("projects.projects")}</h1>
           <p className="text-sm text-muted-foreground">{t("projects.subtitle")}</p>
         </div>
-        <NewProjectDialog
-          isSubmitting={createProjectMutation.isPending}
-          onCreate={async (project) => {
-            if (!workspaceId) {
-              throw new Error(
-                "Workspace is required. Load or seed a workspace before creating a project.",
-              );
-            }
-
-            await createProjectMutation.mutateAsync({
-              workspaceId,
-              name: project.name,
-              description: project.description,
-              status: projectStatusMap[project.status],
-              color: project.color,
-              dueDate: project.dueDate,
-            });
-          }}
-        >
+        <NewProjectDialog>
           <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
             <Plus className="size-4" /> {t("common.newProject")}
           </Button>
@@ -191,25 +153,7 @@ function ProjectsIndexPage() {
         <ErrorState error={error} onRetry={() => void refetch()} />
       ) : filtered.length === 0 ? (
         isTrulyEmpty ? (
-          <EmptyState
-            isSubmitting={createProjectMutation.isPending}
-            onCreate={async (project) => {
-              if (!workspaceId) {
-                throw new Error(
-                  "Workspace is required. Load or seed a workspace before creating a project.",
-                );
-              }
-
-              await createProjectMutation.mutateAsync({
-                workspaceId,
-                name: project.name,
-                description: project.description,
-                status: projectStatusMap[project.status],
-                color: project.color,
-                dueDate: project.dueDate,
-              });
-            }}
-          />
+          <EmptyState />
         ) : (
           <NoResultsState
             hasActiveFilters={hasActiveFilters}
@@ -350,13 +294,7 @@ function NoResultsState({
   );
 }
 
-function EmptyState({
-  isSubmitting,
-  onCreate,
-}: {
-  isSubmitting: boolean;
-  onCreate: (project: Project) => void | Promise<void>;
-}) {
+function EmptyState() {
   const { t } = useI18n();
 
   return (
@@ -368,7 +306,7 @@ function EmptyState({
       <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
         {t("projects.emptyHint")}
       </p>
-      <NewProjectDialog isSubmitting={isSubmitting} onCreate={onCreate}>
+      <NewProjectDialog>
         <Button className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
           <Plus className="size-4" /> {t("common.createProject")}
         </Button>

@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -19,16 +19,8 @@ import { useI18n, type TKey } from "@/lib/i18n";
 import { nameToInitials } from "@/lib/auth/use-current-user";
 import { NewProjectDialog } from "./QuickActionDialogs";
 import type { Workspace } from "./AppShell";
-import { createProject, fetchProjects, type ProjectApiStatus } from "@/lib/api/projects";
-import type { ProjectStatus } from "@/lib/mock-data";
+import { fetchProjects } from "@/lib/api/projects";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
-const projectStatusMap: Record<ProjectStatus, ProjectApiStatus> = {
-  active: "ACTIVE",
-  planning: "PLANNING",
-  on_hold: "ON_HOLD",
-  completed: "COMPLETED",
-};
 
 const nav: { to: string; key: TKey; icon: typeof LayoutDashboard }[] = [
   { to: "/app/dashboard", key: "side.dashboard", icon: LayoutDashboard },
@@ -73,17 +65,9 @@ export function AppSidebar({
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { t } = useI18n();
-  const queryClient = useQueryClient();
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["projects"],
     queryFn: fetchProjects,
-  });
-  const workspaceId = projects[0]?.workspace.id;
-  const createProjectMutation = useMutation({
-    mutationFn: createProject,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["projects"] });
-    },
   });
   const activeProjectId = pathname.match(/^\/app\/projects\/([^/]+)/)?.[1];
   const toggleLabel = collapsed ? t("side.expandSidebar") : t("side.collapseSidebar");
@@ -250,37 +234,19 @@ export function AppSidebar({
             })}
             <li>
               <NewProjectDialog
-                isSubmitting={createProjectMutation.isPending}
-                onCreate={async (project) => {
-                  if (!workspaceId) {
-                    throw new Error(
-                      "Workspace is required. Load or seed a workspace before creating a project.",
-                    );
-                  }
-
-                  await createProjectMutation.mutateAsync({
-                    workspaceId,
-                    name: project.name,
-                    description: project.description,
-                    status: projectStatusMap[project.status],
-                    color: project.color,
-                    dueDate: project.dueDate,
-                  });
-                }}
+                workspaceId={activeWorkspace.id !== "loading" ? activeWorkspace.id : undefined}
               >
-                <SidebarTip collapsed={collapsed} label={t("common.newProject")}>
-                  <button
-                    type="button"
-                    title={collapsed ? t("common.newProject") : undefined}
-                    className={cn(
-                      "flex w-full items-center rounded-lg text-sm text-muted-foreground hover:text-foreground",
-                      collapsed ? "justify-center px-2 py-2" : "gap-2 px-3 py-1.5",
-                    )}
-                  >
-                    <Plus className={cn("shrink-0", collapsed ? "size-4" : "size-3.5")} />
-                    {!collapsed && t("common.newProject")}
-                  </button>
-                </SidebarTip>
+                <button
+                  type="button"
+                  title={collapsed ? t("common.newProject") : undefined}
+                  className={cn(
+                    "flex w-full items-center rounded-lg text-sm text-muted-foreground hover:text-foreground",
+                    collapsed ? "justify-center px-2 py-2" : "gap-2 px-3 py-1.5",
+                  )}
+                >
+                  <Plus className={cn("shrink-0", collapsed ? "size-4" : "size-3.5")} />
+                  {!collapsed && t("common.newProject")}
+                </button>
               </NewProjectDialog>
             </li>
           </ul>
