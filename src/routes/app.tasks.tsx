@@ -39,16 +39,38 @@ import { buildAssigneeOptions, resolveTaskAssignee } from "@/lib/assignee-option
 import { cycleTaskSort, sortTasks, type TaskSortField, type TaskSortState } from "@/lib/task-sort";
 import { taskStatusChipClass } from "@/lib/task-status-theme";
 import { cn } from "@/lib/utils";
+import {
+  taskMatchesUrlAnalyticsFilters,
+  type TasksUrlAnalyticsFilters,
+  type TasksUrlAssigneeFilter,
+  type TasksUrlDue,
+  type TasksUrlPriorityFilter,
+} from "@/lib/dashboard-analytics";
 
 export type TasksUrlStatus = "done" | "open";
 
-type TasksSearch = {
+export type TasksSearch = {
   taskId?: string;
   status?: TasksUrlStatus;
+  due?: TasksUrlDue;
+  priority?: TasksUrlPriorityFilter;
+  assignee?: TasksUrlAssigneeFilter;
 };
 
 function parseTasksUrlStatus(value: unknown): TasksUrlStatus | undefined {
   return value === "done" || value === "open" ? value : undefined;
+}
+
+function parseTasksUrlDue(value: unknown): TasksUrlDue | undefined {
+  return value === "overdue" || value === "soon" ? value : undefined;
+}
+
+function parseTasksUrlPriority(value: unknown): TasksUrlPriorityFilter | undefined {
+  return value === "high" ? value : undefined;
+}
+
+function parseTasksUrlAssignee(value: unknown): TasksUrlAssigneeFilter | undefined {
+  return value === "unassigned" ? value : undefined;
 }
 
 export type TaskListStatusFilter = TaskStatus | "all" | "open";
@@ -77,6 +99,9 @@ export const Route = createFileRoute("/app/tasks")({
     taskId:
       typeof search.taskId === "string" && search.taskId.length > 0 ? search.taskId : undefined,
     status: parseTasksUrlStatus(search.status),
+    due: parseTasksUrlDue(search.due),
+    priority: parseTasksUrlPriority(search.priority),
+    assignee: parseTasksUrlAssignee(search.assignee),
   }),
   head: () => ({ meta: [{ title: "Tasks — TeamFlow AI" }] }),
   component: TasksPage,
@@ -124,7 +149,22 @@ const apiPriorityMap: Record<TaskApiPriority, Priority> = {
 function TasksPage() {
   const { t } = useI18n();
   const urlSearch = Route.useSearch();
-  const { taskId: taskIdFromUrl, status: statusFromUrl } = urlSearch;
+  const {
+    taskId: taskIdFromUrl,
+    status: statusFromUrl,
+    due: dueFromUrl,
+    priority: priorityFromUrl,
+    assignee: assigneeFromUrl,
+  } = urlSearch;
+  const urlAnalyticsFilters = useMemo(
+    (): TasksUrlAnalyticsFilters => ({
+      due: dueFromUrl,
+      priority: priorityFromUrl,
+      assignee: assigneeFromUrl,
+    }),
+    [dueFromUrl, priorityFromUrl, assigneeFromUrl],
+  );
+  const hasUrlAnalyticsFilters = Boolean(dueFromUrl || priorityFromUrl || assigneeFromUrl);
   const navigate = Route.useNavigate();
   const queryClient = useQueryClient();
   const [q, setQ] = useState("");
@@ -201,6 +241,9 @@ function TasksPage() {
       search: {
         taskId: patch.taskId !== undefined ? patch.taskId : urlSearch.taskId,
         status: patch.status !== undefined ? patch.status : urlSearch.status,
+        due: patch.due !== undefined ? patch.due : urlSearch.due,
+        priority: patch.priority !== undefined ? patch.priority : urlSearch.priority,
+        assignee: patch.assignee !== undefined ? patch.assignee : urlSearch.assignee,
       },
       replace: true,
     });
@@ -251,15 +294,20 @@ function TasksPage() {
 
   const filtered = useMemo(
     () =>
-      taskList.filter(
-        (task) =>
-          taskMatchesStatusFilter(task, status) &&
-          (priority === "all" || task.priority === priority) &&
-          (q === "" ||
-            task.title.toLowerCase().includes(q.toLowerCase()) ||
-            task.key.toLowerCase().includes(q.toLowerCase())),
-      ),
-    [q, status, priority, taskList],
+      taskList.filter((task) => {
+        if (!taskMatchesStatusFilter(task, status)) return false;
+        if (priority !== "all" && task.priority !== priority) return false;
+        if (
+          hasUrlAnalyticsFilters &&
+          !taskMatchesUrlAnalyticsFilters(taskRowToAnalyticsRecord(task), urlAnalyticsFilters)
+        ) {
+          return false;
+        }
+        if (q === "") return true;
+        const query = q.toLowerCase();
+        return task.title.toLowerCase().includes(query) || task.key.toLowerCase().includes(query);
+      }),
+    [q, status, priority, taskList, hasUrlAnalyticsFilters, urlAnalyticsFilters],
   );
   const sorted = useMemo(() => sortTasks(filtered, sort), [filtered, sort]);
   const isTrulyEmpty = taskList.length === 0;
@@ -268,7 +316,13 @@ function TasksPage() {
     setQ("");
     setStatus("all");
     setPriority("all");
-    updateUrlSearch({ status: undefined, taskId: undefined });
+    updateUrlSearch({
+      status: undefined,
+      taskId: undefined,
+      due: undefined,
+      priority: undefined,
+      assignee: undefined,
+    });
   }
 
   function handleSort(field: TaskSortField) {
@@ -489,6 +543,17 @@ function TasksPage() {
       />
     </AppShell>
   );
+}
+
+function taskRowToAnalyticsRecord(task: TaskRow) {
+  return {
+    status: taskStatusToApi[task.status],
+    priority: taskPriorityToApi[task.priority],
+    assigneeId: task.assigneeId,
+    dueDate: task.dueDate,
+    createdAt: "",
+    updatedAt: "",
+  };
 }
 
 function mapApiTaskToRow(task: TaskApiItem): TaskRow {
