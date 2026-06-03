@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LanguageSwitcher, useI18n } from "@/lib/i18n";
 import { ThemeToggle } from "@/lib/theme";
 import { toast } from "sonner";
@@ -25,14 +25,40 @@ import { clearAuthToken, getAuthToken } from "@/lib/auth/token";
 import { nameToInitials, useCurrentUser, workspaceRoleLabel } from "@/lib/auth/use-current-user";
 import type { WorkspaceRole } from "@/lib/api/auth";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  fetchNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  resolveNotificationTarget,
+  type NotificationItem,
+} from "@/lib/api/notifications";
 import type { Workspace } from "./AppShell";
 
-const notifications = [
-  { id: "n1", title: "Priya mentioned you", detail: "Review the billing edge case task." },
-  { id: "n2", title: "Sprint digest ready", detail: "12 tasks moved this week." },
-  { id: "n3", title: "Invite accepted", detail: "Lina joined Acme Studio." },
-  { id: "n4", title: "AI credits update", detail: "67% of monthly credits used." },
-];
+const NOTIFICATIONS_QUERY_KEY = ["notifications"] as const;
+const NOTIFICATIONS_POLL_MS = 45_000;
+
+function formatNotificationTime(createdAt: string, lang: string) {
+  const date = new Date(createdAt);
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60_000);
+
+  if (diffMinutes < 1) {
+    return lang === "ru" ? "только что" : "just now";
+  }
+  if (diffMinutes < 60) {
+    return lang === "ru" ? `${diffMinutes} мин назад` : `${diffMinutes}m ago`;
+  }
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return lang === "ru" ? `${diffHours} ч назад` : `${diffHours}h ago`;
+  }
+
+  return date.toLocaleDateString(lang === "ru" ? "ru-RU" : "en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
 
 export function AppTopbar({
   title,
@@ -47,7 +73,7 @@ export function AppTopbar({
   onWorkspaceChange: (workspace: Workspace) => void;
   workspaceRole?: WorkspaceRole | null;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const router = useRouter();
   const queryClient = useQueryClient();
   const hasToken = typeof window !== "undefined" && !!getAuthToken();
@@ -58,7 +84,18 @@ export function AppTopbar({
   const profileRoleLabel = workspaceRole ? workspaceRoleLabel(workspaceRole) : "Member";
   const [helpOpen, setHelpOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [unread, setUnread] = useState(notifications.length);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+
+  const notificationsQuery = useQuery({
+    queryKey: NOTIFICATIONS_QUERY_KEY,
+    queryFn: fetchNotifications,
+    enabled: hasToken,
+    refetchInterval: NOTIFICATIONS_POLL_MS,
+    refetchOnWindowFocus: true,
+  });
+
+  const notifications = notificationsQuery.data?.notifications ?? [];
+  const unreadCount = notificationsQuery.data?.unreadCount ?? 0;
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
@@ -79,9 +116,35 @@ export function AppTopbar({
     },
   });
 
-  function markAllAsRead() {
-    setUnread(0);
-    toast.success(t("top.allMarkedAsRead"));
+  const markReadMutation = useMutation({
+    mutationFn: markNotificationRead,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
+    },
+  });
+
+  const markAllReadMutation = useMutation({
+    mutationFn: markAllNotificationsRead,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
+      toast.success(t("top.allMarkedAsRead"));
+    },
+  });
+
+  function handleNotificationClick(notification: NotificationItem) {
+    setNotificationsOpen(false);
+
+    if (!notification.isRead) {
+      markReadMutation.mutate(notification.id);
+    }
+
+    const target = resolveNotificationTarget(notification);
+    if (target) {
+      void router.navigate({
+        to: target.to,
+        ...(target.search ? { search: target.search } : {}),
+      });
+    }
   }
 
   return (
@@ -142,39 +205,95 @@ export function AppTopbar({
         >
           <HelpCircle className="size-4" />
         </button>
-        <DropdownMenu>
+        <DropdownMenu
+          open={notificationsOpen}
+          onOpenChange={(open) => {
+            setNotificationsOpen(open);
+            if (open) {
+              void queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
+            }
+          }}
+        >
           <DropdownMenuTrigger asChild>
-            <button className="relative grid size-9 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground">
+            <button
+              type="button"
+              className="relative grid size-9 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground outline-none focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground/30"
+            >
               <Bell className="size-4" />
-              {unread > 0 && (
-                <span className="absolute right-2 top-2 size-1.5 rounded-full bg-primary" />
+              {unreadCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 grid min-w-[1.125rem] place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
               )}
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel className="flex items-center justify-between">
+          <DropdownMenuContent
+            align="end"
+            className="flex w-80 flex-col overflow-hidden p-1"
+            onCloseAutoFocus={(event) => event.preventDefault()}
+          >
+            <DropdownMenuLabel className="flex shrink-0 items-center justify-between">
               {t("top.notifications")}
-              <span className="text-[11px] font-normal text-muted-foreground">{unread} unread</span>
-            </DropdownMenuLabel>
-            <p className="px-2 py-1.5 text-[11px] text-muted-foreground">
-              {t("top.notificationsDemoPreview")}
-            </p>
-            <DropdownMenuSeparator />
-            {notifications.map((item, index) => (
-              <DropdownMenuItem key={item.id} className="items-start gap-2 py-2">
-                <span
-                  className={
-                    "mt-1 size-2 rounded-full " + (index < unread ? "bg-primary" : "bg-muted")
-                  }
-                />
-                <span>
-                  <span className="block text-sm font-medium">{item.title}</span>
-                  <span className="block text-xs text-muted-foreground">{item.detail}</span>
+              {unreadCount > 0 && (
+                <span className="text-[11px] font-normal text-muted-foreground">
+                  {t("top.notificationsUnread").replace("{count}", String(unreadCount))}
                 </span>
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={markAllAsRead}>{t("top.markAllAsRead")}</DropdownMenuItem>
+              )}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator className="shrink-0" />
+            {notificationsQuery.isLoading && (
+              <p className="shrink-0 px-2 py-3 text-xs text-muted-foreground">…</p>
+            )}
+            {!notificationsQuery.isLoading && notifications.length === 0 && (
+              <div className="flex shrink-0 flex-col items-center gap-1 px-3 py-6 text-center">
+                <span className="grid size-9 place-items-center rounded-full bg-muted/60 text-muted-foreground">
+                  <Bell className="size-4" />
+                </span>
+                <p className="text-sm font-medium text-foreground">{t("top.notificationsEmpty")}</p>
+                <p className="text-xs text-muted-foreground">{t("top.notificationsEmptyHint")}</p>
+              </div>
+            )}
+            {notifications.length > 0 && (
+              <div className="app-scrollbar max-h-80 min-h-0 overflow-y-auto overscroll-contain">
+                {notifications.map((item) => (
+                  <DropdownMenuItem
+                    key={item.id}
+                    className={"items-start gap-2 py-2 " + (!item.isRead ? "bg-secondary/50" : "")}
+                    onClick={() => handleNotificationClick(item)}
+                  >
+                    <span
+                      className={
+                        "mt-1.5 size-2 shrink-0 rounded-full " +
+                        (item.isRead ? "bg-muted" : "bg-primary")
+                      }
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium leading-snug">{item.title}</span>
+                      {item.body && (
+                        <span className="block text-xs text-muted-foreground line-clamp-2">
+                          {item.body}
+                        </span>
+                      )}
+                      <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                        {formatNotificationTime(item.createdAt, lang)}
+                      </span>
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+              </div>
+            )}
+            {notifications.length > 0 && (
+              <>
+                <DropdownMenuSeparator className="shrink-0" />
+                <DropdownMenuItem
+                  className="shrink-0"
+                  onClick={() => markAllReadMutation.mutate()}
+                  disabled={unreadCount === 0 || markAllReadMutation.isPending}
+                >
+                  {t("top.markAllAsRead")}
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 

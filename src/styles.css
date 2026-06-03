@@ -186,6 +186,54 @@
     box-shadow: var(--shadow-glow);
   }
 
+  /* Shared vertical scrollbar (matches Kanban board palette) */
+  .app-scrollbar {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.55 0.22 277 / 0.55) oklch(0.9 0.01 270 / 0.35);
+  }
+
+  .app-scrollbar::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .app-scrollbar::-webkit-scrollbar-track {
+    margin-block: 0.25rem;
+    border-radius: 9999px;
+    background: oklch(0.9 0.01 270 / 0.45);
+  }
+
+  .app-scrollbar::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background: oklch(0.55 0.22 277 / 0.55);
+    background-clip: padding-box;
+  }
+
+  .app-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.5 0.22 277 / 0.75);
+    background-clip: padding-box;
+  }
+
+  .dark .app-scrollbar {
+    scrollbar-color: oklch(0.7 0.18 277 / 0.7) oklch(0.28 0.03 270 / 0.85);
+  }
+
+  .dark .app-scrollbar::-webkit-scrollbar-track {
+    background: oklch(0.28 0.03 270 / 0.85);
+  }
+
+  .dark .app-scrollbar::-webkit-scrollbar-thumb {
+    background: oklch(0.7 0.18 277 / 0.7);
+    background-clip: padding-box;
+  }
+
+  .dark .app-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.75 0.2 277 / 0.85);
+    background-clip: padding-box;
+  }
+
   /* Kanban: top horizontal scrollbar + natural vertical page scroll */
   .kanban-board-viewport {
     display: flex;

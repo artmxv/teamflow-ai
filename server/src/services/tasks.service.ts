@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma.js";
+import { notifyTaskAssigned } from "./notifications.service.js";
 
 type CreateTaskInput = {
   projectId: string;
@@ -206,8 +207,16 @@ export async function createTask(workspaceId: string, input: CreateTaskInput) {
   };
 }
 
-export async function updateTask(workspaceId: string, id: string, input: UpdateTaskInput) {
-  const existing = await findTaskInWorkspace(id, workspaceId);
+export async function updateTask(
+  workspaceId: string,
+  id: string,
+  input: UpdateTaskInput,
+  actorId?: string,
+) {
+  const existing = await prisma.task.findFirst({
+    where: { id, project: { workspaceId } },
+    select: { id: true, title: true, assigneeId: true },
+  });
 
   if (!existing) {
     return null;
@@ -246,6 +255,21 @@ export async function updateTask(workspaceId: string, id: string, input: UpdateT
     data,
     select: taskDetailSelect,
   });
+
+  if (
+    actorId &&
+    input.assigneeId !== undefined &&
+    task.assigneeId &&
+    task.assigneeId !== existing.assigneeId
+  ) {
+    void notifyTaskAssigned({
+      workspaceId,
+      taskId: task.id,
+      taskTitle: task.title,
+      assigneeId: task.assigneeId,
+      actorId,
+    });
+  }
 
   return mapTaskDetail(task);
 }

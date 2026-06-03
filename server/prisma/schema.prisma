@@ -67,6 +67,8 @@ model User {
   activities              TaskActivity[]
   uploadedTaskAttachments   TaskAttachment[]
   uploadedProjectDocuments ProjectDocument[]
+  notificationsReceived Notification[] @relation("NotificationRecipient")
+  notificationsSent     Notification[] @relation("NotificationActor")
 }
 
 model Workspace {
@@ -78,9 +80,10 @@ model Workspace {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members     WorkspaceMember[]
-  projects    Project[]
-  aiSummaries AiSummary[]
+  members       WorkspaceMember[]
+  projects      Project[]
+  aiSummaries   AiSummary[]
+  notifications Notification[]
 }
 
 model WorkspaceMember {
@@ -258,4 +261,26 @@ model AiSummary {
   @@index([projectId])
   @@index([taskId])
   @@index([type])
+}
+
+model Notification {
+  id          String    @id @default(cuid())
+  workspaceId String
+  recipientId String
+  actorId     String?
+  type        String
+  title       String
+  body        String?
+  entityType  String?
+  entityId    String?
+  href        String?
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  recipient User      @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  actor     User?     @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, recipientId, createdAt])
+  @@index([recipientId, readAt])
 }

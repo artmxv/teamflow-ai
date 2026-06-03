@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma.js";
+import { notifyTaskCommentCreated } from "./notifications.service.js";
 import { findTaskInWorkspace } from "./tasks.service.js";
 
 const authorSelect = {
@@ -70,6 +71,13 @@ export async function createTaskComment(
       createdAt: true,
       author: { select: authorSelect },
     },
+  });
+
+  void notifyTaskCommentCreated({
+    workspaceId,
+    taskId,
+    actorId: authorId,
+    commentPreview: body,
   });
 
   return mapComment(comment);
