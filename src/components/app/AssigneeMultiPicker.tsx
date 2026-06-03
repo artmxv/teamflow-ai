@@ -14,6 +14,7 @@ type AssigneeMultiPickerProps = {
   disabled?: boolean;
   isLoading?: boolean;
   emptyLabel?: string;
+  emptySelectedLabel?: string;
   className?: string;
   listClassName?: string;
   showClearAction?: boolean;
@@ -26,6 +27,7 @@ export function AssigneeMultiPicker({
   disabled = false,
   isLoading = false,
   emptyLabel,
+  emptySelectedLabel,
   className,
   listClassName,
   showClearAction = true,
@@ -65,7 +67,9 @@ export function AssigneeMultiPicker({
             ) : null}
           </div>
           {selectedOptions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("tasks.noAssigneesSelected")}</p>
+            <p className="text-sm text-muted-foreground">
+              {emptySelectedLabel ?? t("tasks.noAssigneesAssigned")}
+            </p>
           ) : (
             <div className="flex flex-wrap gap-1.5">
               {selectedOptions.map((option) => (

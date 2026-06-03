@@ -178,6 +178,8 @@ export async function findTaskInWorkspace(taskId: string, workspaceId: string) {
 async function resolveAssigneeIds(
   assigneeIds?: string[],
   assigneeId?: string | null,
+  projectId?: string,
+  workspaceId?: string,
 ): Promise<string[] | undefined> {
   if (assigneeIds === undefined && assigneeId === undefined) {
     return undefined;
@@ -187,19 +189,63 @@ async function resolveAssigneeIds(
     assigneeIds !== undefined ? assigneeIds : assigneeId?.trim() ? [assigneeId.trim()] : [];
 
   const uniqueIds = [...new Set(rawIds.map((id) => id.trim()).filter(Boolean))];
-  const validIds: string[] = [];
-
-  for (const id of uniqueIds) {
-    const user = await prisma.user.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-    if (user) {
-      validIds.push(user.id);
-    }
+  if (uniqueIds.length === 0) {
+    return [];
   }
 
-  return validIds;
+  if (!projectId || !workspaceId) {
+    const validIds: string[] = [];
+    for (const id of uniqueIds) {
+      const user = await prisma.user.findUnique({
+        where: { id },
+        select: { id: true },
+      });
+      if (user) {
+        validIds.push(user.id);
+      }
+    }
+    return validIds;
+  }
+
+  const workspaceMembers = await prisma.workspaceMember.findMany({
+    where: {
+      workspaceId,
+      userId: { in: uniqueIds },
+      status: "ACTIVE",
+    },
+    select: { userId: true },
+  });
+  const workspaceMemberIds = new Set(workspaceMembers.map((member) => member.userId));
+
+  const projectMemberCount = await prisma.projectMember.count({
+    where: { projectId, project: { workspaceId } },
+  });
+
+  if (projectMemberCount === 0) {
+    return uniqueIds.filter((id) => workspaceMemberIds.has(id));
+  }
+
+  const projectMembers = await prisma.projectMember.findMany({
+    where: {
+      projectId,
+      userId: { in: uniqueIds },
+      project: { workspaceId },
+    },
+    select: { userId: true },
+  });
+  const projectMemberIds = new Set(projectMembers.map((member) => member.userId));
+
+  return uniqueIds.filter((id) => workspaceMemberIds.has(id) && projectMemberIds.has(id));
+}
+
+function sameAssigneeIds(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  const sortedLeft = [...left].sort();
+  const sortedRight = [...right].sort();
+  return sortedLeft.every((id, index) => id === sortedRight[index]);
 }
 
 async function getExistingAssigneeIds(taskId: string) {
@@ -233,7 +279,9 @@ export async function createTask(
   }
 
   const taskCount = await prisma.task.count();
-  const assigneeIds = (await resolveAssigneeIds(input.assigneeIds, input.assigneeId)) ?? [];
+  const assigneeIds =
+    (await resolveAssigneeIds(input.assigneeIds, input.assigneeId, input.projectId, workspaceId)) ??
+    [];
 
   const task = await prisma.task.create({
     data: {
@@ -303,19 +351,27 @@ export async function updateTask(
   }
 
   const previousAssigneeIds = await getExistingAssigneeIds(id);
-  const resolvedAssigneeIds = await resolveAssigneeIds(input.assigneeIds, input.assigneeId);
-  const assigneeIdsChanged = resolvedAssigneeIds !== undefined;
+  const resolvedAssigneeIds = await resolveAssigneeIds(
+    input.assigneeIds,
+    input.assigneeId,
+    existing.projectId,
+    workspaceId,
+  );
+  const nextAssigneeIds =
+    resolvedAssigneeIds !== undefined && !sameAssigneeIds(resolvedAssigneeIds, previousAssigneeIds)
+      ? resolvedAssigneeIds
+      : undefined;
 
-  if (assigneeIdsChanged) {
-    data.assigneeId = resolvedAssigneeIds[0] ?? null;
+  if (nextAssigneeIds !== undefined) {
+    data.assigneeId = nextAssigneeIds[0] ?? null;
   }
 
   const task = await prisma.$transaction(async (tx) => {
-    if (assigneeIdsChanged) {
+    if (nextAssigneeIds !== undefined) {
       await tx.taskAssignee.deleteMany({ where: { taskId: id } });
-      if (resolvedAssigneeIds.length > 0) {
+      if (nextAssigneeIds.length > 0) {
         await tx.taskAssignee.createMany({
-          data: resolvedAssigneeIds.map((assigneeUserId) => ({
+          data: nextAssigneeIds.map((assigneeUserId) => ({
             taskId: id,
             userId: assigneeUserId,
           })),
@@ -330,8 +386,8 @@ export async function updateTask(
     });
   });
 
-  if (actorId && assigneeIdsChanged && resolvedAssigneeIds) {
-    const newlyAssigned = resolvedAssigneeIds.filter(
+  if (actorId && nextAssigneeIds !== undefined) {
+    const newlyAssigned = nextAssigneeIds.filter(
       (assigneeUserId) => !previousAssigneeIds.includes(assigneeUserId),
     );
     for (const assigneeUserId of newlyAssigned) {
@@ -339,6 +395,7 @@ export async function updateTask(
         workspaceId,
         taskId: task.id,
         taskTitle: task.title,
+        projectId: existing.projectId,
         assigneeId: assigneeUserId,
         actorId,
       });

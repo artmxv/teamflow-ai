@@ -31,11 +31,7 @@ import { TaskDrawer } from "@/components/app/TaskDrawer";
 import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
 import { projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
 import { projectApiStatusLabel, projectStatusLabel, useI18n, type TKey } from "@/lib/i18n";
-import {
-  buildAssigneeOptions,
-  resolveTaskAssignees,
-  type AssigneeOption,
-} from "@/lib/assignee-options";
+import { resolveTaskAssignees } from "@/lib/assignee-options";
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
 import {
   deleteProject,
@@ -285,7 +281,6 @@ function ProjectDetailPage() {
     },
   });
 
-  const assigneeOptions = useMemo(() => buildAssigneeOptions(apiTasks), [apiTasks]);
   const selectedAssignees = useMemo(
     () => (selectedTask ? resolveTaskAssignees(apiTasks, selectedTask.id) : []),
     [selectedTask, apiTasks],
@@ -360,7 +355,6 @@ function ProjectDetailPage() {
         <ProjectDetails
           project={project}
           projectTasks={projectTasks}
-          assigneeOptions={assigneeOptions}
           isCreatingTask={createTaskMutation.isPending}
           onCreateTask={handleCreateTask}
           onOpenTask={(task) => setSelectedTask(mapApiTaskToTask(task))}
@@ -371,7 +365,6 @@ function ProjectDetailPage() {
       <TaskDrawer
         task={selectedTask}
         assignees={selectedAssignees}
-        assigneeOptions={assigneeOptions}
         onSaveChanges={({ assigneeIds, dueDate, status, priority }) => {
           if (!selectedTask || updateAssigneeMutation.isPending) return;
           updateAssigneeMutation.mutate({
@@ -575,7 +568,6 @@ function DeleteProjectDialog({
 function ProjectDetails({
   project,
   projectTasks,
-  assigneeOptions,
   isCreatingTask,
   onCreateTask,
   onOpenTask,
@@ -583,7 +575,6 @@ function ProjectDetails({
 }: {
   project: ProjectApiItem;
   projectTasks: TaskApiItem[];
-  assigneeOptions: AssigneeOption[];
   isCreatingTask: boolean;
   onCreateTask: (values: TaskFormValues) => Promise<void>;
   onOpenTask: (task: TaskApiItem) => void;
@@ -692,7 +683,6 @@ function ProjectDetails({
             </div>
             <NewTaskDialog
               isSubmitting={isCreatingTask}
-              assigneeOptions={assigneeOptions}
               fixedProjectId={project.id}
               onSubmit={onCreateTask}
             >

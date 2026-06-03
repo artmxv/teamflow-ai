@@ -20,6 +20,13 @@ export interface DashboardRecentTask {
     id: string;
     name: string;
   };
+  assignees: {
+    id: string;
+    name: string;
+    email: string;
+    avatar: string | null;
+  }[];
+  /** Legacy primary assignee (first in assignees). */
   assignee: {
     id: string;
     name: string;

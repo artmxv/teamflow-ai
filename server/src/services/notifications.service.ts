@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma.js";
+import { canAccessProject } from "./project-access.service.js";
 
 const NOTIFICATION_LIST_LIMIT = 30;
 
@@ -187,6 +188,65 @@ async function getUserName(userId: string) {
   return user?.name ?? "Someone";
 }
 
+async function resolveTaskAssigneeIds(taskId: string): Promise<string[]> {
+  const links = await prisma.taskAssignee.findMany({
+    where: { taskId },
+    select: { userId: true },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (links.length > 0) {
+    return links.map((link) => link.userId);
+  }
+
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { assigneeId: true },
+  });
+
+  return task?.assigneeId ? [task.assigneeId] : [];
+}
+
+async function userCanAccessProject(
+  userId: string,
+  projectId: string,
+  workspaceId: string,
+): Promise<boolean> {
+  const membership = await prisma.workspaceMember.findFirst({
+    where: { workspaceId, userId, status: "ACTIVE" },
+    select: { role: true },
+  });
+
+  if (!membership) {
+    return false;
+  }
+
+  return canAccessProject(userId, workspaceId, membership.role, projectId);
+}
+
+async function filterRecipientsWithProjectAccess(params: {
+  recipientIds: string[];
+  projectId: string;
+  workspaceId: string;
+  actorId?: string | null;
+}): Promise<string[]> {
+  const uniqueIds = [...new Set(params.recipientIds)].filter(Boolean);
+  const recipients: string[] = [];
+
+  for (const recipientId of uniqueIds) {
+    if (params.actorId && recipientId === params.actorId) {
+      continue;
+    }
+
+    const hasAccess = await userCanAccessProject(recipientId, params.projectId, params.workspaceId);
+    if (hasAccess) {
+      recipients.push(recipientId);
+    }
+  }
+
+  return recipients;
+}
+
 export async function notifyTaskCommentCreated(params: {
   workspaceId: string;
   taskId: string;
@@ -198,7 +258,7 @@ export async function notifyTaskCommentCreated(params: {
     select: {
       id: true,
       title: true,
-      assigneeId: true,
+      projectId: true,
     },
   });
 
@@ -221,10 +281,17 @@ export async function notifyTaskCommentCreated(params: {
     href: `/app/tasks?taskId=${task.id}`,
   };
 
-  if (task.assigneeId && task.assigneeId !== params.actorId) {
-    await createNotification({
+  const assigneeIds = await resolveTaskAssigneeIds(task.id);
+  const recipientIds = await filterRecipientsWithProjectAccess({
+    recipientIds: assigneeIds,
+    projectId: task.projectId,
+    workspaceId: params.workspaceId,
+    actorId: params.actorId,
+  });
+
+  if (recipientIds.length > 0) {
+    await createNotificationsForUsers(recipientIds, {
       ...base,
-      recipientId: task.assigneeId,
       title: `New comment on ${task.title}`,
       body: `${actorName}: ${preview}`,
     });
@@ -242,44 +309,37 @@ export async function notifyTaskAssigned(params: {
   workspaceId: string;
   taskId: string;
   taskTitle: string;
+  projectId: string;
   assigneeId: string;
   actorId: string;
 }) {
+  if (params.assigneeId === params.actorId) {
+    return;
+  }
+
+  const recipientIds = await filterRecipientsWithProjectAccess({
+    recipientIds: [params.assigneeId],
+    projectId: params.projectId,
+    workspaceId: params.workspaceId,
+    actorId: params.actorId,
+  });
+
+  if (recipientIds.length === 0) {
+    return;
+  }
+
   const actorName = await getUserName(params.actorId);
 
-  const base = {
+  await createNotification({
     workspaceId: params.workspaceId,
     actorId: params.actorId,
     type: "TASK_ASSIGNED",
     entityType: "task",
     entityId: params.taskId,
     href: `/app/tasks?taskId=${params.taskId}`,
-  };
-
-  if (params.assigneeId === params.actorId) {
-    await createNotification({
-      ...base,
-      recipientId: params.actorId,
-      title: "You were assigned a task",
-      body: params.taskTitle,
-    });
-    return;
-  }
-
-  await createNotification({
-    ...base,
     recipientId: params.assigneeId,
     title: "Task assigned to you",
     body: `${actorName} assigned you to ${params.taskTitle}`,
-  });
-
-  const assigneeName = await getUserName(params.assigneeId);
-
-  await createNotification({
-    ...base,
-    recipientId: params.actorId,
-    title: "Task assignment updated",
-    body: `${params.taskTitle} assigned to ${assigneeName}`,
   });
 }
 
@@ -294,7 +354,7 @@ export async function notifyTaskAttachmentUploaded(params: {
     select: {
       id: true,
       title: true,
-      assigneeId: true,
+      projectId: true,
     },
   });
 
@@ -313,10 +373,17 @@ export async function notifyTaskAttachmentUploaded(params: {
     href: `/app/tasks?taskId=${task.id}`,
   };
 
-  if (task.assigneeId && task.assigneeId !== params.actorId) {
-    await createNotification({
+  const assigneeIds = await resolveTaskAssigneeIds(task.id);
+  const recipientIds = await filterRecipientsWithProjectAccess({
+    recipientIds: assigneeIds,
+    projectId: task.projectId,
+    workspaceId: params.workspaceId,
+    actorId: params.actorId,
+  });
+
+  if (recipientIds.length > 0) {
+    await createNotificationsForUsers(recipientIds, {
       ...base,
-      recipientId: task.assigneeId,
       title: `New attachment on ${task.title}`,
       body: `${actorName} uploaded ${params.fileName}`,
     });

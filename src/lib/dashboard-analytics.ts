@@ -85,13 +85,20 @@ export function taskMatchesUrlPriorityFilter(
   return isOpenStatus(task.status) && isHighPriority(task.priority);
 }
 
+function taskHasAssignees(task: Pick<TaskAnalyticsRecord, "assigneeIds" | "assigneeId">): boolean {
+  const assigneeIds = task.assigneeIds ?? [];
+  if (assigneeIds.length > 0) {
+    return true;
+  }
+  return Boolean(task.assigneeId);
+}
+
 export function taskMatchesUrlAssigneeFilter(
   task: Pick<TaskAnalyticsRecord, "status" | "assigneeIds" | "assigneeId">,
   assignee: TasksUrlAssigneeFilter,
 ): boolean {
   if (assignee !== "unassigned") return true;
-  const hasAssignees = task.assigneeIds.length > 0 || Boolean(task.assigneeId);
-  return isOpenStatus(task.status) && !hasAssignees;
+  return isOpenStatus(task.status) && !taskHasAssignees(task);
 }
 
 export function taskMatchesUrlAnalyticsFilters(
@@ -138,8 +145,7 @@ export function computeTaskAnalyticsCounts(
     }
 
     if (isHighPriority(task.priority)) highPriorityOpen += 1;
-    const hasAssignees = task.assigneeIds.length > 0 || Boolean(task.assigneeId);
-    if (!hasAssignees) unassigned += 1;
+    if (!taskHasAssignees(task)) unassigned += 1;
   }
 
   return { overdue, dueSoon, highPriorityOpen, unassigned };
