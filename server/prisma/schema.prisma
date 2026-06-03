@@ -64,7 +64,8 @@ model User {
   assignedTasks           Task[]
   comments                TaskComment[]
   activities              TaskActivity[]
-  uploadedTaskAttachments TaskAttachment[]
+  uploadedTaskAttachments   TaskAttachment[]
+  uploadedProjectDocuments ProjectDocument[]
 }
 
 model Workspace {
@@ -108,12 +109,31 @@ model Project {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   tasks       Task[]
+  documents   ProjectDocument[]
   aiSummaries AiSummary[]
 
   @@index([workspaceId])
   @@index([status])
+}
+
+model ProjectDocument {
+  id           String   @id @default(cuid())
+  projectId    String
+  uploaderId   String
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  url          String
+  createdAt    DateTime @default(now())
+
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploader User    @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([uploaderId])
 }
 
 model Task {

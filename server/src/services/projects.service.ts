@@ -68,7 +68,7 @@ function mapProjectWithStats(project: {
   };
 }
 
-async function findProjectInWorkspace(projectId: string, workspaceId: string) {
+export async function findProjectInWorkspace(projectId: string, workspaceId: string) {
   return prisma.project.findFirst({
     where: { id: projectId, workspaceId },
     select: { id: true },
