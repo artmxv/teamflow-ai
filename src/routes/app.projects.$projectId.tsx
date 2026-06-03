@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -40,7 +40,39 @@ import {
   type TaskApiPriority,
   type TaskApiStatus,
 } from "@/lib/api/tasks";
-import { Calendar, ChevronLeft, ListTodo } from "lucide-react";
+import {
+  deleteProjectDocument,
+  downloadProjectDocumentFile,
+  fetchProjectDocumentBlob,
+  fetchProjectDocuments,
+  formatDocumentSize,
+  getProjectDocumentFileTypeBadge,
+  isImageProjectDocument,
+  openProjectDocument,
+  uploadProjectDocument,
+  type ProjectDocumentApiItem,
+} from "@/lib/api/project-documents";
+import { cn } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Calendar,
+  ChevronLeft,
+  Download,
+  ExternalLink,
+  FileText,
+  ListTodo,
+  Loader2,
+  Trash2,
+  Upload,
+} from "lucide-react";
 
 export const Route = createFileRoute("/app/projects/$projectId")({
   beforeLoad: requireAuth,
@@ -417,126 +449,473 @@ function ProjectDetails({
   const due = formatDate(project.dueDate);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-soft lg:col-span-2">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div
-              className={
-                "h-2 w-16 rounded-full bg-gradient-to-r " +
-                (project.color ?? "from-indigo-500 to-violet-500")
+    <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft lg:col-span-2">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div
+                className={
+                  "h-2 w-16 rounded-full bg-gradient-to-r " +
+                  (project.color ?? "from-indigo-500 to-violet-500")
+                }
+              />
+              <h2 className="mt-4 truncate text-xl font-semibold tracking-tight">{project.name}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{project.description || "—"}</p>
+            </div>
+            <Badge variant="secondary" className={status.className + " border-0"}>
+              {status.label}
+            </Badge>
+          </div>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+            <Stat label="Status" value={status.label} />
+            <Stat
+              label="Due"
+              value={
+                <span className="inline-flex items-center gap-1">
+                  <Calendar className="size-3.5 text-muted-foreground" /> {due}
+                </span>
               }
             />
-            <h2 className="mt-4 truncate text-xl font-semibold tracking-tight">{project.name}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{project.description || "—"}</p>
-          </div>
-          <Badge variant="secondary" className={status.className + " border-0"}>
-            {status.label}
-          </Badge>
-        </div>
-
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <Stat label="Status" value={status.label} />
-          <Stat
-            label="Due"
-            value={
-              <span className="inline-flex items-center gap-1">
-                <Calendar className="size-3.5 text-muted-foreground" /> {due}
-              </span>
-            }
-          />
-          <Stat
-            label="Tasks"
-            value={
-              <span className="inline-flex items-center gap-1">
-                <ListTodo className="size-3.5 text-muted-foreground" /> {project.openTasks} /{" "}
-                {project.totalTasks}
-              </span>
-            }
-          />
-          <Stat
-            label="Members"
-            value={
-              memberIds.length > 0 ? (
-                <AvatarStack ids={memberIds} initialsMap={initialsMap} />
-              ) : (
-                <span className="text-sm text-muted-foreground">—</span>
-              )
-            }
-          />
-        </div>
-
-        <div className="mt-6">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Progress</span>
-            <span className="font-medium text-foreground">{project.progress}%</span>
-          </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-            <div
-              className={
-                "h-full rounded-full bg-gradient-to-r " +
-                (project.color ?? "from-indigo-500 to-violet-500")
+            <Stat
+              label="Tasks"
+              value={
+                <span className="inline-flex items-center gap-1">
+                  <ListTodo className="size-3.5 text-muted-foreground" /> {project.openTasks} /{" "}
+                  {project.totalTasks}
+                </span>
               }
-              style={{ width: `${project.progress}%` }}
             />
+            <Stat
+              label="Members"
+              value={
+                memberIds.length > 0 ? (
+                  <AvatarStack ids={memberIds} initialsMap={initialsMap} />
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                )
+              }
+            />
+          </div>
+
+          <div className="mt-6">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Progress</span>
+              <span className="font-medium text-foreground">{project.progress}%</span>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+              <div
+                className={
+                  "h-full rounded-full bg-gradient-to-r " +
+                  (project.color ?? "from-indigo-500 to-violet-500")
+                }
+                style={{ width: `${project.progress}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+          <h3 className="text-base font-semibold">Tasks</h3>
+          <p className="mt-1 text-xs text-muted-foreground">Tasks that belong to this project</p>
+          <div className="mt-4 overflow-hidden rounded-xl border border-border">
+            {projectTasks.length === 0 ? (
+              <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+                No tasks in this project yet.
+              </div>
+            ) : (
+              <ul className="divide-y divide-border">
+                {projectTasks.map((task) => (
+                  <li key={task.id} className="px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                            {task.key}
+                          </span>
+                          <span className="truncate text-sm font-medium">{task.title}</span>
+                        </div>
+                        {task.description ? (
+                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                            {task.description}
+                          </p>
+                        ) : null}
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <Badge
+                            variant="secondary"
+                            className={taskStatusTone[task.status] + " border-0 capitalize"}
+                          >
+                            {taskStatusLabel[task.status]}
+                          </Badge>
+                          <Badge
+                            variant="secondary"
+                            className={taskPriorityTone[task.priority] + " border-0 capitalize"}
+                          >
+                            {taskPriorityLabel[task.priority]}
+                          </Badge>
+                          {task.dueDate ? (
+                            <span className="text-[11px] text-muted-foreground">
+                              Due {new Date(task.dueDate).toLocaleDateString()}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       </div>
+      <ProjectDocumentsCard projectId={project.id} />
+    </div>
+  );
+}
 
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-        <h3 className="text-base font-semibold">Tasks</h3>
-        <p className="mt-1 text-xs text-muted-foreground">Tasks that belong to this project</p>
-        <div className="mt-4 overflow-hidden rounded-xl border border-border">
-          {projectTasks.length === 0 ? (
-            <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-              No tasks in this project yet.
-            </div>
-          ) : (
-            <ul className="divide-y divide-border">
-              {projectTasks.map((task) => (
-                <li key={task.id} className="px-4 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                          {task.key}
-                        </span>
-                        <span className="truncate text-sm font-medium">{task.title}</span>
-                      </div>
-                      {task.description ? (
-                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                          {task.description}
-                        </p>
-                      ) : null}
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <Badge
-                          variant="secondary"
-                          className={taskStatusTone[task.status] + " border-0 capitalize"}
-                        >
-                          {taskStatusLabel[task.status]}
-                        </Badge>
-                        <Badge
-                          variant="secondary"
-                          className={taskPriorityTone[task.priority] + " border-0 capitalize"}
-                        >
-                          {taskPriorityLabel[task.priority]}
-                        </Badge>
-                        {task.dueDate ? (
-                          <span className="text-[11px] text-muted-foreground">
-                            Due {new Date(task.dueDate).toLocaleDateString()}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+function ProjectDocumentsCard({ projectId }: { projectId: string }) {
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const documentsQuery = useQuery({
+    queryKey: ["project-documents", projectId],
+    queryFn: () => fetchProjectDocuments(projectId),
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: (file: File) => uploadProjectDocument(projectId, file),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["project-documents", projectId] });
+      toast.success("Document uploaded");
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Document could not be uploaded",
+      );
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (documentId: string) => deleteProjectDocument(projectId, documentId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["project-documents", projectId] });
+      toast.success("Document deleted");
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Document could not be deleted",
+      );
+    },
+  });
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+      <ProjectDocumentsSection
+        documents={documentsQuery.data ?? []}
+        isLoading={documentsQuery.isLoading}
+        isError={documentsQuery.isError}
+        isUploading={uploadMutation.isPending}
+        isDeletingId={deleteMutation.isPending ? (deleteMutation.variables ?? null) : null}
+        fileInputRef={fileInputRef}
+        onPickFile={() => fileInputRef.current?.click()}
+        onFileSelected={(file) => {
+          if (uploadMutation.isPending) return;
+          uploadMutation.mutate(file);
+        }}
+        onOpen={(document) => {
+          openProjectDocument(document).catch(() => {
+            toast.error("Could not open document");
+          });
+        }}
+        onDownload={(document) => {
+          downloadProjectDocumentFile(document).catch(() => {
+            toast.error("Could not download document");
+          });
+        }}
+        onDelete={(documentId) => {
+          if (deleteMutation.isPending) {
+            return Promise.reject(new Error("Delete already in progress"));
+          }
+          return deleteMutation.mutateAsync(documentId);
+        }}
+      />
+    </div>
+  );
+}
+
+function ProjectDocumentsSection({
+  documents,
+  isLoading,
+  isError,
+  isUploading,
+  isDeletingId,
+  fileInputRef,
+  onPickFile,
+  onFileSelected,
+  onOpen,
+  onDownload,
+  onDelete,
+}: {
+  documents: ProjectDocumentApiItem[];
+  isLoading: boolean;
+  isError: boolean;
+  isUploading: boolean;
+  isDeletingId: string | null;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  onPickFile: () => void;
+  onFileSelected: (file: File) => void;
+  onOpen: (document: ProjectDocumentApiItem) => void;
+  onDownload: (document: ProjectDocumentApiItem) => void;
+  onDelete: (documentId: string) => Promise<unknown>;
+}) {
+  const [documentToDelete, setDocumentToDelete] = useState<string | null>(null);
+  const isDeletingSelected = documentToDelete != null && isDeletingId === documentToDelete;
+
+  async function handleConfirmDelete() {
+    if (!documentToDelete || isDeletingSelected) return;
+    try {
+      await onDelete(documentToDelete);
+      setDocumentToDelete(null);
+    } catch {
+      // Toast is shown by the parent mutation.
+    }
+  }
+
+  return (
+    <section>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="flex items-center gap-2 text-base font-semibold">
+            <FileText className="size-4 text-muted-foreground" />
+            Documents
+          </h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Briefs, specs, presentations, and other project files
+          </p>
         </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-8 gap-1.5"
+          disabled={isUploading}
+          onClick={onPickFile}
+        >
+          {isUploading ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <Upload className="size-3.5" />
+          )}
+          {isUploading ? "Uploading…" : "Upload document"}
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.ppt,.pptx,application/pdf,image/png,image/jpeg,image/webp"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (file) {
+              onFileSelected(file);
+            }
+          }}
+        />
+      </div>
+      <div className="space-y-2">
+        {isLoading ? (
+          <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
+            Loading documents…
+          </p>
+        ) : isError ? (
+          <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-6 text-center text-sm text-destructive">
+            Could not load documents. Try refreshing the page.
+          </p>
+        ) : documents.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
+            No documents yet. Upload a PDF, image, or office file (up to 20 MB).
+          </p>
+        ) : (
+          documents.map((document) => (
+            <ProjectDocumentRow
+              key={document.id}
+              document={document}
+              isDeleting={isDeletingId === document.id}
+              onOpen={() => onOpen(document)}
+              onDownload={() => onDownload(document)}
+              onRequestDelete={() => setDocumentToDelete(document.id)}
+            />
+          ))
+        )}
+      </div>
+      <AlertDialog
+        open={documentToDelete != null}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingSelected) {
+            setDocumentToDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-sm gap-4">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete document?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This file will be removed from the project.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingSelected}>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              className="gap-2"
+              disabled={isDeletingSelected}
+              onClick={() => void handleConfirmDelete()}
+            >
+              <Trash2 className="size-4" />
+              {isDeletingSelected ? "Deleting…" : "Delete document"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </section>
+  );
+}
+
+function ProjectDocumentPreview({ document }: { document: ProjectDocumentApiItem }) {
+  const isImage = isImageProjectDocument(document);
+  const badge = getProjectDocumentFileTypeBadge(document.originalName, document.mimeType);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!isImage) {
+      return;
+    }
+
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    setPreviewUrl(null);
+    setFailed(false);
+
+    fetchProjectDocumentBlob(document)
+      .then((blob) => {
+        if (cancelled) {
+          return;
+        }
+        objectUrl = URL.createObjectURL(blob);
+        setPreviewUrl(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFailed(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [document.id, document.downloadUrl, document.url, isImage]);
+
+  const previewClassName =
+    "size-9 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-secondary";
+
+  if (isImage && previewUrl && !failed) {
+    return (
+      <div className={previewClassName}>
+        <img src={previewUrl} alt="" className="size-full object-cover" loading="lazy" />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        previewClassName,
+        "grid place-items-center text-[10px] font-semibold text-muted-foreground",
+      )}
+    >
+      {isImage && !failed && !previewUrl ? <Loader2 className="size-3.5 animate-spin" /> : badge}
+    </div>
+  );
+}
+
+function ProjectDocumentRow({
+  document,
+  isDeleting,
+  onOpen,
+  onDownload,
+  onRequestDelete,
+}: {
+  document: ProjectDocumentApiItem;
+  isDeleting: boolean;
+  onOpen: () => void;
+  onDownload: () => void;
+  onRequestDelete: () => void;
+}) {
+  return (
+    <div className="flex items-start gap-2.5 rounded-xl border border-border bg-muted/10 px-2.5 py-2">
+      <ProjectDocumentPreview document={document} />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium">{document.originalName}</div>
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
+          <span>{formatDocumentSize(document.size)}</span>
+          <span>·</span>
+          <span>{formatDocumentDate(document.createdAt)}</span>
+          <span>·</span>
+          <span>{document.uploader.name}</span>
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-0.5">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-7 text-muted-foreground hover:text-foreground"
+          disabled={isDeleting}
+          aria-label="Open document"
+          onClick={onOpen}
+        >
+          <ExternalLink className="size-3.5" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-7 text-muted-foreground hover:text-foreground"
+          disabled={isDeleting}
+          aria-label="Download document"
+          onClick={onDownload}
+        >
+          <Download className="size-3.5" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-7 text-muted-foreground hover:text-destructive"
+          disabled={isDeleting}
+          aria-label="Delete document"
+          onClick={onRequestDelete}
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
       </div>
     </div>
   );
+}
+
+function formatDocumentDate(value: string) {
+  return new Date(value).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function Stat({ label, value }: { label: string; value: ReactNode }) {
