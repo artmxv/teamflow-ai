@@ -7,6 +7,12 @@ import {
   uploadProjectDocumentController,
 } from "../controllers/project-documents.controller.js";
 import {
+  addProjectMemberController,
+  getAvailableProjectMembersController,
+  getProjectMembersController,
+  removeProjectMemberController,
+} from "../controllers/project-members.controller.js";
+import {
   createProjectController,
   deleteProjectController,
   getProjectsController,
@@ -24,5 +30,9 @@ projectsRouter.get("/:id/documents", getProjectDocumentsController);
 projectsRouter.post("/:id/documents", uploadProjectDocumentController);
 projectsRouter.get("/:id/documents/:documentId/file", downloadProjectDocumentController);
 projectsRouter.delete("/:id/documents/:documentId", deleteProjectDocumentController);
+projectsRouter.get("/:id/members", getProjectMembersController);
+projectsRouter.get("/:id/available-members", getAvailableProjectMembersController);
+projectsRouter.post("/:id/members", addProjectMemberController);
+projectsRouter.delete("/:id/members/:memberId", removeProjectMemberController);
 projectsRouter.patch("/:id", updateProjectController);
 projectsRouter.delete("/:id", deleteProjectController);
