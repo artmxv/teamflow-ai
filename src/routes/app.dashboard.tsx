@@ -1,10 +1,21 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, Link, type LinkProps } from "@tanstack/react-router";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
-import { FolderKanban, CheckCircle2, ListTodo, Users, ArrowUpRight, Sparkles } from "lucide-react";
-import { members, weeklyVelocity, projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
+import {
+  FolderKanban,
+  CheckCircle2,
+  ListTodo,
+  Users,
+  ArrowUpRight,
+  Sparkles,
+  AlertTriangle,
+  CalendarClock,
+  Flame,
+  UserX,
+} from "lucide-react";
+import { members, projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
 import {
   fetchDashboardSummary,
   mapTaskStatusCountsForChart,
@@ -12,6 +23,15 @@ import {
   type DashboardTaskPriority,
   type DashboardTaskStatus,
 } from "@/lib/api/dashboard";
+import { fetchTasks } from "@/lib/api/tasks";
+import {
+  buildTaskActivitySeries,
+  computeTaskAnalyticsCounts,
+  localeForAnalytics,
+  taskActivityHasData,
+  type DashboardAnalyticsPeriod,
+} from "@/lib/dashboard-analytics";
+import type { TasksSearch } from "@/routes/app.tasks";
 import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
 import { Avatar } from "@/components/app/Avatar";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
@@ -75,11 +95,22 @@ type DashboardProjectCard = {
   color: string;
 };
 
+const analyticsPeriods: DashboardAnalyticsPeriod[] = ["week", "month", "year"];
+
 function Dashboard() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const [activityPeriod, setActivityPeriod] = useState<DashboardAnalyticsPeriod>("week");
   const { data, error, isError, isLoading, refetch } = useQuery({
     queryKey: ["dashboard-summary"],
     queryFn: fetchDashboardSummary,
+  });
+  const {
+    data: workspaceTasks = [],
+    isLoading: tasksLoading,
+    isError: tasksError,
+  } = useQuery({
+    queryKey: ["tasks"],
+    queryFn: fetchTasks,
   });
   const {
     data: apiProjects = [],
@@ -89,6 +120,20 @@ function Dashboard() {
     queryKey: ["projects"],
     queryFn: fetchProjects,
   });
+
+  const analyticsLocale = localeForAnalytics(lang);
+  const taskAnalyticsCounts = useMemo(
+    () => computeTaskAnalyticsCounts(workspaceTasks),
+    [workspaceTasks],
+  );
+  const taskActivityBuckets = useMemo(
+    () => buildTaskActivitySeries(workspaceTasks, activityPeriod, analyticsLocale),
+    [workspaceTasks, activityPeriod, analyticsLocale],
+  );
+  const taskActivityChartHasData = useMemo(
+    () => taskActivityHasData(taskActivityBuckets),
+    [taskActivityBuckets],
+  );
 
   const taskStatusChartData = useMemo(
     () => (data ? mapTaskStatusCountsForChart(data.taskStatusCounts) : []),
@@ -157,6 +202,48 @@ function Dashboard() {
       ]
     : [];
 
+  const analyticsCards: {
+    labelKey: TKey;
+    value: number;
+    icon: typeof AlertTriangle;
+    ariaKey: TKey;
+    tone: string;
+    search: TasksSearch;
+  }[] = [
+    {
+      labelKey: "dashboard.overdue",
+      value: taskAnalyticsCounts.overdue,
+      icon: AlertTriangle,
+      ariaKey: "dashboard.viewOverdueTasks",
+      tone: "text-destructive",
+      search: { status: "open", due: "overdue" },
+    },
+    {
+      labelKey: "dashboard.dueSoon",
+      value: taskAnalyticsCounts.dueSoon,
+      icon: CalendarClock,
+      ariaKey: "dashboard.viewDueSoonTasks",
+      tone: "text-warning-foreground",
+      search: { status: "open", due: "soon" },
+    },
+    {
+      labelKey: "dashboard.highPriorityOpen",
+      value: taskAnalyticsCounts.highPriorityOpen,
+      icon: Flame,
+      ariaKey: "dashboard.viewHighPriorityTasks",
+      tone: "text-warning-foreground",
+      search: { status: "open", priority: "high" },
+    },
+    {
+      labelKey: "dashboard.unassigned",
+      value: taskAnalyticsCounts.unassigned,
+      icon: UserX,
+      ariaKey: "dashboard.viewUnassignedTasks",
+      tone: "text-muted-foreground",
+      search: { status: "open", assignee: "unassigned" },
+    },
+  ];
+
   return (
     <AppShell title={t("side.dashboard")}>
       <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
@@ -191,38 +278,45 @@ function Dashboard() {
         </div>
       )}
 
+      <div className="mt-6">
+        <Link
+          to="/app/tasks"
+          search={{ status: "open" }}
+          className="mb-3 inline-flex text-xs text-muted-foreground transition hover:text-primary hover:underline"
+        >
+          {t("dashboard.basedOnWorkspaceTasks")}
+        </Link>
+        {tasksLoading ? (
+          <AnalyticsCardsSkeleton />
+        ) : tasksError ? null : (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {analyticsCards.map((card) => (
+              <AnalyticsMetricCard
+                key={card.labelKey}
+                to="/app/tasks"
+                search={card.search}
+                ariaLabel={t(card.ariaKey)}
+                icon={card.icon}
+                value={card.value}
+                label={t(card.labelKey)}
+                iconClassName={card.tone}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="mt-6 grid gap-4 xl:grid-cols-3">
         <div className="rounded-2xl border border-border bg-card p-5 shadow-soft xl:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-semibold">{t("dashboard.weeklyVelocity")}</h2>
-              <p className="text-xs text-muted-foreground">Tasks created vs completed</p>
-            </div>
-            <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-sm bg-primary" /> {t("dashboard.completed")}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-sm bg-muted-foreground/40" /> Created
-              </span>
-            </div>
-          </div>
-          <ChartContainer
-            config={{
-              completed: { label: t("dashboard.completed"), color: "var(--color-chart-1)" },
-              created: { label: "Created", color: "var(--color-muted-foreground)" },
-            }}
-            className="h-64 w-full"
-          >
-            <BarChart data={weeklyVelocity}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
-              <XAxis dataKey="day" tickLine={false} axisLine={false} className="text-xs" />
-              <YAxis tickLine={false} axisLine={false} className="text-xs" />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="completed" fill="var(--color-chart-1)" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="created" fill="oklch(0.85 0.01 270)" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ChartContainer>
+          <TaskActivityChartSection
+            period={activityPeriod}
+            onPeriodChange={setActivityPeriod}
+            buckets={taskActivityBuckets}
+            hasData={taskActivityChartHasData}
+            isLoading={tasksLoading}
+            isError={tasksError}
+            t={t}
+          />
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
@@ -329,7 +423,11 @@ function Dashboard() {
       <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-soft">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold">{t("dashboard.recentActivity")}</h2>
-          <Link to="/app/tasks" className="text-xs text-primary hover:underline">
+          <Link
+            to="/app/tasks"
+            search={{ status: "open" }}
+            className="text-xs text-primary hover:underline"
+          >
             {t("common.seeAll")}
           </Link>
         </div>
@@ -558,6 +656,173 @@ function DashboardErrorState({ error, onRetry }: { error: Error | null; onRetry:
 const cardLinkClass =
   "rounded-2xl border border-border bg-card p-5 shadow-soft transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
+const periodLabelKeys: Record<DashboardAnalyticsPeriod, TKey> = {
+  week: "dashboard.periodWeek",
+  month: "dashboard.periodMonth",
+  year: "dashboard.periodYear",
+};
+
+function TaskActivityChartSection({
+  period,
+  onPeriodChange,
+  buckets,
+  hasData,
+  isLoading,
+  isError,
+  t,
+}: {
+  period: DashboardAnalyticsPeriod;
+  onPeriodChange: (period: DashboardAnalyticsPeriod) => void;
+  buckets: ReturnType<typeof buildTaskActivitySeries>;
+  hasData: boolean;
+  isLoading: boolean;
+  isError: boolean;
+  t: (key: TKey) => string;
+}) {
+  const chartData = buckets.map((bucket) => ({
+    label: bucket.label,
+    created: bucket.created,
+    done: bucket.done,
+  }));
+
+  return (
+    <>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-base font-semibold">{t("dashboard.taskActivity")}</h2>
+          <p className="text-xs text-muted-foreground">{t("dashboard.doneTasksActivityNote")}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div
+            className="inline-flex rounded-lg border border-border bg-muted/40 p-0.5"
+            role="group"
+            aria-label={t("dashboard.taskActivity")}
+          >
+            {analyticsPeriods.map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => onPeriodChange(value)}
+                aria-pressed={period === value}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-xs font-medium transition",
+                  period === value
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {t(periodLabelKeys[value])}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="size-2 rounded-sm bg-primary" /> {t("dashboard.createdTasks")}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-2 rounded-sm bg-info" /> {t("dashboard.doneTasks")}
+            </span>
+          </div>
+        </div>
+      </div>
+      {isLoading ? (
+        <Skeleton className="h-64 w-full rounded-xl" />
+      ) : isError ? (
+        <p className="flex h-64 items-center justify-center text-sm text-muted-foreground">
+          {t("common.errorServerHint")}
+        </p>
+      ) : !hasData ? (
+        <p className="flex h-64 items-center justify-center text-sm text-muted-foreground">
+          {t("dashboard.noTasksInPeriod")}
+        </p>
+      ) : (
+        <ChartContainer
+          config={{
+            created: { label: t("dashboard.createdTasks"), color: "var(--primary)" },
+            done: { label: t("dashboard.doneTasks"), color: "var(--info)" },
+          }}
+          className="h-64 w-full [&_.recharts-cartesian-grid_line]:stroke-border/80"
+        >
+          <BarChart data={chartData} barGap={4} barCategoryGap="18%">
+            <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/60" />
+            <XAxis
+              dataKey="label"
+              tickLine={false}
+              axisLine={false}
+              interval={0}
+              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+              angle={period === "month" ? -18 : 0}
+              textAnchor={period === "month" ? "end" : "middle"}
+              height={period === "month" ? 52 : 32}
+            />
+            <YAxis
+              allowDecimals={false}
+              tickLine={false}
+              axisLine={false}
+              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+            />
+            <ChartTooltip content={<ChartTooltipContent nameKey="dataKey" />} />
+            <Bar dataKey="created" fill="var(--color-created)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="done" fill="var(--color-done)" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ChartContainer>
+      )}
+    </>
+  );
+}
+
+function AnalyticsMetricCard({
+  to,
+  search,
+  ariaLabel,
+  icon: Icon,
+  value,
+  label,
+  iconClassName,
+}: {
+  to: "/app/tasks";
+  search: TasksSearch;
+  ariaLabel: string;
+  icon: typeof AlertTriangle;
+  value: number;
+  label: string;
+  iconClassName?: string;
+}) {
+  return (
+    <Link
+      to={to}
+      search={search}
+      aria-label={ariaLabel}
+      className={cn("group block", cardLinkClass)}
+    >
+      <div
+        className={cn(
+          "grid size-9 place-items-center rounded-xl bg-accent text-accent-foreground transition group-hover:bg-primary/10",
+          iconClassName,
+        )}
+      >
+        <Icon className="size-4" />
+      </div>
+      <div className="mt-4 text-3xl font-semibold tracking-tight">{value}</div>
+      <div className="mt-0.5 text-xs text-muted-foreground">{label}</div>
+    </Link>
+  );
+}
+
+function AnalyticsCardsSkeleton() {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+          <Skeleton className="size-9 rounded-xl" />
+          <Skeleton className="mt-4 h-9 w-12" />
+          <Skeleton className="mt-2 h-3 w-28" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 type StatCardSearch =
   | { status: "done" | "open" }
   | { status: "active" | "planning" | "on_hold" | "completed" | "all" };
@@ -588,7 +853,7 @@ function StatCard({
   );
   const className = cn("group block", cardLinkClass);
 
-  if (to === "/app/tasks" && search && (search.status === "open" || search.status === "done")) {
+  if (to === "/app/tasks" && search) {
     return (
       <Link to="/app/tasks" search={search} aria-label={ariaLabel} className={className}>
         {content}
@@ -612,7 +877,7 @@ function StatCard({
 }
 
 type InsightTarget =
-  | { to: "/app/tasks"; search?: { status: "done" | "open" } }
+  | { to: "/app/tasks"; search?: TasksSearch }
   | { to: "/app/team" }
   | { to: "/app/projects/$projectId"; params: { projectId: string } };
 
