@@ -81,7 +81,7 @@ export function AppTopbar({
   const currentUser = me?.user;
   const showProfile = hasToken && !isError && !!currentUser;
   const showProfilePlaceholder = hasToken && isPending && !currentUser;
-  const profileRoleLabel = workspaceRole ? workspaceRoleLabel(workspaceRole) : "Member";
+  const profileRoleLabel = workspaceRole ? workspaceRoleLabel(workspaceRole, t) : t("role.member");
   const [helpOpen, setHelpOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -344,7 +344,7 @@ export function AppTopbar({
                 onClick={() => logoutMutation.mutate()}
                 disabled={logoutMutation.isPending}
               >
-                Sign out
+                {t("common.signOut")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -355,14 +355,10 @@ export function AppTopbar({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>TeamFlow {t("top.help")}</DialogTitle>
-            <DialogDescription>
-              This demo runs on mock data. Use the sidebar to explore projects, tasks, billing, and
-              AI assistant flows.
-            </DialogDescription>
+            <DialogDescription>{t("top.helpDescription")}</DialogDescription>
           </DialogHeader>
           <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
-            Need help? Try opening the task board, filtering by assignee, or using the AI suggested
-            prompts.
+            {t("top.helpTip")}
           </div>
         </DialogContent>
       </Dialog>
@@ -386,7 +382,7 @@ export function KeyboardShortcutsDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t("top.keyboardShortcuts")}</DialogTitle>
-          <DialogDescription>Quick actions available in the mock workspace.</DialogDescription>
+          <DialogDescription>{t("top.shortcutsDescription")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-2 text-sm">
           {[

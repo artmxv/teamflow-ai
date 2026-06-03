@@ -2,6 +2,7 @@ import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { Calendar, GripVertical, MessageSquare, Paperclip } from "lucide-react";
 import { type Task, priorityMeta, statusColumns, type TaskStatus } from "@/lib/mock-data";
+import { priorityLabel, taskStatusLabel, useI18n } from "@/lib/i18n";
 import type { AssigneeOption } from "@/lib/assignee-options";
 import { cn } from "@/lib/utils";
 import { Avatar } from "./Avatar";
@@ -38,6 +39,7 @@ export function TaskCard({
   /** Rendered inside DragOverlay (no drag hooks). */
   dragOverlay?: boolean;
 }) {
+  const { t } = useI18n();
   const prio = priorityMeta[task.priority];
   const dueDateLabel = task.dueDate ? formatTaskDueDate(task.dueDate) : null;
 
@@ -91,7 +93,7 @@ export function TaskCard({
         <div className="mt-3 flex items-center justify-between">
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
             <Badge variant="secondary" className={prio.className + " border-0"}>
-              {prio.label}
+              {priorityLabel(task.priority, t)}
             </Badge>
             {dueDateLabel ? (
               <span className="inline-flex items-center gap-1" title="Due date">
@@ -135,7 +137,7 @@ export function TaskCard({
             <SelectContent>
               {statusColumns.map((col) => (
                 <SelectItem key={col.key} value={col.key}>
-                  {col.title}
+                  {taskStatusLabel(col.key, t)}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -93,12 +93,10 @@ function SettingsPage() {
     mutationFn: updateProfile,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
-      toast.success("Profile saved");
+      toast.success(t("settings.profileSaved"));
     },
     onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : "Could not save profile. Please try again.",
-      );
+      toast.error(error instanceof Error ? error.message : t("settings.profileSaveError"));
     },
   });
 
@@ -106,12 +104,10 @@ function SettingsPage() {
     mutationFn: updateWorkspace,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
-      toast.success("Workspace saved");
+      toast.success(t("settings.workspaceSaved"));
     },
     onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : "Could not save workspace. Please try again.",
-      );
+      toast.error(error instanceof Error ? error.message : t("settings.workspaceSaveError"));
     },
   });
 
@@ -144,7 +140,7 @@ function SettingsPage() {
       return;
     }
     if (!workspace) {
-      toast.error("No workspace found");
+      toast.error(t("settings.noWorkspace"));
       return;
     }
     workspaceMutation.mutate({
@@ -169,7 +165,7 @@ function SettingsPage() {
     <AppShell title={t("side.settings")}>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">{t("side.settings")}</h1>
-        <p className="text-sm text-muted-foreground">Manage your workspace, profile and billing.</p>
+        <p className="text-sm text-muted-foreground">{t("settings.pageSubtitle")}</p>
       </div>
 
       <Tabs defaultValue="workspace" className="w-full">
@@ -181,9 +177,12 @@ function SettingsPage() {
         </TabsList>
 
         <TabsContent value="workspace" className="mt-5">
-          <Card title="Workspace details" description="Used across invites and emails.">
+          <Card
+            title={t("settings.workspaceDetailsTitle")}
+            description={t("settings.workspaceDetailsDesc")}
+          >
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Workspace name">
+              <Field label={t("settings.workspaceName")}>
                 {isPending ? (
                   <Skeleton className="h-10 w-full rounded-md" />
                 ) : (
@@ -198,7 +197,7 @@ function SettingsPage() {
                   />
                 )}
               </Field>
-              <Field label="Workspace URL">
+              <Field label={t("settings.workspaceUrl")}>
                 {isPending ? (
                   <Skeleton className="h-10 w-full rounded-md" />
                 ) : (
@@ -210,7 +209,7 @@ function SettingsPage() {
                   />
                 )}
               </Field>
-              <Field label="Industry">
+              <Field label={t("settings.industry")}>
                 <Input
                   value={workspaceForm?.industry ?? ""}
                   onChange={(event) =>
@@ -222,7 +221,7 @@ function SettingsPage() {
                   placeholder="e.g. Product / Software"
                 />
               </Field>
-              <Field label="Team size">
+              <Field label={t("settings.teamSize")}>
                 <Input
                   value={workspaceForm?.teamSize ?? ""}
                   onChange={(event) =>
@@ -245,7 +244,7 @@ function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="profile" className="mt-5">
-          <Card title="Your profile" description="This is how others see you in the workspace.">
+          <Card title={t("settings.yourProfileTitle")} description={t("settings.yourProfileDesc")}>
             <div className="flex items-center gap-4">
               {isPending ? (
                 <Skeleton className="size-16 rounded-2xl" />
@@ -267,7 +266,7 @@ function SettingsPage() {
               </div>
             </div>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <Field label="Full name">
+              <Field label={t("settings.fullName")}>
                 {isPending ? (
                   <Skeleton className="h-10 w-full rounded-md" />
                 ) : (
@@ -282,7 +281,7 @@ function SettingsPage() {
                   />
                 )}
               </Field>
-              <Field label="Display name">
+              <Field label={t("settings.displayName")}>
                 {isPending ? (
                   <Skeleton className="h-10 w-full rounded-md" />
                 ) : (
@@ -297,7 +296,7 @@ function SettingsPage() {
                   />
                 )}
               </Field>
-              <Field label="Email">
+              <Field label={t("settings.email")}>
                 {isPending ? (
                   <Skeleton className="h-10 w-full rounded-md" />
                 ) : (
@@ -310,7 +309,7 @@ function SettingsPage() {
                   />
                 )}
               </Field>
-              <Field label="Time zone">
+              <Field label={t("settings.timeZone")}>
                 <Input
                   value={profileForm?.timezone ?? ""}
                   onChange={(event) =>
@@ -324,7 +323,7 @@ function SettingsPage() {
               </Field>
             </div>
             <div className="mt-4">
-              <Field label="Bio">
+              <Field label={t("settings.bio")}>
                 <Textarea
                   value={profileForm?.bio ?? ""}
                   onChange={(event) =>
@@ -348,15 +347,26 @@ function SettingsPage() {
 
         <TabsContent value="notifications" className="mt-5">
           <Card
-            title="Notification preferences"
-            description="Choose what you want to be notified about."
+            title={t("settings.notificationSettings")}
+            description={t("settings.notificationDesc")}
           >
             <div className="divide-y divide-border">
               {[
-                { l: "New comments on my tasks", d: "Email + in-app" },
-                { l: "Mentions", d: "Email + in-app", on: true },
-                { l: "Weekly AI digest", d: "Sent every Monday", on: true },
-                { l: "Project status changes", d: "Daily summary" },
+                { l: t("settings.notifyComments"), d: t("settings.notifyEmailInApp") },
+                {
+                  l: t("settings.notifyMentions"),
+                  d: t("settings.notifyEmailInApp"),
+                  on: true,
+                },
+                {
+                  l: t("settings.notifyWeeklyDigest"),
+                  d: t("settings.notifyWeeklyDigestSchedule"),
+                  on: true,
+                },
+                {
+                  l: t("settings.notifyProjectStatus"),
+                  d: t("settings.notifyDailySummary"),
+                },
               ].map((n) => (
                 <div key={n.l} className="flex items-center justify-between py-3.5">
                   <div>
@@ -371,10 +381,7 @@ function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="billing" className="mt-5">
-          <Card
-            title="Plan & billing"
-            description="You're on the Team plan. Manage seats and invoices."
-          >
+          <Card title={t("settings.planBillingTitle")} description={t("settings.planBillingDesc")}>
             <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-border bg-gradient-to-br from-primary/8 to-card p-5 sm:flex-row sm:items-center">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider text-primary">
@@ -401,7 +408,7 @@ function SettingsPage() {
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <div className="rounded-2xl border border-border p-5">
                 <div className="flex items-center gap-2 text-sm font-semibold">
-                  <CreditCard className="size-4" /> Payment method
+                  <CreditCard className="size-4" /> {t("billing.paymentMethod")}
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">
                   Visa ending in 4242 · Exp 09/28
@@ -416,13 +423,14 @@ function SettingsPage() {
                 </Button>
               </div>
               <div className="rounded-2xl border border-border p-5">
-                <div className="text-sm font-semibold">What's included</div>
+                <div className="text-sm font-semibold">{t("billing.whatsIncluded")}</div>
                 <ul className="mt-3 space-y-2 text-sm">
                   {[
-                    "Unlimited projects",
-                    "Advanced AI assistant",
-                    "Custom workflows",
-                    "SSO with Google",
+                    t("billing.featureUnlimitedProjects"),
+                    t("billing.featureAiStandups"),
+                    t("billing.featureAdvancedRoles"),
+                    t("billing.featurePrioritySupport"),
+                    t("billing.featureAuditLog"),
                   ].map((f) => (
                     <li key={f} className="flex items-center gap-2">
                       <Check className="size-4 text-primary" /> {f}
@@ -498,7 +506,7 @@ function SaveBar({
         {isSaving ? (
           <>
             <Loader2 className="size-4 animate-spin" />
-            Saving…
+            {t("settings.saving")}
           </>
         ) : (
           t("common.saveChanges")
@@ -516,28 +524,29 @@ function SeatsDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useI18n();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add seats</DialogTitle>
-          <DialogDescription>Mock billing action. No payment is charged.</DialogDescription>
+          <DialogTitle>{t("billing.addSeats")}</DialogTitle>
+          <DialogDescription>{t("settings.seatsDialogDesc")}</DialogDescription>
         </DialogHeader>
-        <Field label="Additional seats">
+        <Field label={t("settings.additionalSeats")}>
           <Input type="number" min="1" defaultValue="2" />
         </Field>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             onClick={() => {
               onOpenChange(false);
-              toast.success("Seats added");
+              toast.success(t("settings.toast.seatsAdded"));
             }}
             className="bg-gradient-brand text-white"
           >
-            Add seats
+            {t("billing.addSeats")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -552,38 +561,39 @@ function PaymentMethodDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useI18n();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Update payment method</DialogTitle>
-          <DialogDescription>Use mock card details for the frontend demo.</DialogDescription>
+          <DialogTitle>{t("settings.updatePaymentTitle")}</DialogTitle>
+          <DialogDescription>{t("settings.updatePaymentDesc")}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <Field label="Card number">
+            <Field label={t("settings.cardNumber")}>
               <Input defaultValue="4242 4242 4242 4242" />
             </Field>
           </div>
-          <Field label="Expiry">
+          <Field label={t("settings.cardExpiry")}>
             <Input defaultValue="09 / 28" />
           </Field>
-          <Field label="CVC">
+          <Field label={t("settings.cardCvc")}>
             <Input defaultValue="123" />
           </Field>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             onClick={() => {
               onOpenChange(false);
-              toast.success("Payment method updated");
+              toast.success(t("settings.toast.paymentMethodUpdated"));
             }}
             className="bg-gradient-brand text-white"
           >
-            Save card
+            {t("settings.saveCard")}
           </Button>
         </DialogFooter>
       </DialogContent>

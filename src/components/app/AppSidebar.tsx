@@ -199,10 +199,14 @@ export function AppSidebar({
           {collapsed && <div className="mt-6" aria-hidden />}
           <ul className="space-y-0.5">
             {!collapsed && projectsLoading && (
-              <li className="px-3 py-1.5 text-xs text-muted-foreground">Loading projects…</li>
+              <li className="px-3 py-1.5 text-xs text-muted-foreground">
+                {t("side.loadingProjects")}
+              </li>
             )}
             {!collapsed && !projectsLoading && projects.length === 0 && (
-              <li className="px-3 py-1.5 text-xs text-muted-foreground">No projects yet</li>
+              <li className="px-3 py-1.5 text-xs text-muted-foreground">
+                {t("side.noProjectsYet")}
+              </li>
             )}
             {projects.map((project) => {
               const projectActive = activeProjectId === project.id;

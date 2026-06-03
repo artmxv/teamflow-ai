@@ -25,11 +25,11 @@ export const Route = createFileRoute("/app/ai")({
 });
 
 const SECTIONS = [
-  { id: "overview", label: "Overview" },
-  { id: "highlights", label: "Highlights" },
-  { id: "risks", label: "Risks" },
-  { id: "actions", label: "Next actions" },
-  { id: "standup", label: "Standup" },
+  { id: "overview", labelKey: "ai.sectionOverview" as const },
+  { id: "highlights", labelKey: "ai.highlights" as const },
+  { id: "risks", labelKey: "ai.risks" as const },
+  { id: "actions", labelKey: "ai.actions" as const },
+  { id: "standup", labelKey: "ai.standupSummary" as const },
 ] as const;
 
 function AssistantPage() {
@@ -52,9 +52,7 @@ function AssistantPage() {
       toast.success(t("ai.summaryRefreshed"));
     } catch (regenerateError) {
       toast.error(
-        regenerateError instanceof Error
-          ? regenerateError.message
-          : "Workspace summary could not be refreshed",
+        regenerateError instanceof Error ? regenerateError.message : t("ai.refreshError"),
       );
     }
   }
@@ -64,19 +62,17 @@ function AssistantPage() {
       <div className="grid h-[calc(100vh-7rem)] gap-4 lg:grid-cols-[260px_1fr]">
         <aside className="hidden flex-col rounded-2xl border border-border bg-card p-3 shadow-soft lg:flex">
           <div className="flex items-center gap-2 px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <BarChart3 className="size-3.5" /> Workspace metrics
+            <BarChart3 className="size-3.5" /> {t("ai.metricsTitle")}
           </div>
           {isLoading ? (
             <MetricsSkeleton />
           ) : data ? (
             <MetricsPanel metrics={data.metrics} />
           ) : (
-            <p className="px-2 py-2 text-xs text-muted-foreground">
-              Metrics appear after summary loads.
-            </p>
+            <p className="px-2 py-2 text-xs text-muted-foreground">{t("ai.metricsPending")}</p>
           )}
           <div className="mt-4 flex items-center gap-2 px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Sections
+            {t("ai.sectionsTitle")}
           </div>
           <ul className="flex-1 space-y-0.5 overflow-y-auto">
             {SECTIONS.map((section) => (
@@ -87,7 +83,7 @@ function AssistantPage() {
                   disabled={!data}
                   className="flex w-full rounded-lg px-2 py-2 text-left text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
                 >
-                  {section.label}
+                  {t(section.labelKey)}
                 </button>
               </li>
             ))}
@@ -111,9 +107,7 @@ function AssistantPage() {
             </div>
             <div className="min-w-0">
               <div className="text-sm font-semibold">TeamFlow AI</div>
-              <div className="text-xs text-muted-foreground">
-                Grounded in your workspace context
-              </div>
+              <div className="text-xs text-muted-foreground">{t("ai.groundedContext")}</div>
             </div>
             <Button
               variant="outline"
@@ -141,20 +135,25 @@ function AssistantPage() {
                 <div id="highlights">
                   <SectionBlock
                     icon={CheckCircle2}
-                    title="Highlights"
+                    title={t("ai.highlights")}
                     tone="ok"
                     items={data.highlights}
                   />
                 </div>
 
                 <div id="risks">
-                  <SectionBlock icon={AlertTriangle} title="Risks" tone="warn" items={data.risks} />
+                  <SectionBlock
+                    icon={AlertTriangle}
+                    title={t("ai.risks")}
+                    tone="warn"
+                    items={data.risks}
+                  />
                 </div>
 
                 <div id="actions">
                   <SectionBlock
                     icon={ListChecks}
-                    title="Recommended next actions"
+                    title={t("ai.nextActions")}
                     tone="info"
                     items={data.recommendedNextActions}
                     ordered
@@ -163,29 +162,29 @@ function AssistantPage() {
 
                 <div id="standup">
                   <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    <Megaphone className="size-3.5" /> Standup summary
+                    <Megaphone className="size-3.5" /> {t("ai.standupSummary")}
                     {data.standupSummary.trim() ? (
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
                         className="ml-auto h-7 gap-1.5 text-xs font-medium normal-case tracking-normal"
-                        onClick={() => void copyStandupSummary(data.standupSummary)}
+                        onClick={() => void copyStandupSummary(data.standupSummary, t)}
                       >
                         <Copy className="size-3.5" />
-                        Copy
+                        {t("ai.copy")}
                       </Button>
                     ) : null}
                   </div>
                   <AssistantBubble
                     content={data.standupSummary}
-                    emptyMessage="No standup summary yet. Regenerate when your workspace has more activity."
+                    emptyMessage={t("ai.standupEmpty")}
                   />
                 </div>
 
                 <div className="lg:hidden">
                   <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Workspace metrics
+                    {t("ai.metricsTitle")}
                   </div>
                   <MetricsPanel metrics={data.metrics} />
                 </div>
@@ -198,12 +197,12 @@ function AssistantPage() {
   );
 }
 
-async function copyStandupSummary(text: string) {
+async function copyStandupSummary(text: string, t: (key: import("@/lib/i18n").TKey) => string) {
   try {
     await navigator.clipboard.writeText(text);
-    toast.success("Standup summary copied");
+    toast.success(t("ai.copied"));
   } catch {
-    toast.error("Could not copy to clipboard");
+    toast.error(t("ai.copyError"));
   }
 }
 
@@ -273,16 +272,17 @@ function SectionBlock({
 }
 
 function MetricsPanel({ metrics }: { metrics: WorkspaceAiMetrics }) {
+  const { t } = useI18n();
   const items = [
-    { label: "Projects", value: metrics.totalProjects },
-    { label: "Active projects", value: metrics.activeProjects },
-    { label: "Tasks", value: metrics.totalTasks },
-    { label: "Open tasks", value: metrics.openTasks },
-    { label: "Completed", value: metrics.completedTasks },
-    { label: "Urgent open", value: metrics.urgentTasks },
-    { label: "High priority", value: metrics.highPriorityTasks },
-    { label: "In review", value: metrics.reviewTasks },
-    { label: "Overdue", value: metrics.overdueTasks },
+    { label: t("ai.metricProjects"), value: metrics.totalProjects },
+    { label: t("ai.metricActiveProjects"), value: metrics.activeProjects },
+    { label: t("ai.metricTasks"), value: metrics.totalTasks },
+    { label: t("ai.metricOpenTasks"), value: metrics.openTasks },
+    { label: t("ai.metricDoneTasks"), value: metrics.completedTasks },
+    { label: t("ai.metricUrgentOpen"), value: metrics.urgentTasks },
+    { label: t("ai.metricHighPriority"), value: metrics.highPriorityTasks },
+    { label: t("ai.metricInReview"), value: metrics.reviewTasks },
+    { label: t("ai.metricOverdue"), value: metrics.overdueTasks },
   ];
 
   return (
@@ -328,17 +328,18 @@ function MetricsSkeleton() {
 }
 
 function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
+  const { t } = useI18n();
   return (
     <div className="rounded-2xl border border-destructive/20 bg-card p-8 text-center shadow-soft">
-      <h3 className="text-base font-semibold">Workspace summary could not load</h3>
+      <h3 className="text-base font-semibold">{t("ai.errorTitle")}</h3>
       <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-        {error?.message ?? "Check that the backend is running and try again."}
+        {error?.message ?? t("board.errorHint")}
       </p>
       <Button
         onClick={onRetry}
         className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95"
       >
-        Retry
+        {t("common.retry")}
       </Button>
     </div>
   );

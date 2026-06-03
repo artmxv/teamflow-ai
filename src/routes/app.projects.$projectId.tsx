@@ -30,6 +30,7 @@ import { Avatar } from "@/components/app/Avatar";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
 import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
 import { projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
+import { useI18n, type TKey } from "@/lib/i18n";
 import {
   buildAssigneeOptions,
   resolveTaskAssignee,
@@ -126,12 +127,19 @@ const apiTaskPriorityMap: Record<TaskApiPriority, Priority> = {
   URGENT: "urgent",
 };
 
-const taskStatusLabel: Record<TaskApiStatus, string> = {
-  BACKLOG: "Backlog",
-  TODO: "Todo",
-  IN_PROGRESS: "In progress",
-  REVIEW: "Review",
-  DONE: "Done",
+const taskStatusLabelKey: Record<TaskApiStatus, TKey> = {
+  BACKLOG: "board.backlog",
+  TODO: "board.todo",
+  IN_PROGRESS: "board.inProgress",
+  REVIEW: "board.review",
+  DONE: "board.done",
+};
+
+const taskPriorityLabelKey: Record<TaskApiPriority, TKey> = {
+  LOW: "tasks.priorityLow",
+  MEDIUM: "tasks.priorityMedium",
+  HIGH: "tasks.priorityHigh",
+  URGENT: "tasks.priorityUrgent",
 };
 
 const taskStatusTone: Record<TaskApiStatus, string> = {
@@ -142,13 +150,6 @@ const taskStatusTone: Record<TaskApiStatus, string> = {
   DONE: "bg-success/15 text-success",
 };
 
-const taskPriorityLabel: Record<TaskApiPriority, string> = {
-  LOW: "low",
-  MEDIUM: "medium",
-  HIGH: "high",
-  URGENT: "urgent",
-};
-
 const taskPriorityTone: Record<TaskApiPriority, string> = {
   LOW: "bg-muted text-muted-foreground",
   MEDIUM: "bg-info/15 text-info",
@@ -157,6 +158,7 @@ const taskPriorityTone: Record<TaskApiPriority, string> = {
 };
 
 function ProjectDetailPage() {
+  const { t } = useI18n();
   const { projectId } = Route.useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -304,15 +306,15 @@ function ProjectDetailPage() {
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" asChild>
             <Link to="/app/projects">
-              <ChevronLeft className="size-4" /> Back to Projects
+              <ChevronLeft className="size-4" /> {t("projects.back")}
             </Link>
           </Button>
           <div className="min-w-0">
             <h1 className="truncate text-2xl font-semibold tracking-tight">
-              {isLoading ? "Loading..." : (project?.name ?? "Project")}
+              {isLoading ? t("projects.detail.loading") : (project?.name ?? t("projects.projects"))}
             </h1>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              {isLoading ? "Fetching project details" : "Status, tasks, and documents"}
+              {isLoading ? t("projects.detail.fetching") : t("projects.detail.headerSubtitle")}
             </p>
           </div>
         </div>
@@ -401,6 +403,7 @@ function EditProjectDialog({
     dueDate: string | null;
   }) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
 
   const initial = useMemo(
@@ -437,8 +440,8 @@ function EditProjectDialog({
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit project</DialogTitle>
-          <DialogDescription>Update safe project fields in your workspace.</DialogDescription>
+          <DialogTitle>{t("projects.detail.editProject")}</DialogTitle>
+          <DialogDescription>{t("projects.detail.editProjectDesc")}</DialogDescription>
         </DialogHeader>
         <form
           className="space-y-4"
@@ -580,6 +583,7 @@ function ProjectDetails({
   onCreateTask: (values: TaskFormValues) => Promise<void>;
   onOpenTask: (task: TaskApiItem) => void;
 }) {
+  const { t } = useI18n();
   const status = projectStatusMeta[apiStatusMap[project.status]];
   const due = formatDate(project.dueDate);
   const progress = calculateTaskProgress(projectTasks);
@@ -598,7 +602,9 @@ function ProjectDetails({
                   {project.name}
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {project.description?.trim() ? project.description : "No description yet."}
+                  {project.description?.trim()
+                    ? project.description
+                    : t("projects.detail.noDescription")}
                 </p>
               </div>
               <Badge variant="secondary" className={status.className + " border-0 shrink-0"}>
@@ -607,9 +613,9 @@ function ProjectDetails({
             </div>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <Stat label="Status" value={status.label} />
+              <Stat label={t("projects.detail.status")} value={status.label} />
               <Stat
-                label="Due date"
+                label={t("projects.detail.dueDate")}
                 value={
                   <span className="inline-flex items-center gap-1">
                     <Calendar className="size-3.5 text-muted-foreground" /> {due}
@@ -617,7 +623,7 @@ function ProjectDetails({
                 }
               />
               <Stat
-                label="Tasks"
+                label={t("projects.detail.tasksLabel")}
                 value={
                   <span className="inline-flex items-center gap-1">
                     <ListTodo className="size-3.5 text-muted-foreground" />
@@ -627,19 +633,19 @@ function ProjectDetails({
               />
             </div>
 
-            <p className="mt-4 text-xs text-muted-foreground">
-              Use Edit to change status, due date, or description.
-            </p>
+            <p className="mt-4 text-xs text-muted-foreground">{t("projects.detail.editHint")}</p>
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <h3 className="text-sm font-semibold">Task progress</h3>
+                <h3 className="text-sm font-semibold">{t("projects.detail.taskProgress")}</h3>
                 <p className="text-xs text-muted-foreground">
                   {progress.total === 0
-                    ? "No tasks yet"
-                    : `${progress.done} of ${progress.total} tasks completed`}
+                    ? t("projects.detail.noTasksYet")
+                    : t("projects.detail.tasksCompleted")
+                        .replace("{done}", String(progress.done))
+                        .replace("{total}", String(progress.total))}
                 </p>
               </div>
               <span className="text-sm font-semibold tabular-nums">
@@ -662,11 +668,16 @@ function ProjectDetails({
         <div className="flex flex-col rounded-2xl border border-border bg-card p-5 shadow-soft lg:row-span-1">
           <div className="flex shrink-0 items-start justify-between gap-2">
             <div>
-              <h3 className="text-base font-semibold">Project tasks</h3>
+              <h3 className="text-base font-semibold">{t("projects.detail.projectTasks")}</h3>
               <p className="mt-1 text-xs text-muted-foreground">
                 {projectTasks.length === 0
-                  ? "Create the first task for this project"
-                  : `${projectTasks.length} task${projectTasks.length === 1 ? "" : "s"}`}
+                  ? t("projects.detail.createFirstTask")
+                  : projectTasks.length === 1
+                    ? t("projects.detail.taskCountOne")
+                    : t("projects.detail.taskCount").replace(
+                        "{count}",
+                        String(projectTasks.length),
+                      )}
               </p>
             </div>
             <NewTaskDialog
@@ -676,14 +687,14 @@ function ProjectDetails({
             >
               <Button size="sm" variant="outline" className="h-8 shrink-0 gap-1">
                 <Plus className="size-3.5" />
-                New task
+                {t("common.newTask")}
               </Button>
             </NewTaskDialog>
           </div>
           <div className="mt-4 min-h-0 flex-1 overflow-hidden rounded-xl border border-border">
             {sortedTasks.length === 0 ? (
               <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-                No tasks in this project yet. Add one to track work here.
+                {t("projects.detail.emptyTaskList")}
               </div>
             ) : (
               <ul className="max-h-[min(70vh,32rem)] divide-y divide-border overflow-y-auto overscroll-contain">
@@ -706,13 +717,13 @@ function ProjectDetails({
                             variant="secondary"
                             className={taskStatusTone[task.status] + " border-0 capitalize"}
                           >
-                            {taskStatusLabel[task.status]}
+                            {t(taskStatusLabelKey[task.status])}
                           </Badge>
                           <Badge
                             variant="secondary"
                             className={taskPriorityTone[task.priority] + " border-0 capitalize"}
                           >
-                            {taskPriorityLabel[task.priority]}
+                            {t(taskPriorityLabelKey[task.priority])}
                           </Badge>
                           {task.dueDate ? (
                             <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
@@ -730,7 +741,9 @@ function ProjectDetails({
                             size="sm"
                           />
                         ) : (
-                          <span className="text-[10px] text-muted-foreground">Unassigned</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {t("projects.detail.unassigned")}
+                          </span>
                         )}
                       </div>
                     </button>
@@ -843,38 +856,39 @@ function ProjectMembersSection({
   onAddMember: (userId: string) => void;
   onRemoveMember: (memberId: string) => void;
 }) {
+  const { t } = useI18n();
   return (
     <section>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="flex items-center gap-2 text-base font-semibold">
             <Users className="size-4 text-muted-foreground" />
-            Project members
+            {t("projects.detail.members")}
           </h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Workspace teammates assigned to this project
-          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t("projects.detail.membersHint")}</p>
         </div>
         <Dialog open={addDialogOpen} onOpenChange={onAddDialogOpenChange}>
           <DialogTrigger asChild>
             <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5">
               <UserPlus className="size-3.5" />
-              Add member
+              {t("projects.detail.addMember")}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-sm gap-0 p-0">
             <DialogHeader className="border-b border-border px-4 py-3">
-              <DialogTitle className="text-base">Add project member</DialogTitle>
+              <DialogTitle className="text-base">{t("projects.detail.addMemberTitle")}</DialogTitle>
               <DialogDescription className="text-xs">
-                Choose someone from your workspace who is not already on this project.
+                {t("projects.detail.addMemberDesc")}
               </DialogDescription>
             </DialogHeader>
             <div className="max-h-72 overflow-y-auto p-2">
               {isLoadingAvailable ? (
-                <p className="px-2 py-6 text-center text-sm text-muted-foreground">Loading…</p>
+                <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+                  {t("common.loading")}
+                </p>
               ) : availableMembers.length === 0 ? (
                 <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-                  Everyone in your workspace is already on this project.
+                  {t("projects.detail.allMembersAssigned")}
                 </p>
               ) : (
                 <ul className="space-y-1">
@@ -910,15 +924,15 @@ function ProjectMembersSection({
       <div className="space-y-2">
         {isLoading ? (
           <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
-            Loading members…
+            {t("projects.detail.loadingMembers")}
           </p>
         ) : isError ? (
           <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-6 text-center text-sm text-destructive">
-            Could not load members. Try refreshing the page.
+            {t("projects.detail.membersError")}
           </p>
         ) : members.length === 0 ? (
           <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
-            No members yet. Add workspace teammates to collaborate on this project.
+            {t("projects.detail.noMembers")}
           </p>
         ) : (
           members.map((member) => (
@@ -1069,6 +1083,7 @@ function ProjectDocumentsSection({
   onDownload: (document: ProjectDocumentApiItem) => void;
   onDelete: (documentId: string) => Promise<unknown>;
 }) {
+  const { t } = useI18n();
   const [documentToDelete, setDocumentToDelete] = useState<string | null>(null);
   const isDeletingSelected = documentToDelete != null && isDeletingId === documentToDelete;
 
@@ -1107,7 +1122,7 @@ function ProjectDocumentsSection({
           ) : (
             <Upload className="size-3.5" />
           )}
-          {isUploading ? "Uploading…" : "Upload document"}
+          {isUploading ? t("common.loading") : t("projects.detail.uploadDocument")}
         </Button>
         <input
           ref={fileInputRef}
@@ -1134,7 +1149,7 @@ function ProjectDocumentsSection({
           </p>
         ) : documents.length === 0 ? (
           <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
-            No documents yet. Upload a PDF, image, or office file (up to 20 MB).
+            {t("projects.detail.noDocumentsYet")}
           </p>
         ) : (
           documents.map((document) => (
@@ -1366,32 +1381,33 @@ function LoadingState() {
 }
 
 function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
+  const { t } = useI18n();
   return (
     <div className="rounded-2xl border border-destructive/20 bg-card p-8 text-center shadow-soft">
-      <h3 className="text-base font-semibold">Could not load project</h3>
+      <h3 className="text-base font-semibold">{t("projects.detail.loadErrorTitle")}</h3>
       <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-        {error?.message ??
-          "We could not reach the server. Check that the backend is running, then try again."}
+        {error?.message ?? t("common.errorServerHint")}
       </p>
       <Button
         onClick={onRetry}
         className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95"
       >
-        Retry
+        {t("common.retry")}
       </Button>
     </div>
   );
 }
 
 function NotFoundState() {
+  const { t } = useI18n();
   return (
     <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
-      <h3 className="text-base font-semibold">Project not found</h3>
+      <h3 className="text-base font-semibold">{t("projects.detail.notFoundTitle")}</h3>
       <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-        This projectId does not match any project in your workspace.
+        {t("projects.detail.notFoundHint")}
       </p>
       <Button variant="outline" className="mt-5" asChild>
-        <Link to="/app/projects">Back to Projects</Link>
+        <Link to="/app/projects">{t("projects.back")}</Link>
       </Button>
     </div>
   );

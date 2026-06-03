@@ -41,26 +41,26 @@ export interface DashboardSummaryApiResponse {
 }
 
 export interface DashboardChartStatusCount {
-  status: string;
+  statusKey: DashboardTaskStatus;
   value: number;
   fill: string;
 }
 
-const STATUS_CHART_META: Record<DashboardTaskStatus, { label: string; fill: string }> = {
-  BACKLOG: { label: "Backlog", fill: "var(--color-chart-3)" },
-  TODO: { label: "Todo", fill: "var(--color-chart-2)" },
-  IN_PROGRESS: { label: "In Progress", fill: "var(--color-chart-1)" },
-  REVIEW: { label: "Review", fill: "var(--color-chart-4)" },
-  DONE: { label: "Done", fill: "var(--color-chart-5)" },
+const STATUS_CHART_FILL: Record<DashboardTaskStatus, string> = {
+  BACKLOG: "var(--color-chart-3)",
+  TODO: "var(--color-chart-2)",
+  IN_PROGRESS: "var(--color-chart-1)",
+  REVIEW: "var(--color-chart-4)",
+  DONE: "var(--color-chart-5)",
 };
 
 export function mapTaskStatusCountsForChart(
   counts: DashboardTaskStatusCount[],
 ): DashboardChartStatusCount[] {
   return counts.map((item) => ({
-    status: STATUS_CHART_META[item.status].label,
+    statusKey: item.status,
     value: item.count,
-    fill: STATUS_CHART_META[item.status].fill,
+    fill: STATUS_CHART_FILL[item.status],
   }));
 }
 

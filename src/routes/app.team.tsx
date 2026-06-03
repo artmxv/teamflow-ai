@@ -43,11 +43,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useI18n } from "@/lib/i18n";
+import { mockTeamRoleLabel, useI18n } from "@/lib/i18n";
 import { Info as InfoIcon, Plus, MoreHorizontal } from "lucide-react";
-
-const DEMO_TEAM_NOTE =
-  "Team management is a portfolio demo preview. The member list below is sample data. Invitations, role changes, and removals are not sent to a server and do not affect real accounts.";
 
 export const Route = createFileRoute("/app/team")({
   beforeLoad: requireAuth,
@@ -87,22 +84,30 @@ function TeamPage() {
 
   const handleSendInvite = () => {
     const email = inviteEmail.trim();
+    const role = inviteRole;
     setInviteOpen(false);
     setInviteEmail("");
     setInviteRole("Member");
-    toast.info("Demo only: no invitation was sent.", {
+    toast.info(t("team.toast.invite"), {
       description: email
-        ? `Preview invite for ${email} (${inviteRole}) was not delivered.`
-        : "Enter an email to preview the invite flow.",
+        ? t("team.toast.inviteDesc")
+            .replace("{email}", email)
+            .replace("{role}", mockTeamRoleLabel(role, t))
+        : t("team.toast.inviteEmpty"),
     });
   };
 
   const handleSaveRole = () => {
     if (!roleMember) return;
     const name = roleMember.name;
+    const role = roleMember.role;
+    const selected = roleSelection;
     setRoleMember(null);
-    toast.info("Demo only: role was not changed.", {
-      description: `Preview: ${name} would stay ${roleMember.role} in this sample roster (selected ${roleSelection}).`,
+    toast.info(t("team.toast.role"), {
+      description: t("team.toast.roleDesc")
+        .replace("{name}", name)
+        .replace("{role}", mockTeamRoleLabel(role, t))
+        .replace("{selected}", mockTeamRoleLabel(selected, t)),
     });
   };
 
@@ -110,8 +115,8 @@ function TeamPage() {
     if (!removeMember) return;
     const name = removeMember.name;
     setRemoveMember(null);
-    toast.info("Demo only: member was not removed.", {
-      description: `${name} remains in the sample roster for this preview.`,
+    toast.info(t("team.toast.remove"), {
+      description: t("team.toast.removeDesc").replace("{name}", name),
     });
   };
 
@@ -120,16 +125,18 @@ function TeamPage() {
       <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">{t("team.members")}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">{t("team.previewTitle")}</h1>
             <Badge
               variant="outline"
               className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
             >
-              Sample data
+              {t("common.sampleData")}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            {members.length} people in {workspaceName}. Roster shown for UI preview only.
+            {t("team.previewSubtitle")
+              .replace("{count}", String(members.length))
+              .replace("{workspace}", workspaceName)}
           </p>
         </div>
         <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
@@ -140,11 +147,8 @@ function TeamPage() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Invite a new teammate</DialogTitle>
-              <DialogDescription>
-                Preview the invite form for this demo workspace. No email is sent and no account is
-                created.
-              </DialogDescription>
+              <DialogTitle>{t("team.inviteTitle")}</DialogTitle>
+              <DialogDescription>{t("team.inviteDesc")}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-1.5">
@@ -163,9 +167,9 @@ function TeamPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Member">Member</SelectItem>
-                    <SelectItem value="Admin">Admin</SelectItem>
-                    <SelectItem value="Owner">Owner</SelectItem>
+                    <SelectItem value="Member">{mockTeamRoleLabel("Member", t)}</SelectItem>
+                    <SelectItem value="Admin">{mockTeamRoleLabel("Admin", t)}</SelectItem>
+                    <SelectItem value="Owner">{mockTeamRoleLabel("Owner", t)}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -175,7 +179,7 @@ function TeamPage() {
                 {t("common.cancel")}
               </Button>
               <Button onClick={handleSendInvite} className="bg-gradient-brand text-white">
-                Send invite (demo)
+                {t("team.sendInvite")}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -184,8 +188,8 @@ function TeamPage() {
 
       <Alert className="mb-6 border-primary/25 bg-primary/5">
         <InfoIcon className="size-4 text-primary" />
-        <AlertTitle>Demo team preview</AlertTitle>
-        <AlertDescription>{DEMO_TEAM_NOTE}</AlertDescription>
+        <AlertTitle>{t("team.previewTitle")}</AlertTitle>
+        <AlertDescription>{t("team.previewNote")}</AlertDescription>
       </Alert>
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
@@ -195,7 +199,7 @@ function TeamPage() {
               <th className="px-5 py-3 text-left">{t("team.members")}</th>
               <th className="px-5 py-3 text-left">{t("team.role")}</th>
               <th className="px-5 py-3 text-left">{t("team.status")}</th>
-              <th className="px-5 py-3 text-left">Joined</th>
+              <th className="px-5 py-3 text-left">{t("team.joined")}</th>
               <th className="px-5 py-3" />
             </tr>
           </thead>
@@ -213,7 +217,7 @@ function TeamPage() {
                 </td>
                 <td className="px-5 py-3">
                   <Badge variant="secondary" className={roleStyles[m.role] + " border-0"}>
-                    {m.role}
+                    {mockTeamRoleLabel(m.role, t)}
                   </Badge>
                 </td>
                 <td className="px-5 py-3">
@@ -238,20 +242,20 @@ function TeamPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => setProfileMember(m)}>
-                        View profile (demo)
+                        {t("team.viewProfile")}
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => openRoleDialog(m)}
                         disabled={m.role === "Owner"}
                       >
-                        Change role (demo)
+                        {t("team.changeRole")}
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-destructive focus:text-destructive"
                         onClick={() => setRemoveMember(m)}
                         disabled={m.role === "Owner"}
                       >
-                        Remove member (demo)
+                        {t("team.removeMember")}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -266,10 +270,7 @@ function TeamPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{profileMember?.name}</DialogTitle>
-            <DialogDescription>
-              Sample member profile for this demo workspace. Details are not loaded from your
-              account directory.
-            </DialogDescription>
+            <DialogDescription>{t("team.profileDesc")}</DialogDescription>
           </DialogHeader>
           {profileMember && (
             <div className="space-y-3 text-sm">
@@ -281,9 +282,9 @@ function TeamPage() {
                 </div>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
-                <Info label={t("team.role")} value={profileMember.role} />
+                <Info label={t("team.role")} value={mockTeamRoleLabel(profileMember.role, t)} />
                 <Info label={t("team.status")} value={profileMember.status} />
-                <Info label="Joined" value={profileMember.joinedAt} />
+                <Info label={t("team.joined")} value={profileMember.joinedAt} />
               </div>
             </div>
           )}
@@ -293,10 +294,9 @@ function TeamPage() {
       <Dialog open={roleMember != null} onOpenChange={(next) => !next && setRoleMember(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Change role (demo)</DialogTitle>
+            <DialogTitle>{t("team.changeRoleTitle")}</DialogTitle>
             <DialogDescription>
-              Preview how role updates would look. Nothing is saved for{" "}
-              {roleMember?.name ?? "this member"}.
+              {t("team.changeRoleDesc").replace("{name}", roleMember?.name ?? "")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5">
@@ -309,20 +309,18 @@ function TeamPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Member">Member</SelectItem>
-                <SelectItem value="Admin">Admin</SelectItem>
+                <SelectItem value="Member">{mockTeamRoleLabel("Member", t)}</SelectItem>
+                <SelectItem value="Admin">{mockTeamRoleLabel("Admin", t)}</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">
-              Owner transfers are disabled in this portfolio preview.
-            </p>
+            <p className="text-xs text-muted-foreground">{t("team.ownerDisabled")}</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRoleMember(null)}>
               {t("common.cancel")}
             </Button>
             <Button onClick={handleSaveRole} className="bg-gradient-brand text-white">
-              Save role (demo)
+              {t("team.saveRole")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -334,10 +332,9 @@ function TeamPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove member (demo)</AlertDialogTitle>
+            <AlertDialogTitle>{t("team.removeTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This confirms the remove flow for {removeMember?.name ?? "this member"}. They will
-              stay in the sample roster; no API call is made.
+              {t("team.removeDesc").replace("{name}", removeMember?.name ?? "")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -346,7 +343,7 @@ function TeamPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={handleConfirmRemove}
             >
-              Remove (demo)
+              {t("team.removeConfirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
