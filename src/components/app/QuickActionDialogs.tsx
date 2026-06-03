@@ -269,10 +269,10 @@ export function NewTaskDialog({
                       <SelectValue placeholder="Select priority" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="urgent">Urgent</SelectItem>
+                      <SelectItem value="low">{t("tasks.priorityLow")}</SelectItem>
+                      <SelectItem value="medium">{t("tasks.priorityMedium")}</SelectItem>
+                      <SelectItem value="high">{t("tasks.priorityHigh")}</SelectItem>
+                      <SelectItem value="urgent">{t("tasks.priorityUrgent")}</SelectItem>
                     </SelectContent>
                   </Select>
                 )}

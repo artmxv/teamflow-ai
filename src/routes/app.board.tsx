@@ -38,7 +38,7 @@ import {
   type TaskApiPriority,
   type TaskApiStatus,
 } from "@/lib/api/tasks";
-import { useI18n, type TKey } from "@/lib/i18n";
+import { taskStatusLabel, useI18n } from "@/lib/i18n";
 import { Filter, Plus } from "lucide-react";
 import { buildAssigneeOptions, resolveTaskAssignee } from "@/lib/assignee-options";
 
@@ -223,7 +223,7 @@ function Board() {
 
   async function handleCreateTask(values: TaskFormValues) {
     if (!projectId) {
-      toast.error("A project is required. Load tasks from the API or seed the database first.");
+      toast.error(t("tasks.projectRequired"));
       throw new Error("Project is required.");
     }
 
@@ -248,8 +248,8 @@ function Board() {
     <AppShell title={t("side.kanban")}>
       <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Sprint 24 board</h1>
-          <p className="text-sm text-muted-foreground">Orion Web App · 12 tasks active</p>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("board.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("board.subtitle")}</p>
         </div>
         <div className="flex gap-2">
           <NewTaskDialog
@@ -266,7 +266,7 @@ function Board() {
 
       <div className="mb-4 flex flex-col gap-2 rounded-2xl border border-border bg-card p-3 shadow-soft sm:flex-row sm:items-center">
         <div className="flex items-center gap-2 text-sm font-medium">
-          <Filter className="size-4 text-muted-foreground" /> Filters
+          <Filter className="size-4 text-muted-foreground" /> {t("board.filters")}
         </div>
         <div className="grid gap-2 sm:ml-auto sm:grid-cols-3">
           <Select
@@ -278,10 +278,10 @@ function Board() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{t("tasks.allPriorities")}</SelectItem>
-              <SelectItem value="low">Low</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="urgent">Urgent</SelectItem>
+              <SelectItem value="low">{t("tasks.priorityLow")}</SelectItem>
+              <SelectItem value="medium">{t("tasks.priorityMedium")}</SelectItem>
+              <SelectItem value="high">{t("tasks.priorityHigh")}</SelectItem>
+              <SelectItem value="urgent">{t("tasks.priorityUrgent")}</SelectItem>
             </SelectContent>
           </Select>
           <Select value={assignee} onValueChange={setAssignee}>
@@ -322,7 +322,7 @@ function Board() {
           <KanbanBoardViewport>
             {statusColumns.map((col) => {
               const colTasks = filteredTasks.filter((task) => task.status === col.key);
-              const columnTitle = statusLabel(col.key, t);
+              const columnTitle = taskStatusLabel(col.key, t);
               const newTaskDialogProps = {
                 initialStatus: col.key,
                 isSubmitting: createTaskMutation.isPending,
@@ -366,7 +366,7 @@ function Board() {
                       ))}
                       {colTasks.length === 0 && (
                         <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
-                          No tasks in this column
+                          {t("board.emptyColumn")}
                         </div>
                       )}
                     </>
@@ -529,31 +529,21 @@ function LoadingCards() {
 }
 
 function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
+  const { t } = useI18n();
   return (
     <div className="rounded-2xl border border-destructive/20 bg-card p-8 text-center shadow-soft">
-      <h3 className="text-base font-semibold">Board tasks could not load</h3>
+      <h3 className="text-base font-semibold">{t("board.errorTitle")}</h3>
       <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-        {error?.message ?? "Check that the backend is running and try again."}
+        {error?.message ?? t("board.errorHint")}
       </p>
       <Button
         onClick={onRetry}
         className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95"
       >
-        Retry
+        {t("common.retry")}
       </Button>
     </div>
   );
-}
-
-function statusLabel(status: TaskStatus, t: (key: TKey) => string) {
-  const labels: Record<TaskStatus, TKey> = {
-    backlog: "board.backlog",
-    todo: "board.todo",
-    in_progress: "board.inProgress",
-    review: "board.review",
-    done: "board.done",
-  };
-  return t(labels[status]);
 }
 
 const columnStatusIds = new Set<TaskStatus>(statusColumns.map((col) => col.key));

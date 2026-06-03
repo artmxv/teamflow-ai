@@ -19,9 +19,6 @@ import { Label } from "@/components/ui/label";
 import { useI18n } from "@/lib/i18n";
 import { Check, CreditCard, Download, Info, Sparkles } from "lucide-react";
 
-const DEMO_BILLING_NOTE =
-  "This page is a portfolio demo preview. Plans, usage, invoices, and payment details are sample data. No real payments are processed and nothing is saved to a billing provider.";
-
 export const Route = createFileRoute("/app/billing")({
   beforeLoad: requireAuth,
   head: () => ({ meta: [{ title: "Billing — TeamFlow AI" }] }),
@@ -46,15 +43,13 @@ function BillingPage() {
     <AppShell title={t("side.billing")}>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">{t("side.billing")}</h1>
-        <p className="text-sm text-muted-foreground">
-          Preview subscription, usage, and invoices for this demo workspace.
-        </p>
+        <p className="text-sm text-muted-foreground">{t("billing.previewSubtitle")}</p>
       </div>
 
       <Alert className="mb-6 border-primary/25 bg-primary/5">
         <Info className="size-4 text-primary" />
-        <AlertTitle>Demo billing preview</AlertTitle>
-        <AlertDescription>{DEMO_BILLING_NOTE}</AlertDescription>
+        <AlertTitle>{t("billing.previewTitle")}</AlertTitle>
+        <AlertDescription>{t("billing.previewNote")}</AlertDescription>
       </Alert>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -69,7 +64,7 @@ function BillingPage() {
                   variant="outline"
                   className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
                 >
-                  Sample data
+                  {t("billing.sampleData")}
                 </Badge>
               </div>
               <h2 className="mt-3 text-2xl font-semibold tracking-tight">$12 / user / month</h2>
@@ -88,17 +83,17 @@ function BillingPage() {
             </div>
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
-            <Stat label="Next invoice" value="$96.00" sub="Jun 1, 2026" />
-            <Stat label="AI credits used" value="1,340 / 2,000" sub="67%" />
-            <Stat label="Seats" value="8 / 25" sub="Add more anytime" />
+            <Stat label={t("billing.nextInvoice")} value="$96.00" sub="Jun 1, 2026" />
+            <Stat label={t("billing.aiCreditsUsed")} value="1,340 / 2,000" sub="67%" />
+            <Stat label={t("billing.seats")} value="8 / 25" sub={t("billing.addMoreAnytime")} />
           </div>
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
           <div className="flex items-center gap-2 text-sm font-semibold">
-            <CreditCard className="size-4 text-primary" /> Payment method
+            <CreditCard className="size-4 text-primary" /> {t("billing.paymentMethod")}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">Placeholder card for UI demo only.</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t("billing.paymentPlaceholder")}</p>
           <div className="mt-4 flex items-center justify-between rounded-xl border border-border p-3">
             <div className="flex items-center gap-3">
               <div className="grid h-8 w-12 place-items-center rounded-md bg-gradient-brand text-[10px] font-semibold text-white">
@@ -114,7 +109,7 @@ function BillingPage() {
             </Button>
           </div>
           <Button variant="outline" className="mt-3 w-full" onClick={() => setCardOpen(true)}>
-            Add new card
+            {t("billing.addNewCard")}
           </Button>
         </div>
       </div>
@@ -126,9 +121,7 @@ function BillingPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() =>
-                toast.info("Demo only: all sample invoices for this workspace are listed below.")
-              }
+              onClick={() => toast.info(t("billing.toast.viewAll"))}
             >
               {t("common.viewAll")}
             </Button>
@@ -147,10 +140,10 @@ function BillingPage() {
                   </Badge>
                   <button
                     type="button"
-                    aria-label={`Download invoice ${inv.id} (demo)`}
+                    aria-label={t("billing.downloadInvoice").replace("{id}", inv.id)}
                     onClick={() =>
-                      toast.info(`Demo only: no PDF was generated for ${inv.id}.`, {
-                        description: "Invoice downloads are disabled in this portfolio preview.",
+                      toast.info(t("billing.toast.download").replace("{id}", inv.id), {
+                        description: t("billing.toast.downloadDesc"),
                       })
                     }
                     className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -164,18 +157,20 @@ function BillingPage() {
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
-          <h3 className="text-base font-semibold">What's included</h3>
+          <h3 className="text-base font-semibold">{t("billing.whatsIncluded")}</h3>
           <ul className="mt-3 space-y-2 text-sm">
-            {[
-              "Unlimited projects",
-              "AI standups & summaries",
-              "Advanced roles & permissions",
-              "Priority support",
-              "Audit log",
-            ].map((f) => (
-              <li key={f} className="flex items-start gap-2">
+            {(
+              [
+                "billing.featureUnlimitedProjects",
+                "billing.featureAiStandups",
+                "billing.featureAdvancedRoles",
+                "billing.featurePrioritySupport",
+                "billing.featureAuditLog",
+              ] as const
+            ).map((key) => (
+              <li key={key} className="flex items-start gap-2">
                 <Check className="mt-0.5 size-4 text-primary" />
-                {f}
+                {t(key)}
               </li>
             ))}
           </ul>
@@ -183,7 +178,7 @@ function BillingPage() {
             onClick={() => setPlanOpen(true)}
             className="mt-5 w-full bg-gradient-brand text-white shadow-glow hover:opacity-95"
           >
-            Upgrade to Business
+            {t("billing.upgradeBusiness")}
           </Button>
         </div>
       </div>
@@ -218,10 +213,7 @@ function PlanDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t("billing.changePlan")}</DialogTitle>
-          <DialogDescription>
-            Pick a plan to preview the UI. Your selection is not charged and is not sent to Stripe
-            or any backend.
-          </DialogDescription>
+          <DialogDescription>{t("billing.planDialogDesc")}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 sm:grid-cols-3">
           {["Free", "Pro", "Business"].map((plan) => (
@@ -229,14 +221,12 @@ function PlanDialog({
               key={plan}
               onClick={() => {
                 onOpenChange(false);
-                toast.info(`Demo only: ${plan} plan selected.`, {
-                  description: "No subscription change was made.",
-                });
+                toast.info(t("billing.toast.planSelected").replace("{plan}", plan));
               }}
               className="rounded-2xl border border-border p-4 text-left transition hover:border-primary/40 hover:bg-accent/40"
             >
               <div className="font-semibold">{plan}</div>
-              <div className="mt-1 text-xs text-muted-foreground">Mock selection</div>
+              <div className="mt-1 text-xs text-muted-foreground">{t("billing.mockSelection")}</div>
             </button>
           ))}
         </div>
@@ -252,32 +242,29 @@ function SeatsDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useI18n();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add seats</DialogTitle>
-          <DialogDescription>
-            Seat changes are simulated for this preview. Nothing is billed or persisted.
-          </DialogDescription>
+          <DialogTitle>{t("billing.addSeats")}</DialogTitle>
+          <DialogDescription>{t("billing.seatsDialogDesc")}</DialogDescription>
         </DialogHeader>
-        <Field label="Seats to add">
+        <Field label={t("billing.seatsToAdd")}>
           <Input type="number" min="1" defaultValue="2" />
         </Field>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             onClick={() => {
               onOpenChange(false);
-              toast.info("Demo only: seats added in preview.", {
-                description: "No billing or seat limits were updated.",
-              });
+              toast.info(t("billing.toast.seatsAdded"));
             }}
             className="bg-gradient-brand text-white"
           >
-            Add seats
+            {t("billing.addSeats")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -298,10 +285,7 @@ function PaymentDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t("billing.updateCard")}</DialogTitle>
-          <DialogDescription>
-            Enter sample card details to preview the form. Card data is not validated, stored, or
-            sent to a payment processor.
-          </DialogDescription>
+          <DialogDescription>{t("billing.paymentDialogDesc")}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
@@ -318,18 +302,16 @@ function PaymentDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             onClick={() => {
               onOpenChange(false);
-              toast.info("Demo only: payment method saved in preview.", {
-                description: "No card was stored and no charge was attempted.",
-              });
+              toast.info(t("billing.toast.cardSaved"));
             }}
             className="bg-gradient-brand text-white"
           >
-            Save
+            {t("common.saveChanges")}
           </Button>
         </DialogFooter>
       </DialogContent>

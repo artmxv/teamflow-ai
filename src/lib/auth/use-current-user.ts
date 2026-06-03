@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { getMe, type AuthWorkspace } from "@/lib/api/auth";
+import type { TKey } from "@/lib/i18n";
 import { clearAuthToken, getAuthToken } from "./token";
 
 export function useCurrentUser() {
@@ -36,13 +37,13 @@ export function useCurrentWorkspace() {
   };
 }
 
-export function workspaceRoleLabel(role: AuthWorkspace["role"]): string {
-  const labels: Record<AuthWorkspace["role"], string> = {
-    OWNER: "Owner",
-    ADMIN: "Admin",
-    MEMBER: "Member",
+export function workspaceRoleLabel(role: AuthWorkspace["role"], t: (k: TKey) => string): string {
+  const keys: Record<AuthWorkspace["role"], TKey> = {
+    OWNER: "role.owner",
+    ADMIN: "role.admin",
+    MEMBER: "role.member",
   };
-  return labels[role];
+  return t(keys[role]);
 }
 
 export function nameToInitials(name: string): string {

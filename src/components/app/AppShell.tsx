@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import type { AuthWorkspace } from "@/lib/api/auth";
 import { nameToInitials, useCurrentUser, workspaceRoleLabel } from "@/lib/auth/use-current-user";
+import { useI18n, type TKey } from "@/lib/i18n";
 import { useSidebarCollapsed } from "@/lib/sidebar-preference";
 import { AppSidebar } from "./AppSidebar";
 import { AppTopbar } from "./AppTopbar";
@@ -27,46 +28,47 @@ const loadingWorkspace: Workspace = {
   initials: "…",
 };
 
-function authWorkspaceToShell(workspace: AuthWorkspace): Workspace {
+function authWorkspaceToShell(workspace: AuthWorkspace, t: (k: TKey) => string): Workspace {
   return {
     id: workspace.id,
     name: workspace.name,
     slug: workspace.slug,
-    plan: workspaceRoleLabel(workspace.role),
+    plan: workspaceRoleLabel(workspace.role, t),
     initials: nameToInitials(workspace.name),
   };
 }
 
 export function AppShell({ title, children }: { title: string; children: ReactNode }) {
+  const { t } = useI18n();
   const { data: me, isPending } = useCurrentUser();
   const [activeWorkspace, setActiveWorkspace] = useState(loadingWorkspace);
   const { collapsed: sidebarCollapsed, toggle: toggleSidebarCollapsed } = useSidebarCollapsed();
 
   const workspaces = useMemo(() => {
     if (me?.workspace) {
-      return [authWorkspaceToShell(me.workspace)];
+      return [authWorkspaceToShell(me.workspace, t)];
     }
     if (isPending) {
       return [loadingWorkspace];
     }
     return fallbackWorkspaces;
-  }, [me?.workspace, isPending]);
+  }, [me?.workspace, isPending, t]);
 
   const displayWorkspace = useMemo(() => {
     if (me?.workspace) {
-      return authWorkspaceToShell(me.workspace);
+      return authWorkspaceToShell(me.workspace, t);
     }
     if (isPending) {
       return loadingWorkspace;
     }
     return fallbackWorkspaces[0];
-  }, [me?.workspace, isPending]);
+  }, [me?.workspace, isPending, t]);
 
   useEffect(() => {
     if (me?.workspace) {
-      setActiveWorkspace(authWorkspaceToShell(me.workspace));
+      setActiveWorkspace(authWorkspaceToShell(me.workspace, t));
     }
-  }, [me?.workspace]);
+  }, [me?.workspace, t]);
 
   return (
     <AuthGuard>

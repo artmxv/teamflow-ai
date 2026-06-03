@@ -99,9 +99,7 @@ function ProjectsIndexPage() {
       <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{t("projects.projects")}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t("projects.allProjects")} across your workspace.
-          </p>
+          <p className="text-sm text-muted-foreground">{t("projects.subtitle")}</p>
         </div>
         <NewProjectDialog
           isSubmitting={createProjectMutation.isPending}
@@ -221,13 +219,15 @@ function ProjectsIndexPage() {
                     <ListTodo className="size-3" /> {p.openTasks} / {p.totalTasks}
                   </span>
                   <span className="inline-flex items-center gap-1">
-                    <Calendar className="size-3" /> Due {p.dueDate}
+                    <Calendar className="size-3" /> {t("projects.due")} {p.dueDate}
                   </span>
                 </div>
 
                 <div className="mt-4 flex items-center justify-between">
                   <AvatarStack ids={p.members} initialsMap={initialsMap} />
-                  <span className="text-xs text-muted-foreground">Updated {p.updatedAt}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {t("projects.updated")} {p.updatedAt}
+                  </span>
                 </div>
               </Link>
             );
@@ -276,18 +276,18 @@ function LoadingGrid() {
 }
 
 function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
+  const { t } = useI18n();
   return (
     <div className="rounded-2xl border border-destructive/20 bg-card p-8 text-center shadow-soft">
-      <h3 className="text-base font-semibold">Could not load projects</h3>
+      <h3 className="text-base font-semibold">{t("projects.loadErrorTitle")}</h3>
       <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-        {error?.message ??
-          "We could not reach the server. Check that the backend is running, then try again."}
+        {error?.message ?? t("common.errorServerHint")}
       </p>
       <Button
         onClick={onRetry}
         className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95"
       >
-        Retry
+        {t("common.retry")}
       </Button>
     </div>
   );
@@ -300,18 +300,19 @@ function NoResultsState({
   hasActiveFilters: boolean;
   onClearFilters: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
       <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-muted text-muted-foreground">
         <Search className="size-5" />
       </div>
-      <h3 className="mt-4 text-base font-semibold">No projects match your search</h3>
+      <h3 className="mt-4 text-base font-semibold">{t("projects.noMatchTitle")}</h3>
       <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-        Try a different keyword or status filter, or clear filters to see all projects.
+        {t("projects.noMatchHint")}
       </p>
       {hasActiveFilters && (
         <Button variant="outline" onClick={onClearFilters} className="mt-5">
-          <RotateCcw className="size-4" /> Clear filters
+          <RotateCcw className="size-4" /> {t("common.clearFilters")}
         </Button>
       )}
     </div>
@@ -332,9 +333,9 @@ function EmptyState({
       <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-accent text-accent-foreground">
         <FolderKanban className="size-5" />
       </div>
-      <h3 className="mt-4 text-base font-semibold">No projects yet</h3>
+      <h3 className="mt-4 text-base font-semibold">{t("projects.emptyTitle")}</h3>
       <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-        Create your first project to organize tasks, track progress, and collaborate with your team.
+        {t("projects.emptyHint")}
       </p>
       <NewProjectDialog isSubmitting={isSubmitting} onCreate={onCreate}>
         <Button className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">

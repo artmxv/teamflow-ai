@@ -224,7 +224,7 @@ function TasksPage() {
 
   async function handleCreateTask(values: TaskFormValues) {
     if (!projectId) {
-      toast.error("A project is required. Load tasks from the API or seed the database first.");
+      toast.error(t("tasks.projectRequired"));
       throw new Error("Project is required.");
     }
 
@@ -244,7 +244,11 @@ function TasksPage() {
       <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{t("tasks.tasks")}</h1>
-          <p className="text-sm text-muted-foreground">{filtered.length} tasks</p>
+          <p className="text-sm text-muted-foreground">
+            {filtered.length === 1
+              ? t("tasks.countOne")
+              : t("tasks.count").replace("{count}", String(filtered.length))}
+          </p>
         </div>
         <NewTaskDialog
           isSubmitting={createTaskMutation.isPending}
@@ -316,7 +320,7 @@ function TasksPage() {
             sort={sort}
             onSort={handleSort}
           />
-          <div className="text-right">Activity</div>
+          <div className="text-right">{t("common.activity")}</div>
         </div>
         {isLoading ? (
           <LoadingRows />
@@ -369,11 +373,18 @@ function TasksPage() {
                 <div>
                   <span
                     className={
-                      "inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold capitalize " +
+                      "inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold " +
                       priorityMeta[task.priority]
                     }
                   >
-                    {task.priority}
+                    {t(
+                      {
+                        low: "tasks.priorityLow",
+                        medium: "tasks.priorityMedium",
+                        high: "tasks.priorityHigh",
+                        urgent: "tasks.priorityUrgent",
+                      }[task.priority],
+                    )}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -499,18 +510,18 @@ function LoadingRows() {
 }
 
 function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
+  const { t } = useI18n();
   return (
     <div className="px-4 py-12 text-center sm:px-8">
-      <h3 className="text-base font-semibold">Could not load tasks</h3>
+      <h3 className="text-base font-semibold">{t("tasks.loadErrorTitle")}</h3>
       <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-        {error?.message ??
-          "We could not reach the server. Check that the backend is running, then try again."}
+        {error?.message ?? t("common.errorServerHint")}
       </p>
       <Button
         onClick={onRetry}
         className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95"
       >
-        Retry
+        {t("common.retry")}
       </Button>
     </div>
   );
@@ -530,10 +541,8 @@ function EmptyState({
       <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-accent text-accent-foreground">
         <ListTodo className="size-5" />
       </div>
-      <h3 className="mt-4 text-base font-semibold">No tasks yet</h3>
-      <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-        Create your first task to track work, set priorities, and keep your team aligned.
-      </p>
+      <h3 className="mt-4 text-base font-semibold">{t("tasks.emptyTitle")}</h3>
+      <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">{t("tasks.emptyHint")}</p>
       <NewTaskDialog isSubmitting={isSubmitting} onSubmit={onCreate}>
         <Button className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
           <Plus className="size-4" /> {t("common.newTask")}
@@ -544,17 +553,18 @@ function EmptyState({
 }
 
 function NoResultsState({ onResetFilters }: { onResetFilters: () => void }) {
+  const { t } = useI18n();
   return (
     <div className="px-4 py-12 text-center sm:px-8">
       <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-muted text-muted-foreground">
         <Search className="size-5" />
       </div>
-      <h3 className="mt-4 text-base font-semibold">No tasks match your filters</h3>
+      <h3 className="mt-4 text-base font-semibold">{t("tasks.noMatchTitle")}</h3>
       <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-        Try a different search term, status, or priority, or reset filters to see all tasks.
+        {t("tasks.noMatchHint")}
       </p>
       <Button variant="outline" onClick={onResetFilters} className="mt-5">
-        <RotateCcw className="size-4" /> Reset filters
+        <RotateCcw className="size-4" /> {t("common.resetFilters")}
       </Button>
     </div>
   );

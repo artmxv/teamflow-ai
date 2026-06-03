@@ -49,6 +49,7 @@ import {
   type TaskAttachmentApiItem,
 } from "@/lib/api/task-attachments";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
+import { priorityLabel, taskStatusLabel, useI18n } from "@/lib/i18n";
 import {
   type Priority,
   type Task,
@@ -104,6 +105,7 @@ export function TaskDrawer({
   onDelete?: (taskId: string) => void;
   isDeleting?: boolean;
 }) {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const { data: me } = useCurrentUser();
   const currentUserId = me?.user.id;
@@ -225,7 +227,7 @@ export function TaskDrawer({
     hasAssigneeChanges || hasDueDateChanges || hasStatusChanges || hasPriorityChanges;
   const project = getProject(task.projectId);
   const prio = priorityMeta[task.priority];
-  const statusLabel = statusColumns.find((s) => s.key === task.status)?.title ?? task.status;
+  const statusLabel = taskStatusLabel(task.status, t);
 
   function handleSaveChanges() {
     if (!onSaveChanges || isSaving) return;
@@ -432,7 +434,7 @@ export function TaskDrawer({
                   <SelectContent>
                     {statusColumns.map((column) => (
                       <SelectItem key={column.key} value={column.key}>
-                        {column.title}
+                        {taskStatusLabel(column.key, t)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -456,16 +458,16 @@ export function TaskDrawer({
                   <SelectContent>
                     {(
                       Object.entries(priorityMeta) as [Priority, (typeof priorityMeta)[Priority]][]
-                    ).map(([key, meta]) => (
+                    ).map(([key]) => (
                       <SelectItem key={key} value={key}>
-                        {meta.label}
+                        {priorityLabel(key, t)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               ) : (
                 <Badge variant="secondary" className={prio.className + " border-0"}>
-                  {prio.label}
+                  {priorityLabel(task.priority, t)}
                 </Badge>
               )}
             </Field>

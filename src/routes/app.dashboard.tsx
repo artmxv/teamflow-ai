@@ -17,7 +17,7 @@ import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useI18n, type TKey } from "@/lib/i18n";
+import { dashboardPriorityLabel, dashboardStatusLabel, useI18n, type TKey } from "@/lib/i18n";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Cell, Pie, PieChart } from "recharts";
 
@@ -42,13 +42,6 @@ const recentPriorityTone: Record<DashboardTaskPriority, string> = {
   MEDIUM: "bg-info/15 text-info",
   HIGH: "bg-warning/20 text-warning-foreground",
   URGENT: "bg-destructive/15 text-destructive",
-};
-
-const recentPriorityLabel: Record<DashboardTaskPriority, string> = {
-  LOW: "low",
-  MEDIUM: "medium",
-  HIGH: "high",
-  URGENT: "urgent",
 };
 
 function Dashboard() {
@@ -76,10 +69,8 @@ function Dashboard() {
     <AppShell title={t("side.dashboard")}>
       <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("dashboard.goodMorning")}</h1>
-          <p className="text-sm text-muted-foreground">
-            Here's what's moving across your workspace today.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("dashboard.overviewTitle")}</h1>
+          <p className="text-sm text-muted-foreground">{t("dashboard.overviewSubtitle")}</p>
         </div>
         <NewProjectDialog>
           <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
@@ -142,7 +133,7 @@ function Dashboard() {
 
         <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
           <h2 className="text-base font-semibold">{t("dashboard.taskStatus")}</h2>
-          <p className="text-xs text-muted-foreground">Across all active projects</p>
+          <p className="text-xs text-muted-foreground">{t("dashboard.acrossActiveProjects")}</p>
           {isLoading ? (
             <TaskStatusChartSkeleton />
           ) : isError ? null : (
@@ -153,7 +144,7 @@ function Dashboard() {
                   <Pie
                     data={taskStatusChartData}
                     dataKey="value"
-                    nameKey="status"
+                    nameKey="statusKey"
                     innerRadius={50}
                     outerRadius={80}
                     paddingAngle={2}
@@ -166,10 +157,10 @@ function Dashboard() {
               </ChartContainer>
               <ul className="space-y-1.5 text-xs">
                 {taskStatusChartData.map((s) => (
-                  <li key={s.status} className="flex items-center justify-between">
+                  <li key={s.statusKey} className="flex items-center justify-between">
                     <span className="flex items-center gap-2">
                       <span className="size-2.5 rounded-sm" style={{ background: s.fill }} />
-                      {s.status}
+                      {dashboardStatusLabel(s.statusKey, t)}
                     </span>
                     <span className="font-medium text-muted-foreground">{s.value}</span>
                   </li>
@@ -203,7 +194,7 @@ function Dashboard() {
             />
           </div>
           <Button variant="outline" className="mt-4 w-full" asChild>
-            <Link to="/app/ai">Open AI assistant</Link>
+            <Link to="/app/ai">{t("dashboard.openAiAssistant")}</Link>
           </Button>
         </div>
 
@@ -299,11 +290,8 @@ function RecentTaskRow({ task, t }: { task: DashboardRecentTask; t: (key: TKey) 
           <Badge variant="secondary" className={status.tone + " border-0 capitalize"}>
             {t(status.labelKey)}
           </Badge>
-          <Badge
-            variant="secondary"
-            className={recentPriorityTone[task.priority] + " border-0 capitalize"}
-          >
-            {recentPriorityLabel[task.priority]}
+          <Badge variant="secondary" className={recentPriorityTone[task.priority] + " border-0"}>
+            {dashboardPriorityLabel(task.priority, t)}
           </Badge>
         </div>
       </div>
@@ -403,6 +391,7 @@ function Insight({
   title: string;
   body: string;
 }) {
+  const { t } = useI18n();
   const toneClass = {
     warn: "bg-warning/15 text-warning-foreground",
     ok: "bg-success/15 text-success",
@@ -416,7 +405,11 @@ function Insight({
             "inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold " + toneClass
           }
         >
-          {tone === "warn" ? "At risk" : tone === "ok" ? "On track" : "FYI"}
+          {tone === "warn"
+            ? t("dashboard.insightAtRisk")
+            : tone === "ok"
+              ? t("dashboard.insightOnTrack")
+              : t("dashboard.insightFyi")}
         </span>
         <span className="text-sm font-medium">{title}</span>
       </div>
