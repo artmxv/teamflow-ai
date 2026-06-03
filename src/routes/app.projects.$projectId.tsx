@@ -65,6 +65,14 @@ import {
   uploadProjectDocument,
   type ProjectDocumentApiItem,
 } from "@/lib/api/project-documents";
+import {
+  addProjectMember,
+  fetchAvailableProjectMembers,
+  fetchProjectMembers,
+  removeProjectMember,
+  type AvailableProjectMember,
+  type ProjectMemberApiItem,
+} from "@/lib/api/project-members";
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -86,6 +94,8 @@ import {
   Plus,
   Trash2,
   Upload,
+  UserPlus,
+  Users,
 } from "lucide-react";
 
 export const Route = createFileRoute("/app/projects/$projectId")({
@@ -644,6 +654,8 @@ function ProjectDetails({
             </div>
           </div>
 
+          <ProjectMembersCard projectId={project.id} />
+
           <ProjectDocumentsCard projectId={project.id} />
         </div>
 
@@ -729,6 +741,235 @@ function ProjectDetails({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ProjectMembersCard({ projectId }: { projectId: string }) {
+  const queryClient = useQueryClient();
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+
+  const membersQuery = useQuery({
+    queryKey: ["project-members", projectId],
+    queryFn: () => fetchProjectMembers(projectId),
+  });
+
+  const availableQuery = useQuery({
+    queryKey: ["project-available-members", projectId],
+    queryFn: () => fetchAvailableProjectMembers(projectId),
+    enabled: addDialogOpen,
+  });
+
+  const addMutation = useMutation({
+    mutationFn: (userId: string) => addProjectMember(projectId, userId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["project-members", projectId] });
+      await queryClient.invalidateQueries({
+        queryKey: ["project-available-members", projectId],
+      });
+      toast.success("Member added");
+      setAddDialogOpen(false);
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Member could not be added",
+      );
+    },
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (memberId: string) => removeProjectMember(projectId, memberId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["project-members", projectId] });
+      await queryClient.invalidateQueries({
+        queryKey: ["project-available-members", projectId],
+      });
+      toast.success("Member removed");
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Member could not be removed",
+      );
+    },
+  });
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+      <ProjectMembersSection
+        members={membersQuery.data ?? []}
+        availableMembers={availableQuery.data ?? []}
+        isLoading={membersQuery.isLoading}
+        isError={membersQuery.isError}
+        isLoadingAvailable={availableQuery.isLoading}
+        isAdding={addMutation.isPending}
+        isRemovingId={removeMutation.isPending ? (removeMutation.variables ?? null) : null}
+        addDialogOpen={addDialogOpen}
+        onAddDialogOpenChange={setAddDialogOpen}
+        onAddMember={(userId) => {
+          if (addMutation.isPending) return;
+          addMutation.mutate(userId);
+        }}
+        onRemoveMember={(memberId) => {
+          if (removeMutation.isPending) return;
+          removeMutation.mutate(memberId);
+        }}
+      />
+    </div>
+  );
+}
+
+function ProjectMembersSection({
+  members,
+  availableMembers,
+  isLoading,
+  isError,
+  isLoadingAvailable,
+  isAdding,
+  isRemovingId,
+  addDialogOpen,
+  onAddDialogOpenChange,
+  onAddMember,
+  onRemoveMember,
+}: {
+  members: ProjectMemberApiItem[];
+  availableMembers: AvailableProjectMember[];
+  isLoading: boolean;
+  isError: boolean;
+  isLoadingAvailable: boolean;
+  isAdding: boolean;
+  isRemovingId: string | null;
+  addDialogOpen: boolean;
+  onAddDialogOpenChange: (open: boolean) => void;
+  onAddMember: (userId: string) => void;
+  onRemoveMember: (memberId: string) => void;
+}) {
+  return (
+    <section>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="flex items-center gap-2 text-base font-semibold">
+            <Users className="size-4 text-muted-foreground" />
+            Project members
+          </h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Workspace teammates assigned to this project
+          </p>
+        </div>
+        <Dialog open={addDialogOpen} onOpenChange={onAddDialogOpenChange}>
+          <DialogTrigger asChild>
+            <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5">
+              <UserPlus className="size-3.5" />
+              Add member
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-sm gap-0 p-0">
+            <DialogHeader className="border-b border-border px-4 py-3">
+              <DialogTitle className="text-base">Add project member</DialogTitle>
+              <DialogDescription className="text-xs">
+                Choose someone from your workspace who is not already on this project.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-72 overflow-y-auto p-2">
+              {isLoadingAvailable ? (
+                <p className="px-2 py-6 text-center text-sm text-muted-foreground">Loading…</p>
+              ) : availableMembers.length === 0 ? (
+                <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+                  Everyone in your workspace is already on this project.
+                </p>
+              ) : (
+                <ul className="space-y-1">
+                  {availableMembers.map((user) => (
+                    <li key={user.id}>
+                      <button
+                        type="button"
+                        disabled={isAdding}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/50 disabled:opacity-50"
+                        onClick={() => onAddMember(user.id)}
+                      >
+                        <Avatar
+                          id={user.id}
+                          initials={user.avatar ?? initialsFromName(user.name)}
+                          size="sm"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{user.name}</span>
+                          <span className="block truncate text-[11px] text-muted-foreground">
+                            {user.email}
+                          </span>
+                        </span>
+                        <Plus className="size-3.5 shrink-0 text-muted-foreground" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+      <div className="space-y-2">
+        {isLoading ? (
+          <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
+            Loading members…
+          </p>
+        ) : isError ? (
+          <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-6 text-center text-sm text-destructive">
+            Could not load members. Try refreshing the page.
+          </p>
+        ) : members.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
+            No members yet. Add workspace teammates to collaborate on this project.
+          </p>
+        ) : (
+          members.map((member) => (
+            <ProjectMemberRow
+              key={member.id}
+              member={member}
+              isRemoving={isRemovingId === member.id}
+              onRemove={() => onRemoveMember(member.id)}
+            />
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
+function ProjectMemberRow({
+  member,
+  isRemoving,
+  onRemove,
+}: {
+  member: ProjectMemberApiItem;
+  isRemoving: boolean;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl border border-border bg-muted/10 px-2.5 py-2">
+      <Avatar
+        id={member.user.id}
+        initials={member.user.avatar ?? initialsFromName(member.user.name)}
+        size="sm"
+      />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium">{member.user.name}</div>
+        <div className="truncate text-[11px] text-muted-foreground">{member.user.email}</div>
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
+        disabled={isRemoving}
+        aria-label={`Remove ${member.user.name}`}
+        onClick={onRemove}
+      >
+        {isRemoving ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <Trash2 className="size-3.5" />
+        )}
+      </Button>
     </div>
   );
 }
