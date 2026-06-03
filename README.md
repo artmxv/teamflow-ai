@@ -154,6 +154,7 @@ PostgreSQL (Docker, port 5433)
 - Express app mounts routers under `/api`
 - Services use Prisma; controllers validate with Zod
 - `requireAuth` attaches `userId`; workspace-scoped handlers resolve the user's workspace before reads/writes
+- Task attachments and project documents are stored under `server/uploads/` (local disk, gitignored). Files are uploaded with Multer and downloaded only through authenticated routes (`GET .../file`), not via a public static directory
 
 ### Database (`server/prisma/`)
 
@@ -312,41 +313,94 @@ postgresql://teamflow:teamflow@localhost:5433/teamflow_ai?schema=public
 
 No Stripe, OpenAI, or other third-party API keys are required for the current feature set.
 
-## Deployment notes
+### File uploads (local disk)
 
-These notes describe what a production-like deploy needs today. They do not replace a full hosting guide (Docker images, CI, and a live demo URL are still future work).
+- Upload root: `server/uploads/tasks/` and `server/uploads/projects/` (see `server/src/lib/task-upload.ts` and `project-upload.ts`).
+- The folder is in `.gitignore`; do not commit uploaded files.
+- **Production:** many PaaS containers use an **ephemeral filesystem**. Uploads disappear on redeploy unless you mount persistent volume storage at `server/uploads` (or run on a VM with a persistent disk). Cloud object storage (S3, R2, and similar) is **not** implemented in this repo.
+- There is no `UPLOAD_DIR` env variable today; paths are relative to the API process working directory (`server/` when you run `npm run start` from `server/`).
 
-**Backend**
+## Deployment
 
-- Provision **PostgreSQL** and set `DATABASE_URL` to a reachable connection string.
-- Set **`JWT_SECRET`** to a long, random value. Do not reuse the placeholder from `server/.env.example`.
-- Set **`CORS_ORIGIN`** to the exact origin of the deployed frontend (scheme + host + port if non-default), for example `https://app.example.com`.
-- Run **Prisma migrations** against that database before starting the API, for example `npm run prisma:migrate` from `server/` (use your host’s equivalent for non-interactive deploys).
-- Start the API with `npm run build` then `npm run start` (or your process manager). Set `NODE_ENV=production`.
-- Optional: `PORT` if the platform does not inject it.
+Portfolio-ready deploy today: provision PostgreSQL, run migrations, configure env, build the frontend with the correct API URL, and start the API. Step-by-step hosting guides, Docker images, and a live demo URL are still optional follow-ups.
 
-**Frontend**
+### Deployment checklist
 
-- Build from the repository root (`npm run build`). Serve the static output from your host.
-- If the API is on a different origin than the default, set **`VITE_API_URL`** at **build time** to the public API URL.
+Use this before going live:
 
-**Not required for current features**
+- [ ] Create a **PostgreSQL** database and copy the connection string into `DATABASE_URL` in `server/.env` (or your host’s secret store).
+- [ ] Set **`JWT_SECRET`** to a long random value (not `change-me-in-production` from `.env.example`).
+- [ ] Set **`CORS_ORIGIN`** to the exact frontend origin (scheme + host + port if non-default), e.g. `https://app.example.com`.
+- [ ] From `server/`, run **`npm run prisma:migrate:deploy`** (non-interactive; applies committed migrations).
+- [ ] Optionally run **`npm run db:seed`** for demo data only (not for a real production tenant).
+- [ ] Build the API: `npm run build` in `server/`, then start with **`npm run start`** and **`NODE_ENV=production`**.
+- [ ] Set **`PORT`** if your platform does not inject it (default `4000`).
+- [ ] At the **repo root**, set **`VITE_API_URL`** to the public API URL, then **`npm run build`** for the frontend.
+- [ ] Serve the frontend build output from your static host or SSR platform.
+- [ ] **Upload storage:** ensure `server/uploads` persists across deploys, or accept that local attachments/documents will be lost on redeploy until object storage is added.
 
-- **AI Assistant:** summaries are deterministic from database data; no OpenAI, GigaChat, or other LLM API keys.
-- **Billing (demo):** UI only; no Stripe or payment processor keys or webhooks.
+### Backend environment (`server/.env`)
 
-After deploy, run migrations and seed only if you want demo data; use a strong `JWT_SECRET` and unique admin credentials in real production.
+| Variable | Required | Production notes |
+|----------|----------|------------------|
+| `DATABASE_URL` | Yes | PostgreSQL URL for Prisma |
+| `JWT_SECRET` | Yes | Strong secret; never commit |
+| `CORS_ORIGIN` | No (default local) | Must match deployed frontend origin |
+| `PORT` | No (default `4000`) | Often set by the host |
+| `NODE_ENV` | No | Use `production` when deployed |
+
+Validated at startup in `server/src/config/env.ts`. Prisma also requires `DATABASE_URL` (documented in `server/.env.example`).
+
+**Migrate (production):**
+
+```bash
+cd server
+npm install
+npm run prisma:generate
+npm run prisma:migrate:deploy
+```
+
+Use `npm run prisma:migrate` only for **local development** (interactive `migrate dev`). Do not edit applied migration history on a live database.
+
+**Start API:**
+
+```bash
+cd server
+npm run build
+NODE_ENV=production npm run start
+```
+
+### Frontend environment (repo root `.env`)
+
+| Variable | Required | Production notes |
+|----------|----------|------------------|
+| `VITE_API_URL` | No locally | **Required at build time** if the API is not at `http://localhost:4000` |
+
+```bash
+# from repository root — example
+echo 'VITE_API_URL=https://api.example.com' >> .env
+npm run build
+```
+
+Vite embeds `VITE_*` values into the client bundle. Rebuild after changing the API URL.
+
+### Not required for current features
+
+- **AI Assistant:** deterministic summaries from PostgreSQL; no OpenAI, GigaChat, or other LLM API keys.
+- **Billing (demo):** UI only; no Stripe or payment webhooks.
+- **Cloud file storage:** uploads use local disk under `server/uploads/` only.
 
 ## Database commands
 
 From `server/`:
 
 ```bash
-docker compose up -d      # Start Postgres
-npm run prisma:migrate    # Apply migrations
-npm run db:seed           # Load demo workspace
-npm run prisma:generate   # Regenerate Prisma Client
-npm run prisma:studio     # Open Prisma Studio
+docker compose up -d           # Start Postgres
+npm run prisma:migrate         # Apply migrations (local dev)
+npm run prisma:migrate:deploy  # Apply migrations (production / CI)
+npm run db:seed                # Load demo workspace
+npm run prisma:generate        # Regenerate Prisma Client
+npm run prisma:studio          # Open Prisma Studio
 ```
 
 ## Available scripts
@@ -369,7 +423,8 @@ npm run prisma:studio     # Open Prisma Studio
 | `npm run build` | Compile TypeScript |
 | `npm run start` | Run compiled server |
 | `npm run typecheck` | Typecheck without emit |
-| `npm run prisma:migrate` | Run Prisma migrations (dev) |
+| `npm run prisma:migrate` | Run Prisma migrations (local dev, interactive) |
+| `npm run prisma:migrate:deploy` | Apply migrations in production / CI |
 | `npm run prisma:generate` | Generate Prisma Client |
 | `npm run prisma:studio` | Prisma Studio |
 | `npm run db:seed` | Seed demo workspace data |
@@ -383,9 +438,9 @@ npm run prisma:studio     # Open Prisma Studio
 - External LLM providers (OpenAI, GigaChat, and similar)
 - Real Stripe or other payment processing
 - Real team invites, email delivery, or member lifecycle APIs
-- Hosted production deployment and live demo URL (see [Deployment notes](#deployment-notes) for env and migration checklist)
+- Hosted production deployment and live demo URL (see [Deployment](#deployment) for env, migrations, and checklist)
 - Drag-and-drop Kanban
-- File uploads
+- Cloud object storage for attachments and project documents (local disk only today)
 
 **Possible next steps:**
 
@@ -403,7 +458,7 @@ This repository demonstrates fullstack TypeScript product work suitable for a po
 - REST API design with Express, validation, and clear route layering
 - PostgreSQL modeling with Prisma (migrations, seed, relations)
 - End-to-end integration for auth, workspace scoping, CRUD, board, dashboard, settings, and deterministic AI summaries
-- Honest scoping: demo Billing/Team UI, no Stripe, no external AI keys, and deployment called out as future work
+- Honest scoping: demo Billing/Team UI, no Stripe, no external AI keys; local uploads and deployment env documented in [Deployment](#deployment)
 
 ---
 
