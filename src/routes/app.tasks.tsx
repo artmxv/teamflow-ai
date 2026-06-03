@@ -11,6 +11,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   createTask,
   deleteTask,
   fetchTasks,
@@ -35,9 +42,14 @@ import {
   ArrowDown,
   ArrowUpDown,
 } from "lucide-react";
+import { fetchWorkspaceMembers } from "@/lib/api/workspace-members";
 import {
-  buildAssigneeOptions,
+  buildAssigneeOptionsFromWorkspaceMembers,
+  buildFilterAssigneeOptions,
   resolveTaskAssignees,
+  taskIsUnassigned,
+  taskMatchesAssignee,
+  taskSortAssigneeName,
   type AssigneeOption,
 } from "@/lib/assignee-options";
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
@@ -47,7 +59,6 @@ import { cn } from "@/lib/utils";
 import {
   taskMatchesUrlAnalyticsFilters,
   type TasksUrlAnalyticsFilters,
-  type TasksUrlAssigneeFilter,
   type TasksUrlDue,
   type TasksUrlPriorityFilter,
 } from "@/lib/dashboard-analytics";
@@ -59,8 +70,30 @@ export type TasksSearch = {
   status?: TasksUrlStatus;
   due?: TasksUrlDue;
   priority?: TasksUrlPriorityFilter;
-  assignee?: TasksUrlAssigneeFilter;
+  assignee?: string;
 };
+
+export type AssigneeListFilter = "all" | "unassigned" | (string & {});
+
+function parseTasksUrlAssignee(value: unknown): AssigneeListFilter {
+  if (typeof value !== "string" || value.length === 0) {
+    return "all";
+  }
+  if (value === "unassigned") {
+    return "unassigned";
+  }
+  return value;
+}
+
+export function assigneeFilterFromUrl(assignee?: string): AssigneeListFilter {
+  if (!assignee) return "all";
+  return parseTasksUrlAssignee(assignee);
+}
+
+export function assigneeFilterToUrl(filter: AssigneeListFilter): string | undefined {
+  if (filter === "all") return undefined;
+  return filter;
+}
 
 function parseTasksUrlStatus(value: unknown): TasksUrlStatus | undefined {
   return value === "done" || value === "open" ? value : undefined;
@@ -72,10 +105,6 @@ function parseTasksUrlDue(value: unknown): TasksUrlDue | undefined {
 
 function parseTasksUrlPriority(value: unknown): TasksUrlPriorityFilter | undefined {
   return value === "high" ? value : undefined;
-}
-
-function parseTasksUrlAssignee(value: unknown): TasksUrlAssigneeFilter | undefined {
-  return value === "unassigned" ? value : undefined;
 }
 
 export type TaskListStatusFilter = TaskStatus | "all" | "open";
@@ -98,6 +127,15 @@ function taskMatchesStatusFilter(task: TaskRow, filter: TaskListStatusFilter) {
   return task.status === filter;
 }
 
+function taskMatchesAssigneeListFilter(
+  task: Pick<TaskRow, "assigneeIds" | "assigneeId">,
+  filter: AssigneeListFilter,
+) {
+  if (filter === "all") return true;
+  if (filter === "unassigned") return taskIsUnassigned(task);
+  return taskMatchesAssignee(task, filter);
+}
+
 export const Route = createFileRoute("/app/tasks")({
   beforeLoad: requireAuth,
   validateSearch: (search: Record<string, unknown>): TasksSearch => ({
@@ -106,7 +144,10 @@ export const Route = createFileRoute("/app/tasks")({
     status: parseTasksUrlStatus(search.status),
     due: parseTasksUrlDue(search.due),
     priority: parseTasksUrlPriority(search.priority),
-    assignee: parseTasksUrlAssignee(search.assignee),
+    assignee:
+      typeof search.assignee === "string" && search.assignee.length > 0
+        ? search.assignee
+        : undefined,
   }),
   head: () => ({ meta: [{ title: "Tasks — TeamFlow AI" }] }),
   component: TasksPage,
@@ -165,11 +206,10 @@ function TasksPage() {
     (): TasksUrlAnalyticsFilters => ({
       due: dueFromUrl,
       priority: priorityFromUrl,
-      assignee: assigneeFromUrl,
     }),
-    [dueFromUrl, priorityFromUrl, assigneeFromUrl],
+    [dueFromUrl, priorityFromUrl],
   );
-  const hasUrlAnalyticsFilters = Boolean(dueFromUrl || priorityFromUrl || assigneeFromUrl);
+  const hasUrlAnalyticsFilters = Boolean(dueFromUrl || priorityFromUrl);
   const navigate = Route.useNavigate();
   const queryClient = useQueryClient();
   const [q, setQ] = useState("");
@@ -177,6 +217,9 @@ function TasksPage() {
     taskListStatusFromUrl(statusFromUrl),
   );
   const [priority, setPriority] = useState<Priority | "all">("all");
+  const [assigneeFilter, setAssigneeFilter] = useState<AssigneeListFilter>(() =>
+    assigneeFilterFromUrl(assigneeFromUrl),
+  );
   const [sort, setSort] = useState<TaskSortState>(null);
   const [selected, setSelected] = useState<Task | null>(null);
   const {
@@ -192,6 +235,10 @@ function TasksPage() {
   const { data: apiProjects = [] } = useQuery({
     queryKey: ["projects"],
     queryFn: fetchProjects,
+  });
+  const { data: workspaceMembers = [] } = useQuery({
+    queryKey: ["workspace-members"],
+    queryFn: fetchWorkspaceMembers,
   });
   const projectOptions = useMemo(
     () => apiProjects.map((project) => ({ id: project.id, name: project.name })),
@@ -238,7 +285,14 @@ function TasksPage() {
       );
     },
   });
-  const assigneeOptions = useMemo(() => buildAssigneeOptions(apiTasks), [apiTasks]);
+  const assigneeOptions = useMemo(
+    () =>
+      buildFilterAssigneeOptions(
+        apiTasks,
+        buildAssigneeOptionsFromWorkspaceMembers(workspaceMembers),
+      ),
+    [apiTasks, workspaceMembers],
+  );
   const selectedAssignees = useMemo(
     () => (selected ? resolveTaskAssignees(apiTasks, selected.id) : []),
     [selected, apiTasks],
@@ -248,6 +302,10 @@ function TasksPage() {
   useEffect(() => {
     setStatus(taskListStatusFromUrl(statusFromUrl));
   }, [statusFromUrl]);
+
+  useEffect(() => {
+    setAssigneeFilter(assigneeFilterFromUrl(assigneeFromUrl));
+  }, [assigneeFromUrl]);
 
   function updateUrlSearch(patch: Partial<TasksSearch>) {
     void navigate({
@@ -265,6 +323,11 @@ function TasksPage() {
   function setStatusFilter(next: TaskListStatusFilter) {
     setStatus(next);
     updateUrlSearch({ status: tasksUrlStatusFromFilter(next) });
+  }
+
+  function setAssigneeListFilter(next: AssigneeListFilter) {
+    setAssigneeFilter(next);
+    updateUrlSearch({ assignee: assigneeFilterToUrl(next) });
   }
 
   const deleteTaskMutation = useMutation({
@@ -310,6 +373,7 @@ function TasksPage() {
       taskList.filter((task) => {
         if (!taskMatchesStatusFilter(task, status)) return false;
         if (priority !== "all" && task.priority !== priority) return false;
+        if (!taskMatchesAssigneeListFilter(task, assigneeFilter)) return false;
         if (
           hasUrlAnalyticsFilters &&
           !taskMatchesUrlAnalyticsFilters(taskRowToAnalyticsRecord(task), urlAnalyticsFilters)
@@ -320,7 +384,7 @@ function TasksPage() {
         const query = q.toLowerCase();
         return task.title.toLowerCase().includes(query) || task.key.toLowerCase().includes(query);
       }),
-    [q, status, priority, taskList, hasUrlAnalyticsFilters, urlAnalyticsFilters],
+    [q, status, priority, assigneeFilter, taskList, hasUrlAnalyticsFilters, urlAnalyticsFilters],
   );
   const sorted = useMemo(() => sortTasks(filtered, sort), [filtered, sort]);
   const isTrulyEmpty = taskList.length === 0;
@@ -329,6 +393,7 @@ function TasksPage() {
     setQ("");
     setStatus("all");
     setPriority("all");
+    setAssigneeFilter("all");
     updateUrlSearch({
       status: undefined,
       taskId: undefined,
@@ -374,7 +439,6 @@ function TasksPage() {
         {hasAccessibleProjects ? (
           <NewTaskDialog
             isSubmitting={createTaskMutation.isPending}
-            assigneeOptions={assigneeOptions}
             projectOptions={projectOptions}
             onSubmit={handleCreateTask}
           >
@@ -407,6 +471,20 @@ function TasksPage() {
             </Pill>
           ))}
         </div>
+        <Select value={assigneeFilter} onValueChange={(value) => setAssigneeListFilter(value)}>
+          <SelectTrigger className="h-8 w-full rounded-full border-border bg-card text-xs sm:w-44">
+            <SelectValue placeholder={t("tasks.assignee")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("tasks.allAssignees")}</SelectItem>
+            <SelectItem value="unassigned">{t("tasks.noAssignees")}</SelectItem>
+            {assigneeOptions.map((option) => (
+              <SelectItem key={option.id} value={option.id}>
+                {option.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <div className="ml-auto flex flex-wrap gap-2">
           <Pill active={priority === "all"} onClick={() => setPriority("all")}>
             {t("tasks.allPriorities")}
@@ -540,7 +618,6 @@ function TasksPage() {
       <TaskDrawer
         task={selected}
         assignees={selectedAssignees}
-        assigneeOptions={assigneeOptions}
         onSaveChanges={({ assigneeIds, dueDate, status, priority }) => {
           if (!selected || updateAssigneeMutation.isPending) return;
           updateAssigneeMutation.mutate({
@@ -607,7 +684,7 @@ function mapApiTaskToRow(task: TaskApiItem): TaskRow {
     attachments: [],
     projectName: task.project.name,
     assigneeOptions,
-    assigneeName: assigneeOptions[0]?.name ?? null,
+    assigneeName: taskSortAssigneeName(assigneeOptions),
     commentsCount: task.commentsCount,
     checklistTotal: task.checklistTotal,
     checklistDone: task.checklistDone,

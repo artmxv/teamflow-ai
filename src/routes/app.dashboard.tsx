@@ -33,7 +33,7 @@ import {
 } from "@/lib/dashboard-analytics";
 import type { TasksSearch } from "@/routes/app.tasks";
 import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
-import { Avatar } from "@/components/app/Avatar";
+import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import { isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user";
 import { Badge } from "@/components/ui/badge";
@@ -456,8 +456,12 @@ function Dashboard() {
 
 function RecentTaskRow({ task, t }: { task: DashboardRecentTask; t: (key: TKey) => string }) {
   const status = recentStatusMeta[task.status];
-  const assigneeInitials =
-    task.assignee?.avatar ?? (task.assignee ? initialsFromName(task.assignee.name) : null);
+  const assigneeOptions = task.assignees.map((assignee) => ({
+    id: assignee.id,
+    name: assignee.name,
+    email: assignee.email,
+    avatar: assignee.avatar ?? initialsFromName(assignee.name),
+  }));
   const taskSearch = task.id ? { taskId: task.id } : undefined;
 
   return (
@@ -468,8 +472,8 @@ function RecentTaskRow({ task, t }: { task: DashboardRecentTask; t: (key: TKey) 
         aria-label={`${t("dashboard.viewTask")}: ${task.title}`}
         className="flex items-center gap-3 rounded-lg py-3 text-sm transition hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        {assigneeInitials ? (
-          <Avatar id={task.assignee!.id} initials={assigneeInitials} />
+        {assigneeOptions.length > 0 ? (
+          <AssigneeAvatars assignees={assigneeOptions} maxVisible={2} className="shrink-0" />
         ) : (
           <div className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
             —

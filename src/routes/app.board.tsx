@@ -41,8 +41,10 @@ import {
 import { fetchProjects } from "@/lib/api/projects";
 import { taskStatusLabel, useI18n } from "@/lib/i18n";
 import { Filter, Plus } from "lucide-react";
+import { fetchWorkspaceMembers } from "@/lib/api/workspace-members";
 import {
-  buildAssigneeOptions,
+  buildAssigneeOptionsFromWorkspaceMembers,
+  buildFilterAssigneeOptions,
   resolveTaskAssignees,
   taskHasAssignee,
   taskIsUnassigned,
@@ -89,6 +91,10 @@ function Board() {
   const { data: apiProjects = [] } = useQuery({
     queryKey: ["projects"],
     queryFn: fetchProjects,
+  });
+  const { data: workspaceMembers = [] } = useQuery({
+    queryKey: ["workspace-members"],
+    queryFn: fetchWorkspaceMembers,
   });
   const projectOptions = useMemo(
     () => apiProjects.map((project) => ({ id: project.id, name: project.name })),
@@ -176,7 +182,14 @@ function Board() {
       );
     },
   });
-  const assigneeOptions = useMemo(() => buildAssigneeOptions(apiTasks), [apiTasks]);
+  const assigneeOptions = useMemo(
+    () =>
+      buildFilterAssigneeOptions(
+        apiTasks,
+        buildAssigneeOptionsFromWorkspaceMembers(workspaceMembers),
+      ),
+    [apiTasks, workspaceMembers],
+  );
   const selectedAssignees = useMemo(
     () => (selected ? resolveTaskAssignees(apiTasks, selected.id) : []),
     [selected, apiTasks],
@@ -277,7 +290,6 @@ function Board() {
           {hasAccessibleProjects ? (
             <NewTaskDialog
               isSubmitting={createTaskMutation.isPending}
-              assigneeOptions={assigneeOptions}
               projectOptions={projectOptions}
               onSubmit={handleCreateTask}
             >
@@ -356,7 +368,6 @@ function Board() {
               const newTaskDialogProps = {
                 initialStatus: col.key,
                 isSubmitting: createTaskMutation.isPending,
-                assigneeOptions,
                 projectOptions: hasAccessibleProjects ? projectOptions : undefined,
                 onSubmit: handleCreateTask,
               } as const;
@@ -434,7 +445,6 @@ function Board() {
       <TaskDrawer
         task={selected}
         assignees={selectedAssignees}
-        assigneeOptions={assigneeOptions}
         onSaveChanges={({ assigneeIds, dueDate, status, priority }) => {
           if (!selected || updateAssigneeMutation.isPending) return;
           updateAssigneeMutation.mutate({

@@ -1,5 +1,6 @@
-import type { ProjectMemberApiItem } from "@/lib/api/project-members";
+import type { AvailableProjectMember, ProjectMemberApiItem } from "@/lib/api/project-members";
 import type { TaskApiItem } from "@/lib/api/tasks";
+import type { WorkspaceMemberItem } from "@/lib/api/workspace-members";
 
 export type AssigneeOption = {
   id: string;
@@ -32,10 +33,18 @@ function toOption(assignee: {
 }
 
 function taskAssigneeUsers(task: TaskApiItem) {
-  if (task.assignees.length > 0) {
+  if ((task.assignees ?? []).length > 0) {
     return task.assignees;
   }
   return task.assignee ? [task.assignee] : [];
+}
+
+export function taskAssigneeIds(task: Pick<TaskApiItem, "assigneeIds" | "assigneeId">): string[] {
+  const ids = task.assigneeIds ?? [];
+  if (ids.length > 0) {
+    return ids;
+  }
+  return task.assigneeId ? [task.assigneeId] : [];
 }
 
 /** Workspace users that can be assigned (real API user ids from loaded tasks). */
@@ -51,12 +60,57 @@ export function buildAssigneeOptions(apiTasks: TaskApiItem[]): AssigneeOption[] 
   return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
+type AssigneeUserLike = {
+  id: string;
+  name: string;
+  email?: string;
+  avatar: string | null;
+};
+
+function buildAssigneeOptionsFromUsers(users: AssigneeUserLike[]): AssigneeOption[] {
+  return users.map((user) => toOption(user)).sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export function buildAssigneeOptionsFromProjectMembers(
   members: ProjectMemberApiItem[],
 ): AssigneeOption[] {
-  return members
-    .map((member) => toOption(member.user))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  return buildAssigneeOptionsFromUsers(members.map((member) => member.user));
+}
+
+export function buildAssigneeOptionsFromWorkspaceMembers(
+  members: WorkspaceMemberItem[],
+): AssigneeOption[] {
+  return buildAssigneeOptionsFromUsers(members);
+}
+
+export function buildAssigneeOptionsFromAvailableProjectMembers(
+  members: AvailableProjectMember[],
+): AssigneeOption[] {
+  return buildAssigneeOptionsFromUsers(members);
+}
+
+/** Options for create/edit pickers: project members when present, otherwise workspace members. */
+export function resolveEditAssigneeOptions(
+  projectMembers: ProjectMemberApiItem[] | undefined,
+  workspaceMembers: WorkspaceMemberItem[] | undefined,
+  ...extras: (AssigneeOption[] | undefined)[]
+): AssigneeOption[] {
+  const fromProject = buildAssigneeOptionsFromProjectMembers(projectMembers ?? []);
+  if (fromProject.length > 0) {
+    return mergeAssigneeOptions(fromProject, ...extras);
+  }
+  return mergeAssigneeOptions(
+    buildAssigneeOptionsFromWorkspaceMembers(workspaceMembers ?? []),
+    ...extras,
+  );
+}
+
+/** Filter dropdowns: accessible members plus anyone already assigned on loaded tasks. */
+export function buildFilterAssigneeOptions(
+  apiTasks: TaskApiItem[],
+  accessibleMembers: AssigneeOption[],
+): AssigneeOption[] {
+  return mergeAssigneeOptions(accessibleMembers, buildAssigneeOptions(apiTasks));
 }
 
 /** Merge project members, workspace fallbacks, and already-selected assignees (deduped). */
@@ -90,11 +144,7 @@ export function resolveTaskAssigneeIds(apiTasks: TaskApiItem[], taskId: string):
     return [];
   }
 
-  if (task.assigneeIds.length > 0) {
-    return task.assigneeIds;
-  }
-
-  return task.assigneeId ? [task.assigneeId] : [];
+  return taskAssigneeIds(task);
 }
 
 /** @deprecated Use resolveTaskAssignees instead. */
@@ -127,15 +177,29 @@ export function taskHasAssignee(
   task: Pick<TaskApiItem, "assigneeIds" | "assigneeId">,
   userId: string,
 ) {
-  if (task.assigneeIds.length > 0) {
-    return task.assigneeIds.includes(userId);
-  }
-  return task.assigneeId === userId;
+  return taskMatchesAssignee(task, userId);
+}
+
+export function taskMatchesAssignee(
+  task: Pick<TaskApiItem, "assigneeIds" | "assigneeId">,
+  userId: string,
+) {
+  return taskAssigneeIds(task).includes(userId);
 }
 
 export function taskIsUnassigned(task: Pick<TaskApiItem, "assigneeIds" | "assigneeId">) {
-  if (task.assigneeIds.length > 0) {
-    return false;
+  return taskAssigneeIds(task).length === 0;
+}
+
+function sortedAssigneeNames(names: string[]): string | null {
+  if (names.length === 0) {
+    return null;
   }
-  return !task.assigneeId;
+  return [...names]
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
+    .join(", ");
+}
+
+export function taskSortAssigneeName(assignees: Pick<AssigneeOption, "name">[]): string | null {
+  return sortedAssigneeNames(assignees.map((assignee) => assignee.name));
 }

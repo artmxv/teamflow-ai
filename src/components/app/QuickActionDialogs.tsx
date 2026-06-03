@@ -32,11 +32,7 @@ import { addProjectMember, fetchProjectMembers } from "@/lib/api/project-members
 import { createProject, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
 import { fetchWorkspaceMembers } from "@/lib/api/workspace-members";
 import { nameToInitials, useCurrentWorkspace } from "@/lib/auth/use-current-user";
-import {
-  buildAssigneeOptionsFromProjectMembers,
-  mergeAssigneeOptions,
-  type AssigneeOption,
-} from "@/lib/assignee-options";
+import { resolveEditAssigneeOptions } from "@/lib/assignee-options";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { type Priority, type ProjectStatus, type TaskStatus } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
@@ -317,7 +313,6 @@ type NewTaskDialogProps = {
   children: ReactNode;
   initialStatus?: TaskStatus;
   isSubmitting?: boolean;
-  assigneeOptions?: AssigneeOption[];
   fixedProjectId?: string;
   projectOptions?: { id: string; name: string }[];
   onSubmit: (values: TaskFormValues) => Promise<void>;
@@ -327,7 +322,6 @@ export function NewTaskDialog({
   children,
   initialStatus = "todo",
   isSubmitting = false,
-  assigneeOptions = [],
   fixedProjectId,
   projectOptions,
   onSubmit,
@@ -345,6 +339,7 @@ export function NewTaskDialog({
     handleSubmit,
     register,
     reset,
+    setValue,
   } = useForm<TaskFormValues>({
     resolver: zodResolver(getTaskSchema(t)),
     mode: "onChange",
@@ -366,14 +361,30 @@ export function NewTaskDialog({
     enabled: open && !!effectiveProjectId,
   });
 
-  const resolvedAssigneeOptions = useMemo(() => {
-    const fromProject = buildAssigneeOptionsFromProjectMembers(projectMembersQuery.data ?? []);
-    const selectedFromIds = watchedAssigneeIds
-      .map((id) => assigneeOptions.find((option) => option.id === id))
-      .filter((option): option is AssigneeOption => Boolean(option));
+  const workspaceMembersQuery = useQuery({
+    queryKey: ["workspace-members"],
+    queryFn: fetchWorkspaceMembers,
+    enabled: open,
+  });
 
-    return mergeAssigneeOptions(fromProject, assigneeOptions, selectedFromIds);
-  }, [assigneeOptions, projectMembersQuery.data, watchedAssigneeIds]);
+  const resolvedAssigneeOptions = useMemo(
+    () => resolveEditAssigneeOptions(projectMembersQuery.data, workspaceMembersQuery.data),
+    [projectMembersQuery.data, workspaceMembersQuery.data],
+  );
+
+  const assigneeOptionsLoading =
+    !!effectiveProjectId &&
+    (projectMembersQuery.isLoading ||
+      ((projectMembersQuery.data?.length ?? 0) === 0 && workspaceMembersQuery.isLoading));
+
+  useEffect(() => {
+    if (!open) return;
+    const validIds = new Set(resolvedAssigneeOptions.map((option) => option.id));
+    const filtered = watchedAssigneeIds.filter((id) => validIds.has(id));
+    if (filtered.length !== watchedAssigneeIds.length) {
+      setValue("assigneeIds", filtered, { shouldValidate: true });
+    }
+  }, [open, resolvedAssigneeOptions, setValue, watchedAssigneeIds]);
 
   useEffect(() => {
     if (!open) return;
@@ -422,7 +433,7 @@ export function NewTaskDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="app-scrollbar max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t("common.newTask")}</DialogTitle>
           <DialogDescription>Add a mock task to the current view.</DialogDescription>
@@ -511,7 +522,7 @@ export function NewTaskDialog({
                       options={resolvedAssigneeOptions}
                       value={field.value ?? []}
                       disabled={isSubmitting}
-                      isLoading={!!effectiveProjectId && projectMembersQuery.isLoading}
+                      isLoading={assigneeOptionsLoading}
                       onChange={field.onChange}
                     />
                   )}

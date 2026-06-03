@@ -4,6 +4,36 @@ import type { WorkspaceRole } from "./workspace-context.service.js";
 
 const TASK_STATUSES = ["BACKLOG", "TODO", "IN_PROGRESS", "REVIEW", "DONE"] as const;
 
+const assigneeUserSelect = {
+  id: true,
+  name: true,
+  email: true,
+  avatar: true,
+} as const;
+
+function mapRecentTaskAssignees(task: {
+  assignee: {
+    id: string;
+    name: string;
+    email: string;
+    avatar: string | null;
+  } | null;
+  taskAssignees: {
+    user: {
+      id: string;
+      name: string;
+      email: string;
+      avatar: string | null;
+    };
+  }[];
+}) {
+  const fromJoin = task.taskAssignees.map((link) => link.user);
+  if (fromJoin.length > 0) {
+    return fromJoin;
+  }
+  return task.assignee ? [task.assignee] : [];
+}
+
 export async function getDashboardSummary(
   workspaceId: string,
   userId: string,
@@ -12,7 +42,7 @@ export async function getDashboardSummary(
   const projectWhere = getAccessibleProjectWhere(userId, workspaceId, role);
   const taskWhere = getAccessibleTaskWhere(userId, workspaceId, role);
 
-  const [activeProjects, openTasks, completedTasks, teamMembers, statusGroups, recentTasks] =
+  const [activeProjects, openTasks, completedTasks, teamMembers, statusGroups, recentTasksRaw] =
     await Promise.all([
       prisma.project.count({ where: { ...projectWhere, status: "ACTIVE" } }),
       prisma.task.count({ where: { ...taskWhere, status: { not: "DONE" } } }),
@@ -41,11 +71,14 @@ export async function getDashboardSummary(
             },
           },
           assignee: {
+            select: assigneeUserSelect,
+          },
+          taskAssignees: {
+            orderBy: { createdAt: "asc" },
             select: {
-              id: true,
-              name: true,
-              email: true,
-              avatar: true,
+              user: {
+                select: assigneeUserSelect,
+              },
             },
           },
         },
@@ -58,6 +91,21 @@ export async function getDashboardSummary(
     status,
     count: countByStatus.get(status) ?? 0,
   }));
+
+  const recentTasks = recentTasksRaw.map((task) => {
+    const assignees = mapRecentTaskAssignees(task);
+    return {
+      id: task.id,
+      key: task.key,
+      title: task.title,
+      status: task.status,
+      priority: task.priority,
+      updatedAt: task.updatedAt,
+      project: task.project,
+      assignees,
+      assignee: assignees[0] ?? null,
+    };
+  });
 
   return {
     activeProjects,

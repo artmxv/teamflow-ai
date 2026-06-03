@@ -2,9 +2,12 @@ import type { Project, Task, TaskStatus, User } from "@prisma/client";
 
 import { prisma } from "../lib/prisma.js";
 
+type AssigneeUser = Pick<User, "id" | "name" | "email">;
+
 type TaskWithRelations = Pick<Task, "id" | "key" | "title" | "status" | "priority" | "dueDate"> & {
   project: Pick<Project, "id" | "name" | "status">;
-  assignee: Pick<User, "id" | "name" | "email"> | null;
+  assignee: AssigneeUser | null;
+  taskAssignees: { user: AssigneeUser }[];
 };
 
 type WorkspaceAiMetrics = {
@@ -63,9 +66,33 @@ function isOverdueTask(task: Pick<Task, "dueDate" | "status">, now: Date): boole
   return task.status !== "DONE" && task.dueDate !== null && task.dueDate < now;
 }
 
+function resolveTaskAssigneeNames(task: TaskWithRelations): string[] {
+  const fromJoin = task.taskAssignees.map((link) => sanitizeText(link.user.name)).filter(Boolean);
+  if (fromJoin.length > 0) {
+    return fromJoin;
+  }
+  if (task.assignee?.name) {
+    return [sanitizeText(task.assignee.name)];
+  }
+  return [];
+}
+
+function formatAssigneeSuffix(names: string[]): string {
+  if (names.length === 0) {
+    return "";
+  }
+  if (names.length === 1) {
+    return ` (${names[0]})`;
+  }
+  if (names.length === 2) {
+    return ` (${names[0]}, ${names[1]})`;
+  }
+  return ` (${names[0]} + ${names.length - 1} more)`;
+}
+
 function formatTaskRef(task: TaskWithRelations): string {
-  const assignee = task.assignee?.name ? ` (${task.assignee.name})` : "";
-  return `${task.key}: ${task.title} in ${task.project.name}${assignee}`;
+  const assigneeSuffix = formatAssigneeSuffix(resolveTaskAssigneeNames(task));
+  return `${task.key}: ${task.title} in ${task.project.name}${assigneeSuffix}`;
 }
 
 function buildOverview(metrics: WorkspaceAiMetrics): string {
@@ -365,6 +392,18 @@ export async function getWorkspaceAiSummary(workspaceId: string): Promise<Worksp
             id: true,
             name: true,
             email: true,
+          },
+        },
+        taskAssignees: {
+          orderBy: { createdAt: "asc" },
+          select: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
           },
         },
       },

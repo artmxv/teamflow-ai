@@ -31,11 +31,8 @@ import {
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
 import { AssigneeMultiPicker } from "@/components/app/AssigneeMultiPicker";
 import { fetchProjectMembers } from "@/lib/api/project-members";
-import {
-  buildAssigneeOptionsFromProjectMembers,
-  mergeAssigneeOptions,
-  type AssigneeOption,
-} from "@/lib/assignee-options";
+import { fetchWorkspaceMembers } from "@/lib/api/workspace-members";
+import { resolveEditAssigneeOptions, type AssigneeOption } from "@/lib/assignee-options";
 import {
   createTaskComment,
   deleteTaskComment,
@@ -102,7 +99,6 @@ function sameAssigneeIds(a: string[], b: string[]) {
 export function TaskDrawer({
   task,
   assignees = [],
-  assigneeOptions = [],
   onOpenChange,
   onSaveChanges,
   isSaving = false,
@@ -111,7 +107,6 @@ export function TaskDrawer({
 }: {
   task: Task | null;
   assignees?: AssigneeOption[];
-  assigneeOptions?: AssigneeOption[];
   onOpenChange: (open: boolean) => void;
   onSaveChanges?: (updates: TaskDrawerUpdates) => void;
   isSaving?: boolean;
@@ -231,15 +226,21 @@ export function TaskDrawer({
     enabled: !!task?.projectId,
   });
 
+  const workspaceMembersQuery = useQuery({
+    queryKey: ["workspace-members"],
+    queryFn: fetchWorkspaceMembers,
+    enabled: !!task?.projectId,
+  });
+
   const resolvedAssigneeOptions = useMemo(
     () =>
-      mergeAssigneeOptions(
-        buildAssigneeOptionsFromProjectMembers(projectMembersQuery.data ?? []),
-        assigneeOptions,
-        assignees,
-      ),
-    [assigneeOptions, assignees, projectMembersQuery.data],
+      resolveEditAssigneeOptions(projectMembersQuery.data, workspaceMembersQuery.data, assignees),
+    [assignees, projectMembersQuery.data, workspaceMembersQuery.data],
   );
+
+  const assigneeOptionsLoading =
+    projectMembersQuery.isLoading ||
+    ((projectMembersQuery.data?.length ?? 0) === 0 && workspaceMembersQuery.isLoading);
 
   if (!task) return null;
 
@@ -269,7 +270,7 @@ export function TaskDrawer({
 
   return (
     <Sheet open={!!task} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+      <SheetContent side="right" className="app-scrollbar w-full overflow-y-auto sm:max-w-2xl">
         <SheetHeader className="space-y-1 border-b border-border pb-4">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="font-mono">{task.key}</span>
@@ -291,7 +292,7 @@ export function TaskDrawer({
               options={resolvedAssigneeOptions}
               value={draftAssigneeIds}
               disabled={isSaving}
-              isLoading={projectMembersQuery.isLoading}
+              isLoading={assigneeOptionsLoading}
               onChange={setDraftAssigneeIds}
             />
           </section>
