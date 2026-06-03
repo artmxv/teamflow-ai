@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { Priority, Task, TaskStatus } from "@/lib/mock-data";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -25,8 +26,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { AvatarStack } from "@/components/app/Avatar";
+import { Avatar } from "@/components/app/Avatar";
+import { TaskDrawer } from "@/components/app/TaskDrawer";
+import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
 import { projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
+import {
+  buildAssigneeOptions,
+  resolveTaskAssignee,
+  type AssigneeOption,
+} from "@/lib/assignee-options";
 import {
   deleteProject,
   fetchProjects,
@@ -35,7 +43,12 @@ import {
   type ProjectApiStatus,
 } from "@/lib/api/projects";
 import {
+  createTask,
+  deleteTask,
   fetchTasks,
+  taskPriorityToApi,
+  taskStatusToApi,
+  updateTask,
   type TaskApiItem,
   type TaskApiPriority,
   type TaskApiStatus,
@@ -70,6 +83,7 @@ import {
   FileText,
   ListTodo,
   Loader2,
+  Plus,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -85,6 +99,21 @@ const apiStatusMap: Record<ProjectApiStatus, ProjectStatus> = {
   PLANNING: "planning",
   ON_HOLD: "on_hold",
   COMPLETED: "completed",
+};
+
+const apiTaskStatusMap: Record<TaskApiStatus, TaskStatus> = {
+  BACKLOG: "backlog",
+  TODO: "todo",
+  IN_PROGRESS: "in_progress",
+  REVIEW: "review",
+  DONE: "done",
+};
+
+const apiTaskPriorityMap: Record<TaskApiPriority, Priority> = {
+  LOW: "low",
+  MEDIUM: "medium",
+  HIGH: "high",
+  URGENT: "urgent",
 };
 
 const taskStatusLabel: Record<TaskApiStatus, string> = {
@@ -121,6 +150,7 @@ function ProjectDetailPage() {
   const { projectId } = Route.useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   const projectsQuery = useQuery({
     queryKey: ["projects"],
@@ -181,15 +211,77 @@ function ProjectDetailPage() {
     },
   });
 
-  const memberIds = Array.from(
-    new Set(projectTasks.map((t) => t.assignee?.id).filter(Boolean) as string[]),
+  const createTaskMutation = useMutation({
+    mutationFn: createTask,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast.success("Task created");
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Task could not be created",
+      );
+    },
+  });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: deleteTask,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      setSelectedTask(null);
+      toast.success("Task deleted");
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Task could not be deleted",
+      );
+    },
+  });
+
+  const updateAssigneeMutation = useMutation({
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: string;
+      input: { assigneeId: string | null; dueDate: string | null };
+    }) => updateTask(id, input),
+    onSuccess: async (updated) => {
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      setSelectedTask((prev) => {
+        if (!prev || prev.id !== updated.id) return prev;
+        return mapApiTaskToTask(updated);
+      });
+      toast.success("Task updated");
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Task could not be updated",
+      );
+    },
+  });
+
+  const assigneeOptions = useMemo(() => buildAssigneeOptions(apiTasks), [apiTasks]);
+  const selectedAssignee = useMemo(
+    () =>
+      selectedTask ? resolveTaskAssignee(selectedTask.assigneeId, apiTasks, selectedTask.id) : null,
+    [selectedTask, apiTasks],
   );
-  const initialsMap = Object.fromEntries(
-    projectTasks
-      .map((t) => t.assignee)
-      .filter(Boolean)
-      .map((a) => [a!.id, a!.avatar ?? initialsFromName(a!.name)] as const),
-  );
+
+  async function handleCreateTask(values: TaskFormValues) {
+    await createTaskMutation.mutateAsync({
+      projectId,
+      title: values.title.trim(),
+      description: values.description?.trim() || undefined,
+      status: taskStatusToApi[values.status],
+      priority: taskPriorityToApi[values.priority],
+      assigneeId: values.assigneeId || null,
+      dueDate: values.dueDate || null,
+    });
+  }
 
   return (
     <AppShell title="Project">
@@ -205,7 +297,7 @@ function ProjectDetailPage() {
               {isLoading ? "Loading..." : (project?.name ?? "Project")}
             </h1>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              {isLoading ? "Fetching project details" : "Read-only project details"}
+              {isLoading ? "Fetching project details" : "Status, tasks, and documents"}
             </p>
           </div>
         </div>
@@ -248,10 +340,29 @@ function ProjectDetailPage() {
         <ProjectDetails
           project={project}
           projectTasks={projectTasks}
-          memberIds={memberIds}
-          initialsMap={initialsMap}
+          assigneeOptions={assigneeOptions}
+          isCreatingTask={createTaskMutation.isPending}
+          onCreateTask={handleCreateTask}
+          onOpenTask={(task) => setSelectedTask(mapApiTaskToTask(task))}
         />
       )}
+
+      <TaskDrawer
+        task={selectedTask}
+        assignee={selectedAssignee}
+        assigneeOptions={assigneeOptions}
+        onSaveChanges={({ assigneeId, dueDate }) => {
+          if (!selectedTask || updateAssigneeMutation.isPending) return;
+          updateAssigneeMutation.mutate({
+            id: selectedTask.id,
+            input: { assigneeId, dueDate },
+          });
+        }}
+        isSaving={updateAssigneeMutation.isPending}
+        onOpenChange={(open) => !open && setSelectedTask(null)}
+        onDelete={(taskId) => deleteTaskMutation.mutate(taskId)}
+        isDeleting={deleteTaskMutation.isPending}
+      />
     </AppShell>
   );
 }
@@ -437,110 +548,137 @@ function DeleteProjectDialog({
 function ProjectDetails({
   project,
   projectTasks,
-  memberIds,
-  initialsMap,
+  assigneeOptions,
+  isCreatingTask,
+  onCreateTask,
+  onOpenTask,
 }: {
   project: ProjectApiItem;
   projectTasks: TaskApiItem[];
-  memberIds: string[];
-  initialsMap: Record<string, string>;
+  assigneeOptions: AssigneeOption[];
+  isCreatingTask: boolean;
+  onCreateTask: (values: TaskFormValues) => Promise<void>;
+  onOpenTask: (task: TaskApiItem) => void;
 }) {
   const status = projectStatusMeta[apiStatusMap[project.status]];
   const due = formatDate(project.dueDate);
+  const progress = calculateTaskProgress(projectTasks);
+  const colorGradient = project.color ?? "from-indigo-500 to-violet-500";
+  const sortedTasks = useMemo(() => sortProjectTasks(projectTasks), [projectTasks]);
 
   return (
     <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft lg:col-span-2">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div
-                className={
-                  "h-2 w-16 rounded-full bg-gradient-to-r " +
-                  (project.color ?? "from-indigo-500 to-violet-500")
+        <div className="space-y-4 lg:col-span-2">
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className={"h-2 w-16 rounded-full bg-gradient-to-r " + colorGradient} />
+                <h2 className="mt-4 truncate text-xl font-semibold tracking-tight">
+                  {project.name}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {project.description?.trim() ? project.description : "No description yet."}
+                </p>
+              </div>
+              <Badge variant="secondary" className={status.className + " border-0 shrink-0"}>
+                {status.label}
+              </Badge>
+            </div>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <Stat label="Status" value={status.label} />
+              <Stat
+                label="Due date"
+                value={
+                  <span className="inline-flex items-center gap-1">
+                    <Calendar className="size-3.5 text-muted-foreground" /> {due}
+                  </span>
                 }
               />
-              <h2 className="mt-4 truncate text-xl font-semibold tracking-tight">{project.name}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{project.description || "—"}</p>
-            </div>
-            <Badge variant="secondary" className={status.className + " border-0"}>
-              {status.label}
-            </Badge>
-          </div>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            <Stat label="Status" value={status.label} />
-            <Stat
-              label="Due"
-              value={
-                <span className="inline-flex items-center gap-1">
-                  <Calendar className="size-3.5 text-muted-foreground" /> {due}
-                </span>
-              }
-            />
-            <Stat
-              label="Tasks"
-              value={
-                <span className="inline-flex items-center gap-1">
-                  <ListTodo className="size-3.5 text-muted-foreground" /> {project.openTasks} /{" "}
-                  {project.totalTasks}
-                </span>
-              }
-            />
-            <Stat
-              label="Members"
-              value={
-                memberIds.length > 0 ? (
-                  <AvatarStack ids={memberIds} initialsMap={initialsMap} />
-                ) : (
-                  <span className="text-sm text-muted-foreground">—</span>
-                )
-              }
-            />
-          </div>
-
-          <div className="mt-6">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Progress</span>
-              <span className="font-medium text-foreground">{project.progress}%</span>
-            </div>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-              <div
-                className={
-                  "h-full rounded-full bg-gradient-to-r " +
-                  (project.color ?? "from-indigo-500 to-violet-500")
+              <Stat
+                label="Tasks"
+                value={
+                  <span className="inline-flex items-center gap-1">
+                    <ListTodo className="size-3.5 text-muted-foreground" />
+                    {progress.done} done · {progress.total} total
+                  </span>
                 }
-                style={{ width: `${project.progress}%` }}
+              />
+            </div>
+
+            <p className="mt-4 text-xs text-muted-foreground">
+              Use Edit to change status, due date, or description.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-semibold">Task progress</h3>
+                <p className="text-xs text-muted-foreground">
+                  {progress.total === 0
+                    ? "No tasks yet"
+                    : `${progress.done} of ${progress.total} tasks completed`}
+                </p>
+              </div>
+              <span className="text-sm font-semibold tabular-nums">
+                {progress.total === 0 ? "0%" : `${progress.percent}%`}
+              </span>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+              <div
+                className={"h-full rounded-full bg-gradient-to-r transition-all " + colorGradient}
+                style={{ width: `${progress.percent}%` }}
               />
             </div>
           </div>
+
+          <ProjectDocumentsCard projectId={project.id} />
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-          <h3 className="text-base font-semibold">Tasks</h3>
-          <p className="mt-1 text-xs text-muted-foreground">Tasks that belong to this project</p>
-          <div className="mt-4 overflow-hidden rounded-xl border border-border">
-            {projectTasks.length === 0 ? (
+        <div className="flex flex-col rounded-2xl border border-border bg-card p-5 shadow-soft lg:row-span-1">
+          <div className="flex shrink-0 items-start justify-between gap-2">
+            <div>
+              <h3 className="text-base font-semibold">Project tasks</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {projectTasks.length === 0
+                  ? "Create the first task for this project"
+                  : `${projectTasks.length} task${projectTasks.length === 1 ? "" : "s"}`}
+              </p>
+            </div>
+            <NewTaskDialog
+              isSubmitting={isCreatingTask}
+              assigneeOptions={assigneeOptions}
+              onSubmit={onCreateTask}
+            >
+              <Button size="sm" variant="outline" className="h-8 shrink-0 gap-1">
+                <Plus className="size-3.5" />
+                New task
+              </Button>
+            </NewTaskDialog>
+          </div>
+          <div className="mt-4 min-h-0 flex-1 overflow-hidden rounded-xl border border-border">
+            {sortedTasks.length === 0 ? (
               <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-                No tasks in this project yet.
+                No tasks in this project yet. Add one to track work here.
               </div>
             ) : (
-              <ul className="divide-y divide-border">
-                {projectTasks.map((task) => (
-                  <li key={task.id} className="px-4 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
+              <ul className="max-h-[min(70vh,32rem)] divide-y divide-border overflow-y-auto overscroll-contain">
+                {sortedTasks.map((task) => (
+                  <li key={task.id}>
+                    <button
+                      type="button"
+                      className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+                      onClick={() => onOpenTask(task)}
+                    >
+                      <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                             {task.key}
                           </span>
                           <span className="truncate text-sm font-medium">{task.title}</span>
                         </div>
-                        {task.description ? (
-                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                            {task.description}
-                          </p>
-                        ) : null}
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           <Badge
                             variant="secondary"
@@ -555,13 +693,25 @@ function ProjectDetails({
                             {taskPriorityLabel[task.priority]}
                           </Badge>
                           {task.dueDate ? (
-                            <span className="text-[11px] text-muted-foreground">
-                              Due {new Date(task.dueDate).toLocaleDateString()}
+                            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                              <Calendar className="size-3" />
+                              {formatDate(task.dueDate)}
                             </span>
                           ) : null}
                         </div>
                       </div>
-                    </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        {task.assignee ? (
+                          <Avatar
+                            id={task.assignee.id}
+                            initials={task.assignee.avatar ?? initialsFromName(task.assignee.name)}
+                            size="sm"
+                          />
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">Unassigned</span>
+                        )}
+                      </div>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -569,7 +719,6 @@ function ProjectDetails({
           </div>
         </div>
       </div>
-      <ProjectDocumentsCard projectId={project.id} />
     </div>
   );
 }
@@ -995,6 +1144,82 @@ function NotFoundState() {
       </Button>
     </div>
   );
+}
+
+const taskPriorityRank: Record<TaskApiPriority, number> = {
+  URGENT: 0,
+  HIGH: 1,
+  MEDIUM: 2,
+  LOW: 3,
+};
+
+function compareTaskDueDates(a: string | null, b: string | null) {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  return new Date(a).getTime() - new Date(b).getTime();
+}
+
+function sortProjectTasks(tasks: TaskApiItem[]) {
+  return [...tasks].sort((a, b) => {
+    const aDone = a.status === "DONE";
+    const bDone = b.status === "DONE";
+    if (aDone !== bDone) {
+      return aDone ? 1 : -1;
+    }
+
+    const priorityDiff = taskPriorityRank[a.priority] - taskPriorityRank[b.priority];
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
+
+    const dueDiff = compareTaskDueDates(a.dueDate, b.dueDate);
+    if (dueDiff !== 0) {
+      return dueDiff;
+    }
+
+    return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+  });
+}
+
+function calculateTaskProgress(tasks: TaskApiItem[]) {
+  const total = tasks.length;
+  if (total === 0) {
+    return { percent: 0, done: 0, total: 0 };
+  }
+  const done = tasks.filter((task) => task.status === "DONE").length;
+  const percent = Math.round((done / total) * 100);
+  return { percent, done, total };
+}
+
+function mapApiTaskToTask(task: TaskApiItem): Task {
+  return {
+    id: task.id,
+    key: task.key,
+    title: task.title,
+    description: task.description ?? "",
+    status: apiTaskStatusMap[task.status],
+    priority: apiTaskPriorityMap[task.priority],
+    assigneeId: task.assigneeId,
+    projectId: task.projectId,
+    dueDate: formatTaskDueDate(task.dueDate),
+    labels: [task.project.name],
+    comments: [],
+    commentsCount: task.commentsCount,
+    attachmentsCount: task.attachmentsCount,
+    checklist: Array.from({ length: task.checklistTotal }, (_, index) => ({
+      id: `${task.id}-checklist-${index}`,
+      label: `Checklist item ${index + 1}`,
+      done: index < task.checklistDone,
+    })),
+    activity: [],
+    attachments: [],
+  };
+}
+
+function formatTaskDueDate(value: string | null) {
+  if (!value) return null;
+  return value.slice(0, 10);
 }
 
 function formatDate(value: string | null) {
