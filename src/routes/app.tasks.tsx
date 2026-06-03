@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -39,8 +39,16 @@ import { buildAssigneeOptions, resolveTaskAssignee } from "@/lib/assignee-option
 import { cycleTaskSort, sortTasks, type TaskSortField, type TaskSortState } from "@/lib/task-sort";
 import { cn } from "@/lib/utils";
 
+type TasksSearch = {
+  taskId?: string;
+};
+
 export const Route = createFileRoute("/app/tasks")({
   beforeLoad: requireAuth,
+  validateSearch: (search: Record<string, unknown>): TasksSearch => ({
+    taskId:
+      typeof search.taskId === "string" && search.taskId.length > 0 ? search.taskId : undefined,
+  }),
   head: () => ({ meta: [{ title: "Tasks — TeamFlow AI" }] }),
   component: TasksPage,
 });
@@ -86,6 +94,8 @@ const apiPriorityMap: Record<TaskApiPriority, Priority> = {
 
 function TasksPage() {
   const { t } = useI18n();
+  const { taskId: taskIdFromUrl } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const queryClient = useQueryClient();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<TaskStatus | "all">("all");
@@ -119,6 +129,9 @@ function TasksPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
       setSelected(null);
+      if (taskIdFromUrl) {
+        void navigate({ search: { taskId: undefined }, replace: true });
+      }
       toast.success("Task deleted");
     },
     onError: (mutationError) => {
@@ -162,6 +175,27 @@ function TasksPage() {
   );
   const projectId = apiTasks[0]?.projectId;
   const taskList = useMemo(() => apiTasks.map(mapApiTaskToRow), [apiTasks]);
+
+  useEffect(() => {
+    if (!taskIdFromUrl || isLoading) return;
+    const task = taskList.find((item) => item.id === taskIdFromUrl);
+    if (task) {
+      setSelected(task);
+      return;
+    }
+    if (taskList.length > 0) {
+      void navigate({ search: { taskId: undefined }, replace: true });
+    }
+  }, [taskIdFromUrl, taskList, isLoading, navigate]);
+
+  function handleDrawerOpenChange(open: boolean) {
+    if (!open) {
+      setSelected(null);
+      if (taskIdFromUrl) {
+        void navigate({ search: { taskId: undefined }, replace: true });
+      }
+    }
+  }
 
   const filtered = useMemo(
     () =>
@@ -392,7 +426,7 @@ function TasksPage() {
           });
         }}
         isSaving={updateAssigneeMutation.isPending}
-        onOpenChange={(o) => !o && setSelected(null)}
+        onOpenChange={handleDrawerOpenChange}
         onDelete={(taskId) => deleteTaskMutation.mutate(taskId)}
         isDeleting={deleteTaskMutation.isPending}
       />

@@ -6,6 +6,7 @@ import {
   removeStoredTaskAttachment,
   taskAttachmentDiskPath,
 } from "../lib/task-upload.js";
+import { notifyTaskAttachmentUploaded } from "./notifications.service.js";
 import { findTaskInWorkspace } from "./tasks.service.js";
 
 const uploaderSelect = {
@@ -120,6 +121,13 @@ export async function createTaskAttachment(
       createdAt: true,
       uploader: { select: uploaderSelect },
     },
+  });
+
+  void notifyTaskAttachmentUploaded({
+    workspaceId,
+    taskId,
+    actorId: uploaderId,
+    fileName: updated.originalName,
   });
 
   return mapAttachment(updated);

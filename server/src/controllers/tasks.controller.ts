@@ -107,7 +107,7 @@ export async function updateTaskController(req: Request, res: Response, next: Ne
       return;
     }
 
-    const task = await updateTask(context.workspaceId, taskId, result.data);
+    const task = await updateTask(context.workspaceId, taskId, result.data, req.userId!);
 
     if (!task) {
       res.status(404).json({

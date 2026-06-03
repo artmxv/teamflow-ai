@@ -6,6 +6,7 @@ import {
   projectDocumentDiskPath,
   removeStoredProjectDocument,
 } from "../lib/project-upload.js";
+import { notifyProjectDocumentUploaded } from "./notifications.service.js";
 import { findProjectInWorkspace } from "./projects.service.js";
 
 const uploaderSelect = {
@@ -120,6 +121,13 @@ export async function createProjectDocument(
       createdAt: true,
       uploader: { select: uploaderSelect },
     },
+  });
+
+  void notifyProjectDocumentUploaded({
+    workspaceId,
+    projectId,
+    actorId: uploaderId,
+    fileName: updated.originalName,
   });
 
   return mapDocument(updated);
