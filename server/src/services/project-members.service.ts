@@ -1,5 +1,7 @@
 import { prisma } from "../lib/prisma.js";
+import { canAccessProject } from "./project-access.service.js";
 import { findProjectInWorkspace } from "./projects.service.js";
+import type { WorkspaceRole } from "./workspace-context.service.js";
 
 const userSelect = {
   id: true,
@@ -38,9 +40,14 @@ function mapProjectMember(member: ProjectMemberRecord) {
   };
 }
 
-export async function getProjectMembers(workspaceId: string, projectId: string) {
-  const project = await findProjectInWorkspace(projectId, workspaceId);
-  if (!project) {
+export async function getProjectMembers(
+  workspaceId: string,
+  projectId: string,
+  userId: string,
+  role: WorkspaceRole,
+) {
+  const hasAccess = await canAccessProject(userId, workspaceId, role, projectId);
+  if (!hasAccess) {
     return null;
   }
 

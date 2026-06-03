@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { requireAuth } from "@/lib/auth/route-guards";
-import { useCurrentWorkspace } from "@/lib/auth/use-current-user";
+import {
+  canManageWorkspaceTeam,
+  useCurrentUser,
+  useCurrentWorkspace,
+} from "@/lib/auth/use-current-user";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import { members, type Member, type Role } from "@/lib/mock-data";
@@ -65,8 +69,26 @@ const statusStyles = {
 
 function TeamPage() {
   const { t } = useI18n();
+  const { data: me } = useCurrentUser();
   const { data: workspace } = useCurrentWorkspace();
   const workspaceName = workspace?.name ?? "your workspace";
+  const canManageTeam = canManageWorkspaceTeam(me?.workspace?.role);
+  const currentUserEmail = me?.user.email.toLowerCase() ?? "";
+
+  const isCurrentMember = (member: Member) => member.email.toLowerCase() === currentUserEmail;
+
+  const canManageMember = (member: Member) => {
+    if (!canManageTeam) {
+      return false;
+    }
+    if (member.role === "Owner") {
+      return false;
+    }
+    if (isCurrentMember(member) && me?.workspace?.role === "OWNER") {
+      return false;
+    }
+    return true;
+  };
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -139,51 +161,56 @@ function TeamPage() {
               .replace("{workspace}", workspaceName)}
           </p>
         </div>
-        <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-              <Plus className="size-4" /> {t("team.inviteMember")}
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{t("team.inviteTitle")}</DialogTitle>
-              <DialogDescription>{t("team.inviteDesc")}</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="invite-email">Email</Label>
-                <Input
-                  id="invite-email"
-                  placeholder="teammate@company.com"
-                  value={inviteEmail}
-                  onChange={(event) => setInviteEmail(event.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>{t("team.role")}</Label>
-                <Select value={inviteRole} onValueChange={(value) => setInviteRole(value as Role)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Member">{mockTeamRoleLabel("Member", t)}</SelectItem>
-                    <SelectItem value="Admin">{mockTeamRoleLabel("Admin", t)}</SelectItem>
-                    <SelectItem value="Owner">{mockTeamRoleLabel("Owner", t)}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setInviteOpen(false)}>
-                {t("common.cancel")}
+        {canManageTeam && (
+          <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+                <Plus className="size-4" /> {t("team.inviteMember")}
               </Button>
-              <Button onClick={handleSendInvite} className="bg-gradient-brand text-white">
-                {t("team.sendInvite")}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{t("team.inviteTitle")}</DialogTitle>
+                <DialogDescription>{t("team.inviteDesc")}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="invite-email">Email</Label>
+                  <Input
+                    id="invite-email"
+                    placeholder="teammate@company.com"
+                    value={inviteEmail}
+                    onChange={(event) => setInviteEmail(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>{t("team.role")}</Label>
+                  <Select
+                    value={inviteRole}
+                    onValueChange={(value) => setInviteRole(value as Role)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Member">{mockTeamRoleLabel("Member", t)}</SelectItem>
+                      <SelectItem value="Admin">{mockTeamRoleLabel("Admin", t)}</SelectItem>
+                      <SelectItem value="Owner">{mockTeamRoleLabel("Owner", t)}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setInviteOpen(false)}>
+                  {t("common.cancel")}
+                </Button>
+                <Button onClick={handleSendInvite} className="bg-gradient-brand text-white">
+                  {t("team.sendInvite")}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <Alert className="mb-6 border-primary/25 bg-primary/5">
@@ -244,19 +271,19 @@ function TeamPage() {
                       <DropdownMenuItem onClick={() => setProfileMember(m)}>
                         {t("team.viewProfile")}
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => openRoleDialog(m)}
-                        disabled={m.role === "Owner"}
-                      >
-                        {t("team.changeRole")}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={() => setRemoveMember(m)}
-                        disabled={m.role === "Owner"}
-                      >
-                        {t("team.removeMember")}
-                      </DropdownMenuItem>
+                      {canManageMember(m) && (
+                        <DropdownMenuItem onClick={() => openRoleDialog(m)}>
+                          {t("team.changeRole")}
+                        </DropdownMenuItem>
+                      )}
+                      {canManageMember(m) && (
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => setRemoveMember(m)}
+                        >
+                          {t("team.removeMember")}
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </td>

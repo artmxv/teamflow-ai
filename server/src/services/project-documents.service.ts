@@ -7,7 +7,8 @@ import {
   removeStoredProjectDocument,
 } from "../lib/project-upload.js";
 import { notifyProjectDocumentUploaded } from "./notifications.service.js";
-import { findProjectInWorkspace } from "./projects.service.js";
+import { canAccessProject } from "./project-access.service.js";
+import type { WorkspaceRole } from "./workspace-context.service.js";
 
 const uploaderSelect = {
   id: true,
@@ -48,9 +49,14 @@ function mapDocument(document: {
   };
 }
 
-export async function getProjectDocuments(workspaceId: string, projectId: string) {
-  const project = await findProjectInWorkspace(projectId, workspaceId);
-  if (!project) {
+export async function getProjectDocuments(
+  workspaceId: string,
+  projectId: string,
+  userId: string,
+  role: WorkspaceRole,
+) {
+  const hasAccess = await canAccessProject(userId, workspaceId, role, projectId);
+  if (!hasAccess) {
     return null;
   }
 
@@ -76,10 +82,11 @@ export async function createProjectDocument(
   workspaceId: string,
   projectId: string,
   uploaderId: string,
+  role: WorkspaceRole,
   file: Express.Multer.File,
 ) {
-  const project = await findProjectInWorkspace(projectId, workspaceId);
-  if (!project) {
+  const hasAccess = await canAccessProject(uploaderId, workspaceId, role, projectId);
+  if (!hasAccess) {
     removeStoredProjectDocument(projectId, file.filename);
     return null;
   }
@@ -137,9 +144,11 @@ export async function deleteProjectDocument(
   workspaceId: string,
   projectId: string,
   documentId: string,
+  userId: string,
+  role: WorkspaceRole,
 ) {
-  const project = await findProjectInWorkspace(projectId, workspaceId);
-  if (!project) {
+  const hasAccess = await canAccessProject(userId, workspaceId, role, projectId);
+  if (!hasAccess) {
     return null;
   }
 
@@ -165,9 +174,11 @@ export async function getProjectDocumentFile(
   workspaceId: string,
   projectId: string,
   documentId: string,
+  userId: string,
+  role: WorkspaceRole,
 ) {
-  const project = await findProjectInWorkspace(projectId, workspaceId);
-  if (!project) {
+  const hasAccess = await canAccessProject(userId, workspaceId, role, projectId);
+  if (!hasAccess) {
     return null;
   }
 

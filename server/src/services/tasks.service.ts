@@ -1,5 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { notifyTaskAssigned } from "./notifications.service.js";
+import { canAccessProject, getAccessibleTaskWhere } from "./project-access.service.js";
+import type { WorkspaceRole } from "./workspace-context.service.js";
 
 type CreateTaskInput = {
   projectId: string;
@@ -109,23 +111,14 @@ function mapTaskDetail(task: {
   };
 }
 
-export async function getTasks(workspaceId: string) {
+export async function getTasks(workspaceId: string, userId: string, role: WorkspaceRole) {
   const tasks = await prisma.task.findMany({
-    where: {
-      project: { workspaceId },
-    },
+    where: getAccessibleTaskWhere(userId, workspaceId, role),
     orderBy: { updatedAt: "desc" },
     select: taskDetailSelect,
   });
 
   return tasks.map(mapTaskDetail);
-}
-
-async function findProjectInWorkspace(projectId: string, workspaceId: string) {
-  return prisma.project.findFirst({
-    where: { id: projectId, workspaceId },
-    select: { id: true },
-  });
 }
 
 export async function findTaskInWorkspace(taskId: string, workspaceId: string) {
@@ -148,9 +141,14 @@ async function resolveAssigneeId(assigneeId?: string | null) {
   return user?.id ?? null;
 }
 
-export async function createTask(workspaceId: string, input: CreateTaskInput) {
-  const project = await findProjectInWorkspace(input.projectId, workspaceId);
-  if (!project) {
+export async function createTask(
+  workspaceId: string,
+  userId: string,
+  role: WorkspaceRole,
+  input: CreateTaskInput,
+) {
+  const hasAccess = await canAccessProject(userId, workspaceId, role, input.projectId);
+  if (!hasAccess) {
     return null;
   }
 
@@ -211,14 +209,21 @@ export async function updateTask(
   workspaceId: string,
   id: string,
   input: UpdateTaskInput,
+  userId: string,
+  role: WorkspaceRole,
   actorId?: string,
 ) {
   const existing = await prisma.task.findFirst({
     where: { id, project: { workspaceId } },
-    select: { id: true, title: true, assigneeId: true },
+    select: { id: true, title: true, assigneeId: true, projectId: true },
   });
 
   if (!existing) {
+    return null;
+  }
+
+  const hasAccess = await canAccessProject(userId, workspaceId, role, existing.projectId);
+  if (!hasAccess) {
     return null;
   }
 
@@ -274,10 +279,23 @@ export async function updateTask(
   return mapTaskDetail(task);
 }
 
-export async function deleteTask(workspaceId: string, id: string) {
-  const existing = await findTaskInWorkspace(id, workspaceId);
+export async function deleteTask(
+  workspaceId: string,
+  id: string,
+  userId: string,
+  role: WorkspaceRole,
+) {
+  const existing = await prisma.task.findFirst({
+    where: { id, project: { workspaceId } },
+    select: { id: true, projectId: true },
+  });
 
   if (!existing) {
+    return null;
+  }
+
+  const hasAccess = await canAccessProject(userId, workspaceId, role, existing.projectId);
+  if (!hasAccess) {
     return null;
   }
 

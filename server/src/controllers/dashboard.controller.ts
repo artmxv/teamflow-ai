@@ -15,7 +15,7 @@ export async function getDashboardSummaryController(
       return;
     }
 
-    const summary = await getDashboardSummary(context.workspaceId);
+    const summary = await getDashboardSummary(context.workspaceId, req.userId!, context.role);
     res.json({ data: summary });
   } catch (error) {
     next(error);

@@ -46,6 +46,14 @@ export function workspaceRoleLabel(role: AuthWorkspace["role"], t: (k: TKey) => 
   return t(keys[role]);
 }
 
+export function isWorkspaceManager(role: AuthWorkspace["role"] | null | undefined): boolean {
+  return role === "OWNER" || role === "ADMIN";
+}
+
+export function canManageWorkspaceTeam(role: AuthWorkspace["role"] | null | undefined): boolean {
+  return role === "OWNER";
+}
+
 export function nameToInitials(name: string): string {
   return name
     .trim()

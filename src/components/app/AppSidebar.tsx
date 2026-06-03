@@ -16,7 +16,7 @@ import {
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useI18n, type TKey } from "@/lib/i18n";
-import { nameToInitials } from "@/lib/auth/use-current-user";
+import { nameToInitials, isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user";
 import { NewProjectDialog } from "./QuickActionDialogs";
 import type { Workspace } from "./AppShell";
 import { fetchProjects } from "@/lib/api/projects";
@@ -65,6 +65,8 @@ export function AppSidebar({
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { t } = useI18n();
+  const { data: me } = useCurrentUser();
+  const canManageProjects = isWorkspaceManager(me?.workspace?.role);
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["projects"],
     queryFn: fetchProjects,
@@ -232,23 +234,25 @@ export function AppSidebar({
                 </li>
               );
             })}
-            <li>
-              <NewProjectDialog
-                workspaceId={activeWorkspace.id !== "loading" ? activeWorkspace.id : undefined}
-              >
-                <button
-                  type="button"
-                  title={collapsed ? t("common.newProject") : undefined}
-                  className={cn(
-                    "flex w-full items-center rounded-lg text-sm text-muted-foreground hover:text-foreground",
-                    collapsed ? "justify-center px-2 py-2" : "gap-2 px-3 py-1.5",
-                  )}
+            {canManageProjects ? (
+              <li>
+                <NewProjectDialog
+                  workspaceId={activeWorkspace.id !== "loading" ? activeWorkspace.id : undefined}
                 >
-                  <Plus className={cn("shrink-0", collapsed ? "size-4" : "size-3.5")} />
-                  {!collapsed && t("common.newProject")}
-                </button>
-              </NewProjectDialog>
-            </li>
+                  <button
+                    type="button"
+                    title={collapsed ? t("common.newProject") : undefined}
+                    className={cn(
+                      "flex w-full items-center rounded-lg text-sm text-muted-foreground hover:text-foreground",
+                      collapsed ? "justify-center px-2 py-2" : "gap-2 px-3 py-1.5",
+                    )}
+                  >
+                    <Plus className={cn("shrink-0", collapsed ? "size-4" : "size-3.5")} />
+                    {!collapsed && t("common.newProject")}
+                  </button>
+                </NewProjectDialog>
+              </li>
+            ) : null}
           </ul>
         </nav>
 

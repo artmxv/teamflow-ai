@@ -7,6 +7,7 @@ import {
   getProjectMembers,
   removeProjectMember,
 } from "../services/project-members.service.js";
+import { canManageProjects } from "../services/project-access.service.js";
 import { getUserWorkspaceContext } from "../services/workspace-context.service.js";
 
 const addProjectMemberSchema = z.object({
@@ -52,7 +53,12 @@ export async function getProjectMembersController(req: Request, res: Response, n
       return;
     }
 
-    const members = await getProjectMembers(context.workspaceId, projectId);
+    const members = await getProjectMembers(
+      context.workspaceId,
+      projectId,
+      req.userId!,
+      context.role,
+    );
     if (members === null) {
       res.status(404).json({ message: "Project not found" });
       return;
@@ -72,6 +78,13 @@ export async function getAvailableProjectMembersController(
   try {
     const context = await resolveWorkspace(req, res);
     if (!context) {
+      return;
+    }
+
+    if (!canManageProjects(context.role)) {
+      res.status(403).json({
+        message: "Project management is available to owners and admins.",
+      });
       return;
     }
 
@@ -96,6 +109,13 @@ export async function addProjectMemberController(req: Request, res: Response, ne
   try {
     const context = await resolveWorkspace(req, res);
     if (!context) {
+      return;
+    }
+
+    if (!canManageProjects(context.role)) {
+      res.status(403).json({
+        message: "Project management is available to owners and admins.",
+      });
       return;
     }
 
@@ -145,6 +165,13 @@ export async function removeProjectMemberController(
   try {
     const context = await resolveWorkspace(req, res);
     if (!context) {
+      return;
+    }
+
+    if (!canManageProjects(context.role)) {
+      res.status(403).json({
+        message: "Project management is available to owners and admins.",
+      });
       return;
     }
 

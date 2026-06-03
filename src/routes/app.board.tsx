@@ -38,6 +38,7 @@ import {
   type TaskApiPriority,
   type TaskApiStatus,
 } from "@/lib/api/tasks";
+import { fetchProjects } from "@/lib/api/projects";
 import { taskStatusLabel, useI18n } from "@/lib/i18n";
 import { Filter, Plus } from "lucide-react";
 import { buildAssigneeOptions, resolveTaskAssignee } from "@/lib/assignee-options";
@@ -80,6 +81,15 @@ function Board() {
     queryKey: ["tasks"],
     queryFn: fetchTasks,
   });
+  const { data: apiProjects = [] } = useQuery({
+    queryKey: ["projects"],
+    queryFn: fetchProjects,
+  });
+  const projectOptions = useMemo(
+    () => apiProjects.map((project) => ({ id: project.id, name: project.name })),
+    [apiProjects],
+  );
+  const hasAccessibleProjects = projectOptions.length > 0;
   const createTaskMutation = useMutation({
     mutationFn: createTask,
     onSuccess: async () => {
@@ -172,7 +182,6 @@ function Board() {
       : null;
   const [activeDragTask, setActiveDragTask] = useState<Task | null>(null);
   const suppressCardClickRef = useRef(false);
-  const projectId = apiTasks[0]?.projectId;
   const taskList = apiTasks.map(mapApiTaskToTask);
 
   const dragSensors = useSensors(
@@ -223,13 +232,14 @@ function Board() {
   }
 
   async function handleCreateTask(values: TaskFormValues) {
-    if (!projectId) {
-      toast.error(t("tasks.projectRequired"));
+    const targetProjectId = values.projectId ?? projectOptions[0]?.id;
+    if (!targetProjectId) {
+      toast.error(t("tasks.noAccessibleProjects"));
       throw new Error("Project is required.");
     }
 
     await createTaskMutation.mutateAsync({
-      projectId,
+      projectId: targetProjectId,
       title: values.title.trim(),
       description: values.description?.trim() || undefined,
       status: taskStatusToApi[values.status],
@@ -253,15 +263,23 @@ function Board() {
           <p className="text-sm text-muted-foreground">{t("board.subtitle")}</p>
         </div>
         <div className="flex gap-2">
-          <NewTaskDialog
-            isSubmitting={createTaskMutation.isPending}
-            assigneeOptions={assigneeOptions}
-            onSubmit={handleCreateTask}
-          >
-            <Button size="sm" className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-              <Plus className="size-4" /> {t("common.newTask")}
-            </Button>
-          </NewTaskDialog>
+          {hasAccessibleProjects ? (
+            <NewTaskDialog
+              isSubmitting={createTaskMutation.isPending}
+              assigneeOptions={assigneeOptions}
+              projectOptions={projectOptions}
+              onSubmit={handleCreateTask}
+            >
+              <Button
+                size="sm"
+                className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
+              >
+                <Plus className="size-4" /> {t("common.newTask")}
+              </Button>
+            </NewTaskDialog>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t("tasks.noAccessibleProjects")}</p>
+          )}
         </div>
       </div>
 
@@ -328,6 +346,7 @@ function Board() {
                 initialStatus: col.key,
                 isSubmitting: createTaskMutation.isPending,
                 assigneeOptions,
+                projectOptions: hasAccessibleProjects ? projectOptions : undefined,
                 onSubmit: handleCreateTask,
               } as const;
               return (
@@ -337,15 +356,17 @@ function Board() {
                   status={col.key}
                   count={isLoading ? 0 : colTasks.length}
                   headerAction={
-                    <NewTaskDialog {...newTaskDialogProps}>
-                      <button
-                        type="button"
-                        className="rounded-md p-1 text-muted-foreground hover:bg-card hover:text-foreground"
-                        aria-label={`${t("common.newTask")} — ${columnTitle}`}
-                      >
-                        <Plus className="size-3.5" />
-                      </button>
-                    </NewTaskDialog>
+                    hasAccessibleProjects ? (
+                      <NewTaskDialog {...newTaskDialogProps}>
+                        <button
+                          type="button"
+                          className="rounded-md p-1 text-muted-foreground hover:bg-card hover:text-foreground"
+                          aria-label={`${t("common.newTask")} — ${columnTitle}`}
+                        >
+                          <Plus className="size-3.5" />
+                        </button>
+                      </NewTaskDialog>
+                    ) : null
                   }
                 >
                   {isLoading ? (
@@ -372,14 +393,16 @@ function Board() {
                       )}
                     </>
                   )}
-                  <NewTaskDialog {...newTaskDialogProps}>
-                    <button
-                      type="button"
-                      className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-border py-2 text-xs text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
-                    >
-                      <Plus className="size-3.5" /> {t("board.addNewCard")}
-                    </button>
-                  </NewTaskDialog>
+                  {hasAccessibleProjects ? (
+                    <NewTaskDialog {...newTaskDialogProps}>
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-border py-2 text-xs text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
+                      >
+                        <Plus className="size-3.5" /> {t("board.addNewCard")}
+                      </button>
+                    </NewTaskDialog>
+                  ) : null}
                 </BoardColumn>
               );
             })}

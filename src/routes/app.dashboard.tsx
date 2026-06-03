@@ -35,6 +35,7 @@ import type { TasksSearch } from "@/routes/app.tasks";
 import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
 import { Avatar } from "@/components/app/Avatar";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
+import { isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -99,6 +100,8 @@ const analyticsPeriods: DashboardAnalyticsPeriod[] = ["week", "month", "year"];
 
 function Dashboard() {
   const { t, lang } = useI18n();
+  const { data: me } = useCurrentUser();
+  const canManageProjects = isWorkspaceManager(me?.workspace?.role);
   const [activityPeriod, setActivityPeriod] = useState<DashboardAnalyticsPeriod>("week");
   const { data, error, isError, isLoading, refetch } = useQuery({
     queryKey: ["dashboard-summary"],
@@ -251,11 +254,13 @@ function Dashboard() {
           <h1 className="text-2xl font-semibold tracking-tight">{t("dashboard.overviewTitle")}</h1>
           <p className="text-sm text-muted-foreground">{t("dashboard.overviewSubtitle")}</p>
         </div>
-        <NewProjectDialog>
-          <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-            {t("common.newProject")} <ArrowUpRight className="size-4" />
-          </Button>
-        </NewProjectDialog>
+        {canManageProjects ? (
+          <NewProjectDialog>
+            <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+              {t("common.newProject")} <ArrowUpRight className="size-4" />
+            </Button>
+          </NewProjectDialog>
+        ) : null}
       </div>
 
       {isLoading ? (

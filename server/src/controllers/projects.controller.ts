@@ -7,6 +7,7 @@ import {
   getProjects,
   updateProject,
 } from "../services/projects.service.js";
+import { canManageProjects } from "../services/project-access.service.js";
 import { getUserWorkspaceContext } from "../services/workspace-context.service.js";
 
 const createProjectSchema = z.object({
@@ -46,7 +47,7 @@ export async function getProjectsController(req: Request, res: Response, next: N
       return;
     }
 
-    const projects = await getProjects(context.workspaceId);
+    const projects = await getProjects(context.workspaceId, req.userId!, context.role);
     res.json({ data: projects });
   } catch (error) {
     next(error);
@@ -57,6 +58,13 @@ export async function createProjectController(req: Request, res: Response, next:
   try {
     const context = await resolveWorkspace(req, res);
     if (!context) {
+      return;
+    }
+
+    if (!canManageProjects(context.role)) {
+      res.status(403).json({
+        message: "Only workspace owners and admins can create projects.",
+      });
       return;
     }
 
@@ -85,6 +93,13 @@ export async function updateProjectController(req: Request, res: Response, next:
   try {
     const context = await resolveWorkspace(req, res);
     if (!context) {
+      return;
+    }
+
+    if (!canManageProjects(context.role)) {
+      res.status(403).json({
+        message: "Project management is available to owners and admins.",
+      });
       return;
     }
 
@@ -126,6 +141,13 @@ export async function deleteProjectController(req: Request, res: Response, next:
       return;
     }
 
+    if (!canManageProjects(context.role)) {
+      res.status(403).json({
+        message: "Project management is available to owners and admins.",
+      });
+      return;
+    }
+
     const projectId = req.params.id;
     if (typeof projectId !== "string") {
       res.status(404).json({
@@ -143,14 +165,16 @@ export async function deleteProjectController(req: Request, res: Response, next:
       return;
     }
 
-    if (result.ok === false && result.reason === "HAS_TASKS") {
+    if ("ok" in result && result.ok === false && result.reason === "HAS_TASKS") {
       res.status(409).json({
         message: "This project has tasks. Move or delete its tasks before deleting the project.",
       });
       return;
     }
 
-    res.json({ data: { id: result.id } });
+    if ("id" in result) {
+      res.json({ data: { id: result.id } });
+    }
   } catch (error) {
     next(error);
   }
