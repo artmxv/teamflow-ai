@@ -141,7 +141,12 @@ function Board() {
       input,
     }: {
       id: string;
-      input: { assigneeId: string | null; dueDate: string | null };
+      input: {
+        assigneeId: string | null;
+        dueDate: string | null;
+        status: TaskApiStatus;
+        priority: TaskApiPriority;
+      };
     }) => updateTask(id, input),
     onSuccess: async (updated) => {
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
@@ -399,9 +404,17 @@ function Board() {
         task={selected}
         assignee={selectedAssignee}
         assigneeOptions={assigneeOptions}
-        onSaveChanges={({ assigneeId, dueDate }) => {
+        onSaveChanges={({ assigneeId, dueDate, status, priority }) => {
           if (!selected || updateAssigneeMutation.isPending) return;
-          updateAssigneeMutation.mutate({ id: selected.id, input: { assigneeId, dueDate } });
+          updateAssigneeMutation.mutate({
+            id: selected.id,
+            input: {
+              assigneeId,
+              dueDate,
+              status: taskStatusToApi[status],
+              priority: taskPriorityToApi[priority],
+            },
+          });
         }}
         isSaving={updateAssigneeMutation.isPending}
         onOpenChange={(o) => !o && setSelected(null)}

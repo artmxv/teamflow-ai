@@ -49,7 +49,15 @@ import {
   type TaskAttachmentApiItem,
 } from "@/lib/api/task-attachments";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
-import { type Task, getMember, getProject, priorityMeta, statusColumns } from "@/lib/mock-data";
+import {
+  type Priority,
+  type Task,
+  type TaskStatus,
+  getMember,
+  getProject,
+  priorityMeta,
+  statusColumns,
+} from "@/lib/mock-data";
 import { Avatar } from "./Avatar";
 import {
   Calendar,
@@ -70,6 +78,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+export type TaskDrawerUpdates = {
+  assigneeId: string | null;
+  dueDate: string | null;
+  status: TaskStatus;
+  priority: Priority;
+};
+
 export function TaskDrawer({
   task,
   assignee,
@@ -84,7 +99,7 @@ export function TaskDrawer({
   assignee?: AssigneeOption | null;
   assigneeOptions?: AssigneeOption[];
   onOpenChange: (open: boolean) => void;
-  onSaveChanges?: (updates: { assigneeId: string | null; dueDate: string | null }) => void;
+  onSaveChanges?: (updates: TaskDrawerUpdates) => void;
   isSaving?: boolean;
   onDelete?: (taskId: string) => void;
   isDeleting?: boolean;
@@ -95,6 +110,8 @@ export function TaskDrawer({
   const [aiOpen, setAiOpen] = useState(false);
   const [draftAssigneeId, setDraftAssigneeId] = useState<string | null>(null);
   const [draftDueDate, setDraftDueDate] = useState<string | null>(null);
+  const [draftStatus, setDraftStatus] = useState<TaskStatus>("backlog");
+  const [draftPriority, setDraftPriority] = useState<Priority>("medium");
   const [commentBody, setCommentBody] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -102,7 +119,9 @@ export function TaskDrawer({
     if (!task) return;
     setDraftAssigneeId(task.assigneeId);
     setDraftDueDate(task.dueDate);
-  }, [task?.id, task?.assigneeId, task?.dueDate]);
+    setDraftStatus(task.status);
+    setDraftPriority(task.priority);
+  }, [task?.id, task?.assigneeId, task?.dueDate, task?.status, task?.priority]);
 
   useEffect(() => {
     setCommentBody("");
@@ -200,14 +219,23 @@ export function TaskDrawer({
   const canEditAssignee = canEditTask && assigneeOptions.length > 0;
   const hasAssigneeChanges = draftSelectValue !== savedSelectValue;
   const hasDueDateChanges = (draftDueDate ?? null) !== (task.dueDate ?? null);
+  const hasStatusChanges = draftStatus !== task.status;
+  const hasPriorityChanges = draftPriority !== task.priority;
+  const hasChanges =
+    hasAssigneeChanges || hasDueDateChanges || hasStatusChanges || hasPriorityChanges;
   const project = getProject(task.projectId);
   const prio = priorityMeta[task.priority];
   const statusLabel = statusColumns.find((s) => s.key === task.status)?.title ?? task.status;
 
-  function handleSaveAssignee() {
+  function handleSaveChanges() {
     if (!onSaveChanges || isSaving) return;
-    if (!hasAssigneeChanges && !hasDueDateChanges) return;
-    onSaveChanges({ assigneeId: draftAssigneeId, dueDate: draftDueDate });
+    if (!hasChanges) return;
+    onSaveChanges({
+      assigneeId: draftAssigneeId,
+      dueDate: draftDueDate,
+      status: draftStatus,
+      priority: draftPriority,
+    });
   }
 
   return (
@@ -392,14 +420,54 @@ export function TaskDrawer({
 
           <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
             <Field icon={CircleDot} label="Status">
-              <Badge variant="secondary" className="border-0">
-                {statusLabel}
-              </Badge>
+              {canEditTask ? (
+                <Select
+                  value={draftStatus}
+                  disabled={isSaving}
+                  onValueChange={(value) => setDraftStatus(value as TaskStatus)}
+                >
+                  <SelectTrigger className="h-9 w-full">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusColumns.map((column) => (
+                      <SelectItem key={column.key} value={column.key}>
+                        {column.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Badge variant="secondary" className="border-0">
+                  {statusLabel}
+                </Badge>
+              )}
             </Field>
             <Field icon={Flag} label="Priority">
-              <Badge variant="secondary" className={prio.className + " border-0"}>
-                {prio.label}
-              </Badge>
+              {canEditTask ? (
+                <Select
+                  value={draftPriority}
+                  disabled={isSaving}
+                  onValueChange={(value) => setDraftPriority(value as Priority)}
+                >
+                  <SelectTrigger className="h-9 w-full">
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(
+                      Object.entries(priorityMeta) as [Priority, (typeof priorityMeta)[Priority]][]
+                    ).map(([key, meta]) => (
+                      <SelectItem key={key} value={key}>
+                        {meta.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Badge variant="secondary" className={prio.className + " border-0"}>
+                  {prio.label}
+                </Badge>
+              )}
             </Field>
             <Field icon={UserIcon} label="Assignee">
               {canEditAssignee ? (
@@ -467,8 +535,8 @@ export function TaskDrawer({
                 type="button"
                 size="sm"
                 className="w-full bg-gradient-brand text-white shadow-glow hover:opacity-95"
-                disabled={(!hasAssigneeChanges && !hasDueDateChanges) || isSaving}
-                onClick={handleSaveAssignee}
+                disabled={!hasChanges || isSaving}
+                onClick={handleSaveChanges}
               >
                 {isSaving ? "Saving…" : "Save changes"}
               </Button>
