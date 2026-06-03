@@ -246,7 +246,12 @@ function ProjectDetailPage() {
       input,
     }: {
       id: string;
-      input: { assigneeId: string | null; dueDate: string | null };
+      input: {
+        assigneeId: string | null;
+        dueDate: string | null;
+        status: TaskApiStatus;
+        priority: TaskApiPriority;
+      };
     }) => updateTask(id, input),
     onSuccess: async (updated) => {
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
@@ -351,11 +356,16 @@ function ProjectDetailPage() {
         task={selectedTask}
         assignee={selectedAssignee}
         assigneeOptions={assigneeOptions}
-        onSaveChanges={({ assigneeId, dueDate }) => {
+        onSaveChanges={({ assigneeId, dueDate, status, priority }) => {
           if (!selectedTask || updateAssigneeMutation.isPending) return;
           updateAssigneeMutation.mutate({
             id: selectedTask.id,
-            input: { assigneeId, dueDate },
+            input: {
+              assigneeId,
+              dueDate,
+              status: taskStatusToApi[status],
+              priority: taskPriorityToApi[priority],
+            },
           });
         }}
         isSaving={updateAssigneeMutation.isPending}
