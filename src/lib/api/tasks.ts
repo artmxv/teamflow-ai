@@ -5,6 +5,13 @@ import type { ProjectApiStatus } from "./projects";
 export type TaskApiStatus = "BACKLOG" | "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE";
 export type TaskApiPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
+export type TaskAssigneeUser = {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+};
+
 export interface TaskApiItem {
   id: string;
   key: string;
@@ -13,7 +20,11 @@ export interface TaskApiItem {
   description: string | null;
   status: TaskApiStatus;
   priority: TaskApiPriority;
+  assigneeIds: string[];
+  assignees: TaskAssigneeUser[];
+  /** Legacy primary assignee (first in assigneeIds). */
   assigneeId: string | null;
+  assignee: TaskAssigneeUser | null;
   dueDate: string | null;
   createdAt: string;
   updatedAt: string;
@@ -22,12 +33,6 @@ export interface TaskApiItem {
     name: string;
     status: ProjectApiStatus;
   };
-  assignee: {
-    id: string;
-    name: string;
-    email: string;
-    avatar: string | null;
-  } | null;
   commentsCount: number;
   checklistTotal: number;
   checklistDone: number;
@@ -59,6 +64,8 @@ export interface CreateTaskInput {
   description?: string;
   status?: TaskApiStatus;
   priority?: TaskApiPriority;
+  assigneeIds?: string[];
+  /** Legacy single assignee; prefer assigneeIds. */
   assigneeId?: string | null;
   dueDate?: string | null;
 }
@@ -73,6 +80,8 @@ export interface UpdateTaskInput {
   description?: string | null;
   status?: TaskApiStatus;
   priority?: TaskApiPriority;
+  assigneeIds?: string[];
+  /** Legacy single assignee; prefer assigneeIds. */
   assigneeId?: string | null;
   dueDate?: string | null;
 }

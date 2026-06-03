@@ -4,7 +4,7 @@ export type DashboardAnalyticsPeriod = "week" | "month" | "year";
 
 export type TaskAnalyticsRecord = Pick<
   TaskApiItem,
-  "status" | "priority" | "assigneeId" | "dueDate" | "createdAt" | "updatedAt"
+  "status" | "priority" | "assigneeIds" | "assigneeId" | "dueDate" | "createdAt" | "updatedAt"
 >;
 
 export interface TaskActivityBucket {
@@ -86,11 +86,12 @@ export function taskMatchesUrlPriorityFilter(
 }
 
 export function taskMatchesUrlAssigneeFilter(
-  task: Pick<TaskAnalyticsRecord, "status" | "assigneeId">,
+  task: Pick<TaskAnalyticsRecord, "status" | "assigneeIds" | "assigneeId">,
   assignee: TasksUrlAssigneeFilter,
 ): boolean {
   if (assignee !== "unassigned") return true;
-  return isOpenStatus(task.status) && !task.assigneeId;
+  const hasAssignees = task.assigneeIds.length > 0 || Boolean(task.assigneeId);
+  return isOpenStatus(task.status) && !hasAssignees;
 }
 
 export function taskMatchesUrlAnalyticsFilters(
@@ -137,7 +138,8 @@ export function computeTaskAnalyticsCounts(
     }
 
     if (isHighPriority(task.priority)) highPriorityOpen += 1;
-    if (!task.assigneeId) unassigned += 1;
+    const hasAssignees = task.assigneeIds.length > 0 || Boolean(task.assigneeId);
+    if (!hasAssignees) unassigned += 1;
   }
 
   return { overdue, dueSoon, highPriorityOpen, unassigned };

@@ -5,7 +5,7 @@ import { type Task, priorityMeta, statusColumns, type TaskStatus } from "@/lib/m
 import { priorityLabel, taskStatusLabel, useI18n } from "@/lib/i18n";
 import type { AssigneeOption } from "@/lib/assignee-options";
 import { cn } from "@/lib/utils";
-import { Avatar } from "./Avatar";
+import { AssigneeAvatars } from "./AssigneeAvatars";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -23,7 +23,7 @@ export type TaskDragData = {
 
 export function TaskCard({
   task,
-  assignee,
+  assignees = [],
   onOpen,
   onStatusChange,
   isStatusUpdating,
@@ -31,7 +31,7 @@ export function TaskCard({
   dragOverlay = false,
 }: {
   task: Task;
-  assignee?: AssigneeOption | null;
+  assignees?: AssigneeOption[];
   onOpen: (task: Task) => void;
   onStatusChange?: (status: TaskStatus) => void;
   isStatusUpdating?: boolean;
@@ -112,11 +112,7 @@ export function TaskCard({
               </span>
             )}
           </div>
-          {assignee ? (
-            <span title={assignee.name} className="shrink-0">
-              <Avatar id={assignee.id} initials={assignee.avatar} size="sm" />
-            </span>
-          ) : null}
+          <AssigneeAvatars assignees={assignees} className="shrink-0" />
         </div>
       </button>
 

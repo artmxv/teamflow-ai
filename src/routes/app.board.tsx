@@ -41,7 +41,12 @@ import {
 import { fetchProjects } from "@/lib/api/projects";
 import { taskStatusLabel, useI18n } from "@/lib/i18n";
 import { Filter, Plus } from "lucide-react";
-import { buildAssigneeOptions, resolveTaskAssignee } from "@/lib/assignee-options";
+import {
+  buildAssigneeOptions,
+  resolveTaskAssignees,
+  taskHasAssignee,
+  taskIsUnassigned,
+} from "@/lib/assignee-options";
 import { taskStatusColumnDotClass } from "@/lib/task-status-theme";
 
 export const Route = createFileRoute("/app/board")({
@@ -153,7 +158,7 @@ function Board() {
     }: {
       id: string;
       input: {
-        assigneeId: string | null;
+        assigneeIds: string[];
         dueDate: string | null;
         status: TaskApiStatus;
         priority: TaskApiPriority;
@@ -172,8 +177,8 @@ function Board() {
     },
   });
   const assigneeOptions = useMemo(() => buildAssigneeOptions(apiTasks), [apiTasks]);
-  const selectedAssignee = useMemo(
-    () => (selected ? resolveTaskAssignee(selected.assigneeId, apiTasks, selected.id) : null),
+  const selectedAssignees = useMemo(
+    () => (selected ? resolveTaskAssignees(apiTasks, selected.id) : []),
     [selected, apiTasks],
   );
   const updatingTaskId =
@@ -244,16 +249,22 @@ function Board() {
       description: values.description?.trim() || undefined,
       status: taskStatusToApi[values.status],
       priority: taskPriorityToApi[values.priority],
-      assigneeId: values.assigneeId || null,
+      assigneeIds: values.assigneeIds ?? [],
       dueDate: values.dueDate || null,
     });
   }
 
-  const filteredTasks = taskList.filter(
-    (task) =>
-      (priority === "all" || task.priority === priority) &&
-      (assignee === "all" || task.assigneeId === assignee),
-  );
+  const filteredTasks = taskList.filter((task) => {
+    const apiTask = apiTasks.find((item) => item.id === task.id);
+    if (!apiTask) {
+      return priority === "all";
+    }
+    const matchesPriority = priority === "all" || task.priority === priority;
+    const matchesAssignee =
+      assignee === "all" ||
+      (assignee === "unassigned" ? taskIsUnassigned(apiTask) : taskHasAssignee(apiTask, assignee));
+    return matchesPriority && matchesAssignee;
+  });
 
   return (
     <AppShell title={t("side.kanban")}>
@@ -378,7 +389,7 @@ function Board() {
                           key={task.id}
                           task={task}
                           draggable
-                          assignee={resolveTaskAssignee(task.assigneeId, apiTasks, task.id)}
+                          assignees={resolveTaskAssignees(apiTasks, task.id)}
                           onOpen={handleOpenTask}
                           onStatusChange={(status) =>
                             handleStatusChange(task.id, task.status, status)
@@ -412,11 +423,7 @@ function Board() {
               <TaskCard
                 task={activeDragTask}
                 dragOverlay
-                assignee={resolveTaskAssignee(
-                  activeDragTask.assigneeId,
-                  apiTasks,
-                  activeDragTask.id,
-                )}
+                assignees={resolveTaskAssignees(apiTasks, activeDragTask.id)}
                 onOpen={() => {}}
               />
             ) : null}
@@ -426,14 +433,14 @@ function Board() {
 
       <TaskDrawer
         task={selected}
-        assignee={selectedAssignee}
+        assignees={selectedAssignees}
         assigneeOptions={assigneeOptions}
-        onSaveChanges={({ assigneeId, dueDate, status, priority }) => {
+        onSaveChanges={({ assigneeIds, dueDate, status, priority }) => {
           if (!selected || updateAssigneeMutation.isPending) return;
           updateAssigneeMutation.mutate({
             id: selected.id,
             input: {
-              assigneeId,
+              assigneeIds,
               dueDate,
               status: taskStatusToApi[status],
               priority: taskPriorityToApi[priority],
@@ -457,6 +464,7 @@ function mapApiTaskToTask(task: TaskApiItem): Task {
     description: task.description ?? "",
     status: apiStatusMap[task.status],
     priority: apiPriorityMap[task.priority],
+    assigneeIds: task.assigneeIds,
     assigneeId: task.assigneeId,
     projectId: task.projectId,
     dueDate: formatDate(task.dueDate),
