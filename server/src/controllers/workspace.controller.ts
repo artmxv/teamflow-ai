@@ -2,7 +2,11 @@ import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 
 import { AuthError } from "../services/auth.service.js";
-import { updateUserWorkspaceSettings } from "../services/workspace-context.service.js";
+import {
+  getUserWorkspaceContext,
+  updateUserWorkspaceSettings,
+} from "../services/workspace-context.service.js";
+import { getWorkspaceMembers } from "../services/workspace-members.service.js";
 
 const updateWorkspaceSchema = z
   .object({
@@ -20,6 +24,30 @@ function handleWorkspaceError(error: unknown, res: Response, next: NextFunction)
     return;
   }
   next(error);
+}
+
+export async function getWorkspaceMembersController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    if (!req.userId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const context = await getUserWorkspaceContext(req.userId);
+    if (!context) {
+      res.status(403).json({ message: "Workspace not found" });
+      return;
+    }
+
+    const members = await getWorkspaceMembers(context.workspaceId);
+    res.json({ data: members });
+  } catch (error) {
+    handleWorkspaceError(error, res, next);
+  }
 }
 
 export async function updateWorkspaceController(req: Request, res: Response, next: NextFunction) {
