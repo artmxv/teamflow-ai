@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,11 +15,20 @@ import {
   type ProjectApiItem,
   type ProjectApiStatus,
 } from "@/lib/api/projects";
-import { useI18n, type TKey } from "@/lib/i18n";
+import { projectStatusLabel, useI18n, type TKey } from "@/lib/i18n";
+import {
+  parseProjectsUrlStatus,
+  projectListStatusFromUrl,
+  projectsUrlStatusFromFilter,
+  type ProjectsSearch,
+} from "@/lib/project-status-url";
 import { Plus, Search, Calendar, ListTodo, FolderKanban, RotateCcw } from "lucide-react";
 
 export const Route = createFileRoute("/app/projects/")({
   beforeLoad: requireAuth,
+  validateSearch: (search: Record<string, unknown>): ProjectsSearch => ({
+    status: parseProjectsUrlStatus(search.status),
+  }),
   head: () => ({ meta: [{ title: "Projects — TeamFlow AI" }] }),
   component: ProjectsIndexPage,
 });
@@ -65,9 +74,31 @@ const projectStatusMap: Record<ProjectStatus, ProjectApiStatus> = {
 
 function ProjectsIndexPage() {
   const { t } = useI18n();
+  const { status: statusFromUrl } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const queryClient = useQueryClient();
-  const [filter, setFilter] = useState<"all" | ProjectStatus>("all");
+  const [filter, setFilter] = useState<"all" | ProjectStatus>(() =>
+    projectListStatusFromUrl(statusFromUrl),
+  );
   const [q, setQ] = useState("");
+
+  useEffect(() => {
+    setFilter(projectListStatusFromUrl(statusFromUrl));
+  }, [statusFromUrl]);
+
+  function updateUrlSearch(patch: Partial<ProjectsSearch>) {
+    void navigate({
+      search: {
+        status: patch.status !== undefined ? patch.status : statusFromUrl,
+      },
+      replace: true,
+    });
+  }
+
+  function setStatusFilter(next: "all" | ProjectStatus) {
+    setFilter(next);
+    updateUrlSearch({ status: projectsUrlStatusFromFilter(next) });
+  }
   const {
     data: apiProjects = [],
     error,
@@ -131,7 +162,7 @@ function ProjectsIndexPage() {
           {filters.map((f) => (
             <button
               key={f.key}
-              onClick={() => setFilter(f.key)}
+              onClick={() => setStatusFilter(f.key)}
               className={
                 "rounded-lg px-3 py-1.5 text-sm transition " +
                 (filter === f.key
@@ -183,7 +214,7 @@ function ProjectsIndexPage() {
           <NoResultsState
             hasActiveFilters={hasActiveFilters}
             onClearFilters={() => {
-              setFilter("all");
+              setStatusFilter("all");
               setQ("");
             }}
           />
@@ -202,7 +233,7 @@ function ProjectsIndexPage() {
                 <div className="flex items-start justify-between">
                   <div className={"h-2 w-12 rounded-full bg-gradient-to-r " + p.color} />
                   <Badge variant="secondary" className={meta.className + " border-0"}>
-                    {meta.label}
+                    {projectStatusLabel(p.status, t)}
                   </Badge>
                 </div>
                 <h3 className="mt-4 text-base font-semibold tracking-tight">{p.name}</h3>

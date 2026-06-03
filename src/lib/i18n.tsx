@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { DashboardTaskPriority, DashboardTaskStatus } from "@/lib/api/dashboard";
-import type { Priority, TaskStatus } from "@/lib/mock-data";
+import type { ProjectApiStatus } from "@/lib/api/projects";
+import type { Priority, ProjectStatus, TaskStatus } from "@/lib/mock-data";
 
 export type Lang = "en" | "ru";
 
@@ -87,7 +88,7 @@ const dict = {
     "board.addNewCard": "Add new card",
     "board.backlog": "Backlog",
     "board.done": "Done",
-    "board.inProgress": "In Progress",
+    "board.inProgress": "In progress",
     "board.review": "Review",
     "board.todo": "Todo",
     "board.title": "Current workflow",
@@ -98,6 +99,8 @@ const dict = {
     "board.filters": "Filters",
     "common.addSeats": "Add seats",
     "common.cancel": "Cancel",
+    "common.delete": "Delete",
+    "common.edit": "Edit",
     "common.changePlan": "Change plan",
     "common.clearFilters": "Clear filters",
     "common.createProject": "Create project",
@@ -135,6 +138,12 @@ const dict = {
     "dashboard.taskStatus": "Task status",
     "dashboard.teamMembers": "Team members",
     "dashboard.weeklyVelocity": "Weekly velocity",
+    "dashboard.viewActiveProjects": "View active projects",
+    "dashboard.viewOpenTasks": "View open tasks",
+    "dashboard.viewCompletedTasks": "View completed tasks",
+    "dashboard.viewTeamMembers": "View team members",
+    "dashboard.viewProject": "View project",
+    "dashboard.viewTask": "View task",
     "nav.features": "Features",
     "nav.product": "Product",
     "nav.pricing": "Pricing",
@@ -147,6 +156,10 @@ const dict = {
     "projects.completed": "Completed",
     "projects.onHold": "On hold",
     "projects.planning": "Planning",
+    "projects.statusPlanning": "Planning",
+    "projects.statusActive": "Active",
+    "projects.statusOnHold": "On hold",
+    "projects.statusCompleted": "Completed",
     "projects.projects": "Projects",
     "projects.searchProjects": "Search projects…",
     "projects.subtitle": "All projects across your workspace.",
@@ -187,6 +200,10 @@ const dict = {
     "projects.detail.addMemberDesc":
       "Choose someone from your workspace who is not already on this project.",
     "projects.detail.allMembersAssigned": "Everyone in your workspace is already on this project.",
+    "projects.detail.deleteProject": "Delete project",
+    "projects.detail.deleteProjectDesc":
+      "This will permanently delete {name}. If the project has tasks, you will be asked to delete or move them first.",
+    "projects.detail.deleting": "Deleting…",
     "projects.detail.editHint": "Use Edit to change status, due date, or description.",
     "projects.detail.unassigned": "Unassigned",
     "projects.detail.status": "Status",
@@ -437,7 +454,7 @@ const dict = {
     "board.backlog": "Бэклог",
     "board.done": "Готово",
     "board.inProgress": "В работе",
-    "board.review": "На проверке",
+    "board.review": "Проверка",
     "board.todo": "К выполнению",
     "board.title": "Текущий процесс",
     "board.subtitle": "Задачи сгруппированы по статусам выполнения",
@@ -447,6 +464,8 @@ const dict = {
     "board.filters": "Фильтры",
     "common.addSeats": "Добавить места",
     "common.cancel": "Отмена",
+    "common.delete": "Удалить",
+    "common.edit": "Редактировать",
     "common.changePlan": "Сменить план",
     "common.clearFilters": "Сбросить фильтры",
     "common.createProject": "Создать проект",
@@ -485,6 +504,12 @@ const dict = {
     "dashboard.taskStatus": "Статус задач",
     "dashboard.teamMembers": "Участники команды",
     "dashboard.weeklyVelocity": "Недельная скорость",
+    "dashboard.viewActiveProjects": "Открыть активные проекты",
+    "dashboard.viewOpenTasks": "Открыть открытые задачи",
+    "dashboard.viewCompletedTasks": "Открыть завершённые задачи",
+    "dashboard.viewTeamMembers": "Открыть участников команды",
+    "dashboard.viewProject": "Открыть проект",
+    "dashboard.viewTask": "Открыть задачу",
     "nav.features": "Возможности",
     "nav.product": "Продукт",
     "nav.pricing": "Цены",
@@ -497,6 +522,10 @@ const dict = {
     "projects.completed": "Завершённые",
     "projects.onHold": "На паузе",
     "projects.planning": "Планирование",
+    "projects.statusPlanning": "Планирование",
+    "projects.statusActive": "Активный",
+    "projects.statusOnHold": "На паузе",
+    "projects.statusCompleted": "Завершён",
     "projects.projects": "Проекты",
     "projects.searchProjects": "Поиск проектов…",
     "projects.subtitle": "Все проекты вашего пространства.",
@@ -537,7 +566,11 @@ const dict = {
     "projects.detail.addMemberDesc":
       "Выберите человека из пространства, который ещё не в этом проекте.",
     "projects.detail.allMembersAssigned": "Все участники пространства уже в этом проекте.",
-    "projects.detail.editHint": "Через «Изменить» можно обновить статус, срок и описание.",
+    "projects.detail.deleteProject": "Удалить проект",
+    "projects.detail.deleteProjectDesc":
+      "Проект {name} будет удалён без возможности восстановления. Если в проекте есть задачи, их нужно сначала удалить или перенести.",
+    "projects.detail.deleting": "Удаление…",
+    "projects.detail.editHint": "Через «Редактировать» можно обновить статус, срок и описание.",
     "projects.detail.unassigned": "Не назначен",
     "projects.detail.status": "Статус",
     "projects.detail.dueDate": "Срок",
@@ -725,7 +758,7 @@ const dashboardStatusKeys: Record<DashboardTaskStatus, TKey> = {
   BACKLOG: "board.backlog",
   TODO: "board.todo",
   IN_PROGRESS: "board.inProgress",
-  REVIEW: "tasks.review",
+  REVIEW: "board.review",
   DONE: "board.done",
 };
 
@@ -734,6 +767,20 @@ const dashboardPriorityKeys: Record<DashboardTaskPriority, TKey> = {
   MEDIUM: "tasks.priorityMedium",
   HIGH: "tasks.priorityHigh",
   URGENT: "tasks.priorityUrgent",
+};
+
+const projectStatusKeys: Record<ProjectStatus, TKey> = {
+  planning: "projects.statusPlanning",
+  active: "projects.statusActive",
+  on_hold: "projects.statusOnHold",
+  completed: "projects.statusCompleted",
+};
+
+const projectApiStatusKeys: Record<ProjectApiStatus, TKey> = {
+  PLANNING: "projects.statusPlanning",
+  ACTIVE: "projects.statusActive",
+  ON_HOLD: "projects.statusOnHold",
+  COMPLETED: "projects.statusCompleted",
 };
 
 const mockTeamRoleKeys = {
@@ -756,6 +803,14 @@ export function dashboardStatusLabel(status: DashboardTaskStatus, t: (k: TKey) =
 
 export function dashboardPriorityLabel(priority: DashboardTaskPriority, t: (k: TKey) => string) {
   return t(dashboardPriorityKeys[priority]);
+}
+
+export function projectStatusLabel(status: ProjectStatus, t: (k: TKey) => string) {
+  return t(projectStatusKeys[status]);
+}
+
+export function projectApiStatusLabel(status: ProjectApiStatus, t: (k: TKey) => string) {
+  return t(projectApiStatusKeys[status]);
 }
 
 export function mockTeamRoleLabel(role: keyof typeof mockTeamRoleKeys, t: (k: TKey) => string) {
