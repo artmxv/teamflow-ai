@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -28,7 +28,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { type AssigneeOption, UNASSIGNED_ASSIGNEE_VALUE } from "@/lib/assignee-options";
+import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
+import { AssigneeMultiPicker } from "@/components/app/AssigneeMultiPicker";
+import { fetchProjectMembers } from "@/lib/api/project-members";
+import {
+  buildAssigneeOptionsFromProjectMembers,
+  mergeAssigneeOptions,
+  type AssigneeOption,
+} from "@/lib/assignee-options";
 import {
   createTaskComment,
   deleteTaskComment,
@@ -54,7 +61,6 @@ import {
   type Priority,
   type Task,
   type TaskStatus,
-  getMember,
   getProject,
   priorityMeta,
   statusColumns,
@@ -80,15 +86,22 @@ import {
 import { cn } from "@/lib/utils";
 
 export type TaskDrawerUpdates = {
-  assigneeId: string | null;
+  assigneeIds: string[];
   dueDate: string | null;
   status: TaskStatus;
   priority: Priority;
 };
 
+function sameAssigneeIds(a: string[], b: string[]) {
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort();
+  const sortedB = [...b].sort();
+  return sortedA.every((id, index) => id === sortedB[index]);
+}
+
 export function TaskDrawer({
   task,
-  assignee,
+  assignees = [],
   assigneeOptions = [],
   onOpenChange,
   onSaveChanges,
@@ -97,7 +110,7 @@ export function TaskDrawer({
   isDeleting = false,
 }: {
   task: Task | null;
-  assignee?: AssigneeOption | null;
+  assignees?: AssigneeOption[];
   assigneeOptions?: AssigneeOption[];
   onOpenChange: (open: boolean) => void;
   onSaveChanges?: (updates: TaskDrawerUpdates) => void;
@@ -110,7 +123,7 @@ export function TaskDrawer({
   const { data: me } = useCurrentUser();
   const currentUserId = me?.user.id;
   const [aiOpen, setAiOpen] = useState(false);
-  const [draftAssigneeId, setDraftAssigneeId] = useState<string | null>(null);
+  const [draftAssigneeIds, setDraftAssigneeIds] = useState<string[]>([]);
   const [draftDueDate, setDraftDueDate] = useState<string | null>(null);
   const [draftStatus, setDraftStatus] = useState<TaskStatus>("backlog");
   const [draftPriority, setDraftPriority] = useState<Priority>("medium");
@@ -119,11 +132,11 @@ export function TaskDrawer({
 
   useEffect(() => {
     if (!task) return;
-    setDraftAssigneeId(task.assigneeId);
+    setDraftAssigneeIds(task.assigneeIds ?? (task.assigneeId ? [task.assigneeId] : []));
     setDraftDueDate(task.dueDate);
     setDraftStatus(task.status);
     setDraftPriority(task.priority);
-  }, [task?.id, task?.assigneeId, task?.dueDate, task?.status, task?.priority]);
+  }, [task?.id, task?.assigneeIds, task?.assigneeId, task?.dueDate, task?.status, task?.priority]);
 
   useEffect(() => {
     setCommentBody("");
@@ -212,14 +225,28 @@ export function TaskDrawer({
     },
   });
 
+  const projectMembersQuery = useQuery({
+    queryKey: ["project-members", task?.projectId],
+    queryFn: () => fetchProjectMembers(task!.projectId),
+    enabled: !!task?.projectId,
+  });
+
+  const resolvedAssigneeOptions = useMemo(
+    () =>
+      mergeAssigneeOptions(
+        buildAssigneeOptionsFromProjectMembers(projectMembersQuery.data ?? []),
+        assigneeOptions,
+        assignees,
+      ),
+    [assigneeOptions, assignees, projectMembersQuery.data],
+  );
+
   if (!task) return null;
 
-  const resolvedAssignee = assignee ?? (task.assigneeId ? getMember(task.assigneeId) : null);
-  const draftSelectValue = draftAssigneeId ?? UNASSIGNED_ASSIGNEE_VALUE;
-  const savedSelectValue = task.assigneeId ?? UNASSIGNED_ASSIGNEE_VALUE;
+  const savedAssigneeIds = task.assigneeIds ?? (task.assigneeId ? [task.assigneeId] : []);
   const canEditTask = !!onSaveChanges;
-  const canEditAssignee = canEditTask && assigneeOptions.length > 0;
-  const hasAssigneeChanges = draftSelectValue !== savedSelectValue;
+  const canEditAssignees = canEditTask;
+  const hasAssigneeChanges = !sameAssigneeIds(draftAssigneeIds, savedAssigneeIds);
   const hasDueDateChanges = (draftDueDate ?? null) !== (task.dueDate ?? null);
   const hasStatusChanges = draftStatus !== task.status;
   const hasPriorityChanges = draftPriority !== task.priority;
@@ -233,7 +260,7 @@ export function TaskDrawer({
     if (!onSaveChanges || isSaving) return;
     if (!hasChanges) return;
     onSaveChanges({
-      assigneeId: draftAssigneeId,
+      assigneeIds: draftAssigneeIds,
       dueDate: draftDueDate,
       status: draftStatus,
       priority: draftPriority,
@@ -254,6 +281,21 @@ export function TaskDrawer({
             Task details, checklist, comments, and activity for {task.key}.
           </SheetDescription>
         </SheetHeader>
+
+        {canEditAssignees ? (
+          <section className="border-b border-border py-4">
+            <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <UserIcon className="size-3.5" /> {t("tasks.assignees")}
+            </div>
+            <AssigneeMultiPicker
+              options={resolvedAssigneeOptions}
+              value={draftAssigneeIds}
+              disabled={isSaving}
+              isLoading={projectMembersQuery.isLoading}
+              onChange={setDraftAssigneeIds}
+            />
+          </section>
+        ) : null}
 
         <div className="grid gap-6 py-4 lg:grid-cols-[1fr_220px]">
           <div className="min-w-0 space-y-6">
@@ -471,39 +513,11 @@ export function TaskDrawer({
                 </Badge>
               )}
             </Field>
-            <Field icon={UserIcon} label="Assignee">
-              {canEditAssignee ? (
-                <Select
-                  value={draftSelectValue}
-                  disabled={isSaving}
-                  onValueChange={(value) => {
-                    setDraftAssigneeId(value === UNASSIGNED_ASSIGNEE_VALUE ? null : value);
-                  }}
-                >
-                  <SelectTrigger className="h-9 w-full">
-                    <SelectValue placeholder="Select assignee" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={UNASSIGNED_ASSIGNEE_VALUE}>Unassigned</SelectItem>
-                    {assigneeOptions.map((member) => (
-                      <SelectItem key={member.id} value={member.id}>
-                        <span className="flex items-center gap-2">
-                          <Avatar id={member.id} initials={member.avatar} size="sm" />
-                          {member.name}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : resolvedAssignee ? (
-                <span className="flex items-center gap-2 text-sm">
-                  <Avatar id={resolvedAssignee.id} initials={resolvedAssignee.avatar} size="sm" />
-                  {resolvedAssignee.name}
-                </span>
-              ) : (
-                <span className="text-sm text-muted-foreground">Unassigned</span>
-              )}
-            </Field>
+            {!canEditAssignees ? (
+              <Field icon={UserIcon} label={t("tasks.assignees")}>
+                <AssigneeAvatars assignees={assignees} showUnassignedLabel />
+              </Field>
+            ) : null}
             <Field icon={Calendar} label="Due date">
               {canEditTask ? (
                 <Input

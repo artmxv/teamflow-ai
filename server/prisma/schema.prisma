@@ -49,26 +49,27 @@ enum AiSummaryType {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  name        String
-  displayName String?
-  timezone    String?
-  bio         String?
-  email       String   @unique
+  id           String   @id @default(cuid())
+  name         String
+  displayName  String?
+  timezone     String?
+  bio          String?
+  email        String   @unique
   passwordHash String
-  avatar      String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  avatar       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  workspaceMemberships    WorkspaceMember[]
-  projectMemberships      ProjectMember[]
-  assignedTasks           Task[]
-  comments                TaskComment[]
-  activities              TaskActivity[]
-  uploadedTaskAttachments   TaskAttachment[]
+  workspaceMemberships     WorkspaceMember[]
+  projectMemberships       ProjectMember[]
+  assignedTasks            Task[]
+  taskAssigneeLinks        TaskAssignee[]
+  comments                 TaskComment[]
+  activities               TaskActivity[]
+  uploadedTaskAttachments  TaskAttachment[]
   uploadedProjectDocuments ProjectDocument[]
-  notificationsReceived Notification[] @relation("NotificationRecipient")
-  notificationsSent     Notification[] @relation("NotificationActor")
+  notificationsReceived    Notification[]    @relation("NotificationRecipient")
+  notificationsSent        Notification[]    @relation("NotificationActor")
 }
 
 model Workspace {
@@ -113,7 +114,7 @@ model Project {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace      Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   tasks          Task[]
   documents      ProjectDocument[]
   projectMembers ProjectMember[]
@@ -171,6 +172,7 @@ model Task {
 
   project        Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   assignee       User?               @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+  taskAssignees  TaskAssignee[]
   comments       TaskComment[]
   checklistItems TaskChecklistItem[]
   activities     TaskActivity[]
@@ -181,6 +183,20 @@ model Task {
   @@index([assigneeId])
   @@index([status])
   @@index([priority])
+}
+
+model TaskAssignee {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@index([taskId])
+  @@index([userId])
 }
 
 model TaskComment {

@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import { type Task, type TaskStatus, type Priority } from "@/lib/mock-data";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
-import { Avatar } from "@/components/app/Avatar";
 import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +35,12 @@ import {
   ArrowDown,
   ArrowUpDown,
 } from "lucide-react";
-import { buildAssigneeOptions, resolveTaskAssignee } from "@/lib/assignee-options";
+import {
+  buildAssigneeOptions,
+  resolveTaskAssignees,
+  type AssigneeOption,
+} from "@/lib/assignee-options";
+import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
 import { cycleTaskSort, sortTasks, type TaskSortField, type TaskSortState } from "@/lib/task-sort";
 import { taskStatusChipClass } from "@/lib/task-status-theme";
 import { cn } from "@/lib/utils";
@@ -124,8 +128,8 @@ const priorityMeta: Record<Priority, { labelKey: TKey; tone: string }> = {
 
 type TaskRow = Task & {
   projectName: string;
+  assigneeOptions: AssigneeOption[];
   assigneeName: string | null;
-  assigneeAvatar: string | null;
   commentsCount: number;
   checklistTotal: number;
   checklistDone: number;
@@ -213,7 +217,7 @@ function TasksPage() {
     }: {
       id: string;
       input: {
-        assigneeId: string | null;
+        assigneeIds: string[];
         dueDate: string | null;
         status: TaskApiStatus;
         priority: TaskApiPriority;
@@ -235,8 +239,8 @@ function TasksPage() {
     },
   });
   const assigneeOptions = useMemo(() => buildAssigneeOptions(apiTasks), [apiTasks]);
-  const selectedAssignee = useMemo(
-    () => (selected ? resolveTaskAssignee(selected.assigneeId, apiTasks, selected.id) : null),
+  const selectedAssignees = useMemo(
+    () => (selected ? resolveTaskAssignees(apiTasks, selected.id) : []),
     [selected, apiTasks],
   );
   const taskList = useMemo(() => apiTasks.map(mapApiTaskToRow), [apiTasks]);
@@ -351,7 +355,7 @@ function TasksPage() {
       description: values.description?.trim() || undefined,
       status: taskStatusToApi[values.status],
       priority: taskPriorityToApi[values.priority],
-      assigneeId: values.assigneeId || null,
+      assigneeIds: values.assigneeIds ?? [],
       dueDate: values.dueDate || null,
     });
   }
@@ -508,18 +512,11 @@ function TasksPage() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {task.assigneeName ? (
-                    <>
-                      <Avatar
-                        id={task.assigneeId ?? task.id}
-                        initials={task.assigneeAvatar ?? initials(task.assigneeName)}
-                        size="sm"
-                      />
-                      <span className="truncate text-xs">{task.assigneeName}</span>
-                    </>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  )}
+                  <AssigneeAvatars
+                    assignees={task.assigneeOptions}
+                    showUnassignedLabel
+                    maxVisible={2}
+                  />
                 </div>
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Calendar className="size-3.5" /> {task.dueDate ?? "—"}
@@ -542,14 +539,14 @@ function TasksPage() {
 
       <TaskDrawer
         task={selected}
-        assignee={selectedAssignee}
+        assignees={selectedAssignees}
         assigneeOptions={assigneeOptions}
-        onSaveChanges={({ assigneeId, dueDate, status, priority }) => {
+        onSaveChanges={({ assigneeIds, dueDate, status, priority }) => {
           if (!selected || updateAssigneeMutation.isPending) return;
           updateAssigneeMutation.mutate({
             id: selected.id,
             input: {
-              assigneeId,
+              assigneeIds,
               dueDate,
               status: taskStatusToApi[status],
               priority: taskPriorityToApi[priority],
@@ -569,6 +566,7 @@ function taskRowToAnalyticsRecord(task: TaskRow) {
   return {
     status: taskStatusToApi[task.status],
     priority: taskPriorityToApi[task.priority],
+    assigneeIds: task.assigneeIds,
     assigneeId: task.assigneeId,
     dueDate: task.dueDate,
     createdAt: "",
@@ -577,6 +575,20 @@ function taskRowToAnalyticsRecord(task: TaskRow) {
 }
 
 function mapApiTaskToRow(task: TaskApiItem): TaskRow {
+  const assigneeOptions = task.assignees.map((assignee) => ({
+    id: assignee.id,
+    name: assignee.name,
+    email: assignee.email,
+    avatar:
+      assignee.avatar ??
+      assignee.name
+        .split(" ")
+        .map((part) => part[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase(),
+  }));
+
   return {
     id: task.id,
     key: task.key,
@@ -584,6 +596,7 @@ function mapApiTaskToRow(task: TaskApiItem): TaskRow {
     description: task.description ?? "",
     status: apiStatusMap[task.status],
     priority: apiPriorityMap[task.priority],
+    assigneeIds: task.assigneeIds,
     assigneeId: task.assigneeId,
     projectId: task.projectId,
     dueDate: formatDate(task.dueDate),
@@ -593,8 +606,8 @@ function mapApiTaskToRow(task: TaskApiItem): TaskRow {
     activity: [],
     attachments: [],
     projectName: task.project.name,
-    assigneeName: task.assignee?.name ?? null,
-    assigneeAvatar: task.assignee?.avatar ?? null,
+    assigneeOptions,
+    assigneeName: assigneeOptions[0]?.name ?? null,
     commentsCount: task.commentsCount,
     checklistTotal: task.checklistTotal,
     checklistDone: task.checklistDone,
@@ -606,15 +619,6 @@ function formatDate(value: string | null) {
   if (!value) return null;
   // Keep YYYY-MM-DD so <input type="date" /> works consistently.
   return value.slice(0, 10);
-}
-
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
 }
 
 function LoadingRows() {

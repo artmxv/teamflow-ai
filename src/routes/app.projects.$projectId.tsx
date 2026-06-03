@@ -33,9 +33,10 @@ import { projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
 import { projectApiStatusLabel, projectStatusLabel, useI18n, type TKey } from "@/lib/i18n";
 import {
   buildAssigneeOptions,
-  resolveTaskAssignee,
+  resolveTaskAssignees,
   type AssigneeOption,
 } from "@/lib/assignee-options";
+import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
 import {
   deleteProject,
   fetchProjects,
@@ -262,7 +263,7 @@ function ProjectDetailPage() {
     }: {
       id: string;
       input: {
-        assigneeId: string | null;
+        assigneeIds: string[];
         dueDate: string | null;
         status: TaskApiStatus;
         priority: TaskApiPriority;
@@ -285,9 +286,8 @@ function ProjectDetailPage() {
   });
 
   const assigneeOptions = useMemo(() => buildAssigneeOptions(apiTasks), [apiTasks]);
-  const selectedAssignee = useMemo(
-    () =>
-      selectedTask ? resolveTaskAssignee(selectedTask.assigneeId, apiTasks, selectedTask.id) : null,
+  const selectedAssignees = useMemo(
+    () => (selectedTask ? resolveTaskAssignees(apiTasks, selectedTask.id) : []),
     [selectedTask, apiTasks],
   );
 
@@ -298,7 +298,7 @@ function ProjectDetailPage() {
       description: values.description?.trim() || undefined,
       status: taskStatusToApi[values.status],
       priority: taskPriorityToApi[values.priority],
-      assigneeId: values.assigneeId || null,
+      assigneeIds: values.assigneeIds ?? [],
       dueDate: values.dueDate || null,
     });
   }
@@ -370,14 +370,14 @@ function ProjectDetailPage() {
 
       <TaskDrawer
         task={selectedTask}
-        assignee={selectedAssignee}
+        assignees={selectedAssignees}
         assigneeOptions={assigneeOptions}
-        onSaveChanges={({ assigneeId, dueDate, status, priority }) => {
+        onSaveChanges={({ assigneeIds, dueDate, status, priority }) => {
           if (!selectedTask || updateAssigneeMutation.isPending) return;
           updateAssigneeMutation.mutate({
             id: selectedTask.id,
             input: {
-              assigneeId,
+              assigneeIds,
               dueDate,
               status: taskStatusToApi[status],
               priority: taskPriorityToApi[priority],
@@ -693,6 +693,7 @@ function ProjectDetails({
             <NewTaskDialog
               isSubmitting={isCreatingTask}
               assigneeOptions={assigneeOptions}
+              fixedProjectId={project.id}
               onSubmit={onCreateTask}
             >
               <Button
@@ -747,17 +748,20 @@ function ProjectDetails({
                         </div>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-1">
-                        {task.assignee ? (
-                          <Avatar
-                            id={task.assignee.id}
-                            initials={task.assignee.avatar ?? initialsFromName(task.assignee.name)}
-                            size="sm"
-                          />
-                        ) : (
-                          <span className="text-[10px] text-muted-foreground">
-                            {t("projects.detail.unassigned")}
-                          </span>
-                        )}
+                        <AssigneeAvatars
+                          assignees={
+                            task.assignees.length > 0
+                              ? task.assignees.map((assignee) => ({
+                                  id: assignee.id,
+                                  name: assignee.name,
+                                  email: assignee.email,
+                                  avatar: assignee.avatar ?? initialsFromName(assignee.name),
+                                }))
+                              : []
+                          }
+                          showUnassignedLabel
+                          maxVisible={2}
+                        />
                       </div>
                     </button>
                   </li>
@@ -1498,6 +1502,7 @@ function mapApiTaskToTask(task: TaskApiItem): Task {
     description: task.description ?? "",
     status: apiTaskStatusMap[task.status],
     priority: apiTaskPriorityMap[task.priority],
+    assigneeIds: task.assigneeIds,
     assigneeId: task.assigneeId,
     projectId: task.projectId,
     dueDate: formatTaskDueDate(task.dueDate),

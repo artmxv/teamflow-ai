@@ -42,6 +42,7 @@ export interface Task {
   status: TaskStatus;
   priority: Priority;
   assigneeId: string | null;
+  assigneeIds: string[];
   projectId: string;
   dueDate: string | null;
   labels: string[];
@@ -229,6 +230,7 @@ function makeTask(projectId: string, status: TaskStatus, title: string): Task {
     status,
     priority: priorities[counter % priorities.length],
     assigneeId: assignee,
+    assigneeIds: assignee ? [assignee] : [],
     projectId,
     dueDate: `2026-0${(counter % 9) + 1}-1${counter % 9}`,
     labels: [

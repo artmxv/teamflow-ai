@@ -1,11 +1,12 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
 import { Avatar } from "@/components/app/Avatar";
+import { AssigneeMultiPicker } from "@/components/app/AssigneeMultiPicker";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -27,11 +28,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { addProjectMember } from "@/lib/api/project-members";
+import { addProjectMember, fetchProjectMembers } from "@/lib/api/project-members";
 import { createProject, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
 import { fetchWorkspaceMembers } from "@/lib/api/workspace-members";
 import { nameToInitials, useCurrentWorkspace } from "@/lib/auth/use-current-user";
-import { type AssigneeOption, UNASSIGNED_ASSIGNEE_VALUE } from "@/lib/assignee-options";
+import {
+  buildAssigneeOptionsFromProjectMembers,
+  mergeAssigneeOptions,
+  type AssigneeOption,
+} from "@/lib/assignee-options";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { type Priority, type ProjectStatus, type TaskStatus } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
@@ -65,7 +70,7 @@ const getTaskSchema = (t: Translate) =>
     description: z.string().max(500, t("validation.taskDescriptionMax")).optional(),
     priority: z.enum(["low", "medium", "high", "urgent"]),
     status: z.enum(["backlog", "todo", "in_progress", "review", "done"]),
-    assigneeId: z.string().optional(),
+    assigneeIds: z.array(z.string()).optional(),
     dueDate: z.string().optional(),
   });
 
@@ -313,6 +318,7 @@ type NewTaskDialogProps = {
   initialStatus?: TaskStatus;
   isSubmitting?: boolean;
   assigneeOptions?: AssigneeOption[];
+  fixedProjectId?: string;
   projectOptions?: { id: string; name: string }[];
   onSubmit: (values: TaskFormValues) => Promise<void>;
 };
@@ -322,13 +328,17 @@ export function NewTaskDialog({
   initialStatus = "todo",
   isSubmitting = false,
   assigneeOptions = [],
+  fixedProjectId,
   projectOptions,
   onSubmit,
 }: NewTaskDialogProps) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState(projectOptions?.[0]?.id ?? "");
-  const showProjectSelect = !!projectOptions && projectOptions.length > 0;
+  const [selectedProjectId, setSelectedProjectId] = useState(
+    fixedProjectId ?? projectOptions?.[0]?.id ?? "",
+  );
+  const showProjectSelect = !!projectOptions && projectOptions.length > 0 && !fixedProjectId;
+  const effectiveProjectId = fixedProjectId ?? (showProjectSelect ? selectedProjectId : undefined);
   const {
     control,
     formState: { errors, isValid },
@@ -343,47 +353,64 @@ export function NewTaskDialog({
       description: "",
       priority: "medium",
       status: initialStatus,
-      assigneeId: undefined,
+      assigneeIds: [],
       dueDate: "",
     },
   });
 
+  const watchedAssigneeIds = useWatch({ control, name: "assigneeIds" }) ?? [];
+
+  const projectMembersQuery = useQuery({
+    queryKey: ["project-members", effectiveProjectId],
+    queryFn: () => fetchProjectMembers(effectiveProjectId!),
+    enabled: open && !!effectiveProjectId,
+  });
+
+  const resolvedAssigneeOptions = useMemo(() => {
+    const fromProject = buildAssigneeOptionsFromProjectMembers(projectMembersQuery.data ?? []);
+    const selectedFromIds = watchedAssigneeIds
+      .map((id) => assigneeOptions.find((option) => option.id === id))
+      .filter((option): option is AssigneeOption => Boolean(option));
+
+    return mergeAssigneeOptions(fromProject, assigneeOptions, selectedFromIds);
+  }, [assigneeOptions, projectMembersQuery.data, watchedAssigneeIds]);
+
   useEffect(() => {
     if (!open) return;
-    setSelectedProjectId(projectOptions?.[0]?.id ?? "");
+    setSelectedProjectId(fixedProjectId ?? projectOptions?.[0]?.id ?? "");
     reset({
       title: "",
       description: "",
       priority: "medium",
       status: initialStatus,
-      assigneeId: undefined,
+      assigneeIds: [],
       dueDate: "",
     });
-  }, [open, initialStatus, projectOptions, reset]);
+  }, [open, initialStatus, fixedProjectId, projectOptions, reset]);
 
   async function submit(values: TaskFormValues) {
     try {
-      if (showProjectSelect && !selectedProjectId) {
+      const targetProjectId =
+        fixedProjectId ?? (showProjectSelect ? selectedProjectId : values.projectId);
+      if (!targetProjectId) {
         toast.error(t("tasks.projectRequired"));
         throw new Error("Project is required.");
       }
 
-      // New tasks must use real API user ids (backend rejects mock ids).
-      const normalizedAssigneeId =
-        values.assigneeId && assigneeOptions.some((option) => option.id === values.assigneeId)
-          ? values.assigneeId
-          : undefined;
+      const normalizedAssigneeIds = (values.assigneeIds ?? []).filter((id) =>
+        resolvedAssigneeOptions.some((option) => option.id === id),
+      );
       await onSubmit({
         ...values,
-        assigneeId: normalizedAssigneeId,
-        projectId: showProjectSelect ? selectedProjectId : values.projectId,
+        assigneeIds: normalizedAssigneeIds,
+        projectId: targetProjectId,
       });
       reset({
         title: "",
         description: "",
         priority: "medium",
         status: initialStatus,
-        assigneeId: undefined,
+        assigneeIds: [],
         dueDate: "",
       });
       setOpen(false);
@@ -395,7 +422,7 @@ export function NewTaskDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t("common.newTask")}</DialogTitle>
           <DialogDescription>Add a mock task to the current view.</DialogDescription>
@@ -474,32 +501,23 @@ export function NewTaskDialog({
                 )}
               />
             </Field>
-            <Field label={t("tasks.assignee")} error={errors.assigneeId?.message}>
-              <Controller
-                control={control}
-                name="assigneeId"
-                render={({ field }) => (
-                  <Select
-                    value={field.value ?? UNASSIGNED_ASSIGNEE_VALUE}
-                    onValueChange={(value) => {
-                      field.onChange(value === UNASSIGNED_ASSIGNEE_VALUE ? undefined : value);
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select assignee" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={UNASSIGNED_ASSIGNEE_VALUE}>Unassigned</SelectItem>
-                      {assigneeOptions.map((option) => (
-                        <SelectItem key={option.id} value={option.id}>
-                          {option.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </Field>
+            <div className="sm:col-span-2">
+              <Field label={t("tasks.assignees")} error={errors.assigneeIds?.message}>
+                <Controller
+                  control={control}
+                  name="assigneeIds"
+                  render={({ field }) => (
+                    <AssigneeMultiPicker
+                      options={resolvedAssigneeOptions}
+                      value={field.value ?? []}
+                      disabled={isSubmitting}
+                      isLoading={!!effectiveProjectId && projectMembersQuery.isLoading}
+                      onChange={field.onChange}
+                    />
+                  )}
+                />
+              </Field>
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>

@@ -9,6 +9,7 @@ type CreateTaskInput = {
   description?: string;
   status?: "BACKLOG" | "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE";
   priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+  assigneeIds?: string[];
   assigneeId?: string | null;
   dueDate?: string | null;
 };
@@ -18,9 +19,17 @@ type UpdateTaskInput = {
   description?: string | null;
   status?: "BACKLOG" | "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE";
   priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+  assigneeIds?: string[];
   assigneeId?: string | null;
   dueDate?: string | null;
 };
+
+const assigneeUserSelect = {
+  id: true,
+  name: true,
+  email: true,
+  avatar: true,
+} as const;
 
 const taskDetailSelect = {
   id: true,
@@ -42,11 +51,14 @@ const taskDetailSelect = {
     },
   },
   assignee: {
+    select: assigneeUserSelect,
+  },
+  taskAssignees: {
+    orderBy: { createdAt: "asc" as const },
     select: {
-      id: true,
-      name: true,
-      email: true,
-      avatar: true,
+      user: {
+        select: assigneeUserSelect,
+      },
     },
   },
   comments: {
@@ -67,6 +79,36 @@ const taskDetailSelect = {
   },
 } as const;
 
+type AssigneeUser = {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+};
+
+function mapAssigneeUser(user: AssigneeUser) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    avatar: user.avatar,
+  };
+}
+
+function resolveAssigneesFromTask(task: {
+  assignee: AssigneeUser | null;
+  taskAssignees: { user: AssigneeUser }[];
+}) {
+  const fromJoin = task.taskAssignees.map((link) => mapAssigneeUser(link.user));
+  if (fromJoin.length > 0) {
+    return fromJoin;
+  }
+  if (task.assignee) {
+    return [mapAssigneeUser(task.assignee)];
+  }
+  return [];
+}
+
 function mapTaskDetail(task: {
   id: string;
   key: string;
@@ -80,7 +122,8 @@ function mapTaskDetail(task: {
   createdAt: Date;
   updatedAt: Date;
   project: { id: string; name: string; status: string };
-  assignee: { id: string; name: string; email: string; avatar: string | null } | null;
+  assignee: AssigneeUser | null;
+  taskAssignees: { user: AssigneeUser }[];
   comments: { id: string }[];
   checklistItems: { id: string; done: boolean }[];
   attachments: { id: string }[];
@@ -89,6 +132,8 @@ function mapTaskDetail(task: {
   const checklistTotal = task.checklistItems.length;
   const checklistDone = task.checklistItems.filter((item) => item.done).length;
   const attachmentsCount = task.attachments.length;
+  const assignees = resolveAssigneesFromTask(task);
+  const assigneeIds = assignees.map((assignee) => assignee.id);
 
   return {
     id: task.id,
@@ -98,12 +143,14 @@ function mapTaskDetail(task: {
     description: task.description,
     status: task.status,
     priority: task.priority,
-    assigneeId: task.assigneeId,
+    assigneeIds,
+    assignees,
+    assigneeId: assigneeIds[0] ?? null,
+    assignee: assignees[0] ?? null,
     dueDate: task.dueDate,
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
     project: task.project,
-    assignee: task.assignee,
     commentsCount,
     checklistTotal,
     checklistDone,
@@ -128,17 +175,50 @@ export async function findTaskInWorkspace(taskId: string, workspaceId: string) {
   });
 }
 
-async function resolveAssigneeId(assigneeId?: string | null) {
-  if (!assigneeId?.trim()) {
-    return null;
+async function resolveAssigneeIds(
+  assigneeIds?: string[],
+  assigneeId?: string | null,
+): Promise<string[] | undefined> {
+  if (assigneeIds === undefined && assigneeId === undefined) {
+    return undefined;
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: assigneeId },
-    select: { id: true },
+  const rawIds =
+    assigneeIds !== undefined ? assigneeIds : assigneeId?.trim() ? [assigneeId.trim()] : [];
+
+  const uniqueIds = [...new Set(rawIds.map((id) => id.trim()).filter(Boolean))];
+  const validIds: string[] = [];
+
+  for (const id of uniqueIds) {
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (user) {
+      validIds.push(user.id);
+    }
+  }
+
+  return validIds;
+}
+
+async function getExistingAssigneeIds(taskId: string) {
+  const links = await prisma.taskAssignee.findMany({
+    where: { taskId },
+    select: { userId: true },
+    orderBy: { createdAt: "asc" },
   });
 
-  return user?.id ?? null;
+  if (links.length > 0) {
+    return links.map((link) => link.userId);
+  }
+
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { assigneeId: true },
+  });
+
+  return task?.assigneeId ? [task.assigneeId] : [];
 }
 
 export async function createTask(
@@ -153,7 +233,7 @@ export async function createTask(
   }
 
   const taskCount = await prisma.task.count();
-  const assigneeId = await resolveAssigneeId(input.assigneeId);
+  const assigneeIds = (await resolveAssigneeIds(input.assigneeIds, input.assigneeId)) ?? [];
 
   const task = await prisma.task.create({
     data: {
@@ -163,46 +243,16 @@ export async function createTask(
       description: input.description ?? null,
       status: input.status ?? "BACKLOG",
       priority: input.priority ?? "MEDIUM",
-      assigneeId,
+      assigneeId: assigneeIds[0] ?? null,
       dueDate: input.dueDate ? new Date(input.dueDate) : null,
-    },
-    select: {
-      id: true,
-      key: true,
-      projectId: true,
-      title: true,
-      description: true,
-      status: true,
-      priority: true,
-      assigneeId: true,
-      dueDate: true,
-      createdAt: true,
-      updatedAt: true,
-      project: {
-        select: {
-          id: true,
-          name: true,
-          status: true,
-        },
-      },
-      assignee: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          avatar: true,
-        },
+      taskAssignees: {
+        create: assigneeIds.map((assigneeUserId) => ({ userId: assigneeUserId })),
       },
     },
+    select: taskDetailSelect,
   });
 
-  return {
-    ...task,
-    commentsCount: 0,
-    checklistTotal: 0,
-    checklistDone: 0,
-    attachmentsCount: 0,
-  };
+  return mapTaskDetail(task);
 }
 
 export async function updateTask(
@@ -251,29 +301,48 @@ export async function updateTask(
   if (input.dueDate !== undefined) {
     data.dueDate = input.dueDate ? new Date(input.dueDate) : null;
   }
-  if (input.assigneeId !== undefined) {
-    data.assigneeId = await resolveAssigneeId(input.assigneeId);
+
+  const previousAssigneeIds = await getExistingAssigneeIds(id);
+  const resolvedAssigneeIds = await resolveAssigneeIds(input.assigneeIds, input.assigneeId);
+  const assigneeIdsChanged = resolvedAssigneeIds !== undefined;
+
+  if (assigneeIdsChanged) {
+    data.assigneeId = resolvedAssigneeIds[0] ?? null;
   }
 
-  const task = await prisma.task.update({
-    where: { id },
-    data,
-    select: taskDetailSelect,
+  const task = await prisma.$transaction(async (tx) => {
+    if (assigneeIdsChanged) {
+      await tx.taskAssignee.deleteMany({ where: { taskId: id } });
+      if (resolvedAssigneeIds.length > 0) {
+        await tx.taskAssignee.createMany({
+          data: resolvedAssigneeIds.map((assigneeUserId) => ({
+            taskId: id,
+            userId: assigneeUserId,
+          })),
+        });
+      }
+    }
+
+    return tx.task.update({
+      where: { id },
+      data,
+      select: taskDetailSelect,
+    });
   });
 
-  if (
-    actorId &&
-    input.assigneeId !== undefined &&
-    task.assigneeId &&
-    task.assigneeId !== existing.assigneeId
-  ) {
-    void notifyTaskAssigned({
-      workspaceId,
-      taskId: task.id,
-      taskTitle: task.title,
-      assigneeId: task.assigneeId,
-      actorId,
-    });
+  if (actorId && assigneeIdsChanged && resolvedAssigneeIds) {
+    const newlyAssigned = resolvedAssigneeIds.filter(
+      (assigneeUserId) => !previousAssigneeIds.includes(assigneeUserId),
+    );
+    for (const assigneeUserId of newlyAssigned) {
+      void notifyTaskAssigned({
+        workspaceId,
+        taskId: task.id,
+        taskTitle: task.title,
+        assigneeId: assigneeUserId,
+        actorId,
+      });
+    }
   }
 
   return mapTaskDetail(task);

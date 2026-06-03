@@ -343,6 +343,13 @@ async function seedDemoWorkspace() {
         assigneeId,
         dueDate: task.dueInDays == null ? null : addDays(now, task.dueInDays),
         updatedAt: task.updatedInDays == null ? now : subtractDays(now, task.updatedInDays),
+        ...(assigneeId
+          ? {
+              taskAssignees: {
+                create: [{ userId: assigneeId }],
+              },
+            }
+          : {}),
       },
       select: { id: true, key: true },
     });
