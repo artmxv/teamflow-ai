@@ -249,6 +249,11 @@ const dict = {
     "role.owner": "Owner",
     "role.admin": "Admin",
     "role.member": "Member",
+    "access.denied": "Access denied",
+    "access.projectDenied": "You do not have access to this project.",
+    "access.createProjectDenied": "Only workspace owners and admins can create projects.",
+    "access.memberProjectsHint": "You can see projects where you are a member.",
+    "access.projectManagementDenied": "Project management is available to owners and admins.",
     "settings.languageSettings": "Language settings",
     "settings.notificationSettings": "Notification settings",
     "settings.permissions": "Permissions",
@@ -333,6 +338,9 @@ const dict = {
     "tasks.noMatchHint":
       "Try a different search term, status, or priority, or reset filters to see all tasks.",
     "tasks.projectRequired": "A project is required. Create or open a project before adding tasks.",
+    "tasks.noAccessibleProjects":
+      "You are not a member of any project yet. Ask a workspace owner or admin to add you.",
+    "tasks.selectProject": "Project",
     "tasks.count": "{count} tasks",
     "tasks.countOne": "1 task",
     "tasks.priorityLow": "Low",
@@ -368,6 +376,8 @@ const dict = {
     "team.removeConfirm": "Remove",
     "team.joined": "Joined",
     "team.ownerDisabled": "Owner transfers are disabled in this preview.",
+    "team.roleManagementRestricted": "Only workspace owners can manage team roles.",
+    "team.viewOnlyNote": "You can view team members, but role management is restricted.",
     "team.toast.invite": "Preview: no invitation was sent.",
     "team.toast.inviteDesc": "Preview invite for {email} ({role}) was not delivered.",
     "team.toast.inviteEmpty": "Enter an email to preview the invite flow.",
@@ -649,6 +659,12 @@ const dict = {
     "role.owner": "Владелец",
     "role.admin": "Администратор",
     "role.member": "Участник",
+    "access.denied": "Доступ запрещён",
+    "access.projectDenied": "У вас нет доступа к этому проекту.",
+    "access.createProjectDenied":
+      "Создавать проекты могут только владельцы и администраторы пространства.",
+    "access.memberProjectsHint": "Вы видите проекты, в которые вас добавили.",
+    "access.projectManagementDenied": "Управление проектами доступно владельцам и администраторам.",
     "settings.languageSettings": "Настройки языка",
     "settings.notificationSettings": "Настройки уведомлений",
     "settings.permissions": "Права доступа",
@@ -732,6 +748,9 @@ const dict = {
     "tasks.noMatchHint":
       "Измените поиск, статус или приоритет, либо сбросьте фильтры, чтобы увидеть все задачи.",
     "tasks.projectRequired": "Нужен проект. Создайте или откройте проект перед добавлением задач.",
+    "tasks.noAccessibleProjects":
+      "Вы пока не добавлены ни в один проект. Попросите владельца или администратора пространства добавить вас.",
+    "tasks.selectProject": "Проект",
     "tasks.count": "{count} задач",
     "tasks.countOne": "1 задача",
     "tasks.priorityLow": "Низкий",
@@ -767,6 +786,10 @@ const dict = {
     "team.removeConfirm": "Удалить",
     "team.joined": "В команде с",
     "team.ownerDisabled": "Передача роли владельца отключена в этом предпросмотре.",
+    "team.roleManagementRestricted":
+      "Управлять ролями команды могут только владельцы пространства.",
+    "team.viewOnlyNote":
+      "Вы можете просматривать участников команды, но управление ролями ограничено.",
     "team.toast.invite": "Предпросмотр: приглашение не отправлено.",
     "team.toast.inviteDesc": "Предпросмотр для {email} ({role}) не доставлен.",
     "team.toast.inviteEmpty": "Введите email, чтобы увидеть форму приглашения.",

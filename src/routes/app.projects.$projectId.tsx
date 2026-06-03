@@ -75,6 +75,7 @@ import {
   type ProjectMemberApiItem,
 } from "@/lib/api/project-members";
 import { cn } from "@/lib/utils";
+import { isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -159,6 +160,8 @@ const taskPriorityTone: Record<TaskApiPriority, string> = {
 
 function ProjectDetailPage() {
   const { t } = useI18n();
+  const { data: me } = useCurrentUser();
+  const canManageProjects = isWorkspaceManager(me?.workspace?.role);
   const { projectId } = Route.useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -318,7 +321,7 @@ function ProjectDetailPage() {
             </p>
           </div>
         </div>
-        {project ? (
+        {project && canManageProjects ? (
           <div className="flex items-center gap-2">
             <EditProjectDialog
               project={project}
@@ -361,6 +364,7 @@ function ProjectDetailPage() {
           isCreatingTask={createTaskMutation.isPending}
           onCreateTask={handleCreateTask}
           onOpenTask={(task) => setSelectedTask(mapApiTaskToTask(task))}
+          canManageMembers={canManageProjects}
         />
       )}
 
@@ -575,6 +579,7 @@ function ProjectDetails({
   isCreatingTask,
   onCreateTask,
   onOpenTask,
+  canManageMembers,
 }: {
   project: ProjectApiItem;
   projectTasks: TaskApiItem[];
@@ -582,6 +587,7 @@ function ProjectDetails({
   isCreatingTask: boolean;
   onCreateTask: (values: TaskFormValues) => Promise<void>;
   onOpenTask: (task: TaskApiItem) => void;
+  canManageMembers: boolean;
 }) {
   const { t } = useI18n();
   const statusKey = apiStatusMap[project.status];
@@ -635,7 +641,9 @@ function ProjectDetails({
               />
             </div>
 
-            <p className="mt-4 text-xs text-muted-foreground">{t("projects.detail.editHint")}</p>
+            {canManageMembers ? (
+              <p className="mt-4 text-xs text-muted-foreground">{t("projects.detail.editHint")}</p>
+            ) : null}
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
@@ -662,7 +670,7 @@ function ProjectDetails({
             </div>
           </div>
 
-          <ProjectMembersCard projectId={project.id} />
+          <ProjectMembersCard projectId={project.id} canManageMembers={canManageMembers} />
 
           <ProjectDocumentsCard projectId={project.id} />
         </div>
@@ -763,7 +771,13 @@ function ProjectDetails({
   );
 }
 
-function ProjectMembersCard({ projectId }: { projectId: string }) {
+function ProjectMembersCard({
+  projectId,
+  canManageMembers,
+}: {
+  projectId: string;
+  canManageMembers: boolean;
+}) {
   const queryClient = useQueryClient();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
@@ -775,7 +789,7 @@ function ProjectMembersCard({ projectId }: { projectId: string }) {
   const availableQuery = useQuery({
     queryKey: ["project-available-members", projectId],
     queryFn: () => fetchAvailableProjectMembers(projectId),
-    enabled: addDialogOpen,
+    enabled: canManageMembers && addDialogOpen,
   });
 
   const addMutation = useMutation({
@@ -823,6 +837,7 @@ function ProjectMembersCard({ projectId }: { projectId: string }) {
         isRemovingId={removeMutation.isPending ? (removeMutation.variables ?? null) : null}
         addDialogOpen={addDialogOpen}
         onAddDialogOpenChange={setAddDialogOpen}
+        canManageMembers={canManageMembers}
         onAddMember={(userId) => {
           if (addMutation.isPending) return;
           addMutation.mutate(userId);
@@ -848,6 +863,7 @@ function ProjectMembersSection({
   onAddDialogOpenChange,
   onAddMember,
   onRemoveMember,
+  canManageMembers,
 }: {
   members: ProjectMemberApiItem[];
   availableMembers: AvailableProjectMember[];
@@ -860,6 +876,7 @@ function ProjectMembersSection({
   onAddDialogOpenChange: (open: boolean) => void;
   onAddMember: (userId: string) => void;
   onRemoveMember: (memberId: string) => void;
+  canManageMembers: boolean;
 }) {
   const { t } = useI18n();
   return (
@@ -872,59 +889,63 @@ function ProjectMembersSection({
           </h3>
           <p className="mt-0.5 text-xs text-muted-foreground">{t("projects.detail.membersHint")}</p>
         </div>
-        <Dialog open={addDialogOpen} onOpenChange={onAddDialogOpenChange}>
-          <DialogTrigger asChild>
-            <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5">
-              <UserPlus className="size-3.5" />
-              {t("projects.detail.addMember")}
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-sm gap-0 p-0">
-            <DialogHeader className="border-b border-border px-4 py-3">
-              <DialogTitle className="text-base">{t("projects.detail.addMemberTitle")}</DialogTitle>
-              <DialogDescription className="text-xs">
-                {t("projects.detail.addMemberDesc")}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="max-h-72 overflow-y-auto p-2">
-              {isLoadingAvailable ? (
-                <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-                  {t("common.loading")}
-                </p>
-              ) : availableMembers.length === 0 ? (
-                <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-                  {t("projects.detail.allMembersAssigned")}
-                </p>
-              ) : (
-                <ul className="space-y-1">
-                  {availableMembers.map((user) => (
-                    <li key={user.id}>
-                      <button
-                        type="button"
-                        disabled={isAdding}
-                        className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/50 disabled:opacity-50"
-                        onClick={() => onAddMember(user.id)}
-                      >
-                        <Avatar
-                          id={user.id}
-                          initials={user.avatar ?? initialsFromName(user.name)}
-                          size="sm"
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium">{user.name}</span>
-                          <span className="block truncate text-[11px] text-muted-foreground">
-                            {user.email}
+        {canManageMembers ? (
+          <Dialog open={addDialogOpen} onOpenChange={onAddDialogOpenChange}>
+            <DialogTrigger asChild>
+              <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5">
+                <UserPlus className="size-3.5" />
+                {t("projects.detail.addMember")}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-sm gap-0 p-0">
+              <DialogHeader className="border-b border-border px-4 py-3">
+                <DialogTitle className="text-base">
+                  {t("projects.detail.addMemberTitle")}
+                </DialogTitle>
+                <DialogDescription className="text-xs">
+                  {t("projects.detail.addMemberDesc")}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="max-h-72 overflow-y-auto p-2">
+                {isLoadingAvailable ? (
+                  <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+                    {t("common.loading")}
+                  </p>
+                ) : availableMembers.length === 0 ? (
+                  <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+                    {t("projects.detail.allMembersAssigned")}
+                  </p>
+                ) : (
+                  <ul className="space-y-1">
+                    {availableMembers.map((user) => (
+                      <li key={user.id}>
+                        <button
+                          type="button"
+                          disabled={isAdding}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/50 disabled:opacity-50"
+                          onClick={() => onAddMember(user.id)}
+                        >
+                          <Avatar
+                            id={user.id}
+                            initials={user.avatar ?? initialsFromName(user.name)}
+                            size="sm"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium">{user.name}</span>
+                            <span className="block truncate text-[11px] text-muted-foreground">
+                              {user.email}
+                            </span>
                           </span>
-                        </span>
-                        <Plus className="size-3.5 shrink-0 text-muted-foreground" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
+                          <Plus className="size-3.5 shrink-0 text-muted-foreground" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+        ) : null}
       </div>
       <div className="space-y-2">
         {isLoading ? (
@@ -945,6 +966,7 @@ function ProjectMembersSection({
               key={member.id}
               member={member}
               isRemoving={isRemovingId === member.id}
+              canRemove={canManageMembers}
               onRemove={() => onRemoveMember(member.id)}
             />
           ))
@@ -957,10 +979,12 @@ function ProjectMembersSection({
 function ProjectMemberRow({
   member,
   isRemoving,
+  canRemove,
   onRemove,
 }: {
   member: ProjectMemberApiItem;
   isRemoving: boolean;
+  canRemove: boolean;
   onRemove: () => void;
 }) {
   return (
@@ -974,21 +998,23 @@ function ProjectMemberRow({
         <div className="truncate text-sm font-medium">{member.user.name}</div>
         <div className="truncate text-[11px] text-muted-foreground">{member.user.email}</div>
       </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
-        disabled={isRemoving}
-        aria-label={`Remove ${member.user.name}`}
-        onClick={onRemove}
-      >
-        {isRemoving ? (
-          <Loader2 className="size-3.5 animate-spin" />
-        ) : (
-          <Trash2 className="size-3.5" />
-        )}
-      </Button>
+      {canRemove ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
+          disabled={isRemoving}
+          aria-label={`Remove ${member.user.name}`}
+          onClick={onRemove}
+        >
+          {isRemoving ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <Trash2 className="size-3.5" />
+          )}
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -1409,7 +1435,7 @@ function NotFoundState() {
     <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
       <h3 className="text-base font-semibold">{t("projects.detail.notFoundTitle")}</h3>
       <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-        {t("projects.detail.notFoundHint")}
+        {t("access.projectDenied")}
       </p>
       <Button variant="outline" className="mt-5" asChild>
         <Link to="/app/projects">{t("projects.back")}</Link>

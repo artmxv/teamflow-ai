@@ -1,4 +1,6 @@
 import { prisma } from "../lib/prisma.js";
+import { getAccessibleProjectWhere } from "./project-access.service.js";
+import type { WorkspaceRole } from "./workspace-context.service.js";
 
 type CreateProjectInput = {
   workspaceId: string;
@@ -75,9 +77,9 @@ export async function findProjectInWorkspace(projectId: string, workspaceId: str
   });
 }
 
-export async function getProjects(workspaceId: string) {
+export async function getProjects(workspaceId: string, userId: string, role: WorkspaceRole) {
   const projects = await prisma.project.findMany({
-    where: { workspaceId },
+    where: getAccessibleProjectWhere(userId, workspaceId, role),
     orderBy: { updatedAt: "desc" },
     select: projectDetailSelect,
   });

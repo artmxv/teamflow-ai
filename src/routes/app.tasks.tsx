@@ -22,6 +22,7 @@ import {
   type TaskApiPriority,
   type TaskApiStatus,
 } from "@/lib/api/tasks";
+import { fetchProjects } from "@/lib/api/projects";
 import { useI18n, type TKey } from "@/lib/i18n";
 import {
   Search,
@@ -184,6 +185,15 @@ function TasksPage() {
     queryKey: ["tasks"],
     queryFn: fetchTasks,
   });
+  const { data: apiProjects = [] } = useQuery({
+    queryKey: ["projects"],
+    queryFn: fetchProjects,
+  });
+  const projectOptions = useMemo(
+    () => apiProjects.map((project) => ({ id: project.id, name: project.name })),
+    [apiProjects],
+  );
+  const hasAccessibleProjects = projectOptions.length > 0;
   const createTaskMutation = useMutation({
     mutationFn: createTask,
     onSuccess: async () => {
@@ -229,7 +239,6 @@ function TasksPage() {
     () => (selected ? resolveTaskAssignee(selected.assigneeId, apiTasks, selected.id) : null),
     [selected, apiTasks],
   );
-  const projectId = apiTasks[0]?.projectId;
   const taskList = useMemo(() => apiTasks.map(mapApiTaskToRow), [apiTasks]);
 
   useEffect(() => {
@@ -330,13 +339,14 @@ function TasksPage() {
   }
 
   async function handleCreateTask(values: TaskFormValues) {
-    if (!projectId) {
-      toast.error(t("tasks.projectRequired"));
+    const targetProjectId = values.projectId ?? projectOptions[0]?.id;
+    if (!targetProjectId) {
+      toast.error(t("tasks.noAccessibleProjects"));
       throw new Error("Project is required.");
     }
 
     await createTaskMutation.mutateAsync({
-      projectId,
+      projectId: targetProjectId,
       title: values.title.trim(),
       description: values.description?.trim() || undefined,
       status: taskStatusToApi[values.status],
@@ -357,15 +367,20 @@ function TasksPage() {
               : t("tasks.count").replace("{count}", String(filtered.length))}
           </p>
         </div>
-        <NewTaskDialog
-          isSubmitting={createTaskMutation.isPending}
-          assigneeOptions={assigneeOptions}
-          onSubmit={handleCreateTask}
-        >
-          <Button size="sm" className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-            <Plus className="size-4" /> {t("common.newTask")}
-          </Button>
-        </NewTaskDialog>
+        {hasAccessibleProjects ? (
+          <NewTaskDialog
+            isSubmitting={createTaskMutation.isPending}
+            assigneeOptions={assigneeOptions}
+            projectOptions={projectOptions}
+            onSubmit={handleCreateTask}
+          >
+            <Button size="sm" className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+              <Plus className="size-4" /> {t("common.newTask")}
+            </Button>
+          </NewTaskDialog>
+        ) : (
+          <p className="text-sm text-muted-foreground">{t("tasks.noAccessibleProjects")}</p>
+        )}
       </div>
 
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -435,7 +450,12 @@ function TasksPage() {
           <ErrorState error={error} onRetry={() => void refetch()} />
         ) : filtered.length === 0 ? (
           isTrulyEmpty ? (
-            <EmptyState isSubmitting={createTaskMutation.isPending} onCreate={handleCreateTask} />
+            <EmptyState
+              isSubmitting={createTaskMutation.isPending}
+              onCreate={handleCreateTask}
+              projectOptions={projectOptions}
+              hasAccessibleProjects={hasAccessibleProjects}
+            />
           ) : (
             <NoResultsState onResetFilters={clearFilters} />
           )
@@ -641,9 +661,13 @@ function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => vo
 function EmptyState({
   isSubmitting,
   onCreate,
+  projectOptions,
+  hasAccessibleProjects,
 }: {
   isSubmitting: boolean;
   onCreate: (values: TaskFormValues) => Promise<void>;
+  projectOptions: { id: string; name: string }[];
+  hasAccessibleProjects: boolean;
 }) {
   const { t } = useI18n();
 
@@ -653,12 +677,20 @@ function EmptyState({
         <ListTodo className="size-5" />
       </div>
       <h3 className="mt-4 text-base font-semibold">{t("tasks.emptyTitle")}</h3>
-      <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">{t("tasks.emptyHint")}</p>
-      <NewTaskDialog isSubmitting={isSubmitting} onSubmit={onCreate}>
-        <Button className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
-          <Plus className="size-4" /> {t("common.newTask")}
-        </Button>
-      </NewTaskDialog>
+      <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+        {hasAccessibleProjects ? t("tasks.emptyHint") : t("tasks.noAccessibleProjects")}
+      </p>
+      {hasAccessibleProjects ? (
+        <NewTaskDialog
+          isSubmitting={isSubmitting}
+          projectOptions={projectOptions}
+          onSubmit={onCreate}
+        >
+          <Button className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
+            <Plus className="size-4" /> {t("common.newTask")}
+          </Button>
+        </NewTaskDialog>
+      ) : null}
     </div>
   );
 }

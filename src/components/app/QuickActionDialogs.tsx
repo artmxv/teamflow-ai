@@ -69,7 +69,9 @@ const getTaskSchema = (t: Translate) =>
     dueDate: z.string().optional(),
   });
 
-export type TaskFormValues = z.infer<ReturnType<typeof getTaskSchema>>;
+export type TaskFormValues = z.infer<ReturnType<typeof getTaskSchema>> & {
+  projectId?: string;
+};
 
 type NewProjectDialogProps = {
   children: ReactNode;
@@ -143,7 +145,12 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
       setOpen(false);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : t("projects.new.createFailed"));
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("Only workspace owners and admins can create projects")) {
+        toast.error(t("access.createProjectDenied"));
+        return;
+      }
+      toast.error(message || t("projects.new.createFailed"));
     },
   });
 
@@ -306,6 +313,7 @@ type NewTaskDialogProps = {
   initialStatus?: TaskStatus;
   isSubmitting?: boolean;
   assigneeOptions?: AssigneeOption[];
+  projectOptions?: { id: string; name: string }[];
   onSubmit: (values: TaskFormValues) => Promise<void>;
 };
 
@@ -314,10 +322,13 @@ export function NewTaskDialog({
   initialStatus = "todo",
   isSubmitting = false,
   assigneeOptions = [],
+  projectOptions,
   onSubmit,
 }: NewTaskDialogProps) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState(projectOptions?.[0]?.id ?? "");
+  const showProjectSelect = !!projectOptions && projectOptions.length > 0;
   const {
     control,
     formState: { errors, isValid },
@@ -339,6 +350,7 @@ export function NewTaskDialog({
 
   useEffect(() => {
     if (!open) return;
+    setSelectedProjectId(projectOptions?.[0]?.id ?? "");
     reset({
       title: "",
       description: "",
@@ -347,16 +359,25 @@ export function NewTaskDialog({
       assigneeId: undefined,
       dueDate: "",
     });
-  }, [open, initialStatus, reset]);
+  }, [open, initialStatus, projectOptions, reset]);
 
   async function submit(values: TaskFormValues) {
     try {
+      if (showProjectSelect && !selectedProjectId) {
+        toast.error(t("tasks.projectRequired"));
+        throw new Error("Project is required.");
+      }
+
       // New tasks must use real API user ids (backend rejects mock ids).
       const normalizedAssigneeId =
         values.assigneeId && assigneeOptions.some((option) => option.id === values.assigneeId)
           ? values.assigneeId
           : undefined;
-      await onSubmit({ ...values, assigneeId: normalizedAssigneeId });
+      await onSubmit({
+        ...values,
+        assigneeId: normalizedAssigneeId,
+        projectId: showProjectSelect ? selectedProjectId : values.projectId,
+      });
       reset({
         title: "",
         description: "",
@@ -380,6 +401,22 @@ export function NewTaskDialog({
           <DialogDescription>Add a mock task to the current view.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(submit)} className="space-y-4">
+          {showProjectSelect ? (
+            <Field label={t("tasks.selectProject")}>
+              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t("tasks.selectProject")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {projectOptions.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t("tasks.task")} error={errors.title?.message}>
               <Input {...register("title")} placeholder="Write release notes" />
@@ -470,7 +507,7 @@ export function NewTaskDialog({
             </Button>
             <Button
               type="submit"
-              disabled={!isValid || isSubmitting}
+              disabled={!isValid || isSubmitting || (showProjectSelect && !selectedProjectId)}
               className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
             >
               {isSubmitting ? "Creating..." : t("common.createTask")}

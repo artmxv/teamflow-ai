@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 
 import { AuthError } from "../services/auth.service.js";
+import { canManageProjects } from "../services/project-access.service.js";
 import {
   getUserWorkspaceContext,
   updateUserWorkspaceSettings,
@@ -40,6 +41,13 @@ export async function getWorkspaceMembersController(
     const context = await getUserWorkspaceContext(req.userId);
     if (!context) {
       res.status(403).json({ message: "Workspace not found" });
+      return;
+    }
+
+    if (!canManageProjects(context.role)) {
+      res.status(403).json({
+        message: "Project management is available to owners and admins.",
+      });
       return;
     }
 

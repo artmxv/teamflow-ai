@@ -52,7 +52,12 @@ export async function getProjectDocumentsController(
       return;
     }
 
-    const documents = await getProjectDocuments(context.workspaceId, projectId);
+    const documents = await getProjectDocuments(
+      context.workspaceId,
+      projectId,
+      req.userId!,
+      context.role,
+    );
 
     if (documents === null) {
       res.status(404).json({ message: "Project not found" });
@@ -100,6 +105,7 @@ export async function uploadProjectDocumentController(
         context.workspaceId,
         projectId,
         req.userId!,
+        context.role,
         req.file,
       );
 
@@ -134,7 +140,13 @@ export async function deleteProjectDocumentController(
       return;
     }
 
-    const deleted = await deleteProjectDocument(context.workspaceId, projectId, documentId);
+    const deleted = await deleteProjectDocument(
+      context.workspaceId,
+      projectId,
+      documentId,
+      req.userId!,
+      context.role,
+    );
 
     if (deleted === null) {
       res.status(404).json({ message: "Project not found" });
@@ -171,7 +183,13 @@ export async function downloadProjectDocumentController(
       return;
     }
 
-    const file = await getProjectDocumentFile(context.workspaceId, projectId, documentId);
+    const file = await getProjectDocumentFile(
+      context.workspaceId,
+      projectId,
+      documentId,
+      req.userId!,
+      context.role,
+    );
 
     if (file === null) {
       res.status(404).json({ message: "Project not found" });

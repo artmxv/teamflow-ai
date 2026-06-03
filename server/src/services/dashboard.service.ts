@@ -1,10 +1,16 @@
 import { prisma } from "../lib/prisma.js";
+import { getAccessibleProjectWhere, getAccessibleTaskWhere } from "./project-access.service.js";
+import type { WorkspaceRole } from "./workspace-context.service.js";
 
 const TASK_STATUSES = ["BACKLOG", "TODO", "IN_PROGRESS", "REVIEW", "DONE"] as const;
 
-export async function getDashboardSummary(workspaceId: string) {
-  const projectWhere = { workspaceId };
-  const taskWhere = { project: { workspaceId } };
+export async function getDashboardSummary(
+  workspaceId: string,
+  userId: string,
+  role: WorkspaceRole,
+) {
+  const projectWhere = getAccessibleProjectWhere(userId, workspaceId, role);
+  const taskWhere = getAccessibleTaskWhere(userId, workspaceId, role);
 
   const [activeProjects, openTasks, completedTasks, teamMembers, statusGroups, recentTasks] =
     await Promise.all([

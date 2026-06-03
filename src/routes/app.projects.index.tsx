@@ -10,6 +10,7 @@ import { AvatarStack } from "@/components/app/Avatar";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import { members, projectStatusMeta, type Project, type ProjectStatus } from "@/lib/mock-data";
 import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
+import { isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user";
 import { projectStatusLabel, useI18n, type TKey } from "@/lib/i18n";
 import {
   parseProjectsUrlStatus,
@@ -62,6 +63,8 @@ const apiStatusMap: Record<ProjectApiStatus, ProjectStatus> = {
 
 function ProjectsIndexPage() {
   const { t } = useI18n();
+  const { data: me } = useCurrentUser();
+  const canManageProjects = isWorkspaceManager(me?.workspace?.role);
   const { status: statusFromUrl } = Route.useSearch();
   const navigate = Route.useNavigate();
   const [filter, setFilter] = useState<"all" | ProjectStatus>(() =>
@@ -110,13 +113,17 @@ function ProjectsIndexPage() {
       <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{t("projects.projects")}</h1>
-          <p className="text-sm text-muted-foreground">{t("projects.subtitle")}</p>
+          <p className="text-sm text-muted-foreground">
+            {canManageProjects ? t("projects.subtitle") : t("access.memberProjectsHint")}
+          </p>
         </div>
-        <NewProjectDialog>
-          <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-            <Plus className="size-4" /> {t("common.newProject")}
-          </Button>
-        </NewProjectDialog>
+        {canManageProjects ? (
+          <NewProjectDialog>
+            <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+              <Plus className="size-4" /> {t("common.newProject")}
+            </Button>
+          </NewProjectDialog>
+        ) : null}
       </div>
 
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -153,7 +160,7 @@ function ProjectsIndexPage() {
         <ErrorState error={error} onRetry={() => void refetch()} />
       ) : filtered.length === 0 ? (
         isTrulyEmpty ? (
-          <EmptyState />
+          <EmptyState canManageProjects={canManageProjects} />
         ) : (
           <NoResultsState
             hasActiveFilters={hasActiveFilters}
@@ -294,7 +301,7 @@ function NoResultsState({
   );
 }
 
-function EmptyState() {
+function EmptyState({ canManageProjects }: { canManageProjects: boolean }) {
   const { t } = useI18n();
 
   return (
@@ -304,13 +311,15 @@ function EmptyState() {
       </div>
       <h3 className="mt-4 text-base font-semibold">{t("projects.emptyTitle")}</h3>
       <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-        {t("projects.emptyHint")}
+        {canManageProjects ? t("projects.emptyHint") : t("access.memberProjectsHint")}
       </p>
-      <NewProjectDialog>
-        <Button className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
-          <Plus className="size-4" /> {t("common.createProject")}
-        </Button>
-      </NewProjectDialog>
+      {canManageProjects ? (
+        <NewProjectDialog>
+          <Button className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
+            <Plus className="size-4" /> {t("common.createProject")}
+          </Button>
+        </NewProjectDialog>
+      ) : null}
     </div>
   );
 }

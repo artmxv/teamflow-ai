@@ -43,7 +43,7 @@ export async function getTasksController(req: Request, res: Response, next: Next
       return;
     }
 
-    const tasks = await getTasks(context.workspaceId);
+    const tasks = await getTasks(context.workspaceId, req.userId!, context.role);
     res.json({ data: tasks });
   } catch (error) {
     next(error);
@@ -67,7 +67,7 @@ export async function createTaskController(req: Request, res: Response, next: Ne
       return;
     }
 
-    const task = await createTask(context.workspaceId, result.data);
+    const task = await createTask(context.workspaceId, req.userId!, context.role, result.data);
 
     if (!task) {
       res.status(404).json({
@@ -107,7 +107,14 @@ export async function updateTaskController(req: Request, res: Response, next: Ne
       return;
     }
 
-    const task = await updateTask(context.workspaceId, taskId, result.data, req.userId!);
+    const task = await updateTask(
+      context.workspaceId,
+      taskId,
+      result.data,
+      req.userId!,
+      context.role,
+      req.userId!,
+    );
 
     if (!task) {
       res.status(404).json({
@@ -137,7 +144,7 @@ export async function deleteTaskController(req: Request, res: Response, next: Ne
       return;
     }
 
-    const deleted = await deleteTask(context.workspaceId, taskId);
+    const deleted = await deleteTask(context.workspaceId, taskId, req.userId!, context.role);
 
     if (!deleted) {
       res.status(404).json({
