@@ -30,7 +30,7 @@ import { Avatar } from "@/components/app/Avatar";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
 import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
 import { projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
-import { useI18n, type TKey } from "@/lib/i18n";
+import { projectApiStatusLabel, projectStatusLabel, useI18n, type TKey } from "@/lib/i18n";
 import {
   buildAssigneeOptions,
   resolveTaskAssignee,
@@ -435,7 +435,7 @@ function EditProjectDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          Edit
+          {t("common.edit")}
         </Button>
       </DialogTrigger>
       <DialogContent>
@@ -482,10 +482,10 @@ function EditProjectDialog({
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="PLANNING">Planning</SelectItem>
-                  <SelectItem value="ACTIVE">Active</SelectItem>
-                  <SelectItem value="ON_HOLD">On hold</SelectItem>
-                  <SelectItem value="COMPLETED">Completed</SelectItem>
+                  <SelectItem value="PLANNING">{projectApiStatusLabel("PLANNING", t)}</SelectItem>
+                  <SelectItem value="ACTIVE">{projectApiStatusLabel("ACTIVE", t)}</SelectItem>
+                  <SelectItem value="ON_HOLD">{projectApiStatusLabel("ON_HOLD", t)}</SelectItem>
+                  <SelectItem value="COMPLETED">{projectApiStatusLabel("COMPLETED", t)}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -526,21 +526,21 @@ function DeleteProjectDialog({
   isSubmitting: boolean;
   onConfirm: () => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="destructive" size="sm" disabled={isSubmitting}>
-          Delete
+          {t("common.delete")}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Delete project</DialogTitle>
+          <DialogTitle>{t("projects.detail.deleteProject")}</DialogTitle>
           <DialogDescription>
-            This will permanently delete <span className="font-medium">{projectName}</span>. If the
-            project has tasks, you will be asked to delete or move them first.
+            {t("projects.detail.deleteProjectDesc").replace("{name}", projectName)}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -550,7 +550,7 @@ function DeleteProjectDialog({
             onClick={() => setOpen(false)}
             disabled={isSubmitting}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             type="button"
@@ -560,7 +560,7 @@ function DeleteProjectDialog({
               void onConfirm().then(() => setOpen(false));
             }}
           >
-            {isSubmitting ? "Deleting..." : "Delete project"}
+            {isSubmitting ? t("projects.detail.deleting") : t("projects.detail.deleteProject")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -584,7 +584,9 @@ function ProjectDetails({
   onOpenTask: (task: TaskApiItem) => void;
 }) {
   const { t } = useI18n();
-  const status = projectStatusMeta[apiStatusMap[project.status]];
+  const statusKey = apiStatusMap[project.status];
+  const statusMeta = projectStatusMeta[statusKey];
+  const statusLabel = projectStatusLabel(statusKey, t);
   const due = formatDate(project.dueDate);
   const progress = calculateTaskProgress(projectTasks);
   const colorGradient = project.color ?? "from-indigo-500 to-violet-500";
@@ -607,13 +609,13 @@ function ProjectDetails({
                     : t("projects.detail.noDescription")}
                 </p>
               </div>
-              <Badge variant="secondary" className={status.className + " border-0 shrink-0"}>
-                {status.label}
+              <Badge variant="secondary" className={statusMeta.className + " border-0 shrink-0"}>
+                {statusLabel}
               </Badge>
             </div>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              <Stat label={t("projects.detail.status")} value={status.label} />
+              <Stat label={t("projects.detail.status")} value={statusLabel} />
               <Stat
                 label={t("projects.detail.dueDate")}
                 value={
@@ -685,7 +687,10 @@ function ProjectDetails({
               assigneeOptions={assigneeOptions}
               onSubmit={onCreateTask}
             >
-              <Button size="sm" variant="outline" className="h-8 shrink-0 gap-1">
+              <Button
+                size="sm"
+                className="h-8 shrink-0 gap-1 bg-gradient-brand text-white shadow-glow hover:opacity-95"
+              >
                 <Plus className="size-3.5" />
                 {t("common.newTask")}
               </Button>

@@ -1,3 +1,4 @@
+import { chartFillForDashboardStatus } from "@/lib/task-status-theme";
 import { apiRequest } from "./client";
 
 export type DashboardTaskStatus = "BACKLOG" | "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE";
@@ -46,21 +47,13 @@ export interface DashboardChartStatusCount {
   fill: string;
 }
 
-const STATUS_CHART_FILL: Record<DashboardTaskStatus, string> = {
-  BACKLOG: "var(--color-chart-3)",
-  TODO: "var(--color-chart-2)",
-  IN_PROGRESS: "var(--color-chart-1)",
-  REVIEW: "var(--color-chart-4)",
-  DONE: "var(--color-chart-5)",
-};
-
 export function mapTaskStatusCountsForChart(
   counts: DashboardTaskStatusCount[],
 ): DashboardChartStatusCount[] {
   return counts.map((item) => ({
     statusKey: item.status,
     value: item.count,
-    fill: STATUS_CHART_FILL[item.status],
+    fill: chartFillForDashboardStatus(item.status),
   }));
 }
 

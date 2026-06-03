@@ -41,6 +41,7 @@ import {
 import { taskStatusLabel, useI18n } from "@/lib/i18n";
 import { Filter, Plus } from "lucide-react";
 import { buildAssigneeOptions, resolveTaskAssignee } from "@/lib/assignee-options";
+import { taskStatusColumnDotClass } from "@/lib/task-status-theme";
 
 export const Route = createFileRoute("/app/board")({
   beforeLoad: requireAuth,
@@ -571,14 +572,6 @@ function BoardColumn({
     data: { type: "column", status },
   });
 
-  const tone: Record<TaskStatus, string> = {
-    backlog: "bg-muted-foreground/50",
-    todo: "bg-info",
-    in_progress: "bg-primary",
-    review: "bg-warning",
-    done: "bg-success",
-  };
-
   return (
     <div
       className={
@@ -588,7 +581,7 @@ function BoardColumn({
     >
       <div className="flex shrink-0 items-center justify-between px-1">
         <div className="flex items-center gap-2 text-sm font-semibold">
-          <span className={"size-2 rounded-full " + tone[status]} />
+          <span className={"size-2 rounded-full " + taskStatusColumnDotClass[status]} />
           {title}
           <span className="rounded-md bg-card px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground shadow-soft">
             {count}

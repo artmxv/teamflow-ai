@@ -37,34 +37,63 @@ import {
 } from "lucide-react";
 import { buildAssigneeOptions, resolveTaskAssignee } from "@/lib/assignee-options";
 import { cycleTaskSort, sortTasks, type TaskSortField, type TaskSortState } from "@/lib/task-sort";
+import { taskStatusChipClass } from "@/lib/task-status-theme";
 import { cn } from "@/lib/utils";
+
+export type TasksUrlStatus = "done" | "open";
 
 type TasksSearch = {
   taskId?: string;
+  status?: TasksUrlStatus;
 };
+
+function parseTasksUrlStatus(value: unknown): TasksUrlStatus | undefined {
+  return value === "done" || value === "open" ? value : undefined;
+}
+
+export type TaskListStatusFilter = TaskStatus | "all" | "open";
+
+export function taskListStatusFromUrl(status?: TasksUrlStatus): TaskListStatusFilter {
+  if (status === "done") return "done";
+  if (status === "open") return "open";
+  return "all";
+}
+
+export function tasksUrlStatusFromFilter(filter: TaskListStatusFilter): TasksUrlStatus | undefined {
+  if (filter === "done") return "done";
+  if (filter === "open") return "open";
+  return undefined;
+}
+
+function taskMatchesStatusFilter(task: TaskRow, filter: TaskListStatusFilter) {
+  if (filter === "all") return true;
+  if (filter === "open") return task.status !== "done";
+  return task.status === filter;
+}
 
 export const Route = createFileRoute("/app/tasks")({
   beforeLoad: requireAuth,
   validateSearch: (search: Record<string, unknown>): TasksSearch => ({
     taskId:
       typeof search.taskId === "string" && search.taskId.length > 0 ? search.taskId : undefined,
+    status: parseTasksUrlStatus(search.status),
   }),
   head: () => ({ meta: [{ title: "Tasks — TeamFlow AI" }] }),
   component: TasksPage,
 });
 
 const statusMeta: Record<TaskStatus, { labelKey: TKey; tone: string }> = {
-  backlog: { labelKey: "board.backlog", tone: "bg-muted text-muted-foreground" },
-  todo: { labelKey: "tasks.todo", tone: "bg-info/15 text-info" },
-  in_progress: { labelKey: "tasks.inProgress", tone: "bg-primary/15 text-primary" },
-  review: { labelKey: "tasks.review", tone: "bg-warning/20 text-warning-foreground" },
-  done: { labelKey: "tasks.done", tone: "bg-success/15 text-success" },
+  backlog: { labelKey: "board.backlog", tone: taskStatusChipClass.backlog },
+  todo: { labelKey: "board.todo", tone: taskStatusChipClass.todo },
+  in_progress: { labelKey: "board.inProgress", tone: taskStatusChipClass.in_progress },
+  review: { labelKey: "board.review", tone: taskStatusChipClass.review },
+  done: { labelKey: "board.done", tone: taskStatusChipClass.done },
 };
-const priorityMeta: Record<Priority, string> = {
-  low: "bg-muted text-muted-foreground",
-  medium: "bg-info/15 text-info",
-  high: "bg-warning/20 text-warning-foreground",
-  urgent: "bg-destructive/15 text-destructive",
+const priorityMeta: Record<Priority, { labelKey: TKey; tone: string }> = {
+  low: { labelKey: "tasks.priorityLow", tone: "bg-muted text-muted-foreground" },
+  medium: { labelKey: "tasks.priorityMedium", tone: "bg-info/15 text-info" },
+  high: { labelKey: "tasks.priorityHigh", tone: "bg-warning/20 text-warning-foreground" },
+  urgent: { labelKey: "tasks.priorityUrgent", tone: "bg-destructive/15 text-destructive" },
 };
 
 type TaskRow = Task & {
@@ -94,11 +123,14 @@ const apiPriorityMap: Record<TaskApiPriority, Priority> = {
 
 function TasksPage() {
   const { t } = useI18n();
-  const { taskId: taskIdFromUrl } = Route.useSearch();
+  const urlSearch = Route.useSearch();
+  const { taskId: taskIdFromUrl, status: statusFromUrl } = urlSearch;
   const navigate = Route.useNavigate();
   const queryClient = useQueryClient();
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState<TaskStatus | "all">("all");
+  const [status, setStatus] = useState<TaskListStatusFilter>(() =>
+    taskListStatusFromUrl(statusFromUrl),
+  );
   const [priority, setPriority] = useState<Priority | "all">("all");
   const [sort, setSort] = useState<TaskSortState>(null);
   const [selected, setSelected] = useState<Task | null>(null);
@@ -121,22 +153,6 @@ function TasksPage() {
     onError: (mutationError) => {
       toast.error(
         mutationError instanceof Error ? mutationError.message : "Task could not be created",
-      );
-    },
-  });
-  const deleteTaskMutation = useMutation({
-    mutationFn: deleteTask,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      setSelected(null);
-      if (taskIdFromUrl) {
-        void navigate({ search: { taskId: undefined }, replace: true });
-      }
-      toast.success("Task deleted");
-    },
-    onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Task could not be deleted",
       );
     },
   });
@@ -177,6 +193,42 @@ function TasksPage() {
   const taskList = useMemo(() => apiTasks.map(mapApiTaskToRow), [apiTasks]);
 
   useEffect(() => {
+    setStatus(taskListStatusFromUrl(statusFromUrl));
+  }, [statusFromUrl]);
+
+  function updateUrlSearch(patch: Partial<TasksSearch>) {
+    void navigate({
+      search: {
+        taskId: patch.taskId !== undefined ? patch.taskId : urlSearch.taskId,
+        status: patch.status !== undefined ? patch.status : urlSearch.status,
+      },
+      replace: true,
+    });
+  }
+
+  function setStatusFilter(next: TaskListStatusFilter) {
+    setStatus(next);
+    updateUrlSearch({ status: tasksUrlStatusFromFilter(next) });
+  }
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: deleteTask,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      setSelected(null);
+      if (taskIdFromUrl) {
+        updateUrlSearch({ taskId: undefined });
+      }
+      toast.success("Task deleted");
+    },
+    onError: (mutationError) => {
+      toast.error(
+        mutationError instanceof Error ? mutationError.message : "Task could not be deleted",
+      );
+    },
+  });
+
+  useEffect(() => {
     if (!taskIdFromUrl || isLoading) return;
     const task = taskList.find((item) => item.id === taskIdFromUrl);
     if (task) {
@@ -184,15 +236,15 @@ function TasksPage() {
       return;
     }
     if (taskList.length > 0) {
-      void navigate({ search: { taskId: undefined }, replace: true });
+      updateUrlSearch({ taskId: undefined });
     }
-  }, [taskIdFromUrl, taskList, isLoading, navigate]);
+  }, [taskIdFromUrl, taskList, isLoading]);
 
   function handleDrawerOpenChange(open: boolean) {
     if (!open) {
       setSelected(null);
       if (taskIdFromUrl) {
-        void navigate({ search: { taskId: undefined }, replace: true });
+        updateUrlSearch({ taskId: undefined });
       }
     }
   }
@@ -201,7 +253,7 @@ function TasksPage() {
     () =>
       taskList.filter(
         (task) =>
-          (status === "all" || task.status === status) &&
+          taskMatchesStatusFilter(task, status) &&
           (priority === "all" || task.priority === priority) &&
           (q === "" ||
             task.title.toLowerCase().includes(q.toLowerCase()) ||
@@ -216,6 +268,7 @@ function TasksPage() {
     setQ("");
     setStatus("all");
     setPriority("all");
+    updateUrlSearch({ status: undefined, taskId: undefined });
   }
 
   function handleSort(field: TaskSortField) {
@@ -272,11 +325,11 @@ function TasksPage() {
           />
         </div>
         <div className="flex flex-wrap gap-2">
-          <Pill active={status === "all"} onClick={() => setStatus("all")}>
+          <Pill active={status === "all"} onClick={() => setStatusFilter("all")}>
             {t("tasks.allStatus")}
           </Pill>
           {(Object.keys(statusMeta) as TaskStatus[]).map((s) => (
-            <Pill key={s} active={status === s} onClick={() => setStatus(s)}>
+            <Pill key={s} active={status === s} onClick={() => setStatusFilter(s)}>
               {t(statusMeta[s].labelKey)}
             </Pill>
           ))}
@@ -374,17 +427,10 @@ function TasksPage() {
                   <span
                     className={
                       "inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold " +
-                      priorityMeta[task.priority]
+                      priorityMeta[task.priority].tone
                     }
                   >
-                    {t(
-                      {
-                        low: "tasks.priorityLow",
-                        medium: "tasks.priorityMedium",
-                        high: "tasks.priorityHigh",
-                        urgent: "tasks.priorityUrgent",
-                      }[task.priority],
-                    )}
+                    {t(priorityMeta[task.priority].labelKey)}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">

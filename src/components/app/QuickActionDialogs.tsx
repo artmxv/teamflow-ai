@@ -138,10 +138,10 @@ export function NewProjectDialog({
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="planning">{t("projects.planning")}</SelectItem>
-                    <SelectItem value="active">{t("projects.active")}</SelectItem>
-                    <SelectItem value="on_hold">{t("projects.onHold")}</SelectItem>
-                    <SelectItem value="completed">{t("projects.completed")}</SelectItem>
+                    <SelectItem value="planning">{t("projects.statusPlanning")}</SelectItem>
+                    <SelectItem value="active">{t("projects.statusActive")}</SelectItem>
+                    <SelectItem value="on_hold">{t("projects.statusOnHold")}</SelectItem>
+                    <SelectItem value="completed">{t("projects.statusCompleted")}</SelectItem>
                   </SelectContent>
                 </Select>
               )}
