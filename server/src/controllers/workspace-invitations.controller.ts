@@ -106,6 +106,8 @@ export async function createWorkspaceInvitationController(
       data: {
         invitation: created.invitation,
         deliveryMode: created.deliveryMode,
+        emailSent: created.emailSent,
+        ...(created.emailWarning ? { emailWarning: created.emailWarning } : {}),
         acceptUrl: created.invitation.acceptUrl,
       },
     });

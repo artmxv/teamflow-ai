@@ -567,11 +567,7 @@ export function TaskDrawer({
                 className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
                 disabled={isDeleting}
                 onClick={() => {
-                  if (
-                    window.confirm(
-                      t("tasks.deleteTaskConfirm").replace("{title}", task.title),
-                    )
-                  ) {
+                  if (window.confirm(t("tasks.deleteTaskConfirm").replace("{title}", task.title))) {
                     onDelete(task.id);
                   }
                 }}

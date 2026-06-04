@@ -171,9 +171,16 @@ function TeamPage() {
     onSuccess: (data) => {
       setLastAcceptUrl(data.acceptUrl);
       void queryClient.invalidateQueries({ queryKey: ["workspace", "invitations"] });
-      toast.success(t("team.invitationSent"), {
-        description: data.acceptUrl,
-      });
+      const emailFailed = data.emailSent === false || Boolean(data.emailWarning);
+      if (emailFailed) {
+        toast.warning(t("team.invitationEmailFailed"), {
+          description: data.acceptUrl,
+        });
+      } else {
+        toast.success(t("team.invitationSent"), {
+          description: data.acceptUrl,
+        });
+      }
       setInviteEmail("");
       setInviteRole("MEMBER");
     },

@@ -18,6 +18,8 @@ export interface CreateWorkspaceInvitationResult {
   invitation: WorkspaceInvitationItem;
   deliveryMode: string;
   acceptUrl: string;
+  emailSent?: boolean;
+  emailWarning?: string;
 }
 
 export interface InvitationPreview {

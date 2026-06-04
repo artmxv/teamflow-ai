@@ -81,9 +81,7 @@ export function getProjectAccent(
   projectName?: string | null,
 ): ProjectAccent {
   if (projectOrId !== null && typeof projectOrId === "object") {
-    return PROJECT_ACCENT_PALETTE[
-      accentIndexForKey(accentKey(projectOrId.id, projectOrId.name))
-    ];
+    return PROJECT_ACCENT_PALETTE[accentIndexForKey(accentKey(projectOrId.id, projectOrId.name))];
   }
   return PROJECT_ACCENT_PALETTE[accentIndexForKey(accentKey(projectOrId, projectName))];
 }
