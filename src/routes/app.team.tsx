@@ -4,13 +4,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { requireAuth } from "@/lib/auth/route-guards";
 import {
   canManageWorkspaceTeam,
+  nameToInitials,
   useCurrentUser,
   useCurrentWorkspace,
   workspaceRoleLabel,
 } from "@/lib/auth/use-current-user";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
-import { members, type Member, type Role } from "@/lib/mock-data";
 import { Avatar } from "@/components/app/Avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,13 +49,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { mockTeamRoleLabel, useI18n } from "@/lib/i18n";
+import { useI18n, type TKey } from "@/lib/i18n";
 import type { WorkspaceRole } from "@/lib/api/auth";
 import {
   createWorkspaceInvitation,
   fetchWorkspaceInvitations,
   revokeWorkspaceInvitation,
 } from "@/lib/api/workspace-invitations";
+import {
+  fetchWorkspaceMembers,
+  removeWorkspaceMember,
+  updateWorkspaceMemberRole,
+  type WorkspaceMemberItem,
+} from "@/lib/api/workspace-members";
 import { Info as InfoIcon, Plus, MoreHorizontal, Copy } from "lucide-react";
 
 export const Route = createFileRoute("/app/team")({
@@ -64,18 +70,34 @@ export const Route = createFileRoute("/app/team")({
   component: TeamPage,
 });
 
-const roleStyles: Record<Role, string> = {
-  Owner: "bg-primary/15 text-primary",
-  Admin: "bg-info/15 text-info",
-  Member: "bg-secondary text-secondary-foreground",
+const roleStyles: Record<WorkspaceRole, string> = {
+  OWNER: "bg-primary/15 text-primary",
+  ADMIN: "bg-info/15 text-info",
+  MEMBER: "bg-secondary text-secondary-foreground",
 };
-const statusStyles = {
-  active: "bg-success/15 text-success",
-  offline: "bg-muted text-muted-foreground",
-  invited: "bg-warning/20 text-warning-foreground",
-} as const;
 
 type InviteRole = Extract<WorkspaceRole, "ADMIN" | "MEMBER">;
+type ManageableRole = InviteRole;
+
+const TEAM_ERROR_KEYS: Record<string, TKey> = {
+  "Only workspace owners can manage members": "team.error.onlyOwners",
+  "You cannot change your own role": "team.error.cannotChangeOwnRole",
+  "You cannot remove yourself": "team.error.cannotRemoveSelf",
+  "Cannot remove the last owner": "team.error.cannotRemoveLastOwner",
+  "Cannot demote the last owner": "team.error.cannotDemoteLastOwner",
+  "Owner role cannot be assigned here": "team.error.ownerRoleNotAssignable",
+};
+
+function formatTeamError(error: unknown, fallback: TKey, t: (k: TKey) => string): string {
+  if (error instanceof Error) {
+    const key = TEAM_ERROR_KEYS[error.message];
+    if (key) {
+      return t(key);
+    }
+    return error.message;
+  }
+  return t(fallback);
+}
 
 function TeamPage() {
   const { t } = useI18n();
@@ -83,19 +105,26 @@ function TeamPage() {
   const { data: me } = useCurrentUser();
   const { data: workspace } = useCurrentWorkspace();
   const workspaceName = workspace?.name ?? "your workspace";
-  const canInvite = canManageWorkspaceTeam(me?.workspace?.role);
-  const currentUserEmail = me?.user.email.toLowerCase() ?? "";
+  const canManageTeam = canManageWorkspaceTeam(me?.workspace?.role);
+  const currentUserId = me?.user.id ?? "";
 
-  const isCurrentMember = (member: Member) => member.email.toLowerCase() === currentUserEmail;
+  const membersQuery = useQuery({
+    queryKey: ["workspace-members"],
+    queryFn: fetchWorkspaceMembers,
+  });
 
-  const canManageMember = (member: Member) => {
-    if (!canInvite) {
+  const members = membersQuery.data ?? [];
+
+  const isCurrentMember = (member: WorkspaceMemberItem) => member.id === currentUserId;
+
+  const canManageMember = (member: WorkspaceMemberItem) => {
+    if (!canManageTeam) {
       return false;
     }
-    if (member.role === "Owner") {
+    if (member.role === "OWNER") {
       return false;
     }
-    if (isCurrentMember(member) && me?.workspace?.role === "OWNER") {
+    if (isCurrentMember(member)) {
       return false;
     }
     return true;
@@ -109,7 +138,7 @@ function TeamPage() {
   const invitationsQuery = useQuery({
     queryKey: ["workspace", "invitations"],
     queryFn: fetchWorkspaceInvitations,
-    enabled: canInvite,
+    enabled: canManageTeam,
   });
 
   const createInviteMutation = useMutation({
@@ -142,14 +171,39 @@ function TeamPage() {
     },
   });
 
-  const [profileMember, setProfileMember] = useState<Member | null>(null);
-  const [roleMember, setRoleMember] = useState<Member | null>(null);
-  const [roleSelection, setRoleSelection] = useState<Role>("Member");
-  const [removeMember, setRemoveMember] = useState<Member | null>(null);
+  const [profileMember, setProfileMember] = useState<WorkspaceMemberItem | null>(null);
+  const [roleMember, setRoleMember] = useState<WorkspaceMemberItem | null>(null);
+  const [roleSelection, setRoleSelection] = useState<ManageableRole>("MEMBER");
+  const [removeMember, setRemoveMember] = useState<WorkspaceMemberItem | null>(null);
 
-  const openRoleDialog = (member: Member) => {
+  const updateRoleMutation = useMutation({
+    mutationFn: ({ memberId, role }: { memberId: string; role: ManageableRole }) =>
+      updateWorkspaceMemberRole(memberId, role),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["workspace-members"] });
+      setRoleMember(null);
+      toast.success(t("team.toast.roleUpdated"));
+    },
+    onError: (error) => {
+      toast.error(formatTeamError(error, "team.error.updateFailed", t));
+    },
+  });
+
+  const removeMemberMutation = useMutation({
+    mutationFn: removeWorkspaceMember,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["workspace-members"] });
+      setRemoveMember(null);
+      toast.success(t("team.toast.memberRemoved"));
+    },
+    onError: (error) => {
+      toast.error(formatTeamError(error, "team.error.removeFailed", t));
+    },
+  });
+
+  const openRoleDialog = (member: WorkspaceMemberItem) => {
     setRoleMember(member);
-    setRoleSelection(member.role);
+    setRoleSelection(member.role === "ADMIN" ? "ADMIN" : "MEMBER");
   };
 
   const handleSendInvite = () => {
@@ -172,25 +226,15 @@ function TeamPage() {
 
   const handleSaveRole = () => {
     if (!roleMember) return;
-    const name = roleMember.name;
-    const role = roleMember.role;
-    const selected = roleSelection;
-    setRoleMember(null);
-    toast.info(t("team.toast.role"), {
-      description: t("team.toast.roleDesc")
-        .replace("{name}", name)
-        .replace("{role}", mockTeamRoleLabel(role, t))
-        .replace("{selected}", mockTeamRoleLabel(selected, t)),
+    updateRoleMutation.mutate({
+      memberId: roleMember.id,
+      role: roleSelection,
     });
   };
 
   const handleConfirmRemove = () => {
     if (!removeMember) return;
-    const name = removeMember.name;
-    setRemoveMember(null);
-    toast.info(t("team.toast.remove"), {
-      description: t("team.toast.removeDesc").replace("{name}", name),
-    });
+    removeMemberMutation.mutate(removeMember.id);
   };
 
   const pendingInvitations = invitationsQuery.data ?? [];
@@ -199,22 +243,14 @@ function TeamPage() {
     <AppShell title={t("team.team")}>
       <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">{t("team.previewTitle")}</h1>
-            <Badge
-              variant="outline"
-              className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
-            >
-              {t("common.sampleData")}
-            </Badge>
-          </div>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("team.previewTitle")}</h1>
           <p className="text-sm text-muted-foreground">
             {t("team.previewSubtitle")
               .replace("{count}", String(members.length))
               .replace("{workspace}", workspaceName)}
           </p>
         </div>
-        {canInvite && (
+        {canManageTeam && (
           <Dialog
             open={inviteOpen}
             onOpenChange={(open) => {
@@ -295,13 +331,15 @@ function TeamPage() {
         )}
       </div>
 
-      <Alert className="mb-6 border-primary/25 bg-primary/5">
-        <InfoIcon className="size-4 text-primary" />
-        <AlertTitle>{t("team.previewTitle")}</AlertTitle>
-        <AlertDescription>{t("team.previewNote")}</AlertDescription>
-      </Alert>
+      {!canManageTeam && (
+        <Alert className="mb-6 border-border bg-muted/30">
+          <InfoIcon className="size-4 text-muted-foreground" />
+          <AlertTitle>{t("team.roleManagementRestricted")}</AlertTitle>
+          <AlertDescription>{t("team.viewOnlyNote")}</AlertDescription>
+        </Alert>
+      )}
 
-      {canInvite && pendingInvitations.length > 0 && (
+      {canManageTeam && pendingInvitations.length > 0 && (
         <section className="mb-6 overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
           <div className="border-b border-border bg-muted/50 px-5 py-3">
             <h2 className="text-sm font-semibold">{t("team.pendingInvitations")}</h2>
@@ -355,70 +393,87 @@ function TeamPage() {
             <tr>
               <th className="px-5 py-3 text-left">{t("team.members")}</th>
               <th className="px-5 py-3 text-left">{t("team.role")}</th>
-              <th className="px-5 py-3 text-left">{t("team.status")}</th>
               <th className="px-5 py-3 text-left">{t("team.joined")}</th>
               <th className="px-5 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {members.map((m) => (
-              <tr key={m.id} className="transition hover:bg-muted/40">
-                <td className="px-5 py-3">
-                  <div className="flex items-center gap-3">
-                    <Avatar id={m.id} initials={m.avatar} />
-                    <div>
-                      <div className="font-medium">{m.name}</div>
-                      <div className="text-xs text-muted-foreground">{m.email}</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-5 py-3">
-                  <Badge variant="secondary" className={roleStyles[m.role] + " border-0"}>
-                    {mockTeamRoleLabel(m.role, t)}
-                  </Badge>
-                </td>
-                <td className="px-5 py-3">
-                  <Badge
-                    variant="secondary"
-                    className={statusStyles[m.status] + " border-0 capitalize"}
-                  >
-                    {m.status}
-                  </Badge>
-                </td>
-                <td className="px-5 py-3 text-muted-foreground">{m.joinedAt}</td>
-                <td className="px-5 py-3 text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        aria-label={`Actions for ${m.name}`}
-                        className="rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
-                      >
-                        <MoreHorizontal className="size-4" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setProfileMember(m)}>
-                        {t("team.viewProfile")}
-                      </DropdownMenuItem>
-                      {canManageMember(m) && (
-                        <DropdownMenuItem onClick={() => openRoleDialog(m)}>
-                          {t("team.changeRole")}
-                        </DropdownMenuItem>
-                      )}
-                      {canManageMember(m) && (
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => setRemoveMember(m)}
-                        >
-                          {t("team.removeMember")}
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            {membersQuery.isLoading && (
+              <tr>
+                <td colSpan={4} className="px-5 py-8 text-center text-muted-foreground">
+                  …
                 </td>
               </tr>
-            ))}
+            )}
+            {membersQuery.isError && (
+              <tr>
+                <td colSpan={4} className="px-5 py-8 text-center text-destructive">
+                  {membersQuery.error instanceof Error
+                    ? membersQuery.error.message
+                    : t("team.error.updateFailed")}
+                </td>
+              </tr>
+            )}
+            {!membersQuery.isLoading &&
+              !membersQuery.isError &&
+              members.map((member) => (
+                <tr key={member.id} className="transition hover:bg-muted/40">
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar
+                        id={member.id}
+                        initials={member.avatar ?? nameToInitials(member.name)}
+                      />
+                      <div>
+                        <div className="font-medium">{member.name}</div>
+                        <div className="text-xs text-muted-foreground">{member.email}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3">
+                    <Badge variant="secondary" className={roleStyles[member.role] + " border-0"}>
+                      {workspaceRoleLabel(member.role, t)}
+                    </Badge>
+                  </td>
+                  <td className="px-5 py-3 text-muted-foreground">
+                    {new Date(member.joinedAt).toLocaleDateString()}
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label={`Actions for ${member.name}`}
+                          className="rounded-md p-1 text-muted-foreground transition outline-none hover:bg-secondary hover:text-foreground focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground/30"
+                        >
+                          <MoreHorizontal className="size-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        onCloseAutoFocus={(event) => event.preventDefault()}
+                      >
+                        <DropdownMenuItem onClick={() => setProfileMember(member)}>
+                          {t("team.viewProfile")}
+                        </DropdownMenuItem>
+                        {canManageMember(member) && (
+                          <DropdownMenuItem onClick={() => openRoleDialog(member)}>
+                            {t("team.changeRole")}
+                          </DropdownMenuItem>
+                        )}
+                        {canManageMember(member) && (
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => setRemoveMember(member)}
+                          >
+                            {t("team.removeMember")}
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </table>
       </div>
@@ -432,16 +487,21 @@ function TeamPage() {
           {profileMember && (
             <div className="space-y-3 text-sm">
               <div className="flex items-center gap-3 rounded-xl border border-border p-3">
-                <Avatar id={profileMember.id} initials={profileMember.avatar} />
+                <Avatar
+                  id={profileMember.id}
+                  initials={profileMember.avatar ?? nameToInitials(profileMember.name)}
+                />
                 <div>
                   <div className="font-medium">{profileMember.name}</div>
                   <div className="text-xs text-muted-foreground">{profileMember.email}</div>
                 </div>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
-                <Info label={t("team.role")} value={mockTeamRoleLabel(profileMember.role, t)} />
-                <Info label={t("team.status")} value={profileMember.status} />
-                <Info label={t("team.joined")} value={profileMember.joinedAt} />
+                <Info label={t("team.role")} value={workspaceRoleLabel(profileMember.role, t)} />
+                <Info
+                  label={t("team.joined")}
+                  value={new Date(profileMember.joinedAt).toLocaleDateString()}
+                />
               </div>
             </div>
           )}
@@ -460,14 +520,14 @@ function TeamPage() {
             <Label>{t("team.role")}</Label>
             <Select
               value={roleSelection}
-              onValueChange={(value) => setRoleSelection(value as Role)}
+              onValueChange={(value) => setRoleSelection(value as ManageableRole)}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Member">{mockTeamRoleLabel("Member", t)}</SelectItem>
-                <SelectItem value="Admin">{mockTeamRoleLabel("Admin", t)}</SelectItem>
+                <SelectItem value="MEMBER">{workspaceRoleLabel("MEMBER", t)}</SelectItem>
+                <SelectItem value="ADMIN">{workspaceRoleLabel("ADMIN", t)}</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">{t("team.ownerDisabled")}</p>
@@ -476,8 +536,12 @@ function TeamPage() {
             <Button variant="outline" onClick={() => setRoleMember(null)}>
               {t("common.cancel")}
             </Button>
-            <Button onClick={handleSaveRole} className="bg-gradient-brand text-white">
-              {t("team.saveRole")}
+            <Button
+              onClick={handleSaveRole}
+              className="bg-gradient-brand text-white"
+              disabled={updateRoleMutation.isPending}
+            >
+              {t("team.updateRole")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -498,6 +562,7 @@ function TeamPage() {
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={removeMemberMutation.isPending}
               onClick={handleConfirmRemove}
             >
               {t("team.removeConfirm")}
@@ -513,7 +578,7 @@ function Info({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-border p-3">
       <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1 text-sm font-medium capitalize">{value}</div>
+      <div className="mt-1 text-sm font-medium">{value}</div>
     </div>
   );
 }
