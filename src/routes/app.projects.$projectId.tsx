@@ -699,7 +699,7 @@ function ProjectDetails({
                 {t("projects.detail.emptyTaskList")}
               </div>
             ) : (
-              <ul className="max-h-[min(70vh,32rem)] divide-y divide-border overflow-y-auto overscroll-contain">
+              <ul className="app-scrollbar max-h-[min(70vh,32rem)] divide-y divide-border overflow-y-auto overscroll-contain">
                 {sortedTasks.map((task) => (
                   <li key={task.id}>
                     <button
