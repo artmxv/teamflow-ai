@@ -6,6 +6,7 @@ import {
   revokeWorkspaceInvitationController,
 } from "../controllers/workspace-invitations.controller.js";
 import {
+  getWorkspaceMemberProfileController,
   getWorkspaceMembersController,
   getWorkspaceSettingsController,
   removeWorkspaceMemberController,
@@ -18,6 +19,7 @@ export const workspaceRouter = Router();
 
 workspaceRouter.use(requireAuth);
 workspaceRouter.get("/members", getWorkspaceMembersController);
+workspaceRouter.get("/members/:memberId/profile", getWorkspaceMemberProfileController);
 workspaceRouter.patch("/members/:memberId", updateWorkspaceMemberRoleController);
 workspaceRouter.delete("/members/:memberId", removeWorkspaceMemberController);
 workspaceRouter.get("/invitations", listWorkspaceInvitationsController);

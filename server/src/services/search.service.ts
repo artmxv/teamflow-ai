@@ -159,7 +159,7 @@ export async function searchWorkspace(
       type: "member" as const,
       title: row.user.name,
       subtitle: row.user.email,
-      href: "/app/team",
+      href: `/app/team?memberId=${row.user.id}`,
       avatar: row.user.avatar,
     })),
   };

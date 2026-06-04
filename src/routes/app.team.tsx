@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { requireAuth } from "@/lib/auth/route-guards";
@@ -11,6 +11,7 @@ import {
 } from "@/lib/auth/use-current-user";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
+import { MemberProfileDrawer } from "@/components/app/MemberProfileDrawer";
 import { Avatar } from "@/components/app/Avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -64,8 +65,18 @@ import {
 } from "@/lib/api/workspace-members";
 import { Info as InfoIcon, Plus, MoreHorizontal, Copy } from "lucide-react";
 
+export type TeamSearch = {
+  memberId?: string;
+};
+
 export const Route = createFileRoute("/app/team")({
   beforeLoad: requireAuth,
+  validateSearch: (search: Record<string, unknown>): TeamSearch => ({
+    memberId:
+      typeof search.memberId === "string" && search.memberId.length > 0
+        ? search.memberId
+        : undefined,
+  }),
   head: () => ({ meta: [{ title: "Team — TeamFlow AI" }] }),
   component: TeamPage,
 });
@@ -101,6 +112,16 @@ function formatTeamError(error: unknown, fallback: TKey, t: (k: TKey) => string)
 
 function TeamPage() {
   const { t } = useI18n();
+  const { memberId: memberIdFromUrl } = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const [memberDrawerOpen, setMemberDrawerOpen] = useState(() => !!memberIdFromUrl);
+
+  useEffect(() => {
+    if (memberIdFromUrl) {
+      setMemberDrawerOpen(true);
+    }
+  }, [memberIdFromUrl]);
+
   const queryClient = useQueryClient();
   const { data: me } = useCurrentUser();
   const { data: workspace } = useCurrentWorkspace();
@@ -171,7 +192,6 @@ function TeamPage() {
     },
   });
 
-  const [profileMember, setProfileMember] = useState<WorkspaceMemberItem | null>(null);
   const [roleMember, setRoleMember] = useState<WorkspaceMemberItem | null>(null);
   const [roleSelection, setRoleSelection] = useState<ManageableRole>("MEMBER");
   const [removeMember, setRemoveMember] = useState<WorkspaceMemberItem | null>(null);
@@ -238,6 +258,26 @@ function TeamPage() {
   };
 
   const pendingInvitations = invitationsQuery.data ?? [];
+
+  function updateUrlSearch(patch: Partial<TeamSearch>) {
+    void navigate({
+      search: {
+        memberId: "memberId" in patch ? patch.memberId : memberIdFromUrl,
+      },
+      replace: true,
+    });
+  }
+
+  function openMemberDrawer(memberId: string) {
+    updateUrlSearch({ memberId });
+  }
+
+  function handleProfileDrawerClose() {
+    setMemberDrawerOpen(false);
+    if (memberIdFromUrl) {
+      updateUrlSearch({ memberId: undefined });
+    }
+  }
 
   return (
     <AppShell>
@@ -417,7 +457,11 @@ function TeamPage() {
             {!membersQuery.isLoading &&
               !membersQuery.isError &&
               members.map((member) => (
-                <tr key={member.id} className="transition hover:bg-muted/40">
+                <tr
+                  key={member.id}
+                  className="cursor-pointer transition hover:bg-muted/40"
+                  onClick={() => openMemberDrawer(member.id)}
+                >
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
                       <Avatar
@@ -438,7 +482,7 @@ function TeamPage() {
                   <td className="px-5 py-3 text-muted-foreground">
                     {new Date(member.joinedAt).toLocaleDateString()}
                   </td>
-                  <td className="px-5 py-3 text-right">
+                  <td className="px-5 py-3 text-right" onClick={(event) => event.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <button
@@ -453,7 +497,7 @@ function TeamPage() {
                         align="end"
                         onCloseAutoFocus={(event) => event.preventDefault()}
                       >
-                        <DropdownMenuItem onClick={() => setProfileMember(member)}>
+                        <DropdownMenuItem onClick={() => openMemberDrawer(member.id)}>
                           {t("team.viewProfile")}
                         </DropdownMenuItem>
                         {canManageMember(member) && (
@@ -478,35 +522,11 @@ function TeamPage() {
         </table>
       </div>
 
-      <Dialog open={profileMember != null} onOpenChange={(next) => !next && setProfileMember(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{profileMember?.name}</DialogTitle>
-            <DialogDescription>{t("team.profileDesc")}</DialogDescription>
-          </DialogHeader>
-          {profileMember && (
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center gap-3 rounded-xl border border-border p-3">
-                <Avatar
-                  id={profileMember.id}
-                  initials={profileMember.avatar ?? nameToInitials(profileMember.name)}
-                />
-                <div>
-                  <div className="font-medium">{profileMember.name}</div>
-                  <div className="text-xs text-muted-foreground">{profileMember.email}</div>
-                </div>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Info label={t("team.role")} value={workspaceRoleLabel(profileMember.role, t)} />
-                <Info
-                  label={t("team.joined")}
-                  value={new Date(profileMember.joinedAt).toLocaleDateString()}
-                />
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <MemberProfileDrawer
+        memberId={memberIdFromUrl ?? null}
+        open={memberDrawerOpen}
+        onClose={handleProfileDrawerClose}
+      />
 
       <Dialog open={roleMember != null} onOpenChange={(next) => !next && setRoleMember(null)}>
         <DialogContent>
@@ -571,14 +591,5 @@ function TeamPage() {
         </AlertDialogContent>
       </AlertDialog>
     </AppShell>
-  );
-}
-
-function Info({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border p-3">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1 text-sm font-medium">{value}</div>
-    </div>
   );
 }

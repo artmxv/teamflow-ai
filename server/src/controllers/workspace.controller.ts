@@ -7,6 +7,7 @@ import {
   getUserWorkspaceContext,
   updateUserWorkspaceSettings,
 } from "../services/workspace-context.service.js";
+import { getWorkspaceMemberProfile } from "../services/member-profile.service.js";
 import {
   getWorkspaceMembers,
   removeWorkspaceMember,
@@ -36,6 +37,42 @@ function handleWorkspaceError(error: unknown, res: Response, next: NextFunction)
     return;
   }
   next(error);
+}
+
+export async function getWorkspaceMemberProfileController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    if (!req.userId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const context = await getUserWorkspaceContext(req.userId);
+    if (!context) {
+      res.status(403).json({ message: "Workspace not found" });
+      return;
+    }
+
+    const memberId = req.params.memberId;
+    if (!memberId || typeof memberId !== "string") {
+      res.status(400).json({ message: "memberId is required" });
+      return;
+    }
+
+    const profile = await getWorkspaceMemberProfile({
+      workspaceId: context.workspaceId,
+      actorUserId: req.userId,
+      actorRole: context.role,
+      memberId,
+    });
+
+    res.json({ data: profile });
+  } catch (error) {
+    handleWorkspaceError(error, res, next);
+  }
 }
 
 export async function getWorkspaceMembersController(
