@@ -13,6 +13,13 @@ enum WorkspaceRole {
   MEMBER
 }
 
+enum WorkspaceInvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
 enum MemberStatus {
   ACTIVE
   INVITED
@@ -60,16 +67,18 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  workspaceMemberships     WorkspaceMember[]
-  projectMemberships       ProjectMember[]
-  assignedTasks            Task[]
-  taskAssigneeLinks        TaskAssignee[]
-  comments                 TaskComment[]
-  activities               TaskActivity[]
-  uploadedTaskAttachments  TaskAttachment[]
-  uploadedProjectDocuments ProjectDocument[]
-  notificationsReceived    Notification[]    @relation("NotificationRecipient")
-  notificationsSent        Notification[]    @relation("NotificationActor")
+  workspaceMemberships         WorkspaceMember[]
+  workspaceInvitationsSent     WorkspaceInvitation[] @relation("WorkspaceInvitationsSent")
+  workspaceInvitationsAccepted WorkspaceInvitation[] @relation("WorkspaceInvitationsAccepted")
+  projectMemberships           ProjectMember[]
+  assignedTasks                Task[]
+  taskAssigneeLinks            TaskAssignee[]
+  comments                     TaskComment[]
+  activities                   TaskActivity[]
+  uploadedTaskAttachments      TaskAttachment[]
+  uploadedProjectDocuments     ProjectDocument[]
+  notificationsReceived        Notification[]        @relation("NotificationRecipient")
+  notificationsSent            Notification[]        @relation("NotificationActor")
 }
 
 model Workspace {
@@ -82,6 +91,7 @@ model Workspace {
   updatedAt DateTime @updatedAt
 
   members       WorkspaceMember[]
+  invitations   WorkspaceInvitation[]
   projects      Project[]
   aiSummaries   AiSummary[]
   notifications Notification[]
@@ -101,6 +111,30 @@ model WorkspaceMember {
   @@unique([workspaceId, userId])
   @@index([workspaceId])
   @@index([userId])
+}
+
+model WorkspaceInvitation {
+  id           String                    @id @default(cuid())
+  workspaceId  String
+  email        String
+  role         WorkspaceRole             @default(MEMBER)
+  token        String                    @unique
+  status       WorkspaceInvitationStatus @default(PENDING)
+  invitedById  String
+  acceptedById String?
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy  User      @relation("WorkspaceInvitationsSent", fields: [invitedById], references: [id], onDelete: Cascade)
+  acceptedBy User?     @relation("WorkspaceInvitationsAccepted", fields: [acceptedById], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([email])
+  @@index([token])
+  @@index([status])
 }
 
 model Project {
