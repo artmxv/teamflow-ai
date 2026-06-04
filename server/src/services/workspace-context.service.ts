@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, type BillingPlan } from "@prisma/client";
 
 import { prisma } from "../lib/prisma.js";
 import { AuthError } from "./auth.service.js";
@@ -16,6 +16,7 @@ export type AuthWorkspace = {
   slug: string;
   industry: string | null;
   teamSize: string | null;
+  plan: BillingPlan;
   role: WorkspaceRole;
 };
 
@@ -44,6 +45,7 @@ export async function getUserCurrentWorkspace(userId: string): Promise<AuthWorks
           slug: true,
           industry: true,
           teamSize: true,
+          plan: true,
         },
       },
     },
@@ -59,6 +61,7 @@ export async function getUserCurrentWorkspace(userId: string): Promise<AuthWorks
     slug: membership.workspace.slug,
     industry: membership.workspace.industry,
     teamSize: membership.workspace.teamSize,
+    plan: membership.workspace.plan,
     role: membership.role,
   };
 }
@@ -121,6 +124,7 @@ export async function updateUserWorkspaceSettings(
       slug: true,
       industry: true,
       teamSize: true,
+      plan: true,
     },
   });
 
@@ -130,6 +134,7 @@ export async function updateUserWorkspaceSettings(
     slug: workspace.slug,
     industry: workspace.industry,
     teamSize: workspace.teamSize,
+    plan: workspace.plan,
     role: context.role,
   };
 }

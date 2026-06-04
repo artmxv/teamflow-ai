@@ -1,11 +1,12 @@
 import { randomBytes } from "node:crypto";
 
-import type { WorkspaceInvitationStatus, WorkspaceRole } from "@prisma/client";
+import type { BillingPlan, WorkspaceInvitationStatus, WorkspaceRole } from "@prisma/client";
 
 import { env } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
 import type { PublicUser } from "./auth.service.js";
 import { AuthError } from "./auth.service.js";
+import { assertCanInviteMember } from "./billing-plans.service.js";
 import { sendWorkspaceInviteEmail } from "./email.service.js";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -160,6 +161,7 @@ export async function listWorkspaceInvitations(
 export async function createWorkspaceInvitation(input: {
   workspaceId: string;
   workspaceName: string;
+  workspacePlan: BillingPlan;
   inviterUserId: string;
   inviterRole: WorkspaceRole;
   email: string;
@@ -197,6 +199,12 @@ export async function createWorkspaceInvitation(input: {
       reused: true,
     };
   }
+
+  await assertCanInviteMember({
+    workspaceId: input.workspaceId,
+    plan: input.workspacePlan,
+    isReusingPendingInvite: false,
+  });
 
   const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
   const token = generateInviteToken();

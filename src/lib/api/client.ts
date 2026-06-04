@@ -2,6 +2,17 @@ import { getAuthToken } from "@/lib/auth/token";
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 export type ApiRequestOptions = {
   method?: string;
   body?: unknown;
@@ -30,8 +41,12 @@ export async function apiRequest<T>(path: string, options?: ApiRequestOptions): 
   });
 
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { message?: string } | null;
-    throw new Error(body?.message ?? `API request failed with status ${response.status}`);
+    const body = (await response.json().catch(() => null)) as {
+      message?: string;
+      code?: string;
+    } | null;
+    const message = body?.message ?? `API request failed with status ${response.status}`;
+    throw new ApiError(message, response.status, body?.code);
   }
 
   return response.json() as Promise<T>;

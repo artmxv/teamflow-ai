@@ -19,12 +19,15 @@ export interface AuthUser {
   updatedAt: string;
 }
 
+export type BillingPlanId = "FREE" | "TEAM" | "BUSINESS" | "ENTERPRISE";
+
 export interface AuthWorkspace {
   id: string;
   name: string;
   slug: string;
   industry: string | null;
   teamSize: string | null;
+  plan: BillingPlanId;
   role: WorkspaceRole;
 }
 

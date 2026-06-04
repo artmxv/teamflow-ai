@@ -26,7 +26,10 @@ function routeParam(value: string | string[] | undefined): string {
 
 function handleInvitationError(error: unknown, res: Response, next: NextFunction) {
   if (error instanceof AuthError) {
-    res.status(error.statusCode).json({ message: error.message });
+    res.status(error.statusCode).json({
+      message: error.message,
+      ...(error.code ? { code: error.code } : {}),
+    });
     return;
   }
   next(error);
@@ -85,7 +88,7 @@ export async function createWorkspaceInvitationController(
 
     const workspace = await prisma.workspace.findUnique({
       where: { id: context.workspaceId },
-      select: { name: true },
+      select: { name: true, plan: true },
     });
 
     if (!workspace) {
@@ -96,6 +99,7 @@ export async function createWorkspaceInvitationController(
     const created = await createWorkspaceInvitation({
       workspaceId: context.workspaceId,
       workspaceName: workspace.name,
+      workspacePlan: workspace.plan,
       inviterUserId: req.userId,
       inviterRole: context.role,
       email: result.data.email,
