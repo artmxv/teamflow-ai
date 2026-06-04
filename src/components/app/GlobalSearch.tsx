@@ -184,7 +184,10 @@ export function GlobalSearch() {
         return;
       }
 
-      void router.navigate({ to: "/app/team" });
+      void router.navigate({
+        to: "/app/team",
+        search: { memberId: result.id },
+      });
     },
     [closeSearch, router],
   );
