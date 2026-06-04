@@ -10,6 +10,7 @@ import { errorMiddleware } from "./middleware/error.middleware.js";
 import { notFoundMiddleware } from "./middleware/not-found.middleware.js";
 import { aiRouter } from "./routes/ai.routes.js";
 import { authRouter } from "./routes/auth.routes.js";
+import { billingRouter } from "./routes/billing.routes.js";
 import { dashboardRouter } from "./routes/dashboard.routes.js";
 import { healthRouter } from "./routes/health.routes.js";
 import { invitationsRouter } from "./routes/invitations.routes.js";
@@ -39,6 +40,7 @@ if (env.NODE_ENV !== "production") {
 
 app.use("/api/health", healthRouter);
 app.use("/api/auth", authRouter);
+app.use("/api/billing", billingRouter);
 app.use("/api/workspace", workspaceRouter);
 app.use("/api/invitations", invitationsRouter);
 app.use("/api/ai", aiRouter);

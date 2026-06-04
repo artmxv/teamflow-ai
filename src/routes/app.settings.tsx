@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -44,12 +44,20 @@ import {
   type PhoneCountryId,
 } from "@/lib/profile-contact";
 import { UserAvatar } from "@/components/app/UserAvatar";
+import { fetchBillingSummary, type BillingPlanId } from "@/lib/api/billing";
 import { updateWorkspace } from "@/lib/api/workspace";
 import { canEditWorkspaceSettings, useCurrentUser } from "@/lib/auth/use-current-user";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CreditCard, Check, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 const SETTINGS_TABS = ["workspace", "profile", "notifications", "billing"] as const;
+
+const SETTINGS_PLAN_LABEL_KEYS: Record<BillingPlanId, TKey> = {
+  FREE: "billing.plan.free",
+  TEAM: "billing.plan.team",
+  BUSINESS: "billing.plan.business",
+  ENTERPRISE: "billing.plan.enterprise",
+};
 type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 type SettingsSearch = {
@@ -241,9 +249,13 @@ function SettingsPage() {
   const workspace = me?.workspace;
   const canEditWorkspace = canEditWorkspaceSettings(workspace?.role);
   const activeTab = tab ?? "workspace";
+
+  const billingQuery = useQuery({
+    queryKey: ["billing", "summary"],
+    queryFn: fetchBillingSummary,
+    enabled: activeTab === "billing",
+  });
   const avatarInputRef = useRef<HTMLInputElement>(null);
-  const [seatsOpen, setSeatsOpen] = useState(false);
-  const [cardOpen, setCardOpen] = useState(false);
   const [profileForm, setProfileForm] = useState<ProfileFormState | null>(null);
   const [profileBaseline, setProfileBaseline] = useState<ProfileFormState | null>(null);
   const [workspaceForm, setWorkspaceForm] = useState<WorkspaceFormState | null>(null);
@@ -748,69 +760,38 @@ function SettingsPage() {
 
         <TabsContent value="billing" className="mt-5">
           <Card title={t("settings.planBillingTitle")} description={t("settings.planBillingDesc")}>
-            <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-border bg-gradient-to-br from-primary/8 to-card p-5 sm:flex-row sm:items-center">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wider text-primary">
-                  {t("billing.currentPlan")}
-                </div>
-                <div className="mt-1 text-xl font-semibold">Team · 6 seats</div>
-                <div className="text-xs text-muted-foreground">
-                  $72 / month · Renews on Jul 14, 2026
-                </div>
+            <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/8 to-card p-5">
+              <div className="text-xs font-semibold uppercase tracking-wider text-primary">
+                {t("billing.currentPlan")}
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" asChild>
-                  <Link to="/app/billing">{t("common.changePlan")}</Link>
-                </Button>
-                <Button
-                  onClick={() => setSeatsOpen(true)}
-                  className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
-                >
-                  {t("common.addSeats")}
-                </Button>
+              <div className="mt-1 text-xl font-semibold">
+                {billingQuery.isLoading ? (
+                  <Skeleton className="h-7 w-40" />
+                ) : billingQuery.data ? (
+                  <>
+                    {t(SETTINGS_PLAN_LABEL_KEYS[billingQuery.data.currentPlan])}
+                    {" · "}
+                    {billingQuery.data.usage.members}
+                    {billingQuery.data.limits.maxMembers !== null
+                      ? ` / ${billingQuery.data.limits.maxMembers}`
+                      : ""}{" "}
+                    {t("billing.membersUsed").toLowerCase()}
+                  </>
+                ) : (
+                  t("billing.currentPlan")
+                )}
               </div>
-            </div>
-
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl border border-border p-5">
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <CreditCard className="size-4" /> {t("billing.paymentMethod")}
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Visa ending in 4242 · Exp 09/28
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  onClick={() => setCardOpen(true)}
-                >
-                  {t("common.updateCard")}
-                </Button>
-              </div>
-              <div className="rounded-2xl border border-border p-5">
-                <div className="text-sm font-semibold">{t("billing.whatsIncluded")}</div>
-                <ul className="mt-3 space-y-2 text-sm">
-                  {[
-                    t("billing.featureUnlimitedProjects"),
-                    t("billing.featureAiStandups"),
-                    t("billing.featureAdvancedRoles"),
-                    t("billing.featurePrioritySupport"),
-                    t("billing.featureAuditLog"),
-                  ].map((f) => (
-                    <li key={f} className="flex items-center gap-2">
-                      <Check className="size-4 text-primary" /> {f}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <p className="mt-3 text-sm text-muted-foreground">
+                {t("billing.settingsManagedOnPage")}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">{t("billing.paymentsLaterNote")}</p>
+              <Button variant="brand" className="mt-4" asChild>
+                <Link to="/app/billing">{t("side.billing")}</Link>
+              </Button>
             </div>
           </Card>
         </TabsContent>
       </Tabs>
-
-      <SeatsDialog open={seatsOpen} onOpenChange={setSeatsOpen} />
-      <PaymentMethodDialog open={cardOpen} onOpenChange={setCardOpen} />
     </AppShell>
   );
 }
@@ -1023,89 +1004,5 @@ function SaveBar({
       </Button>
       <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
-  );
-}
-
-function SeatsDialog({
-  open,
-  onOpenChange,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("billing.addSeats")}</DialogTitle>
-          <DialogDescription>{t("settings.seatsDialogDesc")}</DialogDescription>
-        </DialogHeader>
-        <Field label={t("settings.additionalSeats")}>
-          <Input type="number" min="1" defaultValue="2" />
-        </Field>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            onClick={() => {
-              onOpenChange(false);
-              toast.success(t("settings.toast.seatsAdded"));
-            }}
-            className="bg-gradient-brand text-white"
-          >
-            {t("billing.addSeats")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function PaymentMethodDialog({
-  open,
-  onOpenChange,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const { t } = useI18n();
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("settings.updatePaymentTitle")}</DialogTitle>
-          <DialogDescription>{t("settings.updatePaymentDesc")}</DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <Field label={t("settings.cardNumber")}>
-              <Input defaultValue="4242 4242 4242 4242" />
-            </Field>
-          </div>
-          <Field label={t("settings.cardExpiry")}>
-            <Input defaultValue="09 / 28" />
-          </Field>
-          <Field label={t("settings.cardCvc")}>
-            <Input defaultValue="123" />
-          </Field>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            onClick={() => {
-              onOpenChange(false);
-              toast.success(t("settings.toast.paymentMethodUpdated"));
-            }}
-            className="bg-gradient-brand text-white"
-          >
-            {t("settings.saveCard")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }

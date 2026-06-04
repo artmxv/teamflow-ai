@@ -20,6 +20,13 @@ enum WorkspaceInvitationStatus {
   EXPIRED
 }
 
+enum BillingPlan {
+  FREE
+  TEAM
+  BUSINESS
+  ENTERPRISE
+}
+
 enum MemberStatus {
   ACTIVE
   INVITED
@@ -86,13 +93,14 @@ model User {
 }
 
 model Workspace {
-  id        String   @id @default(cuid())
+  id        String      @id @default(cuid())
   name      String
-  slug      String   @unique
+  slug      String      @unique
   industry  String?
   teamSize  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  plan      BillingPlan @default(FREE)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
   members       WorkspaceMember[]
   invitations   WorkspaceInvitation[]

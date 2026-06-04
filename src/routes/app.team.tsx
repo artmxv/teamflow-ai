@@ -52,6 +52,7 @@ import {
 import { useI18n, type Lang, type TKey } from "@/lib/i18n";
 import { formatJoinedDate } from "@/lib/profile-contact";
 import type { WorkspaceRole } from "@/lib/api/auth";
+import { ApiError } from "@/lib/api/client";
 import {
   createWorkspaceInvitation,
   fetchWorkspaceInvitations,
@@ -97,7 +98,30 @@ const TEAM_ERROR_KEYS: Record<string, TKey> = {
   "Cannot remove the last owner": "team.error.cannotRemoveLastOwner",
   "Cannot demote the last owner": "team.error.cannotDemoteLastOwner",
   "Owner role cannot be assigned here": "team.error.ownerRoleNotAssignable",
+  "Member limit reached for the current plan": "billing.memberLimitReached",
 };
+
+function isMemberLimitInviteError(error: unknown): boolean {
+  if (error instanceof ApiError) {
+    if (error.code === "MEMBER_LIMIT_REACHED") {
+      return true;
+    }
+    const lower = error.message.toLowerCase();
+    return lower.includes("member limit");
+  }
+  if (error instanceof Error) {
+    const lower = error.message.toLowerCase();
+    return lower.includes("member limit");
+  }
+  return false;
+}
+
+function formatInviteError(error: unknown, t: (k: TKey) => string): string {
+  if (isMemberLimitInviteError(error)) {
+    return t("billing.memberLimitReached");
+  }
+  return formatTeamError(error, "team.toast.inviteFailed", t);
+}
 
 function formatTeamError(error: unknown, fallback: TKey, t: (k: TKey) => string): string {
   if (error instanceof Error) {
@@ -185,7 +209,7 @@ function TeamPage() {
       setInviteRole("MEMBER");
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : t("team.toast.inviteFailed"));
+      toast.error(formatInviteError(error, t));
     },
   });
 
