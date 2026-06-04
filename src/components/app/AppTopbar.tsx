@@ -1,4 +1,4 @@
-import { Bell, Search, ChevronDown, HelpCircle, Check } from "lucide-react";
+import { Bell, Search, ChevronDown, HelpCircle } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,8 +32,6 @@ import {
   resolveNotificationTarget,
   type NotificationItem,
 } from "@/lib/api/notifications";
-import type { Workspace } from "./AppShell";
-
 const NOTIFICATIONS_QUERY_KEY = ["notifications"] as const;
 const NOTIFICATIONS_POLL_MS = 45_000;
 
@@ -60,19 +58,7 @@ function formatNotificationTime(createdAt: string, lang: string) {
   });
 }
 
-export function AppTopbar({
-  title,
-  workspaces,
-  activeWorkspace,
-  onWorkspaceChange,
-  workspaceRole,
-}: {
-  title: string;
-  workspaces: Workspace[];
-  activeWorkspace: Workspace;
-  onWorkspaceChange: (workspace: Workspace) => void;
-  workspaceRole?: WorkspaceRole | null;
-}) {
+export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | null }) {
   const { t, lang } = useI18n();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -149,42 +135,7 @@ export function AppTopbar({
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur sm:gap-3 sm:px-6">
-      <div className="hidden items-center gap-2 text-sm md:flex">
-        <span className="font-semibold tracking-tight">{title}</span>
-      </div>
-
-      {/* Workspace switcher */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="md:ml-2 flex items-center gap-2 rounded-lg border border-border bg-card px-2 py-1.5 text-sm transition hover:bg-secondary">
-            <span className="grid size-6 place-items-center rounded-md bg-gradient-brand text-[10px] font-semibold text-white">
-              {activeWorkspace.initials}
-            </span>
-            <span className="hidden font-medium sm:inline">{activeWorkspace.name}</span>
-            <ChevronDown className="size-3.5 text-muted-foreground" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-64">
-          <DropdownMenuLabel>{t("top.workspaceSwitcher")}</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {workspaces.map((w) => (
-            <DropdownMenuItem key={w.id} onClick={() => onWorkspaceChange(w)} className="gap-2">
-              <span className="grid size-6 place-items-center rounded-md bg-gradient-brand text-[10px] font-semibold text-white">
-                {w.initials}
-              </span>
-              <span className="flex-1">
-                <span className="block text-sm font-medium leading-tight">{w.name}</span>
-                <span className="block text-[11px] text-muted-foreground leading-tight">
-                  {w.slug ?? w.plan}
-                </span>
-              </span>
-              {activeWorkspace.id === w.id && <Check className="size-4 text-primary" />}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <div className="relative ml-auto hidden lg:block w-72 xl:w-80">
+      <div className="relative hidden min-w-0 flex-1 lg:block lg:max-w-sm xl:max-w-md">
         <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <input
           type="search"
@@ -196,7 +147,7 @@ export function AppTopbar({
         </kbd>
       </div>
 
-      <div className="ml-auto flex items-center gap-1 lg:ml-0 lg:gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
         <LanguageSwitcher />
         <ThemeToggle />
         <button
@@ -328,10 +279,14 @@ export function AppTopbar({
               <DropdownMenuLabel>{currentUser.email}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link to="/app/settings">{t("settings.profileSettings")}</Link>
+                <Link to="/app/settings" search={{ tab: "profile" }}>
+                  {t("settings.profileSettings")}
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link to="/app/settings">{t("settings.workspaceSettings")}</Link>
+                <Link to="/app/settings" search={{ tab: "workspace" }}>
+                  {t("settings.workspaceSettings")}
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link to="/app/billing">{t("side.billing")}</Link>

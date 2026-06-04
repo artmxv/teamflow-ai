@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { AuthError } from "../services/auth.service.js";
 import {
+  getUserCurrentWorkspace,
   getUserWorkspaceContext,
   updateUserWorkspaceSettings,
 } from "../services/workspace-context.service.js";
@@ -12,15 +13,16 @@ import {
   updateWorkspaceMemberRole,
 } from "../services/workspace-members.service.js";
 
-const updateWorkspaceSchema = z
-  .object({
-    name: z.string().trim().min(1, "name cannot be empty").optional(),
-    industry: z.string().trim().optional(),
-    teamSize: z.string().trim().optional(),
-  })
-  .refine((value) => Object.keys(value).length > 0, {
-    message: "at least one field is required",
-  });
+const updateWorkspaceSchema = z.object({
+  name: z.string().trim().min(1, "name cannot be empty"),
+  slug: z
+    .string()
+    .trim()
+    .min(1, "slug cannot be empty")
+    .regex(/^[a-z0-9-]+$/, "Slug can only contain lowercase letters, numbers, and hyphens"),
+  industry: z.string().trim().optional(),
+  teamSize: z.string().trim().optional(),
+});
 
 const updateMemberRoleSchema = z.object({
   role: z.enum(["ADMIN", "MEMBER"], {
@@ -138,6 +140,29 @@ export async function removeWorkspaceMemberController(
     });
 
     res.json({ data: result });
+  } catch (error) {
+    handleWorkspaceError(error, res, next);
+  }
+}
+
+export async function getWorkspaceSettingsController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    if (!req.userId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const workspace = await getUserCurrentWorkspace(req.userId);
+    if (!workspace) {
+      res.status(403).json({ message: "Workspace not found" });
+      return;
+    }
+
+    res.json({ data: { workspace } });
   } catch (error) {
     handleWorkspaceError(error, res, next);
   }

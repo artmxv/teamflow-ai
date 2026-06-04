@@ -248,7 +248,7 @@ function Dashboard() {
   ];
 
   return (
-    <AppShell title={t("side.dashboard")}>
+    <AppShell>
       <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{t("dashboard.overviewTitle")}</h1>

@@ -12,6 +12,8 @@ import {
   CreditCard,
   PanelLeftClose,
   PanelLeftOpen,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
@@ -21,6 +23,15 @@ import { NewProjectDialog } from "./QuickActionDialogs";
 import type { Workspace } from "./AppShell";
 import { fetchProjects } from "@/lib/api/projects";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const nav: { to: string; key: TKey; icon: typeof LayoutDashboard }[] = [
   { to: "/app/dashboard", key: "side.dashboard", icon: LayoutDashboard },
@@ -54,12 +65,100 @@ function SidebarTip({
   );
 }
 
+function WorkspaceSwitcher({
+  workspace,
+  loading,
+  collapsed,
+}: {
+  workspace: Workspace | null;
+  loading: boolean;
+  collapsed: boolean;
+}) {
+  const { t } = useI18n();
+
+  if (loading && !workspace) {
+    return (
+      <div
+        className={cn(
+          "flex w-full min-w-0 items-center rounded-xl border border-sidebar-border bg-card",
+          collapsed ? "justify-center p-2" : "gap-2 px-3 py-2",
+        )}
+        aria-hidden
+      >
+        <Skeleton className="size-6 shrink-0 rounded-md" />
+        {!collapsed && (
+          <>
+            <Skeleton className="h-4 min-w-0 flex-1" />
+            <Skeleton className="size-4 shrink-0 rounded-sm" />
+          </>
+        )}
+      </div>
+    );
+  }
+
+  if (!workspace) {
+    return null;
+  }
+
+  const trigger = (
+    <button
+      type="button"
+      title={workspace.name}
+      className={cn(
+        "flex w-full min-w-0 items-center rounded-xl border border-sidebar-border bg-card text-left text-sm transition hover:bg-sidebar-accent outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+        collapsed ? "justify-center p-2" : "gap-2 px-3 py-2",
+      )}
+    >
+      <span className="grid size-6 shrink-0 place-items-center rounded-md bg-gradient-brand text-[10px] font-semibold text-white">
+        {workspace.initials}
+      </span>
+      {!collapsed && (
+        <>
+          <span className="min-w-0 flex-1 truncate font-medium">{workspace.name}</span>
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        </>
+      )}
+    </button>
+  );
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64" side={collapsed ? "right" : "bottom"}>
+        <DropdownMenuLabel>{t("workspace.switchWorkspace")}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled className="gap-2 opacity-100 focus:bg-secondary/50">
+          <span className="grid size-6 shrink-0 place-items-center rounded-md bg-gradient-brand text-[10px] font-semibold text-white">
+            {workspace.initials}
+          </span>
+          <span className="min-w-0 flex-1 truncate font-medium">{workspace.name}</span>
+          <Check className="size-4 shrink-0 text-primary" aria-hidden />
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link to="/app/settings" search={{ tab: "workspace" }} className="cursor-pointer">
+            {t("settings.workspaceSettings")}
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled className="flex items-center justify-between gap-2">
+          <span>{t("workspace.createWorkspace")}</span>
+          <span className="shrink-0 text-[11px] text-muted-foreground">
+            {t("common.comingSoon")}
+          </span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function AppSidebar({
-  activeWorkspace,
+  workspace,
+  workspaceLoading,
   collapsed,
   onToggleCollapsed,
 }: {
-  activeWorkspace: Workspace;
+  workspace: Workspace | null;
+  workspaceLoading: boolean;
   collapsed: boolean;
   onToggleCollapsed: () => void;
 }) {
@@ -116,26 +215,11 @@ export function AppSidebar({
         </div>
 
         <div className={cn(collapsed ? "px-2" : "px-3")}>
-          <SidebarTip collapsed={collapsed} label={activeWorkspace.name}>
-            <button
-              type="button"
-              title={collapsed ? activeWorkspace.name : undefined}
-              className={cn(
-                "flex w-full items-center rounded-xl border border-sidebar-border bg-card text-left text-sm transition hover:bg-sidebar-accent",
-                collapsed ? "justify-center p-2" : "justify-between px-3 py-2",
-              )}
-            >
-              <span className={cn("flex items-center", collapsed ? "" : "gap-2")}>
-                <span className="grid size-6 shrink-0 place-items-center rounded-md bg-gradient-brand text-[10px] font-semibold text-white">
-                  {activeWorkspace.initials}
-                </span>
-                {!collapsed && <span className="font-medium">{activeWorkspace.name}</span>}
-              </span>
-              {!collapsed && (
-                <span className="text-xs text-muted-foreground">{activeWorkspace.plan}</span>
-              )}
-            </button>
-          </SidebarTip>
+          <WorkspaceSwitcher
+            workspace={workspace}
+            loading={workspaceLoading}
+            collapsed={collapsed}
+          />
         </div>
 
         <nav className={cn("mt-6 flex-1", collapsed ? "px-2" : "px-3")}>
@@ -236,9 +320,7 @@ export function AppSidebar({
             })}
             {canManageProjects ? (
               <li>
-                <NewProjectDialog
-                  workspaceId={activeWorkspace.id !== "loading" ? activeWorkspace.id : undefined}
-                >
+                <NewProjectDialog workspaceId={workspace?.id}>
                   <button
                     type="button"
                     title={collapsed ? t("common.newProject") : undefined}

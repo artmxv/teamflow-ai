@@ -7,6 +7,7 @@ import {
 } from "../controllers/workspace-invitations.controller.js";
 import {
   getWorkspaceMembersController,
+  getWorkspaceSettingsController,
   removeWorkspaceMemberController,
   updateWorkspaceController,
   updateWorkspaceMemberRoleController,
@@ -22,4 +23,6 @@ workspaceRouter.delete("/members/:memberId", removeWorkspaceMemberController);
 workspaceRouter.get("/invitations", listWorkspaceInvitationsController);
 workspaceRouter.post("/invitations", createWorkspaceInvitationController);
 workspaceRouter.delete("/invitations/:id", revokeWorkspaceInvitationController);
+workspaceRouter.get("/settings", getWorkspaceSettingsController);
+workspaceRouter.patch("/settings", updateWorkspaceController);
 workspaceRouter.patch("/", updateWorkspaceController);

@@ -109,7 +109,7 @@ function ProjectsIndexPage() {
   const isTrulyEmpty = projectList.length === 0;
 
   return (
-    <AppShell title={t("projects.projects")}>
+    <AppShell>
       <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{t("projects.projects")}</h1>
