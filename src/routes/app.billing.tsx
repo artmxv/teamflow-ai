@@ -74,10 +74,7 @@ function BillingPage() {
               <Button variant="outline" onClick={() => setPlanOpen(true)}>
                 {t("common.changePlan")}
               </Button>
-              <Button
-                onClick={() => setSeatsOpen(true)}
-                className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
-              >
+              <Button variant="brand" onClick={() => setSeatsOpen(true)}>
                 {t("common.addSeats")}
               </Button>
             </div>
@@ -174,10 +171,7 @@ function BillingPage() {
               </li>
             ))}
           </ul>
-          <Button
-            onClick={() => setPlanOpen(true)}
-            className="mt-5 w-full bg-gradient-brand text-white shadow-glow hover:opacity-95"
-          >
+          <Button variant="brand" className="mt-5 w-full" onClick={() => setPlanOpen(true)}>
             {t("billing.upgradeBusiness")}
           </Button>
         </div>

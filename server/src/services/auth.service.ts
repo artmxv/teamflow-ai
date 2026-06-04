@@ -317,3 +317,18 @@ export async function updateUserAvatarUrl(userId: string, avatarUrl: string): Pr
     throw error;
   }
 }
+
+export async function removeUserAvatar(userId: string): Promise<PublicUser> {
+  try {
+    return await prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl: null },
+      select: publicUserSelect,
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      throw new AuthError("Unauthorized", 401);
+    }
+    throw error;
+  }
+}

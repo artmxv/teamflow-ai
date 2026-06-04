@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { register } from "@/lib/api/auth";
+import { primeAuthMeAfterAuth } from "@/lib/auth/auth-cache";
 import { redirectIfAuthenticated } from "@/lib/auth/route-guards";
 import { setAuthToken } from "@/lib/auth/token";
 import { PASSWORD_HELPER_TEXT, validatePassword } from "@/lib/validation/password";
@@ -32,7 +33,7 @@ function SignUp() {
     mutationFn: register,
     onSuccess: ({ token, user }) => {
       setAuthToken(token);
-      queryClient.setQueryData(["auth", "me"], user);
+      primeAuthMeAfterAuth(queryClient, user);
       toast.success("Account created successfully");
       void router.navigate({ to: "/app/dashboard" });
     },

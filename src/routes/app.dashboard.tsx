@@ -33,6 +33,7 @@ import {
 } from "@/lib/dashboard-analytics";
 import type { TasksSearch } from "@/routes/app.tasks";
 import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
+import { resolveProjectGradient } from "@/lib/project-color";
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import { isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user";
@@ -530,7 +531,7 @@ function mapApiProjectToDashboardCard(project: ProjectApiItem): DashboardProject
     progress: project.progress,
     openTasks: project.openTasks,
     totalTasks: project.totalTasks,
-    color: project.color ?? "from-indigo-500 to-violet-500",
+    color: resolveProjectGradient(project),
   };
 }
 
@@ -652,10 +653,7 @@ function DashboardErrorState({ error, onRetry }: { error: Error | null; onRetry:
       <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
         {error?.message ?? "Check that the backend is running and try again."}
       </p>
-      <Button
-        onClick={onRetry}
-        className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95"
-      >
+      <Button variant="outline" onClick={onRetry} className="mt-5">
         Retry
       </Button>
     </div>

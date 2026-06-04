@@ -279,7 +279,7 @@ export function TaskDrawer({
           </div>
           <SheetTitle className="text-xl leading-snug">{task.title}</SheetTitle>
           <SheetDescription className="sr-only">
-            Task details, checklist, comments, and activity for {task.key}.
+            {t("tasks.sheetDescription").replace("{key}", task.key)}
           </SheetDescription>
         </SheetHeader>
 
@@ -302,7 +302,7 @@ export function TaskDrawer({
           <div className="min-w-0 space-y-6">
             <section>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Description
+                {t("projects.new.description")}
               </h3>
               <p className="text-sm leading-relaxed text-foreground/90">{task.description}</p>
             </section>
@@ -311,10 +311,10 @@ export function TaskDrawer({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <Sparkles className="size-4 text-primary" />
-                  AI assist
+                  {t("tasks.aiAssist")}
                 </div>
-                <Button size="sm" variant="outline" onClick={() => setAiOpen(true)}>
-                  Summarize task
+                <Button size="sm" variant="brand" onClick={() => setAiOpen(true)}>
+                  {t("tasks.taskSummary")}
                 </Button>
               </div>
               {aiOpen && (
@@ -355,7 +355,7 @@ export function TaskDrawer({
 
             <section>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Checklist
+                {t("tasks.sectionChecklist")}
               </h3>
               <ul className="space-y-1.5">
                 {task.checklist.map((c) => (
@@ -449,7 +449,7 @@ export function TaskDrawer({
 
             <section>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Activity
+                {t("common.activity")}
               </h3>
               <ol className="space-y-2 border-l border-border pl-4">
                 {task.activity.map((a) => (
@@ -551,11 +551,12 @@ export function TaskDrawer({
               <Button
                 type="button"
                 size="sm"
-                className="w-full bg-gradient-brand text-white shadow-glow hover:opacity-95"
+                variant="brand"
+                className="w-full"
                 disabled={!hasChanges || isSaving}
                 onClick={handleSaveChanges}
               >
-                {isSaving ? "Saving…" : "Save changes"}
+                {isSaving ? t("settings.saving") : t("common.saveChanges")}
               </Button>
             )}
             {onDelete && (
@@ -567,14 +568,16 @@ export function TaskDrawer({
                 disabled={isDeleting}
                 onClick={() => {
                   if (
-                    window.confirm(`Delete task "${task.title}"? This action cannot be undone.`)
+                    window.confirm(
+                      t("tasks.deleteTaskConfirm").replace("{title}", task.title),
+                    )
                   ) {
                     onDelete(task.id);
                   }
                 }}
               >
                 <Trash2 className="size-4" />
-                {isDeleting ? "Deleting…" : "Delete task"}
+                {isDeleting ? t("tasks.deleting") : t("tasks.deleteTask")}
               </Button>
             )}
           </aside>
@@ -893,6 +896,7 @@ function TaskAttachmentsSection({
   onDownload: (attachment: TaskAttachmentApiItem) => void;
   onDelete: (attachmentId: string) => Promise<unknown>;
 }) {
+  const { t } = useI18n();
   const [attachmentToDelete, setAttachmentToDelete] = useState<string | null>(null);
   const isDeletingSelected = attachmentToDelete != null && isDeletingId === attachmentToDelete;
 
@@ -910,12 +914,12 @@ function TaskAttachmentsSection({
     <section>
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          <Paperclip className="size-3.5" /> Attachments
+          <Paperclip className="size-3.5" /> {t("tasks.sectionAttachments")}
         </h3>
         <Button
           type="button"
           size="sm"
-          variant="outline"
+          variant="brand"
           className="h-7 gap-1.5 px-2 text-xs"
           disabled={isUploading}
           onClick={onPickFile}
@@ -925,7 +929,7 @@ function TaskAttachmentsSection({
           ) : (
             <Upload className="size-3.5" />
           )}
-          {isUploading ? "Uploading…" : "Upload"}
+          {isUploading ? t("tasks.uploading") : t("tasks.upload")}
         </Button>
         <input
           ref={fileInputRef}
@@ -944,15 +948,15 @@ function TaskAttachmentsSection({
       <div className="space-y-2">
         {isLoading ? (
           <p className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-            Loading attachments…
+            {t("tasks.attachmentsLoading")}
           </p>
         ) : isError ? (
           <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-4 text-center text-xs text-destructive">
-            Could not load attachments. Try closing and reopening the task.
+            {t("tasks.attachmentsError")}
           </p>
         ) : attachments.length === 0 ? (
           <p className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-            No attachments yet. Upload a PDF, image, or document.
+            {t("tasks.attachmentsEmpty")}
           </p>
         ) : (
           attachments.map((attachment) => (

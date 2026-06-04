@@ -68,7 +68,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
   const { data: me, isPending, isError } = useCurrentUser();
   const currentUser = me?.user;
   const showProfile = hasToken && !isError && !!currentUser;
-  const showProfilePlaceholder = hasToken && isPending && !currentUser;
+  const showProfilePlaceholder = hasToken && !isError && !currentUser;
   const profileRoleLabel = workspaceRole ? workspaceRoleLabel(workspaceRole, t) : t("role.member");
   const [helpOpen, setHelpOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);

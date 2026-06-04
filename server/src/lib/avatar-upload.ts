@@ -24,6 +24,71 @@ export function avatarPublicPath(filename: string) {
   return `/uploads/avatars/${filename}`;
 }
 
+const LOCAL_AVATAR_URL_PATTERN = /^\/uploads\/avatars\/([^/]+)$/;
+
+function pathOnlyFromAvatarUrl(avatarUrl: string) {
+  const trimmed = avatarUrl.trim();
+  if (!trimmed) {
+    return "";
+  }
+  try {
+    if (/^https?:\/\//i.test(trimmed)) {
+      const parsed = new URL(trimmed);
+      return parsed.pathname;
+    }
+  } catch {
+    return "";
+  }
+  return trimmed.split("?")[0]?.split("#")[0] ?? "";
+}
+
+export function resolveAvatarFilePathFromUrl(avatarUrl: string | null | undefined): string | null {
+  if (!avatarUrl) {
+    return null;
+  }
+
+  const trimmed = avatarUrl.trim();
+  if (/^https?:\/\//i.test(trimmed) || trimmed.startsWith("//")) {
+    const pathname = pathOnlyFromAvatarUrl(trimmed);
+    if (!pathname) {
+      return null;
+    }
+    return resolveAvatarFilePathFromUrl(pathname);
+  }
+
+  const pathname = pathOnlyFromAvatarUrl(trimmed);
+  const match = pathname.match(LOCAL_AVATAR_URL_PATTERN);
+  const filename = match?.[1];
+  if (!filename || filename.includes("..")) {
+    return null;
+  }
+
+  const resolved = path.resolve(AVATAR_UPLOAD_ROOT, filename);
+  const rootResolved = path.resolve(AVATAR_UPLOAD_ROOT);
+  if (resolved !== rootResolved && !resolved.startsWith(`${rootResolved}${path.sep}`)) {
+    return null;
+  }
+
+  return resolved;
+}
+
+export function deleteLocalAvatarFile(avatarUrl: string | null | undefined): void {
+  const filePath = resolveAvatarFilePathFromUrl(avatarUrl);
+  if (!filePath) {
+    return;
+  }
+
+  try {
+    fs.unlinkSync(filePath);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") {
+      return;
+    }
+    console.warn("[avatar-upload] Could not delete local avatar file");
+  }
+}
+
 export function ensureAvatarUploadDir() {
   fs.mkdirSync(AVATAR_UPLOAD_ROOT, { recursive: true });
   return AVATAR_UPLOAD_ROOT;

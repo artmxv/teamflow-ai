@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { getMe, type AuthWorkspace } from "@/lib/api/auth";
+import { AUTH_ME_QUERY_KEY } from "@/lib/auth/auth-cache";
 import type { TKey } from "@/lib/i18n";
 import { clearAuthToken, getAuthToken } from "./token";
 
@@ -11,7 +12,7 @@ export function useCurrentUser() {
   const hasToken = typeof window !== "undefined" && !!getAuthToken();
 
   const query = useQuery({
-    queryKey: ["auth", "me"],
+    queryKey: AUTH_ME_QUERY_KEY,
     queryFn: getMe,
     enabled: hasToken,
     retry: false,

@@ -138,3 +138,10 @@ export async function uploadAvatar(file: File): Promise<AuthUser> {
   const json = (await response.json()) as UpdateProfileResponse;
   return json.data.user;
 }
+
+export async function removeAvatar(): Promise<AuthUser> {
+  const response = await apiRequest<UpdateProfileResponse>("/api/auth/avatar", {
+    method: "DELETE",
+  });
+  return response.data.user;
+}
