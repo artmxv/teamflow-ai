@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Avatar } from "@/components/app/Avatar";
 import { resolveAvatarUrl } from "@/lib/avatar-url";
 import { nameToInitials } from "@/lib/auth/use-current-user";
@@ -30,10 +31,16 @@ export function UserAvatar({
 }) {
   const src = resolveAvatarUrl(avatarUrl);
   const initials = avatar ?? nameToInitials(name);
+  const [imageFailed, setImageFailed] = useState(false);
 
-  if (src) {
+  useEffect(() => {
+    setImageFailed(false);
+  }, [src]);
+
+  if (src && !imageFailed) {
     return (
       <img
+        key={src}
         src={src}
         alt=""
         className={cn(
@@ -41,6 +48,7 @@ export function UserAvatar({
           sizeClasses[size],
           className,
         )}
+        onError={() => setImageFailed(true)}
       />
     );
   }

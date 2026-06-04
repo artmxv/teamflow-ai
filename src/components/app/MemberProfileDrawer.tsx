@@ -356,7 +356,7 @@ export function MemberProfileDrawer({
       <Dialog open={photoPreviewOpen} onOpenChange={setPhotoPreviewOpen}>
         <DialogContent
           className="max-w-lg border-0 bg-transparent p-2 shadow-none sm:max-w-xl"
-          closeClassName="right-2 top-2 text-white hover:bg-white/15 focus-visible:outline-white/50"
+          closeClassName="right-2 top-2 text-white hover:bg-white/15 focus:outline-none focus-visible:outline-none focus-visible:ring-0 active:ring-0"
           onCloseAutoFocus={(event) => event.preventDefault()}
         >
           <DialogTitle className="sr-only">{t("settings.viewPhoto")}</DialogTitle>

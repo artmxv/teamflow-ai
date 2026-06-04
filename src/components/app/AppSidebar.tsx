@@ -22,6 +22,7 @@ import { nameToInitials, isWorkspaceManager, useCurrentUser } from "@/lib/auth/u
 import { NewProjectDialog } from "./QuickActionDialogs";
 import type { Workspace } from "./AppShell";
 import { fetchProjects } from "@/lib/api/projects";
+import { getProjectAccent } from "@/lib/project-color";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
@@ -281,6 +282,7 @@ export function AppSidebar({
             {projects.map((project) => {
               const projectActive = activeProjectId === project.id;
               const projectLabel = project.name;
+              const { dot: accentDot, gradient: accentGradient } = getProjectAccent(project);
               return (
                 <li key={project.id}>
                   <SidebarTip collapsed={collapsed} label={projectLabel}>
@@ -301,7 +303,7 @@ export function AppSidebar({
                           className={cn(
                             "grid size-7 place-items-center rounded-md text-[10px] font-semibold",
                             projectActive
-                              ? "bg-gradient-brand text-white"
+                              ? cn("bg-gradient-to-br text-white", accentGradient)
                               : "border border-sidebar-border bg-card text-sidebar-foreground",
                           )}
                         >
@@ -309,7 +311,7 @@ export function AppSidebar({
                         </span>
                       ) : (
                         <>
-                          <span className="size-2 shrink-0 rounded-full bg-gradient-brand" />
+                          <span className={cn("size-2 shrink-0 rounded-full", accentDot)} />
                           <span className="truncate">{project.name}</span>
                         </>
                       )}

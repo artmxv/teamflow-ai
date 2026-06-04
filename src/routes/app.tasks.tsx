@@ -442,7 +442,7 @@ function TasksPage() {
             projectOptions={projectOptions}
             onSubmit={handleCreateTask}
           >
-            <Button size="sm" className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+            <Button size="sm" variant="brand">
               <Plus className="size-4" /> {t("common.newTask")}
             </Button>
           </NewTaskDialog>
@@ -729,10 +729,7 @@ function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => vo
       <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
         {error?.message ?? t("common.errorServerHint")}
       </p>
-      <Button
-        onClick={onRetry}
-        className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95"
-      >
+      <Button variant="outline" onClick={onRetry} className="mt-5">
         {t("common.retry")}
       </Button>
     </div>

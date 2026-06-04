@@ -2,12 +2,13 @@ import type { NextFunction, Request, Response } from "express";
 import multer from "multer";
 import { z } from "zod";
 
-import { avatarPublicPath, avatarUpload } from "../lib/avatar-upload.js";
+import { avatarPublicPath, avatarUpload, deleteLocalAvatarFile } from "../lib/avatar-upload.js";
 import {
   AuthError,
   getUserById,
   loginUser,
   registerUser,
+  removeUserAvatar,
   updateUserAvatarUrl,
   updateUserProfile,
 } from "../services/auth.service.js";
@@ -186,11 +187,37 @@ export async function uploadAvatarController(req: Request, res: Response, next: 
         return;
       }
 
+      const previousUser = await getUserById(req.userId);
+      const previousAvatarUrl = previousUser.avatarUrl;
       const avatarUrl = avatarPublicPath(req.file.filename);
-      const user = await updateUserAvatarUrl(req.userId, avatarUrl);
-      res.json({ data: { user } });
+
+      try {
+        const user = await updateUserAvatarUrl(req.userId, avatarUrl);
+        deleteLocalAvatarFile(previousAvatarUrl);
+        res.json({ data: { user } });
+      } catch (updateError) {
+        deleteLocalAvatarFile(avatarUrl);
+        throw updateError;
+      }
     } catch (uploadError) {
       handleAuthError(uploadError, res, next);
     }
   });
+}
+
+export async function removeAvatarController(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.userId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const previousUser = await getUserById(req.userId);
+    const previousAvatarUrl = previousUser.avatarUrl;
+    const user = await removeUserAvatar(req.userId);
+    deleteLocalAvatarFile(previousAvatarUrl);
+    res.json({ data: { user } });
+  } catch (error) {
+    handleAuthError(error, res, next);
+  }
 }

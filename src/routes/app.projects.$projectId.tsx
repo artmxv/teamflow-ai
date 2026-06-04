@@ -33,6 +33,7 @@ import { projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
 import { projectApiStatusLabel, projectStatusLabel, useI18n, type TKey } from "@/lib/i18n";
 import { resolveTaskAssignees } from "@/lib/assignee-options";
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
+import { resolveProjectGradient } from "@/lib/project-color";
 import {
   deleteProject,
   fetchProjects,
@@ -505,7 +506,7 @@ function EditProjectDialog({
               disabled={!isValid || isSubmitting}
               className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
             >
-              {isSubmitting ? "Saving..." : "Save changes"}
+              {isSubmitting ? t("settings.saving") : t("common.saveChanges")}
             </Button>
           </DialogFooter>
         </form>
@@ -586,7 +587,7 @@ function ProjectDetails({
   const statusLabel = projectStatusLabel(statusKey, t);
   const due = formatDate(project.dueDate);
   const progress = calculateTaskProgress(projectTasks);
-  const colorGradient = project.color ?? "from-indigo-500 to-violet-500";
+  const colorGradient = resolveProjectGradient(project);
   const sortedTasks = useMemo(() => sortProjectTasks(projectTasks), [projectTasks]);
 
   return (
@@ -686,10 +687,7 @@ function ProjectDetails({
               fixedProjectId={project.id}
               onSubmit={onCreateTask}
             >
-              <Button
-                size="sm"
-                className="h-8 shrink-0 gap-1 bg-gradient-brand text-white shadow-glow hover:opacity-95"
-              >
+              <Button size="sm" variant="brand" className="h-8 shrink-0 gap-1">
                 <Plus className="size-3.5" />
                 {t("common.newTask")}
               </Button>
@@ -886,7 +884,7 @@ function ProjectMembersSection({
         {canManageMembers ? (
           <Dialog open={addDialogOpen} onOpenChange={onAddDialogOpenChange}>
             <DialogTrigger asChild>
-              <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5">
+              <Button type="button" size="sm" variant="brand" className="h-8 gap-1.5">
                 <UserPlus className="size-3.5" />
                 {t("projects.detail.addMember")}
               </Button>
@@ -1137,7 +1135,7 @@ function ProjectDocumentsSection({
         <Button
           type="button"
           size="sm"
-          variant="outline"
+          variant="brand"
           className="h-8 gap-1.5"
           disabled={isUploading}
           onClick={onPickFile}
@@ -1413,10 +1411,7 @@ function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => vo
       <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
         {error?.message ?? t("common.errorServerHint")}
       </p>
-      <Button
-        onClick={onRetry}
-        className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95"
-      >
+      <Button variant="outline" onClick={onRetry} className="mt-5">
         {t("common.retry")}
       </Button>
     </div>

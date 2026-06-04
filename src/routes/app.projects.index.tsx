@@ -10,6 +10,7 @@ import { AvatarStack } from "@/components/app/Avatar";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import { members, projectStatusMeta, type Project, type ProjectStatus } from "@/lib/mock-data";
 import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
+import { getProjectAccent } from "@/lib/project-color";
 import { isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user";
 import { projectStatusLabel, useI18n, type TKey } from "@/lib/i18n";
 import {
@@ -119,7 +120,7 @@ function ProjectsIndexPage() {
         </div>
         {canManageProjects ? (
           <NewProjectDialog>
-            <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+            <Button variant="brand">
               <Plus className="size-4" /> {t("common.newProject")}
             </Button>
           </NewProjectDialog>
@@ -230,7 +231,7 @@ function mapApiProjectToCard(project: ProjectApiItem): ProjectCard {
     openTasks: project.openTasks,
     totalTasks: project.totalTasks,
     members: [],
-    color: project.color ?? "from-indigo-500 to-violet-500",
+    color: getProjectAccent(project).gradient,
     dueDate: formatDate(project.dueDate),
     updatedAt: formatDate(project.updatedAt),
   };
@@ -265,10 +266,7 @@ function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => vo
       <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
         {error?.message ?? t("common.errorServerHint")}
       </p>
-      <Button
-        onClick={onRetry}
-        className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95"
-      >
+      <Button variant="outline" onClick={onRetry} className="mt-5">
         {t("common.retry")}
       </Button>
     </div>

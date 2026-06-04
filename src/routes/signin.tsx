@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { login } from "@/lib/api/auth";
+import { primeAuthMeAfterAuth } from "@/lib/auth/auth-cache";
 import { redirectIfAuthenticated } from "@/lib/auth/route-guards";
 import { setAuthToken } from "@/lib/auth/token";
 
@@ -26,7 +27,7 @@ function SignIn() {
     mutationFn: login,
     onSuccess: ({ token, user }) => {
       setAuthToken(token);
-      queryClient.setQueryData(["auth", "me"], user);
+      primeAuthMeAfterAuth(queryClient, user);
       toast.success("Signed in successfully");
       void router.navigate({ to: "/app/dashboard" });
     },

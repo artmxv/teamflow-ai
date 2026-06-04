@@ -27,7 +27,8 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useI18n, type Lang, type TKey } from "@/lib/i18n";
-import { updateProfile, uploadAvatar } from "@/lib/api/auth";
+import { removeAvatar, updateProfile, uploadAvatar } from "@/lib/api/auth";
+import { AUTH_ME_QUERY_KEY, patchAuthMeUser } from "@/lib/auth/auth-cache";
 import {
   formatLocation,
   formatPhone,
@@ -56,6 +57,9 @@ type SettingsSearch = {
 };
 
 const WORKSPACE_SLUG_PATTERN = /^[a-z0-9-]+$/;
+
+const AVATAR_ACCEPTED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 
 const WORKSPACE_TEAM_SIZE_VALUES = ["0-5", "6-10", "11-20", "21-50", "51+"] as const;
 
@@ -273,7 +277,8 @@ function SettingsPage() {
       const saved = profileFormFromUser(updatedUser);
       setProfileForm(saved);
       setProfileBaseline(saved);
-      await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+      patchAuthMeUser(queryClient, updatedUser);
+      await queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY });
       toast.success(t("settings.profileUpdated"));
     },
     onError: (error) => {
@@ -281,15 +286,16 @@ function SettingsPage() {
     },
   });
 
-  const avatarMutation = useMutation({
+  const avatarUploadMutation = useMutation({
     mutationFn: uploadAvatar,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+    onSuccess: async (updatedUser) => {
+      patchAuthMeUser(queryClient, updatedUser);
+      await queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY });
       toast.success(t("settings.avatarUpdated"));
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : t("settings.avatarUploadError");
-      if (message.includes("JPG")) {
+      if (message.includes("JPG") || message.includes("PNG") || message.includes("WEBP")) {
         toast.error(t("settings.imageTypeError"));
         return;
       }
@@ -299,12 +305,31 @@ function SettingsPage() {
       }
       toast.error(message);
     },
+    onSettled: () => {
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = "";
+      }
+    },
   });
+
+  const avatarRemoveMutation = useMutation({
+    mutationFn: removeAvatar,
+    onSuccess: async (updatedUser) => {
+      patchAuthMeUser(queryClient, updatedUser);
+      await queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY });
+      toast.success(t("settings.avatarRemoved"));
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : t("settings.avatarRemoveError"));
+    },
+  });
+
+  const avatarBusy = avatarUploadMutation.isPending || avatarRemoveMutation.isPending;
 
   const workspaceMutation = useMutation({
     mutationFn: updateWorkspace,
     onSuccess: async (updated) => {
-      await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+      await queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY });
       const saved = workspaceFormFromWorkspace(updated);
       setWorkspaceForm(saved);
       setWorkspaceBaseline(saved);
@@ -341,11 +366,27 @@ function SettingsPage() {
 
   const handleAvatarFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    event.target.value = "";
     if (!file) {
       return;
     }
-    avatarMutation.mutate(file);
+
+    if (!AVATAR_ACCEPTED_TYPES.has(file.type)) {
+      toast.error(t("settings.imageTypeError"));
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > MAX_AVATAR_BYTES) {
+      toast.error(t("settings.imageTooLarge"));
+      event.target.value = "";
+      return;
+    }
+
+    avatarUploadMutation.mutate(file);
+  };
+
+  const handleRemoveAvatar = () => {
+    avatarRemoveMutation.mutate();
   };
 
   const handleWorkspaceSave = () => {
@@ -516,24 +557,54 @@ function SettingsPage() {
                   className="rounded-2xl"
                 />
               ) : null}
-              <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2">
                 <input
                   ref={avatarInputRef}
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   className="sr-only"
+                  disabled={avatarBusy || isPending}
                   onChange={handleAvatarFileChange}
                 />
                 <Button
                   variant="outline"
                   size="sm"
                   type="button"
-                  disabled={avatarMutation.isPending || isPending}
+                  disabled={avatarBusy || isPending}
                   onClick={() => avatarInputRef.current?.click()}
                 >
-                  {user?.avatarUrl ? t("settings.changeAvatar") : t("settings.uploadAvatar")}
+                  {avatarUploadMutation.isPending ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      {t("settings.uploadingAvatar")}
+                    </>
+                  ) : user?.avatarUrl ? (
+                    t("settings.changeAvatar")
+                  ) : (
+                    t("settings.uploadAvatar")
+                  )}
                 </Button>
-                <p className="text-xs text-muted-foreground">{t("settings.avatarUploadHelper")}</p>
+                {user?.avatarUrl ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    disabled={avatarBusy || isPending}
+                    onClick={handleRemoveAvatar}
+                  >
+                    {avatarRemoveMutation.isPending ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        {t("settings.removingAvatar")}
+                      </>
+                    ) : (
+                      t("settings.removeAvatar")
+                    )}
+                  </Button>
+                ) : null}
+                <p className="w-full text-xs text-muted-foreground">
+                  {t("settings.avatarUploadHelper")}
+                </p>
               </div>
             </div>
             <div className="mt-5 max-w-3xl">
@@ -940,11 +1011,7 @@ function SaveBar({
       <Button variant="outline" onClick={onCancel} disabled={isSaving || cancelDisabled}>
         {cancelLabel ?? t("common.cancel")}
       </Button>
-      <Button
-        onClick={onSave}
-        disabled={isSaving || saveDisabled}
-        className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
-      >
+      <Button variant="brand" onClick={onSave} disabled={isSaving || saveDisabled}>
         {isSaving ? (
           <>
             <Loader2 className="size-4 animate-spin" />

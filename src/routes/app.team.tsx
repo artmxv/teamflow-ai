@@ -301,7 +301,7 @@ function TeamPage() {
             }}
           >
             <DialogTrigger asChild>
-              <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+              <Button variant="brand">
                 <Plus className="size-4" /> {t("team.inviteMember")}
               </Button>
             </DialogTrigger>
@@ -412,9 +412,8 @@ function TeamPage() {
                   </Button>
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="destructive"
                     size="sm"
-                    className="text-destructive"
                     disabled={revokeInviteMutation.isPending}
                     onClick={() => revokeInviteMutation.mutate(invite.id)}
                   >
