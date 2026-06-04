@@ -99,6 +99,11 @@
   --sidebar-accent-foreground: oklch(0.35 0.15 277);
   --sidebar-border: oklch(0.92 0.01 270);
   --sidebar-ring: oklch(0.55 0.22 277);
+
+  --scrollbar-size: 8px;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: color-mix(in oklch, var(--primary) 28%, transparent);
+  --scrollbar-thumb-hover: color-mix(in oklch, var(--primary) 44%, transparent);
 }
 
 .dark {
@@ -140,6 +145,9 @@
   --sidebar-accent-foreground: oklch(0.92 0.05 277);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.7 0.2 277);
+
+  --scrollbar-thumb: color-mix(in oklch, var(--primary) 36%, transparent);
+  --scrollbar-thumb-hover: color-mix(in oklch, var(--primary) 52%, transparent);
 }
 
 @layer base {
@@ -186,52 +194,39 @@
     box-shadow: var(--shadow-glow);
   }
 
-  /* Shared vertical scrollbar (matches Kanban board palette) */
+  /* Shared overlay-style scrollbar (page + panels + Kanban) */
   .app-scrollbar {
     -webkit-overflow-scrolling: touch;
-    scrollbar-gutter: stable;
     scrollbar-width: thin;
-    scrollbar-color: oklch(0.55 0.22 277 / 0.55) oklch(0.9 0.01 270 / 0.35);
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+
+  html.app-scrollbar {
+    scrollbar-gutter: stable;
   }
 
   .app-scrollbar::-webkit-scrollbar {
-    width: 10px;
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
   }
 
   .app-scrollbar::-webkit-scrollbar-track {
-    margin-block: 0.25rem;
-    border-radius: 9999px;
-    background: oklch(0.9 0.01 270 / 0.45);
+    background: var(--scrollbar-track);
   }
 
   .app-scrollbar::-webkit-scrollbar-thumb {
     border: 2px solid transparent;
     border-radius: 9999px;
-    background: oklch(0.55 0.22 277 / 0.55);
+    background-color: var(--scrollbar-thumb);
     background-clip: padding-box;
   }
 
   .app-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: oklch(0.5 0.22 277 / 0.75);
-    background-clip: padding-box;
+    background-color: var(--scrollbar-thumb-hover);
   }
 
-  .dark .app-scrollbar {
-    scrollbar-color: oklch(0.7 0.18 277 / 0.7) oklch(0.28 0.03 270 / 0.85);
-  }
-
-  .dark .app-scrollbar::-webkit-scrollbar-track {
-    background: oklch(0.28 0.03 270 / 0.85);
-  }
-
-  .dark .app-scrollbar::-webkit-scrollbar-thumb {
-    background: oklch(0.7 0.18 277 / 0.7);
-    background-clip: padding-box;
-  }
-
-  .dark .app-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: oklch(0.75 0.2 277 / 0.85);
-    background-clip: padding-box;
+  .app-scrollbar::-webkit-scrollbar-corner {
+    background: transparent;
   }
 
   /* Kanban: top horizontal scrollbar + natural vertical page scroll */
@@ -246,47 +241,9 @@
     overflow-x: scroll;
     overflow-y: hidden;
     flex: none;
-    height: 14px;
-    margin-bottom: 0.25rem;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-gutter: stable both-edges;
-    scrollbar-width: thin;
-    scrollbar-color: oklch(0.55 0.22 277 / 0.55) oklch(0.9 0.01 270 / 0.35);
-  }
-
-  .kanban-board-scroll-top::-webkit-scrollbar {
     height: 12px;
-  }
-
-  .kanban-board-scroll-top::-webkit-scrollbar-track {
-    margin-inline: 0.25rem;
-    border-radius: 9999px;
-    background: oklch(0.9 0.01 270 / 0.45);
-  }
-
-  .kanban-board-scroll-top::-webkit-scrollbar-thumb {
-    border: 2px solid transparent;
-    border-radius: 9999px;
-    background: oklch(0.55 0.22 277 / 0.55);
-    background-clip: padding-box;
-  }
-
-  .kanban-board-scroll-top::-webkit-scrollbar-thumb:hover {
-    background: oklch(0.5 0.22 277 / 0.75);
-    background-clip: padding-box;
-  }
-
-  .dark .kanban-board-scroll-top {
-    scrollbar-color: oklch(0.7 0.18 277 / 0.7) oklch(0.28 0.03 270 / 0.85);
-  }
-
-  .dark .kanban-board-scroll-top::-webkit-scrollbar-track {
-    background: oklch(0.28 0.03 270 / 0.85);
-  }
-
-  .dark .kanban-board-scroll-top::-webkit-scrollbar-thumb {
-    background: oklch(0.7 0.18 277 / 0.7);
-    background-clip: padding-box;
+    margin-bottom: 0.25rem;
+    scrollbar-gutter: stable both-edges;
   }
 
   /* Horizontal scroll only; height grows with columns (page scrolls vertically) */

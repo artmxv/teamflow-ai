@@ -533,7 +533,7 @@ function KanbanBoardViewport({ children }: { children: React.ReactNode }) {
     <div className="kanban-board-viewport w-full min-w-0">
       <div
         ref={topScrollRef}
-        className="kanban-board-scroll-top -mx-2 px-2"
+        className="kanban-board-scroll-top app-scrollbar -mx-2 px-2"
         onScroll={() => syncScroll("top")}
         aria-hidden="true"
       >

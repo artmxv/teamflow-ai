@@ -760,33 +760,44 @@ function SettingsPage() {
 
         <TabsContent value="billing" className="mt-5">
           <Card title={t("settings.planBillingTitle")} description={t("settings.planBillingDesc")}>
-            <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/8 to-card p-5">
+            <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/8 to-card p-5 shadow-soft">
               <div className="text-xs font-semibold uppercase tracking-wider text-primary">
                 {t("billing.currentPlan")}
               </div>
-              <div className="mt-1 text-xl font-semibold">
-                {billingQuery.isLoading ? (
-                  <Skeleton className="h-7 w-40" />
-                ) : billingQuery.data ? (
-                  <>
+              {billingQuery.isLoading ? (
+                <Skeleton className="mt-2 h-8 w-48" />
+              ) : billingQuery.data ? (
+                <>
+                  <div className="mt-1 text-xl font-semibold">
                     {t(SETTINGS_PLAN_LABEL_KEYS[billingQuery.data.currentPlan])}
-                    {" · "}
-                    {billingQuery.data.usage.members}
-                    {billingQuery.data.limits.maxMembers !== null
-                      ? ` / ${billingQuery.data.limits.maxMembers}`
-                      : ""}{" "}
-                    {t("billing.membersUsed").toLowerCase()}
-                  </>
-                ) : (
-                  t("billing.currentPlan")
-                )}
-              </div>
-              <p className="mt-3 text-sm text-muted-foreground">
-                {t("billing.settingsManagedOnPage")}
-              </p>
-              <p className="mt-2 text-xs text-muted-foreground">{t("billing.paymentsLaterNote")}</p>
+                  </div>
+                  <ul className="mt-4 space-y-2 text-sm">
+                    <li className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">{t("billing.activeMembers")}</span>
+                      <span className="font-medium tabular-nums">
+                        {billingQuery.data.usage.members}
+                        {billingQuery.data.limits.maxMembers !== null
+                          ? ` / ${billingQuery.data.limits.maxMembers}`
+                          : ` · ${t("billing.unlimited")}`}
+                      </span>
+                    </li>
+                    <li className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">{t("billing.workspacesUsed")}</span>
+                      <span className="font-medium tabular-nums">
+                        {billingQuery.data.usage.workspaces} /{" "}
+                        {billingQuery.data.limits.maxWorkspaces === null
+                          ? t("billing.unlimited")
+                          : billingQuery.data.limits.maxWorkspaces}
+                      </span>
+                    </li>
+                  </ul>
+                </>
+              ) : (
+                <div className="mt-1 text-sm text-muted-foreground">{t("board.errorTitle")}</div>
+              )}
+              <p className="mt-4 text-xs text-muted-foreground">{t("billing.paymentsLaterNote")}</p>
               <Button variant="brand" className="mt-4" asChild>
-                <Link to="/app/billing">{t("side.billing")}</Link>
+                <Link to="/app/billing">{t("billing.manageBilling")}</Link>
               </Button>
             </div>
           </Card>
