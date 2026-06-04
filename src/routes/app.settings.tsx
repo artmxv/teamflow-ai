@@ -1,7 +1,7 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { requireAuth } from "@/lib/auth/route-guards";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import { KeyboardShortcutsDialog } from "@/components/app/AppTopbar";
@@ -26,14 +26,25 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { useI18n, type TKey } from "@/lib/i18n";
-import { updateProfile } from "@/lib/api/auth";
-import { updateWorkspace } from "@/lib/api/workspace";
+import { useI18n, type Lang, type TKey } from "@/lib/i18n";
+import { updateProfile, uploadAvatar } from "@/lib/api/auth";
 import {
-  canEditWorkspaceSettings,
-  nameToInitials,
-  useCurrentUser,
-} from "@/lib/auth/use-current-user";
+  formatLocation,
+  formatPhone,
+  LOCATION_COUNTRY_OPTIONS,
+  locationCountryLabel,
+  parseLocation,
+  parsePhone,
+  PHONE_COUNTRY_OPTIONS,
+  phoneCountryLabel,
+  phoneCountryTriggerLabel,
+  LOCATION_UNSET,
+  type LocationFormCountry,
+  type PhoneCountryId,
+} from "@/lib/profile-contact";
+import { UserAvatar } from "@/components/app/UserAvatar";
+import { updateWorkspace } from "@/lib/api/workspace";
+import { canEditWorkspaceSettings, useCurrentUser } from "@/lib/auth/use-current-user";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreditCard, Check, Loader2 } from "lucide-react";
 
@@ -160,9 +171,54 @@ export const Route = createFileRoute("/app/settings")({
 type ProfileFormState = {
   name: string;
   displayName: string;
-  timezone: string;
   bio: string;
+  phoneCountryId: PhoneCountryId;
+  phoneLocal: string;
+  position: string;
+  locationCountry: LocationFormCountry;
+  locationOther: string;
 };
+
+function profileFormFromUser(user: {
+  name: string;
+  displayName?: string | null;
+  bio?: string | null;
+  phone?: string | null;
+  position?: string | null;
+  location?: string | null;
+}): ProfileFormState {
+  const phone = parsePhone(user.phone ?? "");
+  const location = parseLocation(user.location ?? "");
+  return {
+    name: user.name,
+    displayName: user.displayName ?? firstNameFromFullName(user.name),
+    bio: user.bio ?? "",
+    phoneCountryId: phone.countryId,
+    phoneLocal: phone.local,
+    position: user.position ?? "",
+    locationCountry: location.country,
+    locationOther: location.other,
+  };
+}
+
+function isProfileFormDirty(
+  form: ProfileFormState | null,
+  baseline: ProfileFormState | null,
+): boolean {
+  if (!form || !baseline) {
+    return false;
+  }
+  return (
+    form.name.trim() !== baseline.name.trim() ||
+    form.displayName.trim() !== baseline.displayName.trim() ||
+    form.bio.trim() !== baseline.bio.trim() ||
+    form.phoneCountryId !== baseline.phoneCountryId ||
+    form.phoneLocal.trim() !== baseline.phoneLocal.trim() ||
+    form.position.trim() !== baseline.position.trim() ||
+    form.locationCountry !== baseline.locationCountry ||
+    form.locationOther.trim() !== baseline.locationOther.trim()
+  );
+}
 
 type WorkspaceFormState = {
   name: string;
@@ -181,23 +237,23 @@ function SettingsPage() {
   const workspace = me?.workspace;
   const canEditWorkspace = canEditWorkspaceSettings(workspace?.role);
   const activeTab = tab ?? "workspace";
-  const userInitials = user ? nameToInitials(user.name) : "…";
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const [seatsOpen, setSeatsOpen] = useState(false);
   const [cardOpen, setCardOpen] = useState(false);
   const [profileForm, setProfileForm] = useState<ProfileFormState | null>(null);
+  const [profileBaseline, setProfileBaseline] = useState<ProfileFormState | null>(null);
   const [workspaceForm, setWorkspaceForm] = useState<WorkspaceFormState | null>(null);
   const [workspaceBaseline, setWorkspaceBaseline] = useState<WorkspaceFormState | null>(null);
 
   useEffect(() => {
     if (!user) {
+      setProfileForm(null);
+      setProfileBaseline(null);
       return;
     }
-    setProfileForm({
-      name: user.name,
-      displayName: user.displayName ?? firstNameFromFullName(user.name),
-      timezone: user.timezone ?? "",
-      bio: user.bio ?? "",
-    });
+    const saved = profileFormFromUser(user);
+    setProfileForm(saved);
+    setProfileBaseline(saved);
   }, [user]);
 
   useEffect(() => {
@@ -213,12 +269,35 @@ function SettingsPage() {
 
   const profileMutation = useMutation({
     mutationFn: updateProfile,
-    onSuccess: async () => {
+    onSuccess: async (updatedUser) => {
+      const saved = profileFormFromUser(updatedUser);
+      setProfileForm(saved);
+      setProfileBaseline(saved);
       await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
-      toast.success(t("settings.profileSaved"));
+      toast.success(t("settings.profileUpdated"));
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : t("settings.profileSaveError"));
+    },
+  });
+
+  const avatarMutation = useMutation({
+    mutationFn: uploadAvatar,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+      toast.success(t("settings.avatarUpdated"));
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : t("settings.avatarUploadError");
+      if (message.includes("JPG")) {
+        toast.error(t("settings.imageTypeError"));
+        return;
+      }
+      if (message.toLowerCase().includes("large")) {
+        toast.error(t("settings.imageTooLarge"));
+        return;
+      }
+      toast.error(message);
     },
   });
 
@@ -237,27 +316,36 @@ function SettingsPage() {
   });
 
   const handleProfileSave = () => {
-    if (!profileForm) {
+    if (!profileForm || !user) {
       return;
     }
     profileMutation.mutate({
       name: profileForm.name.trim(),
       displayName: profileForm.displayName.trim(),
-      timezone: profileForm.timezone.trim(),
+      timezone: user.timezone ?? "",
       bio: profileForm.bio.trim(),
+      phone: formatPhone(profileForm.phoneCountryId, profileForm.phoneLocal),
+      position: profileForm.position.trim(),
+      location: formatLocation(profileForm.locationCountry, profileForm.locationOther),
     });
   };
 
-  const handleProfileCancel = () => {
-    if (!user) {
+  const handleProfileReset = () => {
+    if (!profileBaseline) {
       return;
     }
-    setProfileForm({
-      name: user.name,
-      displayName: user.displayName ?? firstNameFromFullName(user.name),
-      timezone: user.timezone ?? "",
-      bio: user.bio ?? "",
-    });
+    setProfileForm({ ...profileBaseline });
+  };
+
+  const profileHasUnsavedChanges = isProfileFormDirty(profileForm, profileBaseline);
+
+  const handleAvatarFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+    avatarMutation.mutate(file);
   };
 
   const handleWorkspaceSave = () => {
@@ -417,101 +505,138 @@ function SettingsPage() {
           <Card title={t("settings.yourProfileTitle")} description={t("settings.yourProfileDesc")}>
             <div className="flex items-center gap-4">
               {isPending ? (
-                <Skeleton className="size-16 rounded-2xl" />
-              ) : (
-                <div className="grid size-16 place-items-center rounded-2xl bg-gradient-brand text-lg font-semibold text-white shadow-glow">
-                  {userInitials}
-                </div>
-              )}
+                <Skeleton className="size-16 rounded-full" />
+              ) : user ? (
+                <UserAvatar
+                  id={user.id}
+                  name={user.name}
+                  avatar={user.avatar}
+                  avatarUrl={user.avatarUrl}
+                  size="xl"
+                  className="rounded-2xl"
+                />
+              ) : null}
               <div className="space-y-1.5">
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  onChange={handleAvatarFileChange}
+                />
                 <Button
                   variant="outline"
                   size="sm"
                   type="button"
-                  onClick={() => toast.message(t("settings.avatarUploadUnavailable"))}
+                  disabled={avatarMutation.isPending || isPending}
+                  onClick={() => avatarInputRef.current?.click()}
                 >
-                  {t("common.uploadNewPhoto")}
+                  {user?.avatarUrl ? t("settings.changeAvatar") : t("settings.uploadAvatar")}
                 </Button>
                 <p className="text-xs text-muted-foreground">{t("settings.avatarUploadHelper")}</p>
               </div>
             </div>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <Field label={t("settings.fullName")}>
-                {isPending ? (
-                  <Skeleton className="h-10 w-full rounded-md" />
-                ) : (
+            <div className="mt-5 max-w-3xl">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label={t("settings.fullName")}>
+                  {isPending ? (
+                    <Skeleton className="h-10 w-full rounded-md" />
+                  ) : (
+                    <Input
+                      value={profileForm?.name ?? ""}
+                      onChange={(event) =>
+                        setProfileForm((current) =>
+                          current ? { ...current, name: event.target.value } : current,
+                        )
+                      }
+                      disabled={profileMutation.isPending}
+                    />
+                  )}
+                </Field>
+                <Field label={t("settings.displayName")}>
+                  {isPending ? (
+                    <Skeleton className="h-10 w-full rounded-md" />
+                  ) : (
+                    <Input
+                      value={profileForm?.displayName ?? ""}
+                      onChange={(event) =>
+                        setProfileForm((current) =>
+                          current ? { ...current, displayName: event.target.value } : current,
+                        )
+                      }
+                      disabled={profileMutation.isPending}
+                    />
+                  )}
+                </Field>
+                <Field label={t("settings.email")}>
+                  {isPending ? (
+                    <Skeleton className="h-10 w-full rounded-md" />
+                  ) : (
+                    <Input
+                      key={user?.id ?? "user-email"}
+                      value={user?.email ?? ""}
+                      readOnly
+                      type="email"
+                      className="bg-muted/40"
+                    />
+                  )}
+                </Field>
+                <ProfilePhoneFields
+                  phoneCountryId={profileForm?.phoneCountryId ?? "RU"}
+                  phoneLocal={profileForm?.phoneLocal ?? ""}
+                  disabled={profileMutation.isPending}
+                  onChange={(phoneCountryId, phoneLocal) =>
+                    setProfileForm((current) =>
+                      current ? { ...current, phoneCountryId, phoneLocal } : current,
+                    )
+                  }
+                />
+                <Field label={t("settings.position")}>
                   <Input
-                    value={profileForm?.name ?? ""}
+                    value={profileForm?.position ?? ""}
                     onChange={(event) =>
                       setProfileForm((current) =>
-                        current ? { ...current, name: event.target.value } : current,
+                        current ? { ...current, position: event.target.value } : current,
                       )
                     }
                     disabled={profileMutation.isPending}
                   />
-                )}
-              </Field>
-              <Field label={t("settings.displayName")}>
-                {isPending ? (
-                  <Skeleton className="h-10 w-full rounded-md" />
-                ) : (
-                  <Input
-                    value={profileForm?.displayName ?? ""}
-                    onChange={(event) =>
-                      setProfileForm((current) =>
-                        current ? { ...current, displayName: event.target.value } : current,
-                      )
-                    }
-                    disabled={profileMutation.isPending}
-                  />
-                )}
-              </Field>
-              <Field label={t("settings.email")}>
-                {isPending ? (
-                  <Skeleton className="h-10 w-full rounded-md" />
-                ) : (
-                  <Input
-                    key={user?.id ?? "user-email"}
-                    value={user?.email ?? ""}
-                    readOnly
-                    type="email"
-                    className="bg-muted/40"
-                  />
-                )}
-              </Field>
-              <Field label={t("settings.timeZone")}>
-                <Input
-                  value={profileForm?.timezone ?? ""}
-                  onChange={(event) =>
+                </Field>
+                <ProfileLocationField
+                  country={profileForm?.locationCountry ?? LOCATION_UNSET}
+                  other={profileForm?.locationOther ?? ""}
+                  disabled={profileMutation.isPending}
+                  onChange={(locationCountry, locationOther) =>
                     setProfileForm((current) =>
-                      current ? { ...current, timezone: event.target.value } : current,
+                      current ? { ...current, locationCountry, locationOther } : current,
                     )
                   }
-                  disabled={profileMutation.isPending}
-                  placeholder="e.g. Europe/Berlin"
                 />
-              </Field>
+                <div className="sm:col-span-2">
+                  <Field label={t("settings.bio")}>
+                    <Textarea
+                      value={profileForm?.bio ?? ""}
+                      onChange={(event) =>
+                        setProfileForm((current) =>
+                          current ? { ...current, bio: event.target.value } : current,
+                        )
+                      }
+                      disabled={profileMutation.isPending}
+                      rows={3}
+                      className="max-h-32 min-h-22 resize-y"
+                    />
+                  </Field>
+                </div>
+              </div>
+              <SaveBar
+                isSaving={profileMutation.isPending}
+                onSave={handleProfileSave}
+                onCancel={handleProfileReset}
+                saveDisabled={!profileForm || !profileHasUnsavedChanges}
+                cancelDisabled={!profileHasUnsavedChanges}
+                cancelLabel={t("settings.resetChanges")}
+              />
             </div>
-            <div className="mt-4">
-              <Field label={t("settings.bio")}>
-                <Textarea
-                  value={profileForm?.bio ?? ""}
-                  onChange={(event) =>
-                    setProfileForm((current) =>
-                      current ? { ...current, bio: event.target.value } : current,
-                    )
-                  }
-                  disabled={profileMutation.isPending}
-                  rows={3}
-                />
-              </Field>
-            </div>
-            <SaveBar
-              isSaving={profileMutation.isPending}
-              onSave={handleProfileSave}
-              onCancel={handleProfileCancel}
-              saveDisabled={!profileForm}
-            />
           </Card>
         </TabsContent>
 
@@ -685,6 +810,104 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <Label>{label}</Label>
       {children}
     </div>
+  );
+}
+
+function ProfilePhoneFields({
+  phoneCountryId,
+  phoneLocal,
+  disabled,
+  onChange,
+}: {
+  phoneCountryId: PhoneCountryId;
+  phoneLocal: string;
+  disabled?: boolean;
+  onChange: (countryId: PhoneCountryId, local: string) => void;
+}) {
+  const { t, lang } = useI18n();
+
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor="profile-phone-local">{t("settings.phoneNumber")}</Label>
+      <div className="flex gap-2">
+        <Select
+          value={phoneCountryId}
+          onValueChange={(value) => onChange(value as PhoneCountryId, phoneLocal)}
+          disabled={disabled}
+        >
+          <SelectTrigger
+            className="h-10 w-22 shrink-0 justify-center gap-1 px-2 [&>span]:line-clamp-1"
+            aria-label={t("settings.countryCode")}
+          >
+            <SelectValue>{phoneCountryTriggerLabel(phoneCountryId, lang as Lang)}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {PHONE_COUNTRY_OPTIONS.map((option) => (
+              <SelectItem key={option.id} value={option.id}>
+                {phoneCountryLabel(option.id, lang as Lang)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input
+          id="profile-phone-local"
+          value={phoneLocal}
+          onChange={(event) => onChange(phoneCountryId, event.target.value)}
+          disabled={disabled}
+          type="tel"
+          autoComplete="tel-national"
+          className="min-w-0 flex-1"
+          placeholder={phoneCountryId === "OTHER" ? "+48 123456789" : "123456789"}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ProfileLocationField({
+  country,
+  other,
+  disabled,
+  onChange,
+}: {
+  country: LocationFormCountry;
+  other: string;
+  disabled?: boolean;
+  onChange: (country: LocationFormCountry, other: string) => void;
+}) {
+  const { t, lang } = useI18n();
+
+  return (
+    <Field label={t("settings.country")}>
+      <Select
+        value={country}
+        onValueChange={(value) => onChange(value as LocationFormCountry, other)}
+        disabled={disabled}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder={t("settings.country")}>
+            {country !== LOCATION_UNSET ? locationCountryLabel(country, lang as Lang) : null}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={LOCATION_UNSET}>—</SelectItem>
+          {LOCATION_COUNTRY_OPTIONS.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {locationCountryLabel(option.value, lang as Lang)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {country === "OTHER" ? (
+        <Input
+          className="mt-2"
+          value={other}
+          onChange={(event) => onChange(country, event.target.value)}
+          disabled={disabled}
+          placeholder={t("settings.other")}
+        />
+      ) : null}
+    </Field>
   );
 }
 function SaveBar({

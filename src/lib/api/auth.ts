@@ -1,4 +1,5 @@
-import { apiRequest } from "./client";
+import { getAuthToken } from "@/lib/auth/token";
+import { API_BASE_URL, apiRequest } from "./client";
 
 export type WorkspaceRole = "OWNER" | "ADMIN" | "MEMBER";
 
@@ -10,6 +11,10 @@ export interface AuthUser {
   bio: string | null;
   email: string;
   avatar: string | null;
+  avatarUrl: string | null;
+  phone: string | null;
+  position: string | null;
+  location: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -28,6 +33,9 @@ export interface UpdateProfileInput {
   displayName?: string;
   timezone?: string;
   bio?: string;
+  phone?: string;
+  position?: string;
+  location?: string;
 }
 
 export interface AuthMeData {
@@ -104,4 +112,29 @@ export async function updateProfile(input: UpdateProfileInput): Promise<AuthUser
     body: input,
   });
   return response.data.user;
+}
+
+export async function uploadAvatar(file: File): Promise<AuthUser> {
+  const formData = new FormData();
+  formData.append("avatar", file);
+
+  const headers: Record<string, string> = {};
+  const token = getAuthToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/auth/avatar`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(body?.message ?? `Upload failed with status ${response.status}`);
+  }
+
+  const json = (await response.json()) as UpdateProfileResponse;
+  return json.data.user;
 }

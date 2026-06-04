@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { getAuthToken } from "@/lib/auth/token";
 import { nameToInitials } from "@/lib/auth/use-current-user";
+import { resolveAvatarUrl } from "@/lib/avatar-url";
 import { searchWorkspace, type GlobalSearchResult } from "@/lib/api/search";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -55,11 +56,11 @@ function SearchResultButton({
       onMouseDown={(event) => event.preventDefault()}
       onClick={() => onSelect(result)}
     >
-      {result.type === "member" && result.avatar ? (
+      {result.type === "member" && resolveAvatarUrl(result.avatarUrl) ? (
         <img
-          src={result.avatar}
+          src={resolveAvatarUrl(result.avatarUrl)!}
           alt=""
-          className="mt-0.5 size-7 shrink-0 rounded-md object-cover"
+          className="mt-0.5 size-7 shrink-0 rounded-full object-cover"
         />
       ) : result.type === "member" ? (
         <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-gradient-brand text-[10px] font-semibold text-white">

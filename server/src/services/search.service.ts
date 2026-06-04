@@ -30,6 +30,7 @@ export interface GlobalSearchMemberResult {
   subtitle: string | null;
   href: string;
   avatar: string | null;
+  avatarUrl: string | null;
 }
 
 export interface GlobalSearchGroupedResults {
@@ -132,6 +133,7 @@ export async function searchWorkspace(
             name: true,
             email: true,
             avatar: true,
+            avatarUrl: true,
           },
         },
       },
@@ -161,6 +163,7 @@ export async function searchWorkspace(
       subtitle: row.user.email,
       href: `/app/team?memberId=${row.user.id}`,
       avatar: row.user.avatar,
+      avatarUrl: row.user.avatarUrl,
     })),
   };
 }

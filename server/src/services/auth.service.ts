@@ -15,6 +15,10 @@ const publicUserSelect = {
   bio: true,
   email: true,
   avatar: true,
+  avatarUrl: true,
+  phone: true,
+  position: true,
+  location: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -27,6 +31,10 @@ export type PublicUser = {
   bio: string | null;
   email: string;
   avatar: string | null;
+  avatarUrl: string | null;
+  phone: string | null;
+  position: string | null;
+  location: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -36,6 +44,9 @@ export type UpdateUserProfileInput = {
   displayName?: string;
   timezone?: string;
   bio?: string;
+  phone?: string;
+  position?: string;
+  location?: string;
 };
 
 type JwtPayload = {
@@ -268,11 +279,35 @@ export async function updateUserProfile(
   if (input.bio !== undefined) {
     data.bio = optionalStringToNull(input.bio);
   }
+  if (input.phone !== undefined) {
+    data.phone = optionalStringToNull(input.phone);
+  }
+  if (input.position !== undefined) {
+    data.position = optionalStringToNull(input.position);
+  }
+  if (input.location !== undefined) {
+    data.location = optionalStringToNull(input.location);
+  }
 
   try {
     return await prisma.user.update({
       where: { id: userId },
       data,
+      select: publicUserSelect,
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      throw new AuthError("Unauthorized", 401);
+    }
+    throw error;
+  }
+}
+
+export async function updateUserAvatarUrl(userId: string, avatarUrl: string): Promise<PublicUser> {
+  try {
+    return await prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl },
       select: publicUserSelect,
     });
   } catch (error) {

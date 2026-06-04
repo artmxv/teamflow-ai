@@ -1,11 +1,14 @@
 import type { NextFunction, Request, Response } from "express";
+import multer from "multer";
 import { z } from "zod";
 
+import { avatarPublicPath, avatarUpload } from "../lib/avatar-upload.js";
 import {
   AuthError,
   getUserById,
   loginUser,
   registerUser,
+  updateUserAvatarUrl,
   updateUserProfile,
 } from "../services/auth.service.js";
 import { getUserCurrentWorkspace } from "../services/workspace-context.service.js";
@@ -43,10 +46,31 @@ const updateProfileSchema = z
     displayName: z.string().trim().optional(),
     timezone: z.string().trim().optional(),
     bio: z.string().trim().optional(),
+    phone: z.string().trim().optional(),
+    position: z.string().trim().optional(),
+    location: z.string().trim().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
     message: "at least one field is required",
   });
+
+function handleAvatarUploadError(error: unknown, res: Response) {
+  if (error instanceof multer.MulterError) {
+    if (error.code === "LIMIT_FILE_SIZE") {
+      res.status(400).json({ message: "Image is too large" });
+      return true;
+    }
+  }
+
+  if (error instanceof Error) {
+    if (error.message === "UNSUPPORTED_AVATAR_TYPE") {
+      res.status(400).json({ message: "Image must be JPG, PNG, or WEBP" });
+      return true;
+    }
+  }
+
+  return false;
+}
 
 function handleAuthError(error: unknown, res: Response, next: NextFunction) {
   if (error instanceof AuthError) {
@@ -139,4 +163,34 @@ export async function updateProfileController(req: Request, res: Response, next:
   } catch (error) {
     handleAuthError(error, res, next);
   }
+}
+
+export async function uploadAvatarController(req: Request, res: Response, next: NextFunction) {
+  avatarUpload.single("avatar")(req, res, async (error) => {
+    try {
+      if (error) {
+        if (handleAvatarUploadError(error, res)) {
+          return;
+        }
+        next(error);
+        return;
+      }
+
+      if (!req.userId) {
+        res.status(401).json({ message: "Unauthorized" });
+        return;
+      }
+
+      if (!req.file) {
+        res.status(400).json({ message: "Avatar file is required" });
+        return;
+      }
+
+      const avatarUrl = avatarPublicPath(req.file.filename);
+      const user = await updateUserAvatarUrl(req.userId, avatarUrl);
+      res.json({ data: { user } });
+    } catch (uploadError) {
+      handleAuthError(uploadError, res, next);
+    }
+  });
 }

@@ -2,6 +2,8 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { env } from "./config/env.js";
 import { errorMiddleware } from "./middleware/error.middleware.js";
@@ -17,9 +19,17 @@ import { searchRouter } from "./routes/search.routes.js";
 import { tasksRouter } from "./routes/tasks.routes.js";
 import { workspaceRouter } from "./routes/workspace.routes.js";
 
+const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const uploadsRoot = path.join(serverRoot, "uploads");
+
 export const app = express();
 
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  }),
+);
+app.use("/uploads", express.static(uploadsRoot));
 app.use(cors({ origin: env.CORS_ORIGIN }));
 app.use(express.json());
 

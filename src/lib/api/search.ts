@@ -10,6 +10,7 @@ export interface GlobalSearchResult {
   href: string;
   projectName?: string;
   avatar?: string | null;
+  avatarUrl?: string | null;
 }
 
 export interface GlobalSearchResponse {

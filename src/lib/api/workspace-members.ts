@@ -8,6 +8,7 @@ export interface WorkspaceMemberItem {
   name: string;
   email: string;
   avatar: string | null;
+  avatarUrl: string | null;
   role: WorkspaceRole;
   joinedAt: string;
 }
@@ -40,6 +41,7 @@ export interface MemberProfile {
   name: string;
   email: string;
   avatar: string | null;
+  avatarUrl: string | null;
   role: WorkspaceRole;
   joinedAt: string;
   contact: MemberProfileContact;
