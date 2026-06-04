@@ -16,15 +16,129 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, type TKey } from "@/lib/i18n";
 import { updateProfile } from "@/lib/api/auth";
 import { updateWorkspace } from "@/lib/api/workspace";
-import { nameToInitials, useCurrentUser } from "@/lib/auth/use-current-user";
+import {
+  canEditWorkspaceSettings,
+  nameToInitials,
+  useCurrentUser,
+} from "@/lib/auth/use-current-user";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreditCard, Check, Loader2 } from "lucide-react";
+
+const SETTINGS_TABS = ["workspace", "profile", "notifications", "billing"] as const;
+type SettingsTab = (typeof SETTINGS_TABS)[number];
+
+type SettingsSearch = {
+  tab?: SettingsTab;
+};
+
+const WORKSPACE_SLUG_PATTERN = /^[a-z0-9-]+$/;
+
+const WORKSPACE_TEAM_SIZE_VALUES = ["0-5", "6-10", "11-20", "21-50", "51+"] as const;
+
+const WORKSPACE_TEAM_SIZE_OPTIONS: {
+  value: (typeof WORKSPACE_TEAM_SIZE_VALUES)[number];
+  labelKey: TKey;
+}[] = [
+  { value: "0-5", labelKey: "settings.teamSize0to5" },
+  { value: "6-10", labelKey: "settings.teamSize6to10" },
+  { value: "11-20", labelKey: "settings.teamSize11to20" },
+  { value: "21-50", labelKey: "settings.teamSize21to50" },
+  { value: "51+", labelKey: "settings.teamSize51plus" },
+];
+
+const TEAM_SIZE_SELECT_EMPTY = "__none__";
+
+function isKnownTeamSizeValue(value: string): value is (typeof WORKSPACE_TEAM_SIZE_VALUES)[number] {
+  return (WORKSPACE_TEAM_SIZE_VALUES as readonly string[]).includes(value);
+}
+
+function normalizeTeamSizeValue(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (isKnownTeamSizeValue(trimmed)) {
+    return trimmed;
+  }
+  const withDash = trimmed.replace(/\s*[-–—]\s*/g, "-");
+  if (isKnownTeamSizeValue(withDash)) {
+    return withDash;
+  }
+  const compact = trimmed.replace(/\s+/g, "");
+  if (isKnownTeamSizeValue(compact)) {
+    return compact;
+  }
+  if (/^51\+?$/i.test(compact)) {
+    return "51+";
+  }
+  return trimmed;
+}
+
+function workspaceFormFromWorkspace(workspace: {
+  name: string;
+  slug: string;
+  industry?: string | null;
+  teamSize?: string | null;
+}): WorkspaceFormState {
+  return {
+    name: workspace.name,
+    slug: workspace.slug,
+    industry: workspace.industry ?? "",
+    teamSize: normalizeTeamSizeValue(workspace.teamSize ?? ""),
+  };
+}
+
+function isWorkspaceFormDirty(
+  form: WorkspaceFormState | null,
+  baseline: WorkspaceFormState | null,
+): boolean {
+  if (!form || !baseline) {
+    return false;
+  }
+  return (
+    form.name.trim() !== baseline.name.trim() ||
+    form.slug.trim() !== baseline.slug.trim() ||
+    form.industry.trim() !== baseline.industry.trim() ||
+    form.teamSize.trim() !== baseline.teamSize.trim()
+  );
+}
+
+const WORKSPACE_ERROR_KEYS: Record<string, TKey> = {
+  "Slug is already taken": "settings.error.slugTaken",
+  "Slug can only contain lowercase letters, numbers, and hyphens": "settings.error.slugInvalid",
+  "Only workspace owners can edit workspace settings": "settings.error.onlyOwners",
+};
+
+function parseSettingsTab(value: unknown): SettingsTab | undefined {
+  if (typeof value === "string" && (SETTINGS_TABS as readonly string[]).includes(value)) {
+    return value as SettingsTab;
+  }
+  return undefined;
+}
+
+function formatWorkspaceError(error: unknown, fallback: TKey, t: (k: TKey) => string): string {
+  if (error instanceof Error) {
+    const key = WORKSPACE_ERROR_KEYS[error.message];
+    if (key) {
+      return t(key);
+    }
+    return error.message;
+  }
+  return t(fallback);
+}
 
 function workspaceUrlFromSlug(slug: string): string {
   return `${slug}.teamflow.ai`;
@@ -36,6 +150,9 @@ function firstNameFromFullName(name: string): string {
 
 export const Route = createFileRoute("/app/settings")({
   beforeLoad: requireAuth,
+  validateSearch: (search: Record<string, unknown>): SettingsSearch => ({
+    tab: parseSettingsTab(search.tab),
+  }),
   head: () => ({ meta: [{ title: "Settings — TeamFlow AI" }] }),
   component: SettingsPage,
 });
@@ -49,21 +166,27 @@ type ProfileFormState = {
 
 type WorkspaceFormState = {
   name: string;
+  slug: string;
   industry: string;
   teamSize: string;
 };
 
 function SettingsPage() {
   const { t } = useI18n();
+  const { tab } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const queryClient = useQueryClient();
   const { data: me, isPending } = useCurrentUser();
   const user = me?.user;
   const workspace = me?.workspace;
+  const canEditWorkspace = canEditWorkspaceSettings(workspace?.role);
+  const activeTab = tab ?? "workspace";
   const userInitials = user ? nameToInitials(user.name) : "…";
   const [seatsOpen, setSeatsOpen] = useState(false);
   const [cardOpen, setCardOpen] = useState(false);
   const [profileForm, setProfileForm] = useState<ProfileFormState | null>(null);
   const [workspaceForm, setWorkspaceForm] = useState<WorkspaceFormState | null>(null);
+  const [workspaceBaseline, setWorkspaceBaseline] = useState<WorkspaceFormState | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -80,13 +203,12 @@ function SettingsPage() {
   useEffect(() => {
     if (!workspace) {
       setWorkspaceForm(null);
+      setWorkspaceBaseline(null);
       return;
     }
-    setWorkspaceForm({
-      name: workspace.name,
-      industry: workspace.industry ?? "",
-      teamSize: workspace.teamSize ?? "",
-    });
+    const saved = workspaceFormFromWorkspace(workspace);
+    setWorkspaceForm(saved);
+    setWorkspaceBaseline(saved);
   }, [workspace]);
 
   const profileMutation = useMutation({
@@ -102,12 +224,15 @@ function SettingsPage() {
 
   const workspaceMutation = useMutation({
     mutationFn: updateWorkspace,
-    onSuccess: async () => {
+    onSuccess: async (updated) => {
       await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
-      toast.success(t("settings.workspaceSaved"));
+      const saved = workspaceFormFromWorkspace(updated);
+      setWorkspaceForm(saved);
+      setWorkspaceBaseline(saved);
+      toast.success(t("settings.workspaceUpdated"));
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : t("settings.workspaceSaveError"));
+      toast.error(formatWorkspaceError(error, "settings.workspaceSaveError", t));
     },
   });
 
@@ -143,32 +268,51 @@ function SettingsPage() {
       toast.error(t("settings.noWorkspace"));
       return;
     }
+    const slug = workspaceForm.slug.trim();
+    if (!WORKSPACE_SLUG_PATTERN.test(slug)) {
+      toast.error(t("settings.error.slugInvalid"));
+      return;
+    }
     workspaceMutation.mutate({
       name: workspaceForm.name.trim(),
+      slug,
       industry: workspaceForm.industry.trim(),
       teamSize: workspaceForm.teamSize.trim(),
     });
   };
 
   const handleWorkspaceCancel = () => {
-    if (!workspace) {
+    if (!workspaceBaseline) {
       return;
     }
-    setWorkspaceForm({
-      name: workspace.name,
-      industry: workspace.industry ?? "",
-      teamSize: workspace.teamSize ?? "",
-    });
+    setWorkspaceForm({ ...workspaceBaseline });
   };
 
+  const workspaceHasUnsavedChanges = isWorkspaceFormDirty(workspaceForm, workspaceBaseline);
+  const workspaceFieldsDisabled = !workspace || workspaceMutation.isPending || !canEditWorkspace;
+  const workspaceSlugPreview = workspaceForm?.slug?.trim()
+    ? workspaceUrlFromSlug(workspaceForm.slug.trim())
+    : workspace?.slug
+      ? workspaceUrlFromSlug(workspace.slug)
+      : "";
+
   return (
-    <AppShell title={t("side.settings")}>
+    <AppShell>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">{t("side.settings")}</h1>
         <p className="text-sm text-muted-foreground">{t("settings.pageSubtitle")}</p>
       </div>
 
-      <Tabs defaultValue="workspace" className="w-full">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => {
+          void navigate({
+            to: "/app/settings",
+            search: { tab: value as SettingsTab },
+          });
+        }}
+        className="w-full"
+      >
         <TabsList>
           <TabsTrigger value="workspace">{t("side.workspace")}</TabsTrigger>
           <TabsTrigger value="profile">{t("settings.profileSettings")}</TabsTrigger>
@@ -181,6 +325,9 @@ function SettingsPage() {
             title={t("settings.workspaceDetailsTitle")}
             description={t("settings.workspaceDetailsDesc")}
           >
+            {!canEditWorkspace && workspace ? (
+              <p className="mb-4 text-sm text-muted-foreground">{t("settings.viewOnlyRole")}</p>
+            ) : null}
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={t("settings.workspaceName")}>
                 {isPending ? (
@@ -193,22 +340,41 @@ function SettingsPage() {
                         current ? { ...current, name: event.target.value } : current,
                       )
                     }
-                    disabled={!workspace || workspaceMutation.isPending}
+                    disabled={workspaceFieldsDisabled}
                   />
                 )}
               </Field>
-              <Field label={t("settings.workspaceUrl")}>
+              <Field label={t("settings.workspaceSlug")}>
                 {isPending ? (
                   <Skeleton className="h-10 w-full rounded-md" />
                 ) : (
                   <Input
-                    key={workspace?.slug ?? "workspace-url"}
-                    value={workspace?.slug ? workspaceUrlFromSlug(workspace.slug) : ""}
-                    readOnly
-                    className="bg-muted/40"
+                    value={workspaceForm?.slug ?? ""}
+                    onChange={(event) =>
+                      setWorkspaceForm((current) =>
+                        current ? { ...current, slug: event.target.value } : current,
+                      )
+                    }
+                    disabled={workspaceFieldsDisabled}
+                    autoComplete="off"
+                    spellCheck={false}
                   />
                 )}
               </Field>
+              <div className="sm:col-span-2">
+                <Field label={t("settings.workspaceUrl")}>
+                  {isPending ? (
+                    <Skeleton className="h-10 w-full rounded-md" />
+                  ) : (
+                    <>
+                      <Input value={workspaceSlugPreview} readOnly className="bg-muted/40" />
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        {t("settings.workspaceUrlPreview")} {workspaceSlugPreview || "—"}
+                      </p>
+                    </>
+                  )}
+                </Field>
+              </div>
               <Field label={t("settings.industry")}>
                 <Input
                   value={workspaceForm?.industry ?? ""}
@@ -217,29 +383,33 @@ function SettingsPage() {
                       current ? { ...current, industry: event.target.value } : current,
                     )
                   }
-                  disabled={!workspace || workspaceMutation.isPending}
+                  disabled={workspaceFieldsDisabled}
                   placeholder="e.g. Product / Software"
                 />
               </Field>
               <Field label={t("settings.teamSize")}>
-                <Input
+                <WorkspaceTeamSizeSelect
                   value={workspaceForm?.teamSize ?? ""}
-                  onChange={(event) =>
-                    setWorkspaceForm((current) =>
-                      current ? { ...current, teamSize: event.target.value } : current,
-                    )
+                  onChange={(teamSize) =>
+                    setWorkspaceForm((current) => (current ? { ...current, teamSize } : current))
                   }
-                  disabled={!workspace || workspaceMutation.isPending}
-                  placeholder="e.g. 6 - 10"
+                  disabled={workspaceFieldsDisabled}
                 />
+                <p className="mt-1.5 text-xs text-muted-foreground">{t("settings.teamSizeHint")}</p>
               </Field>
             </div>
-            <SaveBar
-              isSaving={workspaceMutation.isPending}
-              onSave={handleWorkspaceSave}
-              onCancel={handleWorkspaceCancel}
-              saveDisabled={!workspace || !workspaceForm}
-            />
+            {canEditWorkspace ? (
+              <SaveBar
+                isSaving={workspaceMutation.isPending}
+                onSave={handleWorkspaceSave}
+                onCancel={handleWorkspaceCancel}
+                saveDisabled={!workspace || !workspaceForm || !workspaceHasUnsavedChanges}
+                cancelDisabled={!workspaceHasUnsavedChanges}
+                cancelLabel={t("settings.resetChanges")}
+                saveLabel={t("settings.saveWorkspace")}
+                savingLabel={t("settings.savingWorkspace")}
+              />
+            ) : null}
           </Card>
         </TabsContent>
 
@@ -468,6 +638,47 @@ function Card({
     </div>
   );
 }
+function WorkspaceTeamSizeSelect({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (teamSize: string) => void;
+  disabled?: boolean;
+}) {
+  const { t } = useI18n();
+  const trimmed = value.trim();
+  const normalized = normalizeTeamSizeValue(trimmed);
+  const selectValue = trimmed
+    ? isKnownTeamSizeValue(normalized)
+      ? normalized
+      : trimmed
+    : TEAM_SIZE_SELECT_EMPTY;
+  const showLegacyOption = Boolean(trimmed && !isKnownTeamSizeValue(normalized));
+
+  return (
+    <Select
+      value={selectValue}
+      onValueChange={(next) => onChange(next === TEAM_SIZE_SELECT_EMPTY ? "" : next)}
+      disabled={disabled}
+    >
+      <SelectTrigger>
+        <SelectValue placeholder={t("settings.teamSize")} />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={TEAM_SIZE_SELECT_EMPTY}>—</SelectItem>
+        {showLegacyOption ? <SelectItem value={trimmed}>{trimmed}</SelectItem> : null}
+        {WORKSPACE_TEAM_SIZE_OPTIONS.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {t(option.labelKey)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
@@ -481,11 +692,19 @@ function SaveBar({
   onCancel,
   isSaving = false,
   saveDisabled = false,
+  cancelDisabled = false,
+  cancelLabel,
+  saveLabel,
+  savingLabel,
 }: {
   onSave: () => void;
   onCancel: () => void;
   isSaving?: boolean;
   saveDisabled?: boolean;
+  cancelDisabled?: boolean;
+  cancelLabel?: string;
+  saveLabel?: string;
+  savingLabel?: string;
 }) {
   const { t } = useI18n();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -495,8 +714,8 @@ function SaveBar({
       <Button variant="outline" onClick={() => setShortcutsOpen(true)} disabled={isSaving}>
         {t("top.keyboardShortcuts")}
       </Button>
-      <Button variant="outline" onClick={onCancel} disabled={isSaving || saveDisabled}>
-        {t("common.cancel")}
+      <Button variant="outline" onClick={onCancel} disabled={isSaving || cancelDisabled}>
+        {cancelLabel ?? t("common.cancel")}
       </Button>
       <Button
         onClick={onSave}
@@ -506,10 +725,10 @@ function SaveBar({
         {isSaving ? (
           <>
             <Loader2 className="size-4 animate-spin" />
-            {t("settings.saving")}
+            {savingLabel ?? t("settings.saving")}
           </>
         ) : (
-          t("common.saveChanges")
+          (saveLabel ?? t("common.saveChanges"))
         )}
       </Button>
       <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />

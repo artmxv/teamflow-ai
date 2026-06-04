@@ -426,7 +426,7 @@ function TasksPage() {
   }
 
   return (
-    <AppShell title={t("tasks.tasks")}>
+    <AppShell>
       <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{t("tasks.tasks")}</h1>

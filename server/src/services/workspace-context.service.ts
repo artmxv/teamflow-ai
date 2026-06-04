@@ -19,8 +19,11 @@ export type AuthWorkspace = {
   role: WorkspaceRole;
 };
 
+export const WORKSPACE_SLUG_PATTERN = /^[a-z0-9-]+$/;
+
 export type UpdateWorkspaceSettingsInput = {
-  name?: string;
+  name: string;
+  slug: string;
   industry?: string;
   teamSize?: string;
 };
@@ -68,6 +71,20 @@ function optionalStringToNull(value: string | undefined): string | null | undefi
   return trimmed.length === 0 ? null : trimmed;
 }
 
+async function assertWorkspaceSlugAvailable(slug: string, workspaceId: string): Promise<void> {
+  const existing = await prisma.workspace.findFirst({
+    where: {
+      slug,
+      id: { not: workspaceId },
+    },
+    select: { id: true },
+  });
+
+  if (existing) {
+    throw new AuthError("Slug is already taken", 409);
+  }
+}
+
 export async function updateUserWorkspaceSettings(
   userId: string,
   input: UpdateWorkspaceSettingsInput,
@@ -77,17 +94,23 @@ export async function updateUserWorkspaceSettings(
     throw new AuthError("Workspace not found", 403);
   }
 
-  const data: Prisma.WorkspaceUpdateInput = {};
+  if (context.role !== "OWNER") {
+    throw new AuthError("Only workspace owners can edit workspace settings", 403);
+  }
 
-  if (input.name !== undefined) {
-    data.name = input.name;
+  const slug = input.slug.trim();
+  if (!WORKSPACE_SLUG_PATTERN.test(slug)) {
+    throw new AuthError("Slug can only contain lowercase letters, numbers, and hyphens", 400);
   }
-  if (input.industry !== undefined) {
-    data.industry = optionalStringToNull(input.industry);
-  }
-  if (input.teamSize !== undefined) {
-    data.teamSize = optionalStringToNull(input.teamSize);
-  }
+
+  await assertWorkspaceSlugAvailable(slug, context.workspaceId);
+
+  const data: Prisma.WorkspaceUpdateInput = {
+    name: input.name.trim(),
+    slug,
+    industry: optionalStringToNull(input.industry),
+    teamSize: optionalStringToNull(input.teamSize),
+  };
 
   const workspace = await prisma.workspace.update({
     where: { id: context.workspaceId },

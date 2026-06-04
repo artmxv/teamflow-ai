@@ -40,7 +40,7 @@ function BillingPage() {
   const [cardOpen, setCardOpen] = useState(false);
 
   return (
-    <AppShell title={t("side.billing")}>
+    <AppShell>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">{t("side.billing")}</h1>
         <p className="text-sm text-muted-foreground">{t("billing.previewSubtitle")}</p>

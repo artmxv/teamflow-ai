@@ -15,6 +15,8 @@ export function useCurrentUser() {
     queryFn: getMe,
     enabled: hasToken,
     retry: false,
+    staleTime: 30 * 60 * 1000,
+    placeholderData: (previous) => previous,
   });
 
   useEffect(() => {
@@ -51,6 +53,10 @@ export function isWorkspaceManager(role: AuthWorkspace["role"] | null | undefine
 }
 
 export function canManageWorkspaceTeam(role: AuthWorkspace["role"] | null | undefined): boolean {
+  return role === "OWNER";
+}
+
+export function canEditWorkspaceSettings(role: AuthWorkspace["role"] | null | undefined): boolean {
   return role === "OWNER";
 }
 

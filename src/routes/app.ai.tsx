@@ -58,7 +58,7 @@ function AssistantPage() {
   }
 
   return (
-    <AppShell title={t("ai.assistant")}>
+    <AppShell>
       <div className="grid h-[calc(100vh-7rem)] gap-4 lg:grid-cols-[260px_1fr]">
         <aside className="hidden flex-col rounded-2xl border border-border bg-card p-3 shadow-soft lg:flex">
           <div className="flex items-center gap-2 px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">

@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import type { AuthWorkspace } from "@/lib/api/auth";
-import { nameToInitials, useCurrentUser, workspaceRoleLabel } from "@/lib/auth/use-current-user";
-import { useI18n, type TKey } from "@/lib/i18n";
+import { nameToInitials, useCurrentUser } from "@/lib/auth/use-current-user";
 import { useSidebarCollapsed } from "@/lib/sidebar-preference";
 import { AppSidebar } from "./AppSidebar";
 import { AppTopbar } from "./AppTopbar";
@@ -10,82 +9,41 @@ import { AppTopbar } from "./AppTopbar";
 export type Workspace = {
   id: string;
   name: string;
-  plan: string;
   initials: string;
   slug?: string;
 };
 
-const fallbackWorkspaces: Workspace[] = [
-  { id: "ws1", name: "Acme Studio", plan: "Pro", initials: "AC" },
-  { id: "ws2", name: "Northwind Labs", plan: "Free", initials: "NL" },
-  { id: "ws3", name: "Atlas Design Co.", plan: "Business", initials: "AD" },
-];
-
-const loadingWorkspace: Workspace = {
-  id: "loading",
-  name: "Loading…",
-  plan: "",
-  initials: "…",
-};
-
-function authWorkspaceToShell(workspace: AuthWorkspace, t: (k: TKey) => string): Workspace {
+export function authWorkspaceToShell(workspace: AuthWorkspace): Workspace {
   return {
     id: workspace.id,
     name: workspace.name,
     slug: workspace.slug,
-    plan: workspaceRoleLabel(workspace.role, t),
     initials: nameToInitials(workspace.name),
   };
 }
 
-export function AppShell({ title, children }: { title: string; children: ReactNode }) {
-  const { t } = useI18n();
-  const { data: me, isPending } = useCurrentUser();
-  const [activeWorkspace, setActiveWorkspace] = useState(loadingWorkspace);
+export function AppShell({ children }: { children: ReactNode }) {
+  const { data: me, isPending, isFetching } = useCurrentUser();
   const { collapsed: sidebarCollapsed, toggle: toggleSidebarCollapsed } = useSidebarCollapsed();
 
-  const workspaces = useMemo(() => {
-    if (me?.workspace) {
-      return [authWorkspaceToShell(me.workspace, t)];
-    }
-    if (isPending) {
-      return [loadingWorkspace];
-    }
-    return fallbackWorkspaces;
-  }, [me?.workspace, isPending, t]);
+  const workspace = useMemo(
+    () => (me?.workspace ? authWorkspaceToShell(me.workspace) : null),
+    [me?.workspace],
+  );
 
-  const displayWorkspace = useMemo(() => {
-    if (me?.workspace) {
-      return authWorkspaceToShell(me.workspace, t);
-    }
-    if (isPending) {
-      return loadingWorkspace;
-    }
-    return fallbackWorkspaces[0];
-  }, [me?.workspace, isPending, t]);
-
-  useEffect(() => {
-    if (me?.workspace) {
-      setActiveWorkspace(authWorkspaceToShell(me.workspace, t));
-    }
-  }, [me?.workspace, t]);
+  const workspaceLoading = !workspace && (isPending || isFetching);
 
   return (
     <AuthGuard>
       <div className="flex min-h-screen w-full bg-muted/30">
         <AppSidebar
-          activeWorkspace={displayWorkspace}
+          workspace={workspace}
+          workspaceLoading={workspaceLoading}
           collapsed={sidebarCollapsed}
           onToggleCollapsed={toggleSidebarCollapsed}
         />
         <div className="flex min-w-0 flex-1 flex-col">
-          <AppTopbar
-            title={title}
-            workspaces={workspaces}
-            activeWorkspace={displayWorkspace}
-            onWorkspaceChange={setActiveWorkspace}
-            workspaceRole={me?.workspace?.role ?? null}
-          />
+          <AppTopbar workspaceRole={me?.workspace?.role ?? null} />
           <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
         </div>
       </div>
