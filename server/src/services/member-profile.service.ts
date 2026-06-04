@@ -10,6 +10,10 @@ const userSelect = {
   name: true,
   email: true,
   avatar: true,
+  avatarUrl: true,
+  phone: true,
+  position: true,
+  location: true,
 } as const;
 
 export type GetMemberProfileInput = {
@@ -96,12 +100,13 @@ export async function getWorkspaceMemberProfile(input: GetMemberProfileInput) {
     name: membership.user.name,
     email: membership.user.email,
     avatar: membership.user.avatar,
+    avatarUrl: membership.user.avatarUrl,
     role: membership.role,
     joinedAt: membership.joinedAt.toISOString(),
     contact: {
-      phone: null as string | null,
-      position: null as string | null,
-      location: null as string | null,
+      phone: membership.user.phone,
+      position: membership.user.position,
+      location: membership.user.location,
     },
     projects: projects.map((project) => ({
       id: project.id,

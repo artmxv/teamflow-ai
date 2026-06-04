@@ -8,6 +8,7 @@ const userSelect = {
   name: true,
   email: true,
   avatar: true,
+  avatarUrl: true,
 } as const;
 
 const manageableRoles = ["ADMIN", "MEMBER"] as const;
@@ -72,6 +73,7 @@ export async function getWorkspaceMembers(workspaceId: string) {
     name: membership.user.name,
     email: membership.user.email,
     avatar: membership.user.avatar,
+    avatarUrl: membership.user.avatarUrl,
     role: membership.role,
     joinedAt: membership.joinedAt.toISOString(),
   }));
@@ -114,6 +116,7 @@ export async function updateWorkspaceMemberRole(input: UpdateWorkspaceMemberRole
       name: membership.user.name,
       email: membership.user.email,
       avatar: membership.user.avatar,
+      avatarUrl: membership.user.avatarUrl,
       role: membership.role,
     };
   }
@@ -139,6 +142,7 @@ export async function updateWorkspaceMemberRole(input: UpdateWorkspaceMemberRole
     name: updated.user.name,
     email: updated.user.email,
     avatar: updated.user.avatar,
+    avatarUrl: updated.user.avatarUrl,
     role: updated.role,
   };
 }

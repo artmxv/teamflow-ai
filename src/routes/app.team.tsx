@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { requireAuth } from "@/lib/auth/route-guards";
 import {
   canManageWorkspaceTeam,
-  nameToInitials,
   useCurrentUser,
   useCurrentWorkspace,
   workspaceRoleLabel,
@@ -12,7 +11,7 @@ import {
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import { MemberProfileDrawer } from "@/components/app/MemberProfileDrawer";
-import { Avatar } from "@/components/app/Avatar";
+import { UserAvatar } from "@/components/app/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,7 +49,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useI18n, type TKey } from "@/lib/i18n";
+import { useI18n, type Lang, type TKey } from "@/lib/i18n";
+import { formatJoinedDate } from "@/lib/profile-contact";
 import type { WorkspaceRole } from "@/lib/api/auth";
 import {
   createWorkspaceInvitation,
@@ -111,7 +111,7 @@ function formatTeamError(error: unknown, fallback: TKey, t: (k: TKey) => string)
 }
 
 function TeamPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { memberId: memberIdFromUrl } = Route.useSearch();
   const navigate = Route.useNavigate();
   const [memberDrawerOpen, setMemberDrawerOpen] = useState(() => !!memberIdFromUrl);
@@ -464,9 +464,11 @@ function TeamPage() {
                 >
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-3">
-                      <Avatar
+                      <UserAvatar
                         id={member.id}
-                        initials={member.avatar ?? nameToInitials(member.name)}
+                        name={member.name}
+                        avatar={member.avatar}
+                        avatarUrl={member.avatarUrl}
                       />
                       <div>
                         <div className="font-medium">{member.name}</div>
@@ -480,7 +482,7 @@ function TeamPage() {
                     </Badge>
                   </td>
                   <td className="px-5 py-3 text-muted-foreground">
-                    {new Date(member.joinedAt).toLocaleDateString()}
+                    {formatJoinedDate(member.joinedAt, lang as Lang) ?? "—"}
                   </td>
                   <td className="px-5 py-3 text-right" onClick={(event) => event.stopPropagation()}>
                     <DropdownMenu>

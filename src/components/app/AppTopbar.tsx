@@ -23,7 +23,8 @@ import { ThemeToggle } from "@/lib/theme";
 import { toast } from "sonner";
 import { logout } from "@/lib/api/auth";
 import { clearAuthToken, getAuthToken } from "@/lib/auth/token";
-import { nameToInitials, useCurrentUser, workspaceRoleLabel } from "@/lib/auth/use-current-user";
+import { useCurrentUser, workspaceRoleLabel } from "@/lib/auth/use-current-user";
+import { UserAvatar } from "@/components/app/UserAvatar";
 import type { WorkspaceRole } from "@/lib/api/auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -251,10 +252,18 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
         {showProfile && currentUser && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 rounded-lg p-1 pr-2 transition hover:bg-secondary">
-                <span className="grid size-8 place-items-center rounded-md bg-gradient-brand text-xs font-semibold text-white">
-                  {nameToInitials(currentUser.name)}
-                </span>
+              <button
+                type="button"
+                className="flex items-center gap-2 rounded-lg p-1 pr-2 transition hover:bg-secondary outline-none focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground/30"
+              >
+                <UserAvatar
+                  id={currentUser.id}
+                  name={currentUser.name}
+                  avatar={currentUser.avatar}
+                  avatarUrl={currentUser.avatarUrl}
+                  size="md"
+                  className="rounded-md"
+                />
                 <span className="hidden text-left xl:block">
                   <span className="block text-sm font-medium leading-tight">
                     {currentUser.name}
