@@ -1,4 +1,5 @@
-import { Bell, Search, ChevronDown, HelpCircle } from "lucide-react";
+import { Bell, ChevronDown, HelpCircle } from "lucide-react";
+import { GlobalSearch } from "@/components/app/GlobalSearch";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -135,17 +136,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur sm:gap-3 sm:px-6">
-      <div className="relative hidden min-w-0 flex-1 lg:block lg:max-w-sm xl:max-w-md">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          type="search"
-          placeholder={t("top.search")}
-          className="h-9 w-full rounded-lg border border-input bg-secondary/60 pl-9 pr-12 text-sm outline-none transition placeholder:text-muted-foreground focus:bg-card focus:ring-2 focus:ring-ring/40"
-        />
-        <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-          ⌘K
-        </kbd>
-      </div>
+      <GlobalSearch />
 
       <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
         <LanguageSwitcher />
