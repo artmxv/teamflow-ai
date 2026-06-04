@@ -65,8 +65,7 @@ function generateInviteToken(): string {
 }
 
 export function buildWorkspaceInviteAcceptUrl(token: string): string {
-  const base = env.CORS_ORIGIN.replace(/\/$/, "");
-  return `${base}/invite/${token}`;
+  return `${env.APP_URL}/invite/${token}`;
 }
 
 function isInviteExpired(invite: { expiresAt: Date; status: WorkspaceInvitationStatus }): boolean {
@@ -165,7 +164,13 @@ export async function createWorkspaceInvitation(input: {
   inviterRole: WorkspaceRole;
   email: string;
   role: WorkspaceRole;
-}): Promise<{ invitation: WorkspaceInvitationDto; deliveryMode: string; reused: boolean }> {
+}): Promise<{
+  invitation: WorkspaceInvitationDto;
+  deliveryMode: string;
+  emailSent: boolean;
+  emailWarning?: string;
+  reused: boolean;
+}> {
   assertOwner(input.inviterRole);
 
   if (input.role === "OWNER") {
@@ -188,6 +193,7 @@ export async function createWorkspaceInvitation(input: {
     return {
       invitation: toInvitationDto(existing),
       deliveryMode: "existing",
+      emailSent: true,
       reused: true,
     };
   }
@@ -208,17 +214,27 @@ export async function createWorkspaceInvitation(input: {
   });
 
   const acceptUrl = buildWorkspaceInviteAcceptUrl(token);
+
+  const inviter = await prisma.user.findUnique({
+    where: { id: input.inviterUserId },
+    select: { name: true, displayName: true, email: true },
+  });
+
   const emailResult = await sendWorkspaceInviteEmail({
     to: email,
     workspaceName: input.workspaceName,
     role: input.role,
     acceptUrl,
     expiresAt,
+    inviterName: inviter?.displayName ?? inviter?.name ?? null,
+    inviterEmail: inviter?.email ?? null,
   });
 
   return {
     invitation: toInvitationDto(invite),
-    deliveryMode: emailResult.deliveryMode,
+    deliveryMode: emailResult.mode,
+    emailSent: emailResult.sent,
+    emailWarning: emailResult.warning,
     reused: false,
   };
 }

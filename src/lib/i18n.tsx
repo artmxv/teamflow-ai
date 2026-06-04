@@ -407,12 +407,11 @@ const dict = {
     "tasks.uploading": "Uploading…",
     "tasks.attachmentsEmpty": "No attachments yet. Upload a PDF, image, or document.",
     "tasks.attachmentsLoading": "Loading attachments…",
-    "tasks.attachmentsError":
-      "Could not load attachments. Try closing and reopening the task.",
+    "tasks.attachmentsError": "Could not load attachments. Try closing and reopening the task.",
     "tasks.sheetDescription": "Task details, checklist, comments, and activity for {key}",
     "tasks.deleteTask": "Delete task",
     "tasks.deleting": "Deleting…",
-    "tasks.deleteTaskConfirm": "Delete task \"{title}\"? This action cannot be undone.",
+    "tasks.deleteTaskConfirm": 'Delete task "{title}"? This action cannot be undone.',
     "team.inviteMember": "Invite member",
     "team.inviteByEmail": "Invite by email",
     "team.memberEmail": "Member email",
@@ -430,6 +429,8 @@ const dict = {
     "team.sendInvite": "Send invite",
     "team.sendingInvite": "Sending invite",
     "team.invitationSent": "Invitation sent",
+    "team.invitationEmailFailed":
+      "Invitation created, but the email was not sent. Copy the link manually.",
     "team.invitationLink": "Invitation link",
     "team.copyInviteLink": "Copy invite link",
     "team.invitationLinkCopied": "Invitation link copied",
@@ -927,8 +928,7 @@ const dict = {
     "tasks.uploading": "Загрузка…",
     "tasks.attachmentsEmpty": "Вложений пока нет. Загрузите PDF, изображение или документ.",
     "tasks.attachmentsLoading": "Загрузка вложений…",
-    "tasks.attachmentsError":
-      "Не удалось загрузить вложения. Закройте и снова откройте задачу.",
+    "tasks.attachmentsError": "Не удалось загрузить вложения. Закройте и снова откройте задачу.",
     "tasks.sheetDescription": "Детали задачи, чеклист, комментарии и активность для {key}",
     "tasks.deleteTask": "Удалить задачу",
     "tasks.deleting": "Удаление…",
@@ -951,6 +951,8 @@ const dict = {
     "team.sendInvite": "Отправить приглашение",
     "team.sendingInvite": "Отправляем приглашение",
     "team.invitationSent": "Приглашение отправлено",
+    "team.invitationEmailFailed":
+      "Приглашение создано, но письмо не отправилось. Скопируйте ссылку вручную.",
     "team.invitationLink": "Ссылка приглашения",
     "team.copyInviteLink": "Скопировать ссылку",
     "team.invitationLinkCopied": "Ссылка приглашения скопирована",
