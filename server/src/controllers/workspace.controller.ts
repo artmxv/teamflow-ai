@@ -2,12 +2,15 @@ import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 
 import { AuthError } from "../services/auth.service.js";
-import { canManageProjects } from "../services/project-access.service.js";
 import {
   getUserWorkspaceContext,
   updateUserWorkspaceSettings,
 } from "../services/workspace-context.service.js";
-import { getWorkspaceMembers } from "../services/workspace-members.service.js";
+import {
+  getWorkspaceMembers,
+  removeWorkspaceMember,
+  updateWorkspaceMemberRole,
+} from "../services/workspace-members.service.js";
 
 const updateWorkspaceSchema = z
   .object({
@@ -18,6 +21,12 @@ const updateWorkspaceSchema = z
   .refine((value) => Object.keys(value).length > 0, {
     message: "at least one field is required",
   });
+
+const updateMemberRoleSchema = z.object({
+  role: z.enum(["ADMIN", "MEMBER"], {
+    message: "role must be ADMIN or MEMBER",
+  }),
+});
 
 function handleWorkspaceError(error: unknown, res: Response, next: NextFunction) {
   if (error instanceof AuthError) {
@@ -44,15 +53,91 @@ export async function getWorkspaceMembersController(
       return;
     }
 
-    if (!canManageProjects(context.role)) {
-      res.status(403).json({
-        message: "Project management is available to owners and admins.",
+    const members = await getWorkspaceMembers(context.workspaceId);
+    res.json({ data: members });
+  } catch (error) {
+    handleWorkspaceError(error, res, next);
+  }
+}
+
+export async function updateWorkspaceMemberRoleController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    if (!req.userId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const context = await getUserWorkspaceContext(req.userId);
+    if (!context) {
+      res.status(403).json({ message: "Workspace not found" });
+      return;
+    }
+
+    const memberId = req.params.memberId;
+    if (!memberId || typeof memberId !== "string") {
+      res.status(400).json({ message: "memberId is required" });
+      return;
+    }
+
+    const parsed = updateMemberRoleSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0];
+      res.status(400).json({
+        message: firstIssue?.message ?? "Invalid role payload",
+        issues: parsed.error.issues,
       });
       return;
     }
 
-    const members = await getWorkspaceMembers(context.workspaceId);
-    res.json({ data: members });
+    const member = await updateWorkspaceMemberRole({
+      workspaceId: context.workspaceId,
+      actorUserId: req.userId,
+      actorRole: context.role,
+      memberId,
+      role: parsed.data.role,
+    });
+
+    res.json({ data: member });
+  } catch (error) {
+    handleWorkspaceError(error, res, next);
+  }
+}
+
+export async function removeWorkspaceMemberController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    if (!req.userId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const context = await getUserWorkspaceContext(req.userId);
+    if (!context) {
+      res.status(403).json({ message: "Workspace not found" });
+      return;
+    }
+
+    const memberId = req.params.memberId;
+    if (!memberId || typeof memberId !== "string") {
+      res.status(400).json({ message: "memberId is required" });
+      return;
+    }
+
+    const result = await removeWorkspaceMember({
+      workspaceId: context.workspaceId,
+      actorUserId: req.userId,
+      actorRole: context.role,
+      memberId,
+    });
+
+    res.json({ data: result });
   } catch (error) {
     handleWorkspaceError(error, res, next);
   }
