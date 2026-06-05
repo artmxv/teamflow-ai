@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { AvatarStack } from "@/components/app/Avatar";
+import { EmptyState } from "@/components/app/EmptyState";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import { members, projectStatusMeta, type Project, type ProjectStatus } from "@/lib/mock-data";
 import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
@@ -161,7 +162,7 @@ function ProjectsIndexPage() {
         <ErrorState error={error} onRetry={() => void refetch()} />
       ) : filtered.length === 0 ? (
         isTrulyEmpty ? (
-          <EmptyState canManageProjects={canManageProjects} />
+          <ProjectsEmptyState canManageProjects={canManageProjects} />
         ) : (
           <NoResultsState
             hasActiveFilters={hasActiveFilters}
@@ -299,25 +300,30 @@ function NoResultsState({
   );
 }
 
-function EmptyState({ canManageProjects }: { canManageProjects: boolean }) {
+function ProjectsEmptyState({ canManageProjects }: { canManageProjects: boolean }) {
   const { t } = useI18n();
 
   return (
-    <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
-      <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-accent text-accent-foreground">
-        <FolderKanban className="size-5" />
-      </div>
-      <h3 className="mt-4 text-base font-semibold">{t("projects.emptyTitle")}</h3>
-      <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-        {canManageProjects ? t("projects.emptyHint") : t("access.memberProjectsHint")}
-      </p>
-      {canManageProjects ? (
-        <NewProjectDialog>
-          <Button className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
-            <Plus className="size-4" /> {t("common.createProject")}
+    <EmptyState
+      icon={FolderKanban}
+      title={t("projects.emptyTitle")}
+      description={canManageProjects ? t("projects.emptyHint") : t("workspace.permissionHint")}
+      primaryAction={
+        canManageProjects ? (
+          <NewProjectDialog>
+            <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+              <Plus className="size-4" /> {t("common.createProject")}
+            </Button>
+          </NewProjectDialog>
+        ) : undefined
+      }
+      secondaryAction={
+        canManageProjects ? (
+          <Button variant="outline" asChild>
+            <Link to="/app/team">{t("team.inviteMember")}</Link>
           </Button>
-        </NewProjectDialog>
-      ) : null}
-    </div>
+        ) : undefined
+      }
+    />
   );
 }

@@ -133,7 +133,12 @@ export async function addProjectMemberController(req: Request, res: Response, ne
       return;
     }
 
-    const addResult = await addProjectMember(context.workspaceId, projectId, result.data.userId);
+    const addResult = await addProjectMember(
+      context.workspaceId,
+      projectId,
+      result.data.userId,
+      req.userId!,
+    );
 
     if (!addResult.ok) {
       if (addResult.reason === "NOT_FOUND") {

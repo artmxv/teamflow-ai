@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma.js";
+import { notifyProjectMemberAdded } from "./notifications.service.js";
 import { canAccessProject } from "./project-access.service.js";
 import { findProjectInWorkspace } from "./projects.service.js";
 import type { WorkspaceRole } from "./workspace-context.service.js";
@@ -97,6 +98,7 @@ export async function addProjectMember(
   workspaceId: string,
   projectId: string,
   userId: string,
+  actorId?: string,
 ): Promise<AddProjectMemberResult> {
   const project = await findProjectInWorkspace(projectId, workspaceId);
   if (!project) {
@@ -138,6 +140,16 @@ export async function addProjectMember(
     },
     select: projectMemberSelect,
   });
+
+  if (actorId) {
+    void notifyProjectMemberAdded({
+      workspaceId,
+      projectId,
+      projectName: project.name,
+      memberUserId: userId,
+      actorId,
+    });
+  }
 
   return { ok: true, data: mapProjectMember(member) };
 }

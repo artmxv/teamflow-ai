@@ -27,8 +27,10 @@ type WorkspaceItemResponse = {
   data: WorkspaceItem;
 };
 
-export async function fetchWorkspaces(): Promise<WorkspaceItem[]> {
-  const response = await apiRequest<WorkspacesListResponse>("/api/workspaces");
+export async function fetchWorkspaces(options?: {
+  skipWorkspaceHeader?: boolean;
+}): Promise<WorkspaceItem[]> {
+  const response = await apiRequest<WorkspacesListResponse>("/api/workspaces", options);
   return response.data;
 }
 

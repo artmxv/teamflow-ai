@@ -9,6 +9,7 @@ import {
   ListTodo,
   Users,
   ArrowUpRight,
+  Rocket,
   Sparkles,
   AlertTriangle,
   CalendarClock,
@@ -35,8 +36,13 @@ import type { TasksSearch } from "@/routes/app.tasks";
 import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
 import { resolveProjectGradient } from "@/lib/project-color";
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
+import { EmptyState } from "@/components/app/EmptyState";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
-import { isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user";
+import {
+  canManageWorkspaceTeam,
+  isWorkspaceManager,
+  useCurrentUser,
+} from "@/lib/auth/use-current-user";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -103,6 +109,7 @@ function Dashboard() {
   const { t, lang } = useI18n();
   const { data: me } = useCurrentUser();
   const canManageProjects = isWorkspaceManager(me?.workspace?.role);
+  const canManageTeam = canManageWorkspaceTeam(me?.workspace?.role);
   const [activityPeriod, setActivityPeriod] = useState<DashboardAnalyticsPeriod>("week");
   const { data, error, isError, isLoading, refetch } = useQuery({
     queryKey: ["dashboard-summary"],
@@ -169,6 +176,14 @@ function Dashboard() {
     () => apiProjects.find((p) => p.name === "Orion Web App")?.id,
     [apiProjects],
   );
+
+  const isEmptyWorkspace =
+    !isLoading &&
+    !isError &&
+    data != null &&
+    data.activeProjects === 0 &&
+    data.openTasks === 0 &&
+    data.completedTasks === 0;
 
   const stats = data
     ? [
@@ -263,6 +278,35 @@ function Dashboard() {
           </NewProjectDialog>
         ) : null}
       </div>
+
+      {isEmptyWorkspace ? (
+        <EmptyState
+          className="mb-6"
+          icon={Rocket}
+          title={t("workspace.onboardingTitle")}
+          description={
+            canManageProjects || canManageTeam
+              ? t("workspace.onboardingDescription")
+              : t("workspace.permissionHint")
+          }
+          primaryAction={
+            canManageProjects ? (
+              <NewProjectDialog>
+                <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+                  {t("common.createProject")}
+                </Button>
+              </NewProjectDialog>
+            ) : undefined
+          }
+          secondaryAction={
+            canManageTeam ? (
+              <Button variant="outline" asChild>
+                <Link to="/app/team">{t("team.inviteMember")}</Link>
+              </Button>
+            ) : undefined
+          }
+        />
+      ) : null}
 
       {isLoading ? (
         <StatCardSkeletons />
@@ -440,9 +484,12 @@ function Dashboard() {
         {isLoading ? (
           <RecentTasksSkeleton />
         ) : isError ? null : data && data.recentTasks.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            No recent task updates yet. Create or update a task to see activity here.
-          </p>
+          <EmptyState
+            compact
+            className="border-0 bg-transparent shadow-none"
+            title={t("dashboard.noRecentActivityTitle")}
+            description={t("dashboard.noRecentActivityHint")}
+          />
         ) : (
           <ul className="divide-y divide-border">
             {data?.recentTasks.map((task) => (

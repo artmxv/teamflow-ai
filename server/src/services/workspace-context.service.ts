@@ -53,7 +53,9 @@ async function findActiveMembership(userId: string, selectedWorkspaceId?: string
       },
     });
 
-    return membership;
+    if (membership) {
+      return membership;
+    }
   }
 
   return prisma.workspaceMember.findFirst({

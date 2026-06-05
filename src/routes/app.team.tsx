@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth/use-current-user";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
+import { EmptyState } from "@/components/app/EmptyState";
 import { MemberProfileDrawer } from "@/components/app/MemberProfileDrawer";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { Badge } from "@/components/ui/badge";
@@ -64,7 +65,7 @@ import {
   updateWorkspaceMemberRole,
   type WorkspaceMemberItem,
 } from "@/lib/api/workspace-members";
-import { Info as InfoIcon, Plus, MoreHorizontal, Copy } from "lucide-react";
+import { Info as InfoIcon, Plus, MoreHorizontal, Copy, Mail } from "lucide-react";
 
 export type TeamSearch = {
   memberId?: string;
@@ -410,50 +411,60 @@ function TeamPage() {
         </Alert>
       )}
 
-      {canManageTeam && pendingInvitations.length > 0 && (
+      {canManageTeam && (
         <section className="mb-6 overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
           <div className="border-b border-border bg-muted/50 px-5 py-3">
             <h2 className="text-sm font-semibold">{t("team.pendingInvitations")}</h2>
           </div>
-          <ul className="divide-y divide-border">
-            {pendingInvitations.map((invite) => (
-              <li
-                key={invite.id}
-                className="flex flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <div className="font-medium">{invite.email}</div>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <Badge variant="secondary" className="border-0">
-                      {workspaceRoleLabel(invite.role, t)}
-                    </Badge>
-                    <span>
-                      {t("team.inviteExpires")}: {new Date(invite.expiresAt).toLocaleString()}
-                    </span>
+          {pendingInvitations.length === 0 ? (
+            <EmptyState
+              compact
+              className="border-0 bg-transparent shadow-none"
+              icon={Mail}
+              title={t("team.noPendingInvitationsTitle")}
+              description={t("team.noPendingInvitationsHint")}
+            />
+          ) : (
+            <ul className="divide-y divide-border">
+              {pendingInvitations.map((invite) => (
+                <li
+                  key={invite.id}
+                  className="flex flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <div className="font-medium">{invite.email}</div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <Badge variant="secondary" className="border-0">
+                        {workspaceRoleLabel(invite.role, t)}
+                      </Badge>
+                      <span>
+                        {t("team.inviteExpires")}: {new Date(invite.expiresAt).toLocaleString()}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div className="flex shrink-0 flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void handleCopyInviteLink(invite.acceptUrl)}
-                  >
-                    <Copy className="size-4" /> {t("team.copyInviteLink")}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    disabled={revokeInviteMutation.isPending}
-                    onClick={() => revokeInviteMutation.mutate(invite.id)}
-                  >
-                    {t("team.revokeInvite")}
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void handleCopyInviteLink(invite.acceptUrl)}
+                    >
+                      <Copy className="size-4" /> {t("team.copyInviteLink")}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      disabled={revokeInviteMutation.isPending}
+                      onClick={() => revokeInviteMutation.mutate(invite.id)}
+                    >
+                      {t("team.revokeInvite")}
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
 

@@ -27,6 +27,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Avatar } from "@/components/app/Avatar";
+import { EmptyState } from "@/components/app/EmptyState";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
 import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
 import { projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
@@ -695,9 +696,25 @@ function ProjectDetails({
           </div>
           <div className="mt-4 min-h-0 flex-1 overflow-hidden rounded-xl border border-border">
             {sortedTasks.length === 0 ? (
-              <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-                {t("projects.detail.emptyTaskList")}
-              </div>
+              <EmptyState
+                compact
+                className="border-0 bg-transparent shadow-none"
+                icon={ListTodo}
+                title={t("projects.detail.emptyTasksTitle")}
+                description={t("projects.detail.emptyTasksHint")}
+                primaryAction={
+                  <NewTaskDialog
+                    isSubmitting={isCreatingTask}
+                    fixedProjectId={project.id}
+                    onSubmit={onCreateTask}
+                  >
+                    <Button size="sm" variant="brand" className="h-8 gap-1">
+                      <Plus className="size-3.5" />
+                      {t("common.newTask")}
+                    </Button>
+                  </NewTaskDialog>
+                }
+              />
             ) : (
               <ul className="app-scrollbar max-h-[min(70vh,32rem)] divide-y divide-border overflow-y-auto overscroll-contain">
                 {sortedTasks.map((task) => (
@@ -949,9 +966,27 @@ function ProjectMembersSection({
             {t("projects.detail.membersError")}
           </p>
         ) : members.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
-            {t("projects.detail.noMembers")}
-          </p>
+          <EmptyState
+            compact
+            className="border-0 bg-transparent shadow-none"
+            icon={Users}
+            title={t("projects.detail.emptyMembersTitle")}
+            description={t("projects.detail.emptyMembersHint")}
+            primaryAction={
+              canManageMembers ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="brand"
+                  className="h-8 gap-1.5"
+                  onClick={() => onAddDialogOpenChange(true)}
+                >
+                  <UserPlus className="size-3.5" />
+                  {t("projects.detail.addMember")}
+                </Button>
+              ) : undefined
+            }
+          />
         ) : (
           members.map((member) => (
             <ProjectMemberRow
@@ -1171,9 +1206,30 @@ function ProjectDocumentsSection({
             Could not load documents. Try refreshing the page.
           </p>
         ) : documents.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
-            {t("projects.detail.noDocumentsYet")}
-          </p>
+          <EmptyState
+            compact
+            className="border-0 bg-transparent shadow-none"
+            icon={FileText}
+            title={t("projects.detail.emptyDocumentsTitle")}
+            description={t("projects.detail.emptyDocumentsHint")}
+            primaryAction={
+              <Button
+                type="button"
+                size="sm"
+                variant="brand"
+                className="h-8 gap-1.5"
+                disabled={isUploading}
+                onClick={onPickFile}
+              >
+                {isUploading ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Upload className="size-3.5" />
+                )}
+                {isUploading ? t("common.loading") : t("projects.detail.uploadDocument")}
+              </Button>
+            }
+          />
         ) : (
           documents.map((document) => (
             <ProjectDocumentRow
