@@ -63,7 +63,7 @@ export async function revokeWorkspaceInvitation(id: string) {
 export async function fetchInvitationPreview(token: string) {
   const response = await apiRequest<{ data: InvitationPreview }>(
     `/api/invitations/${encodeURIComponent(token)}`,
-    { skipAuth: false },
+    { skipWorkspaceHeader: true },
   );
   return response.data;
 }
@@ -71,7 +71,7 @@ export async function fetchInvitationPreview(token: string) {
 export async function acceptWorkspaceInvitation(token: string) {
   const response = await apiRequest<{ data: { workspaceId: string; role: WorkspaceRole } }>(
     `/api/invitations/${encodeURIComponent(token)}/accept`,
-    { method: "POST" },
+    { method: "POST", skipWorkspaceHeader: true },
   );
   return response.data;
 }

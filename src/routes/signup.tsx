@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AuthShell } from "@/components/auth/AuthShell";
@@ -7,13 +7,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { register } from "@/lib/api/auth";
-import { primeAuthMeAfterAuth } from "@/lib/auth/auth-cache";
-import { redirectIfAuthenticated } from "@/lib/auth/route-guards";
-import { setAuthToken } from "@/lib/auth/token";
+import { primeAuthMeAfterAuth, resetWorkspaceValidationSession } from "@/lib/auth/auth-cache";
+import { getSafeRedirectPath } from "@/lib/auth/safe-redirect";
+import { getAuthToken, setAuthToken } from "@/lib/auth/token";
 import { PASSWORD_HELPER_TEXT, validatePassword } from "@/lib/validation/password";
 
+export type SignUpSearch = {
+  redirect?: string;
+};
+
 export const Route = createFileRoute("/signup")({
-  beforeLoad: redirectIfAuthenticated,
+  validateSearch: (search: Record<string, unknown>): SignUpSearch => ({
+    redirect:
+      typeof search.redirect === "string" && search.redirect.length > 0
+        ? search.redirect
+        : undefined,
+  }),
+  beforeLoad: ({ search }) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    if (getAuthToken()) {
+      throw redirect({ href: getSafeRedirectPath(search.redirect) });
+    }
+  },
   head: () => ({ meta: [{ title: "Create account — TeamFlow AI" }] }),
   component: SignUp,
 });
@@ -21,6 +38,7 @@ export const Route = createFileRoute("/signup")({
 function SignUp() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { redirect: redirectPath } = Route.useSearch();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -31,11 +49,12 @@ function SignUp() {
 
   const registerMutation = useMutation({
     mutationFn: register,
-    onSuccess: ({ token, user }) => {
+    onSuccess: async ({ token, user }) => {
+      resetWorkspaceValidationSession();
       setAuthToken(token);
-      primeAuthMeAfterAuth(queryClient, user);
+      await primeAuthMeAfterAuth(queryClient, user);
       toast.success("Account created successfully");
-      void router.navigate({ to: "/app/dashboard" });
+      void router.navigate({ href: getSafeRedirectPath(redirectPath) });
     },
     onError: (error) => {
       toast.error(
@@ -51,7 +70,11 @@ function SignUp() {
       footer={
         <>
           Already have an account?{" "}
-          <Link to="/signin" className="font-medium text-primary hover:underline">
+          <Link
+            to="/signin"
+            search={redirectPath ? { redirect: redirectPath } : undefined}
+            className="font-medium text-primary hover:underline"
+          >
             Sign in
           </Link>
         </>

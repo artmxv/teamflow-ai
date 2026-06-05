@@ -16,9 +16,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import { statusColumns, type Priority, type Task, type TaskStatus } from "@/lib/mock-data";
+import { EmptyState } from "@/components/app/EmptyState";
 import { TaskCard, type TaskDragData } from "@/components/app/TaskCard";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
-import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
+import {
+  NewProjectDialog,
+  NewTaskDialog,
+  type TaskFormValues,
+} from "@/components/app/QuickActionDialogs";
+import { isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -40,7 +46,7 @@ import {
 } from "@/lib/api/tasks";
 import { fetchProjects } from "@/lib/api/projects";
 import { taskStatusLabel, useI18n } from "@/lib/i18n";
-import { Filter, Plus } from "lucide-react";
+import { Filter, FolderKanban, ListTodo, Plus } from "lucide-react";
 import { fetchWorkspaceMembers } from "@/lib/api/workspace-members";
 import {
   buildAssigneeOptionsFromWorkspaceMembers,
@@ -74,6 +80,8 @@ const apiPriorityMap: Record<TaskApiPriority, Priority> = {
 
 function Board() {
   const { t } = useI18n();
+  const { data: me } = useCurrentUser();
+  const canManageProjects = isWorkspaceManager(me?.workspace?.role);
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<Task | null>(null);
   const [priority, setPriority] = useState<Priority | "all">("all");
@@ -267,6 +275,10 @@ function Board() {
     });
   }
 
+  const showPageEmptyState =
+    !isLoading && !isError && (!hasAccessibleProjects || taskList.length === 0);
+  const isKanbanWithoutProjects = !hasAccessibleProjects;
+
   const filteredTasks = taskList.filter((task) => {
     const apiTask = apiTasks.find((item) => item.id === task.id);
     if (!apiTask) {
@@ -354,6 +366,37 @@ function Board() {
 
       {isError ? (
         <ErrorState error={error} onRetry={() => void refetch()} />
+      ) : showPageEmptyState ? (
+        <EmptyState
+          icon={isKanbanWithoutProjects ? FolderKanban : ListTodo}
+          title={t(isKanbanWithoutProjects ? "board.emptyKanbanTitle" : "board.noTasksTitle")}
+          description={
+            isKanbanWithoutProjects && !canManageProjects
+              ? t("workspace.permissionHint")
+              : t(isKanbanWithoutProjects ? "board.emptyKanbanHint" : "board.noTasksHint")
+          }
+          primaryAction={
+            isKanbanWithoutProjects ? (
+              canManageProjects ? (
+                <NewProjectDialog>
+                  <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+                    <Plus className="size-4" /> {t("common.createProject")}
+                  </Button>
+                </NewProjectDialog>
+              ) : undefined
+            ) : hasAccessibleProjects ? (
+              <NewTaskDialog
+                isSubmitting={createTaskMutation.isPending}
+                projectOptions={projectOptions}
+                onSubmit={handleCreateTask}
+              >
+                <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+                  <Plus className="size-4" /> {t("common.newTask")}
+                </Button>
+              </NewTaskDialog>
+            ) : undefined
+          }
+        />
       ) : (
         <DndContext
           sensors={dragSensors}

@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { canAccessProject } from "./project-access.service.js";
+import { listPendingInvitationsForUser } from "./workspace-invitations.service.js";
 
 const NOTIFICATION_LIST_LIMIT = 30;
 
@@ -15,8 +16,31 @@ export type CreateNotificationInput = {
   href?: string | null;
 };
 
+export type NotificationDto = {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  entityType: string | null;
+  entityId: string | null;
+  href: string | null;
+  readAt: string | null;
+  createdAt: string;
+  actorId: string | null;
+  isRead: boolean;
+  workspaceId?: string;
+  projectId?: string | null;
+  taskId?: string | null;
+  workspaceName?: string;
+  invitationRole?: string;
+  invitationToken?: string;
+};
+
+const INVITE_NOTIFICATION_PREFIX = "invite:";
+
 function mapNotification(notification: {
   id: string;
+  workspaceId: string;
   type: string;
   title: string;
   body: string | null;
@@ -26,7 +50,8 @@ function mapNotification(notification: {
   readAt: Date | null;
   createdAt: Date;
   actorId: string | null;
-}) {
+  workspace?: { name: string } | null;
+}): NotificationDto {
   return {
     id: notification.id,
     type: notification.type,
@@ -35,11 +60,46 @@ function mapNotification(notification: {
     entityType: notification.entityType,
     entityId: notification.entityId,
     href: notification.href,
-    readAt: notification.readAt,
-    createdAt: notification.createdAt,
+    readAt: notification.readAt?.toISOString() ?? null,
+    createdAt: notification.createdAt.toISOString(),
     actorId: notification.actorId,
     isRead: notification.readAt !== null,
+    workspaceId: notification.workspaceId,
+    projectId: notification.entityType === "project" ? notification.entityId : null,
+    taskId: notification.entityType === "task" ? notification.entityId : null,
+    workspaceName: notification.workspace?.name,
   };
+}
+
+function mapPendingInvitationNotification(invite: {
+  id: string;
+  token: string;
+  role: string;
+  createdAt: Date;
+  workspaceId: string;
+  workspaceName: string;
+}): NotificationDto {
+  return {
+    id: `${INVITE_NOTIFICATION_PREFIX}${invite.id}`,
+    type: "WORKSPACE_INVITATION",
+    title: "You were invited to a workspace",
+    body: `${invite.workspaceName} · ${invite.role}`,
+    entityType: "workspace_invitation",
+    entityId: invite.id,
+    href: `/invite/${invite.token}`,
+    readAt: null,
+    createdAt: invite.createdAt.toISOString(),
+    actorId: null,
+    isRead: false,
+    workspaceId: invite.workspaceId,
+    workspaceName: invite.workspaceName,
+    invitationRole: invite.role,
+    invitationToken: invite.token,
+  };
+}
+
+export function isVirtualInviteNotificationId(notificationId: string): boolean {
+  return notificationId.startsWith(INVITE_NOTIFICATION_PREFIX);
 }
 
 export async function createNotification(input: CreateNotificationInput) {
@@ -91,53 +151,77 @@ export async function createNotificationsForUsers(
   }
 }
 
-export async function getNotifications(workspaceId: string, recipientId: string) {
-  const where = {
-    workspaceId,
-    recipientId,
-  };
+async function getActiveMemberWorkspaceIds(recipientId: string): Promise<string[]> {
+  const memberships = await prisma.workspaceMember.findMany({
+    where: {
+      userId: recipientId,
+      status: "ACTIVE",
+    },
+    select: { workspaceId: true },
+  });
 
-  const [notifications, unreadCount] = await Promise.all([
-    prisma.notification.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      take: NOTIFICATION_LIST_LIMIT,
-      select: {
-        id: true,
-        type: true,
-        title: true,
-        body: true,
-        entityType: true,
-        entityId: true,
-        href: true,
-        readAt: true,
-        createdAt: true,
-        actorId: true,
-      },
-    }),
-    prisma.notification.count({
-      where: {
-        ...where,
-        readAt: null,
-      },
-    }),
+  return memberships.map((membership) => membership.workspaceId);
+}
+
+export async function getNotifications(recipientId: string, userEmail: string) {
+  const memberWorkspaceIds = await getActiveMemberWorkspaceIds(recipientId);
+
+  const [workspaceNotifications, workspaceUnreadCount, pendingInvites] = await Promise.all([
+    memberWorkspaceIds.length > 0
+      ? prisma.notification.findMany({
+          where: {
+            recipientId,
+            workspaceId: { in: memberWorkspaceIds },
+          },
+          orderBy: { createdAt: "desc" },
+          take: NOTIFICATION_LIST_LIMIT,
+          select: {
+            id: true,
+            workspaceId: true,
+            type: true,
+            title: true,
+            body: true,
+            entityType: true,
+            entityId: true,
+            href: true,
+            readAt: true,
+            createdAt: true,
+            actorId: true,
+            workspace: { select: { name: true } },
+          },
+        })
+      : Promise.resolve([]),
+    memberWorkspaceIds.length > 0
+      ? prisma.notification.count({
+          where: {
+            recipientId,
+            workspaceId: { in: memberWorkspaceIds },
+            readAt: null,
+          },
+        })
+      : Promise.resolve(0),
+    listPendingInvitationsForUser(recipientId, userEmail),
   ]);
 
+  const inviteNotifications = pendingInvites.map(mapPendingInvitationNotification);
+  const notifications = [...inviteNotifications, ...workspaceNotifications.map(mapNotification)]
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, NOTIFICATION_LIST_LIMIT);
+
   return {
-    notifications: notifications.map(mapNotification),
-    unreadCount,
+    notifications,
+    unreadCount: workspaceUnreadCount + inviteNotifications.length,
   };
 }
 
-export async function markNotificationRead(
-  workspaceId: string,
-  recipientId: string,
-  notificationId: string,
-) {
+export async function markNotificationRead(recipientId: string, notificationId: string) {
+  if (isVirtualInviteNotificationId(notificationId)) {
+    return null;
+  }
+
   const notification = await prisma.notification.findFirst({
     where: {
       id: notificationId,
-      workspaceId,
       recipientId,
     },
     select: { id: true },
@@ -152,6 +236,7 @@ export async function markNotificationRead(
     data: { readAt: new Date() },
     select: {
       id: true,
+      workspaceId: true,
       type: true,
       title: true,
       body: true,
@@ -161,21 +246,26 @@ export async function markNotificationRead(
       readAt: true,
       createdAt: true,
       actorId: true,
+      workspace: { select: { name: true } },
     },
   });
 
   return mapNotification(updated);
 }
 
-export async function markAllNotificationsRead(workspaceId: string, recipientId: string) {
-  await prisma.notification.updateMany({
-    where: {
-      workspaceId,
-      recipientId,
-      readAt: null,
-    },
-    data: { readAt: new Date() },
-  });
+export async function markAllNotificationsRead(recipientId: string) {
+  const memberWorkspaceIds = await getActiveMemberWorkspaceIds(recipientId);
+
+  if (memberWorkspaceIds.length > 0) {
+    await prisma.notification.updateMany({
+      where: {
+        recipientId,
+        workspaceId: { in: memberWorkspaceIds },
+        readAt: null,
+      },
+      data: { readAt: new Date() },
+    });
+  }
 
   return { ok: true as const };
 }
@@ -394,6 +484,32 @@ export async function notifyTaskAttachmentUploaded(params: {
     recipientId: params.actorId,
     title: "You uploaded an attachment",
     body: `${task.title}: ${params.fileName}`,
+  });
+}
+
+export async function notifyProjectMemberAdded(params: {
+  workspaceId: string;
+  projectId: string;
+  projectName: string;
+  memberUserId: string;
+  actorId: string;
+}) {
+  if (params.memberUserId === params.actorId) {
+    return;
+  }
+
+  const actorName = await getUserName(params.actorId);
+
+  await createNotification({
+    workspaceId: params.workspaceId,
+    actorId: params.actorId,
+    type: "PROJECT_MEMBER_ADDED",
+    entityType: "project",
+    entityId: params.projectId,
+    href: `/app/projects/${params.projectId}`,
+    recipientId: params.memberUserId,
+    title: "Added to project",
+    body: `${actorName} added you to ${params.projectName}`,
   });
 }
 

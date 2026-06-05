@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { AppShell } from "@/components/app/AppShell";
+import { EmptyState } from "@/components/app/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -127,68 +128,76 @@ function AssistantPage() {
             ) : isError ? (
               <ErrorState error={error} onRetry={() => void refetch()} />
             ) : data ? (
-              <>
-                <div id="overview">
-                  <AssistantBubble content={data.overview} />
-                </div>
-
-                <div id="highlights">
-                  <SectionBlock
-                    icon={CheckCircle2}
-                    title={t("ai.highlights")}
-                    tone="ok"
-                    items={data.highlights}
-                  />
-                </div>
-
-                <div id="risks">
-                  <SectionBlock
-                    icon={AlertTriangle}
-                    title={t("ai.risks")}
-                    tone="warn"
-                    items={data.risks}
-                  />
-                </div>
-
-                <div id="actions">
-                  <SectionBlock
-                    icon={ListChecks}
-                    title={t("ai.nextActions")}
-                    tone="info"
-                    items={data.recommendedNextActions}
-                    ordered
-                  />
-                </div>
-
-                <div id="standup">
-                  <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    <Megaphone className="size-3.5" /> {t("ai.standupSummary")}
-                    {data.standupSummary.trim() ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="ml-auto h-7 gap-1.5 text-xs font-medium normal-case tracking-normal"
-                        onClick={() => void copyStandupSummary(data.standupSummary, t)}
-                      >
-                        <Copy className="size-3.5" />
-                        {t("ai.copy")}
-                      </Button>
-                    ) : null}
+              data.metrics.totalProjects === 0 && data.metrics.totalTasks === 0 ? (
+                <EmptyState
+                  icon={Sparkles}
+                  title={t("ai.emptyWorkspaceTitle")}
+                  description={t("ai.emptyWorkspaceHint")}
+                />
+              ) : (
+                <>
+                  <div id="overview">
+                    <AssistantBubble content={data.overview} />
                   </div>
-                  <AssistantBubble
-                    content={data.standupSummary}
-                    emptyMessage={t("ai.standupEmpty")}
-                  />
-                </div>
 
-                <div className="lg:hidden">
-                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    {t("ai.metricsTitle")}
+                  <div id="highlights">
+                    <SectionBlock
+                      icon={CheckCircle2}
+                      title={t("ai.highlights")}
+                      tone="ok"
+                      items={data.highlights}
+                    />
                   </div>
-                  <MetricsPanel metrics={data.metrics} />
-                </div>
-              </>
+
+                  <div id="risks">
+                    <SectionBlock
+                      icon={AlertTriangle}
+                      title={t("ai.risks")}
+                      tone="warn"
+                      items={data.risks}
+                    />
+                  </div>
+
+                  <div id="actions">
+                    <SectionBlock
+                      icon={ListChecks}
+                      title={t("ai.nextActions")}
+                      tone="info"
+                      items={data.recommendedNextActions}
+                      ordered
+                    />
+                  </div>
+
+                  <div id="standup">
+                    <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      <Megaphone className="size-3.5" /> {t("ai.standupSummary")}
+                      {data.standupSummary.trim() ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="ml-auto h-7 gap-1.5 text-xs font-medium normal-case tracking-normal"
+                          onClick={() => void copyStandupSummary(data.standupSummary, t)}
+                        >
+                          <Copy className="size-3.5" />
+                          {t("ai.copy")}
+                        </Button>
+                      ) : null}
+                    </div>
+                    <AssistantBubble
+                      content={data.standupSummary}
+                      emptyMessage={t("ai.standupEmpty")}
+                    />
+                  </div>
+
+                  <div className="lg:hidden">
+                    <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {t("ai.metricsTitle")}
+                    </div>
+                    <MetricsPanel metrics={data.metrics} />
+                  </div>
+                </>
+              )
             ) : null}
           </div>
         </section>

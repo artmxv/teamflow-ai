@@ -300,6 +300,17 @@ export async function createTask(
     select: taskDetailSelect,
   });
 
+  for (const assigneeUserId of assigneeIds) {
+    void notifyTaskAssigned({
+      workspaceId,
+      taskId: task.id,
+      taskTitle: task.title,
+      projectId: input.projectId,
+      assigneeId: assigneeUserId,
+      actorId: userId,
+    });
+  }
+
   return mapTaskDetail(task);
 }
 

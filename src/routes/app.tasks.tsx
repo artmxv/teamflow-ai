@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import { type Task, type TaskStatus, type Priority } from "@/lib/mock-data";
+import { EmptyState } from "@/components/app/EmptyState";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
 import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
 import { Button } from "@/components/ui/button";
@@ -532,7 +533,7 @@ function TasksPage() {
           <ErrorState error={error} onRetry={() => void refetch()} />
         ) : filtered.length === 0 ? (
           isTrulyEmpty ? (
-            <EmptyState
+            <TasksEmptyState
               isSubmitting={createTaskMutation.isPending}
               onCreate={handleCreateTask}
               projectOptions={projectOptions}
@@ -736,7 +737,7 @@ function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => vo
   );
 }
 
-function EmptyState({
+function TasksEmptyState({
   isSubmitting,
   onCreate,
   projectOptions,
@@ -750,44 +751,42 @@ function EmptyState({
   const { t } = useI18n();
 
   return (
-    <div className="px-4 py-12 text-center sm:px-8">
-      <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-accent text-accent-foreground">
-        <ListTodo className="size-5" />
-      </div>
-      <h3 className="mt-4 text-base font-semibold">{t("tasks.emptyTitle")}</h3>
-      <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-        {hasAccessibleProjects ? t("tasks.emptyHint") : t("tasks.noAccessibleProjects")}
-      </p>
-      {hasAccessibleProjects ? (
-        <NewTaskDialog
-          isSubmitting={isSubmitting}
-          projectOptions={projectOptions}
-          onSubmit={onCreate}
-        >
-          <Button className="mt-5 bg-gradient-brand text-white shadow-glow hover:opacity-95">
-            <Plus className="size-4" /> {t("common.newTask")}
-          </Button>
-        </NewTaskDialog>
-      ) : null}
-    </div>
+    <EmptyState
+      className="border-0 bg-transparent shadow-none"
+      icon={ListTodo}
+      title={t("tasks.emptyTitle")}
+      description={hasAccessibleProjects ? t("tasks.emptyHint") : t("tasks.noAccessibleProjects")}
+      primaryAction={
+        hasAccessibleProjects ? (
+          <NewTaskDialog
+            isSubmitting={isSubmitting}
+            projectOptions={projectOptions}
+            onSubmit={onCreate}
+          >
+            <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+              <Plus className="size-4" /> {t("common.newTask")}
+            </Button>
+          </NewTaskDialog>
+        ) : undefined
+      }
+    />
   );
 }
 
 function NoResultsState({ onResetFilters }: { onResetFilters: () => void }) {
   const { t } = useI18n();
   return (
-    <div className="px-4 py-12 text-center sm:px-8">
-      <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-muted text-muted-foreground">
-        <Search className="size-5" />
-      </div>
-      <h3 className="mt-4 text-base font-semibold">{t("tasks.noMatchTitle")}</h3>
-      <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-        {t("tasks.noMatchHint")}
-      </p>
-      <Button variant="outline" onClick={onResetFilters} className="mt-5">
-        <RotateCcw className="size-4" /> {t("common.resetFilters")}
-      </Button>
-    </div>
+    <EmptyState
+      className="border-0 bg-transparent shadow-none"
+      icon={Search}
+      title={t("tasks.noMatchTitle")}
+      description={t("tasks.noMatchHint")}
+      primaryAction={
+        <Button variant="outline" onClick={onResetFilters}>
+          <RotateCcw className="size-4" /> {t("common.resetFilters")}
+        </Button>
+      }
+    />
   );
 }
 

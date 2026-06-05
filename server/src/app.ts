@@ -32,7 +32,12 @@ app.use(
   }),
 );
 app.use("/uploads", express.static(uploadsRoot));
-app.use(cors({ origin: env.CORS_ORIGIN }));
+app.use(
+  cors({
+    origin:
+      env.CORS_ORIGINS.length <= 1 ? (env.CORS_ORIGINS[0] ?? env.CORS_ORIGIN) : env.CORS_ORIGINS,
+  }),
+);
 app.use(express.json());
 
 if (env.NODE_ENV !== "production") {

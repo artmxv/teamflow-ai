@@ -15,7 +15,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ApiError, clearSelectedWorkspaceId, setSelectedWorkspaceId } from "@/lib/api/client";
+import { ApiError, setSelectedWorkspaceId } from "@/lib/api/client";
 import { deleteWorkspace } from "@/lib/api/workspaces";
 import { useI18n } from "@/lib/i18n";
 import { invalidateWorkspaceScopedQueries } from "@/lib/workspace-queries";
@@ -34,7 +34,6 @@ export function DeleteWorkspaceDialog({ workspaceId, children }: DeleteWorkspace
   const mutation = useMutation({
     mutationFn: () => deleteWorkspace(workspaceId),
     onSuccess: async (result) => {
-      clearSelectedWorkspaceId();
       if (result.fallbackWorkspace) {
         setSelectedWorkspaceId(result.fallbackWorkspace.id);
       }

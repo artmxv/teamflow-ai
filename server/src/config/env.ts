@@ -12,7 +12,15 @@ const envSchema = z.object({
 
 const parsed = envSchema.parse(process.env);
 
-/** Public frontend origin for invite links (defaults to CORS_ORIGIN). */
-export const appUrl = (parsed.APP_URL ?? parsed.CORS_ORIGIN).replace(/\/$/, "");
+/** Browser origins allowed by CORS (comma-separated). First entry is the default APP_URL fallback. */
+export const corsOrigins = parsed.CORS_ORIGIN.split(",")
+  .map((origin) => origin.trim().replace(/\/$/, ""))
+  .filter(Boolean);
 
-export const env = { ...parsed, APP_URL: appUrl };
+/** Public frontend origin for invite links (defaults to first CORS origin). */
+export const appUrl = (parsed.APP_URL ?? corsOrigins[0] ?? "http://localhost:8080").replace(
+  /\/$/,
+  "",
+);
+
+export const env = { ...parsed, APP_URL: appUrl, CORS_ORIGINS: corsOrigins };

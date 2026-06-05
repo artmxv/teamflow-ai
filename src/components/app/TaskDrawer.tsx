@@ -123,6 +123,7 @@ export function TaskDrawer({
   const [draftStatus, setDraftStatus] = useState<TaskStatus>("backlog");
   const [draftPriority, setDraftPriority] = useState<Priority>("medium");
   const [commentBody, setCommentBody] = useState("");
+  const [deleteTaskOpen, setDeleteTaskOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -136,6 +137,12 @@ export function TaskDrawer({
   useEffect(() => {
     setCommentBody("");
   }, [task?.id]);
+
+  useEffect(() => {
+    if (!task) {
+      setDeleteTaskOpen(false);
+    }
+  }, [task]);
 
   const commentsQuery = useQuery({
     queryKey: ["task-comments", task?.id],
@@ -269,317 +276,351 @@ export function TaskDrawer({
   }
 
   return (
-    <Sheet open={!!task} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="app-scrollbar w-full overflow-y-auto sm:max-w-2xl">
-        <SheetHeader className="space-y-1 border-b border-border pb-4">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="font-mono">{task.key}</span>
-            <span>·</span>
-            <span>{project?.name}</span>
-          </div>
-          <SheetTitle className="text-xl leading-snug">{task.title}</SheetTitle>
-          <SheetDescription className="sr-only">
-            {t("tasks.sheetDescription").replace("{key}", task.key)}
-          </SheetDescription>
-        </SheetHeader>
-
-        {canEditAssignees ? (
-          <section className="border-b border-border py-4">
-            <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              <UserIcon className="size-3.5" /> {t("tasks.assignees")}
+    <>
+      <Sheet open={!!task} onOpenChange={onOpenChange}>
+        <SheetContent side="right" className="app-scrollbar w-full overflow-y-auto sm:max-w-2xl">
+          <SheetHeader className="space-y-1 border-b border-border pb-4">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="font-mono">{task.key}</span>
+              <span>·</span>
+              <span>{project?.name}</span>
             </div>
-            <AssigneeMultiPicker
-              options={resolvedAssigneeOptions}
-              value={draftAssigneeIds}
-              disabled={isSaving}
-              isLoading={assigneeOptionsLoading}
-              onChange={setDraftAssigneeIds}
-            />
-          </section>
-        ) : null}
+            <SheetTitle className="text-xl leading-snug">{task.title}</SheetTitle>
+            <SheetDescription className="sr-only">
+              {t("tasks.sheetDescription").replace("{key}", task.key)}
+            </SheetDescription>
+          </SheetHeader>
 
-        <div className="grid gap-6 py-4 lg:grid-cols-[1fr_220px]">
-          <div className="min-w-0 space-y-6">
-            <section>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {t("projects.new.description")}
-              </h3>
-              <p className="text-sm leading-relaxed text-foreground/90">{task.description}</p>
-            </section>
-
-            <section className="rounded-2xl border border-border bg-gradient-to-br from-primary/5 to-transparent p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <Sparkles className="size-4 text-primary" />
-                  {t("tasks.aiAssist")}
-                </div>
-                <Button size="sm" variant="brand" onClick={() => setAiOpen(true)}>
-                  {t("tasks.taskSummary")}
-                </Button>
+          {canEditAssignees ? (
+            <section className="border-b border-border py-4">
+              <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <UserIcon className="size-3.5" /> {t("tasks.assignees")}
               </div>
-              {aiOpen && (
-                <div className="mt-3 space-y-3 text-sm">
-                  <div className="rounded-lg bg-card p-3 shadow-soft">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-primary">
-                      Summary
-                    </div>
-                    <p className="mt-1 text-foreground/90">
-                      This task involves implementing the requested feature, validating with QA, and
-                      updating the documentation. Two open dependencies were detected in linked PRs.
-                    </p>
+              <AssigneeMultiPicker
+                options={resolvedAssigneeOptions}
+                value={draftAssigneeIds}
+                disabled={isSaving}
+                isLoading={assigneeOptionsLoading}
+                onChange={setDraftAssigneeIds}
+              />
+            </section>
+          ) : null}
+
+          <div className="grid gap-6 py-4 lg:grid-cols-[1fr_220px]">
+            <div className="min-w-0 space-y-6">
+              <section>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t("projects.new.description")}
+                </h3>
+                <p className="text-sm leading-relaxed text-foreground/90">{task.description}</p>
+              </section>
+
+              <section className="rounded-2xl border border-border bg-gradient-to-br from-primary/5 to-transparent p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Sparkles className="size-4 text-primary" />
+                    {t("tasks.aiAssist")}
                   </div>
-                  <div className="rounded-lg bg-card p-3 shadow-soft">
-                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary">
-                      Generated checklist
-                    </div>
-                    <ul className="space-y-1.5">
-                      {[
-                        "Confirm spec with design",
-                        "Land scaffolding PR",
-                        "Wire up state & data",
-                        "Add unit & e2e tests",
-                        "Ship behind feature flag",
-                      ].map((c) => (
-                        <li key={c} className="flex items-start gap-2 text-sm">
-                          <span className="mt-0.5 grid size-4 place-items-center rounded border border-input">
-                            <Plus className="size-3 text-muted-foreground" />
-                          </span>
-                          {c}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                  <Button size="sm" variant="brand" onClick={() => setAiOpen(true)}>
+                    {t("tasks.taskSummary")}
+                  </Button>
                 </div>
-              )}
-            </section>
+                {aiOpen && (
+                  <div className="mt-3 space-y-3 text-sm">
+                    <div className="rounded-lg bg-card p-3 shadow-soft">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-primary">
+                        Summary
+                      </div>
+                      <p className="mt-1 text-foreground/90">
+                        This task involves implementing the requested feature, validating with QA,
+                        and updating the documentation. Two open dependencies were detected in
+                        linked PRs.
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-card p-3 shadow-soft">
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary">
+                        Generated checklist
+                      </div>
+                      <ul className="space-y-1.5">
+                        {[
+                          "Confirm spec with design",
+                          "Land scaffolding PR",
+                          "Wire up state & data",
+                          "Add unit & e2e tests",
+                          "Ship behind feature flag",
+                        ].map((c) => (
+                          <li key={c} className="flex items-start gap-2 text-sm">
+                            <span className="mt-0.5 grid size-4 place-items-center rounded border border-input">
+                              <Plus className="size-3 text-muted-foreground" />
+                            </span>
+                            {c}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </section>
 
-            <section>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {t("tasks.sectionChecklist")}
-              </h3>
-              <ul className="space-y-1.5">
-                {task.checklist.map((c) => (
-                  <li key={c.id} className="flex items-center gap-2 text-sm">
-                    <span
-                      className={cn(
-                        "grid size-5 place-items-center rounded-md border",
-                        c.done
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-input",
-                      )}
-                    >
-                      {c.done && <Check className="size-3" />}
-                    </span>
-                    <span className={cn(c.done && "text-muted-foreground line-through")}>
-                      {c.label}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
+              <section>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t("tasks.sectionChecklist")}
+                </h3>
+                <ul className="space-y-1.5">
+                  {task.checklist.map((c) => (
+                    <li key={c.id} className="flex items-center gap-2 text-sm">
+                      <span
+                        className={cn(
+                          "grid size-5 place-items-center rounded-md border",
+                          c.done
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-input",
+                        )}
+                      >
+                        {c.done && <Check className="size-3" />}
+                      </span>
+                      <span className={cn(c.done && "text-muted-foreground line-through")}>
+                        {c.label}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
 
-            <TaskAttachmentsSection
-              attachments={attachmentsQuery.data ?? []}
-              isLoading={attachmentsQuery.isLoading}
-              isError={attachmentsQuery.isError}
-              isUploading={uploadAttachmentMutation.isPending}
-              isDeletingId={
-                deleteAttachmentMutation.isPending
-                  ? (deleteAttachmentMutation.variables ?? null)
-                  : null
-              }
-              fileInputRef={fileInputRef}
-              onPickFile={() => fileInputRef.current?.click()}
-              onFileSelected={(file) => {
-                if (uploadAttachmentMutation.isPending) return;
-                uploadAttachmentMutation.mutate(file);
-              }}
-              onOpen={(attachment) => {
-                openTaskAttachment(attachment).catch(() => {
-                  toast.error("Could not open attachment");
-                });
-              }}
-              onDownload={(attachment) => {
-                downloadTaskAttachmentFile(attachment).catch(() => {
-                  toast.error("Could not download attachment");
-                });
-              }}
-              onDelete={(attachmentId) => {
-                if (deleteAttachmentMutation.isPending) {
-                  return Promise.reject(new Error("Delete already in progress"));
+              <TaskAttachmentsSection
+                attachments={attachmentsQuery.data ?? []}
+                isLoading={attachmentsQuery.isLoading}
+                isError={attachmentsQuery.isError}
+                isUploading={uploadAttachmentMutation.isPending}
+                isDeletingId={
+                  deleteAttachmentMutation.isPending
+                    ? (deleteAttachmentMutation.variables ?? null)
+                    : null
                 }
-                return deleteAttachmentMutation.mutateAsync(attachmentId);
-              }}
-            />
-
-            <TaskCommentsSection
-              comments={commentsQuery.data ?? []}
-              currentUserId={currentUserId}
-              isLoading={commentsQuery.isLoading}
-              isError={commentsQuery.isError}
-              commentBody={commentBody}
-              onCommentBodyChange={setCommentBody}
-              isSubmitting={createCommentMutation.isPending}
-              onSubmit={() => {
-                const trimmed = commentBody.trim();
-                if (!trimmed || createCommentMutation.isPending) return;
-                createCommentMutation.mutate(trimmed);
-              }}
-              onUpdateComment={(commentId, body) => {
-                if (updateCommentMutation.isPending) {
-                  return Promise.reject(new Error("Update already in progress"));
-                }
-                return updateCommentMutation.mutateAsync({ commentId, body });
-              }}
-              onDeleteComment={(commentId) => {
-                if (deleteCommentMutation.isPending) {
-                  return Promise.reject(new Error("Delete already in progress"));
-                }
-                return deleteCommentMutation.mutateAsync(commentId);
-              }}
-              updatingCommentId={
-                updateCommentMutation.isPending
-                  ? (updateCommentMutation.variables?.commentId ?? null)
-                  : null
-              }
-              deletingCommentId={
-                deleteCommentMutation.isPending ? (deleteCommentMutation.variables ?? null) : null
-              }
-            />
-
-            <section>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {t("common.activity")}
-              </h3>
-              <ol className="space-y-2 border-l border-border pl-4">
-                {task.activity.map((a) => (
-                  <li key={a.id} className="relative text-sm">
-                    <span className="absolute -left-[21px] top-1.5 size-2 rounded-full bg-primary" />
-                    <div>{a.text}</div>
-                    <div className="text-xs text-muted-foreground">{a.at}</div>
-                  </li>
-                ))}
-              </ol>
-            </section>
-          </div>
-
-          <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
-            <Field icon={CircleDot} label="Status">
-              {canEditTask ? (
-                <Select
-                  value={draftStatus}
-                  disabled={isSaving}
-                  onValueChange={(value) => setDraftStatus(value as TaskStatus)}
-                >
-                  <SelectTrigger className="h-9 w-full">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statusColumns.map((column) => (
-                      <SelectItem key={column.key} value={column.key}>
-                        {taskStatusLabel(column.key, t)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Badge variant="secondary" className="border-0">
-                  {statusLabel}
-                </Badge>
-              )}
-            </Field>
-            <Field icon={Flag} label="Priority">
-              {canEditTask ? (
-                <Select
-                  value={draftPriority}
-                  disabled={isSaving}
-                  onValueChange={(value) => setDraftPriority(value as Priority)}
-                >
-                  <SelectTrigger className="h-9 w-full">
-                    <SelectValue placeholder="Select priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(
-                      Object.entries(priorityMeta) as [Priority, (typeof priorityMeta)[Priority]][]
-                    ).map(([key]) => (
-                      <SelectItem key={key} value={key}>
-                        {priorityLabel(key, t)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Badge variant="secondary" className={prio.className + " border-0"}>
-                  {priorityLabel(task.priority, t)}
-                </Badge>
-              )}
-            </Field>
-            {!canEditAssignees ? (
-              <Field icon={UserIcon} label={t("tasks.assignees")}>
-                <AssigneeAvatars assignees={assignees} showUnassignedLabel />
-              </Field>
-            ) : null}
-            <Field icon={Calendar} label="Due date">
-              {canEditTask ? (
-                <Input
-                  type="date"
-                  className={cn("date-input-native h-9")}
-                  disabled={isSaving}
-                  value={draftDueDate ?? ""}
-                  onChange={(event) => {
-                    const next = event.target.value;
-                    setDraftDueDate(next === "" ? null : next);
-                  }}
-                />
-              ) : (
-                <span className="text-sm">{task.dueDate ?? "—"}</span>
-              )}
-            </Field>
-            <Field icon={Flag} label="Labels">
-              <div className="flex flex-wrap gap-1">
-                {task.labels.map((l) => (
-                  <span
-                    key={l}
-                    className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-medium"
-                  >
-                    {l}
-                  </span>
-                ))}
-              </div>
-            </Field>
-            {canEditTask && (
-              <Button
-                type="button"
-                size="sm"
-                variant="brand"
-                className="w-full"
-                disabled={!hasChanges || isSaving}
-                onClick={handleSaveChanges}
-              >
-                {isSaving ? t("settings.saving") : t("common.saveChanges")}
-              </Button>
-            )}
-            {onDelete && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                disabled={isDeleting}
-                onClick={() => {
-                  if (window.confirm(t("tasks.deleteTaskConfirm").replace("{title}", task.title))) {
-                    onDelete(task.id);
-                  }
+                fileInputRef={fileInputRef}
+                onPickFile={() => fileInputRef.current?.click()}
+                onFileSelected={(file) => {
+                  if (uploadAttachmentMutation.isPending) return;
+                  uploadAttachmentMutation.mutate(file);
                 }}
-              >
-                <Trash2 className="size-4" />
-                {isDeleting ? t("tasks.deleting") : t("tasks.deleteTask")}
-              </Button>
-            )}
-          </aside>
-        </div>
-      </SheetContent>
-    </Sheet>
+                onOpen={(attachment) => {
+                  openTaskAttachment(attachment).catch(() => {
+                    toast.error("Could not open attachment");
+                  });
+                }}
+                onDownload={(attachment) => {
+                  downloadTaskAttachmentFile(attachment).catch(() => {
+                    toast.error("Could not download attachment");
+                  });
+                }}
+                onDelete={(attachmentId) => {
+                  if (deleteAttachmentMutation.isPending) {
+                    return Promise.reject(new Error("Delete already in progress"));
+                  }
+                  return deleteAttachmentMutation.mutateAsync(attachmentId);
+                }}
+              />
+
+              <TaskCommentsSection
+                comments={commentsQuery.data ?? []}
+                currentUserId={currentUserId}
+                isLoading={commentsQuery.isLoading}
+                isError={commentsQuery.isError}
+                commentBody={commentBody}
+                onCommentBodyChange={setCommentBody}
+                isSubmitting={createCommentMutation.isPending}
+                onSubmit={() => {
+                  const trimmed = commentBody.trim();
+                  if (!trimmed || createCommentMutation.isPending) return;
+                  createCommentMutation.mutate(trimmed);
+                }}
+                onUpdateComment={(commentId, body) => {
+                  if (updateCommentMutation.isPending) {
+                    return Promise.reject(new Error("Update already in progress"));
+                  }
+                  return updateCommentMutation.mutateAsync({ commentId, body });
+                }}
+                onDeleteComment={(commentId) => {
+                  if (deleteCommentMutation.isPending) {
+                    return Promise.reject(new Error("Delete already in progress"));
+                  }
+                  return deleteCommentMutation.mutateAsync(commentId);
+                }}
+                updatingCommentId={
+                  updateCommentMutation.isPending
+                    ? (updateCommentMutation.variables?.commentId ?? null)
+                    : null
+                }
+                deletingCommentId={
+                  deleteCommentMutation.isPending ? (deleteCommentMutation.variables ?? null) : null
+                }
+              />
+
+              <section>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t("common.activity")}
+                </h3>
+                <ol className="space-y-2 border-l border-border pl-4">
+                  {task.activity.map((a) => (
+                    <li key={a.id} className="relative text-sm">
+                      <span className="absolute -left-[21px] top-1.5 size-2 rounded-full bg-primary" />
+                      <div>{a.text}</div>
+                      <div className="text-xs text-muted-foreground">{a.at}</div>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            </div>
+
+            <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+              <Field icon={CircleDot} label="Status">
+                {canEditTask ? (
+                  <Select
+                    value={draftStatus}
+                    disabled={isSaving}
+                    onValueChange={(value) => setDraftStatus(value as TaskStatus)}
+                  >
+                    <SelectTrigger className="h-9 w-full">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statusColumns.map((column) => (
+                        <SelectItem key={column.key} value={column.key}>
+                          {taskStatusLabel(column.key, t)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Badge variant="secondary" className="border-0">
+                    {statusLabel}
+                  </Badge>
+                )}
+              </Field>
+              <Field icon={Flag} label="Priority">
+                {canEditTask ? (
+                  <Select
+                    value={draftPriority}
+                    disabled={isSaving}
+                    onValueChange={(value) => setDraftPriority(value as Priority)}
+                  >
+                    <SelectTrigger className="h-9 w-full">
+                      <SelectValue placeholder="Select priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(
+                        Object.entries(priorityMeta) as [
+                          Priority,
+                          (typeof priorityMeta)[Priority],
+                        ][]
+                      ).map(([key]) => (
+                        <SelectItem key={key} value={key}>
+                          {priorityLabel(key, t)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Badge variant="secondary" className={prio.className + " border-0"}>
+                    {priorityLabel(task.priority, t)}
+                  </Badge>
+                )}
+              </Field>
+              {!canEditAssignees ? (
+                <Field icon={UserIcon} label={t("tasks.assignees")}>
+                  <AssigneeAvatars assignees={assignees} showUnassignedLabel />
+                </Field>
+              ) : null}
+              <Field icon={Calendar} label="Due date">
+                {canEditTask ? (
+                  <Input
+                    type="date"
+                    className={cn("date-input-native h-9")}
+                    disabled={isSaving}
+                    value={draftDueDate ?? ""}
+                    onChange={(event) => {
+                      const next = event.target.value;
+                      setDraftDueDate(next === "" ? null : next);
+                    }}
+                  />
+                ) : (
+                  <span className="text-sm">{task.dueDate ?? "—"}</span>
+                )}
+              </Field>
+              <Field icon={Flag} label="Labels">
+                <div className="flex flex-wrap gap-1">
+                  {task.labels.map((l) => (
+                    <span
+                      key={l}
+                      className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-medium"
+                    >
+                      {l}
+                    </span>
+                  ))}
+                </div>
+              </Field>
+              {canEditTask && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="brand"
+                  className="w-full"
+                  disabled={!hasChanges || isSaving}
+                  onClick={handleSaveChanges}
+                >
+                  {isSaving ? t("settings.saving") : t("common.saveChanges")}
+                </Button>
+              )}
+              {onDelete && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  disabled={isDeleting}
+                  onClick={() => setDeleteTaskOpen(true)}
+                >
+                  <Trash2 className="size-4" />
+                  {isDeleting ? t("tasks.deleting") : t("tasks.deleteTask")}
+                </Button>
+              )}
+            </aside>
+          </div>
+        </SheetContent>
+      </Sheet>
+      <AlertDialog
+        open={deleteTaskOpen}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) {
+            setDeleteTaskOpen(false);
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-sm gap-4">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("tasks.deleteTaskTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("tasks.deleteTaskDescription")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>{t("common.cancel")}</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              className="gap-2"
+              disabled={isDeleting}
+              onClick={() => {
+                if (task) {
+                  onDelete?.(task.id);
+                }
+              }}
+            >
+              <Trash2 className="size-4" />
+              {isDeleting ? t("tasks.deleting") : t("tasks.deleteTask")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -627,6 +668,7 @@ function TaskCommentsSection({
   updatingCommentId: string | null;
   deletingCommentId: string | null;
 }) {
+  const { t } = useI18n();
   const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
   const isDeletingSelected = commentToDelete != null && deletingCommentId === commentToDelete;
 
@@ -658,9 +700,10 @@ function TaskCommentsSection({
             Could not load comments. Try closing and reopening the task.
           </p>
         ) : comments.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-            No comments yet. Be the first to leave a note.
-          </p>
+          <div className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">{t("comments.emptyTitle")}</p>
+            <p className="mt-1">{t("comments.emptyHint")}</p>
+          </div>
         ) : (
           comments.map((comment) => (
             <TaskCommentRow

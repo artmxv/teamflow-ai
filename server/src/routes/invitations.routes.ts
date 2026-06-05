@@ -9,5 +9,6 @@ import { requireAuth } from "../middleware/require-auth.middleware.js";
 
 export const invitationsRouter = Router();
 
+// Token-based routes: resolve invitation by token only; ignore X-Workspace-Id.
 invitationsRouter.get("/:token", optionalAuth, getInvitationPreviewController);
 invitationsRouter.post("/:token/accept", requireAuth, acceptInvitationController);

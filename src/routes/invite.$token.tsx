@@ -1,13 +1,22 @@
+import { useEffect } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  ApiError,
+  clearActiveWorkspaceId,
+  preserveWorkspaceSelectionForUser,
+  setSelectedWorkspaceId,
+} from "@/lib/api/client";
 import { acceptWorkspaceInvitation, fetchInvitationPreview } from "@/lib/api/workspace-invitations";
-import { getAuthToken } from "@/lib/auth/token";
+import { resetWorkspaceValidationSession } from "@/lib/auth/auth-cache";
+import { getAuthToken, clearAuthToken } from "@/lib/auth/token";
 import { useCurrentUser, workspaceRoleLabel } from "@/lib/auth/use-current-user";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, type TKey } from "@/lib/i18n";
+import { invalidateWorkspaceScopedQueries } from "@/lib/workspace-queries";
 
 export const Route = createFileRoute("/invite/$token")({
   head: () => ({ meta: [{ title: "Accept invitation — TeamFlow AI" }] }),
@@ -19,6 +28,7 @@ function AcceptInvitePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { token } = Route.useParams();
+  const returnPath = `/invite/${token}`;
   const hasToken = !!getAuthToken();
   const { data: me, isLoading: meLoading } = useCurrentUser();
 
@@ -28,17 +38,52 @@ function AcceptInvitePage() {
     retry: false,
   });
 
+  useEffect(() => {
+    if (!import.meta.env.DEV) {
+      return;
+    }
+    if (previewQuery.isError) {
+      const error = previewQuery.error;
+      console.warn("[invite] preview failed", {
+        token,
+        status: error instanceof ApiError ? error.status : undefined,
+        code: error instanceof ApiError ? error.code : undefined,
+        reason: error instanceof Error ? error.message : "unknown",
+      });
+    }
+  }, [previewQuery.isError, previewQuery.error, token]);
+
   const acceptMutation = useMutation({
     mutationFn: () => acceptWorkspaceInvitation(token),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+    onSuccess: async (result) => {
+      setSelectedWorkspaceId(result.workspaceId);
+      await invalidateWorkspaceScopedQueries(queryClient);
       toast.success(t("invite.accepted"));
       void router.navigate({ to: "/app/dashboard" });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : t("invite.invalidOrExpired"));
+      if (import.meta.env.DEV) {
+        console.warn("[invite] accept failed", {
+          token,
+          status: error instanceof ApiError ? error.status : undefined,
+          code: error instanceof ApiError ? error.code : undefined,
+          reason: error instanceof Error ? error.message : "unknown",
+        });
+      }
+      toast.error(mapInviteError(error, t, "invite.acceptFailed"));
     },
   });
+
+  const handleSwitchAccount = () => {
+    if (me?.user) {
+      preserveWorkspaceSelectionForUser(me.user.id, me.user.email);
+    }
+    clearAuthToken();
+    clearActiveWorkspaceId();
+    resetWorkspaceValidationSession();
+    void queryClient.removeQueries({ queryKey: ["auth"] });
+    void router.navigate({ to: "/signin", search: { redirect: returnPath } });
+  };
 
   const preview = previewQuery.data;
 
@@ -52,9 +97,14 @@ function AcceptInvitePage() {
 
   if (previewQuery.isError || !preview) {
     return (
-      <AuthShell title={t("invite.acceptInvitation")} subtitle={t("invite.invalidOrExpired")}>
+      <AuthShell
+        title={t("invite.acceptInvitation")}
+        subtitle={mapInviteError(previewQuery.error, t, "invite.noLongerAvailable")}
+      >
         <Button asChild variant="outline" className="w-full">
-          <Link to="/signin">{t("nav.signin")}</Link>
+          <Link to="/signin" search={{ redirect: returnPath }}>
+            {t("nav.signin")}
+          </Link>
         </Button>
       </AuthShell>
     );
@@ -62,7 +112,7 @@ function AcceptInvitePage() {
 
   if (!preview.canAccept || preview.isExpired) {
     return (
-      <AuthShell title={t("invite.acceptInvitation")} subtitle={t("invite.invalidOrExpired")}>
+      <AuthShell title={t("invite.acceptInvitation")} subtitle={t("invite.noLongerAvailable")}>
         <InviteSummary preview={preview} t={t} />
       </AuthShell>
     );
@@ -84,18 +134,27 @@ function AcceptInvitePage() {
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">{t("invite.signInToAccept")}</p>
             <Button asChild className="w-full bg-gradient-brand text-white">
-              <Link to="/signin">{t("nav.signin")}</Link>
+              <Link to="/signin" search={{ redirect: returnPath }}>
+                {t("nav.signin")}
+              </Link>
             </Button>
             <Button asChild variant="outline" className="w-full">
-              <Link to="/signup">{t("invite.createAccount")}</Link>
+              <Link to="/signup" search={{ redirect: returnPath }}>
+                {t("invite.createAccount")}
+              </Link>
             </Button>
           </div>
         )}
 
         {wrongEmail && (
-          <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-            {t("invite.wrongEmail").replace("{email}", preview.email)}
-          </p>
+          <div className="space-y-2">
+            <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+              {t("invite.wrongEmail")}
+            </p>
+            <Button variant="outline" className="w-full" onClick={handleSwitchAccount}>
+              {t("invite.switchAccount")}
+            </Button>
+          </div>
         )}
 
         {signedIn && emailMatches && (
@@ -110,6 +169,35 @@ function AcceptInvitePage() {
       </div>
     </AuthShell>
   );
+}
+
+const INVITE_ERROR_KEYS: Record<string, TKey> = {
+  "Sign in with the email address this invitation was sent to.": "invite.wrongEmail",
+  "This invitation is no longer available.": "invite.noLongerAvailable",
+  "Sign in with the invited email address to accept this invitation": "invite.wrongEmail",
+  "This invitation is invalid or expired": "invite.noLongerAvailable",
+};
+
+function mapInviteError(error: unknown, t: (key: TKey) => string, fallback: TKey): string {
+  if (error instanceof ApiError) {
+    if (error.code === "INVITATION_EMAIL_MISMATCH") {
+      return t("invite.wrongEmail");
+    }
+    if (error.code === "INVITATION_NO_LONGER_AVAILABLE") {
+      return t("invite.noLongerAvailable");
+    }
+    const key = INVITE_ERROR_KEYS[error.message];
+    if (key) {
+      return t(key);
+    }
+  }
+  if (error instanceof Error) {
+    const key = INVITE_ERROR_KEYS[error.message];
+    if (key) {
+      return t(key);
+    }
+  }
+  return t(fallback);
 }
 
 function InviteSummary({

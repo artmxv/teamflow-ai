@@ -276,6 +276,61 @@ export async function revokeWorkspaceInvitation(
   return toInvitationDto(revoked);
 }
 
+export async function listPendingInvitationsForUser(
+  userId: string,
+  email: string,
+): Promise<
+  Array<{
+    id: string;
+    token: string;
+    role: WorkspaceRole;
+    createdAt: Date;
+    workspaceId: string;
+    workspaceName: string;
+  }>
+> {
+  const normalized = normalizeEmail(email);
+  if (!normalized) {
+    return [];
+  }
+
+  const [invites, activeMemberships] = await Promise.all([
+    prisma.workspaceInvitation.findMany({
+      where: {
+        email: normalized,
+        status: "PENDING",
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        token: true,
+        role: true,
+        createdAt: true,
+        workspaceId: true,
+        workspace: { select: { name: true } },
+      },
+    }),
+    prisma.workspaceMember.findMany({
+      where: { userId, status: "ACTIVE" },
+      select: { workspaceId: true },
+    }),
+  ]);
+
+  const memberWorkspaceIds = new Set(activeMemberships.map((membership) => membership.workspaceId));
+
+  return invites
+    .filter((invite) => !memberWorkspaceIds.has(invite.workspaceId))
+    .map((invite) => ({
+      id: invite.id,
+      token: invite.token,
+      role: invite.role,
+      createdAt: invite.createdAt,
+      workspaceId: invite.workspaceId,
+      workspaceName: invite.workspace.name,
+    }));
+}
+
 export async function getInvitationByToken(
   token: string,
   currentUser?: Pick<PublicUser, "email"> | null,
@@ -286,16 +341,16 @@ export async function getInvitationByToken(
   });
 
   if (!invite) {
-    throw new AuthError("This invitation is invalid or expired", 404);
+    throw new AuthError(
+      "This invitation is no longer available.",
+      404,
+      "INVITATION_NO_LONGER_AVAILABLE",
+    );
   }
 
   const resolved = await markExpiredIfNeeded(invite);
-
-  if (resolved.status === "REVOKED" || resolved.status === "ACCEPTED") {
-    throw new AuthError("This invitation is invalid or expired", 404);
-  }
-
   const expired = isInviteExpired(resolved);
+  const unavailable = resolved.status === "REVOKED" || resolved.status === "ACCEPTED";
   const currentEmail = currentUser?.email ? normalizeEmail(currentUser.email) : null;
 
   return {
@@ -305,7 +360,7 @@ export async function getInvitationByToken(
     role: resolved.role,
     status: resolved.status,
     expiresAt: resolved.expiresAt.toISOString(),
-    isExpired: expired,
+    isExpired: expired || unavailable,
     canAccept: resolved.status === "PENDING" && !expired,
     emailMatchesCurrentUser: currentEmail === null ? null : currentEmail === resolved.email,
   };
@@ -323,18 +378,30 @@ export async function acceptWorkspaceInvitation(
   });
 
   if (!invite) {
-    throw new AuthError("This invitation is invalid or expired", 404);
+    throw new AuthError(
+      "This invitation is no longer available.",
+      404,
+      "INVITATION_NO_LONGER_AVAILABLE",
+    );
   }
 
   const resolved = await markExpiredIfNeeded(invite);
 
   if (resolved.status !== "PENDING" || isInviteExpired(resolved)) {
-    throw new AuthError("This invitation is invalid or expired", 404);
+    throw new AuthError(
+      "This invitation is no longer available.",
+      404,
+      "INVITATION_NO_LONGER_AVAILABLE",
+    );
   }
 
   const userEmail = normalizeEmail(currentUser.email);
   if (userEmail !== resolved.email) {
-    throw new AuthError("Sign in with the invited email address to accept this invitation", 403);
+    throw new AuthError(
+      "Sign in with the email address this invitation was sent to.",
+      403,
+      "INVITATION_EMAIL_MISMATCH",
+    );
   }
 
   const existingMembership = await prisma.workspaceMember.findFirst({
