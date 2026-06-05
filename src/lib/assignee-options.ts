@@ -6,6 +6,7 @@ export type AssigneeOption = {
   id: string;
   name: string;
   avatar: string;
+  avatarUrl?: string | null;
   email?: string;
 };
 
@@ -22,13 +23,26 @@ function toOption(assignee: {
   id: string;
   name: string;
   email?: string;
-  avatar: string | null;
+  avatar?: string | null;
+  avatarUrl?: string | null;
 }): AssigneeOption {
+  const initials = assignee.avatar?.trim() || initialsFromName(assignee.name);
   return {
     id: assignee.id,
     name: assignee.name,
     email: assignee.email,
-    avatar: assignee.avatar ?? initialsFromName(assignee.name),
+    avatar: initials,
+    avatarUrl: assignee.avatarUrl ?? null,
+  };
+}
+
+function mergeAssigneeOption(existing: AssigneeOption, next: AssigneeOption): AssigneeOption {
+  return {
+    id: next.id,
+    name: next.name || existing.name,
+    email: next.email ?? existing.email,
+    avatar: next.avatar || existing.avatar,
+    avatarUrl: next.avatarUrl ?? existing.avatarUrl ?? null,
   };
 }
 
@@ -64,7 +78,8 @@ type AssigneeUserLike = {
   id: string;
   name: string;
   email?: string;
-  avatar: string | null;
+  avatar?: string | null;
+  avatarUrl?: string | null;
 };
 
 function buildAssigneeOptionsFromUsers(users: AssigneeUserLike[]): AssigneeOption[] {
@@ -122,11 +137,38 @@ export function mergeAssigneeOptions(
   for (const source of sources) {
     if (!source) continue;
     for (const option of source) {
-      byId.set(option.id, option);
+      const existing = byId.get(option.id);
+      byId.set(option.id, existing ? mergeAssigneeOption(existing, option) : option);
     }
   }
 
   return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Fill missing avatarUrl from task assignees, auth user, or member lists. */
+export function enrichAssigneeOptionsWithAvatars(
+  options: AssigneeOption[],
+  ...sources: (AssigneeUserLike[] | undefined)[]
+): AssigneeOption[] {
+  const avatarById = new Map<string, string | null>();
+
+  for (const source of sources) {
+    if (!source) continue;
+    for (const user of source) {
+      if (user.avatarUrl) {
+        avatarById.set(user.id, user.avatarUrl);
+      }
+    }
+  }
+
+  if (avatarById.size === 0) {
+    return options;
+  }
+
+  return options.map((option) => ({
+    ...option,
+    avatarUrl: option.avatarUrl ?? avatarById.get(option.id) ?? null,
+  }));
 }
 
 export function resolveTaskAssignees(apiTasks: TaskApiItem[], taskId: string): AssigneeOption[] {

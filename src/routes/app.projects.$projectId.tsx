@@ -26,7 +26,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Avatar } from "@/components/app/Avatar";
+import { UserAvatar } from "@/components/app/UserAvatar";
 import { EmptyState } from "@/components/app/EmptyState";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
 import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
@@ -35,6 +35,11 @@ import { projectApiStatusLabel, projectStatusLabel, useI18n, type TKey } from "@
 import { resolveTaskAssignees } from "@/lib/assignee-options";
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
 import { resolveProjectGradient } from "@/lib/project-color";
+import {
+  displayProjectDescription,
+  displayProjectName,
+  displayTaskTitle,
+} from "@/lib/starter-content";
 import {
   deleteProject,
   fetchProjects,
@@ -158,7 +163,7 @@ const taskPriorityTone: Record<TaskApiPriority, string> = {
 };
 
 function ProjectDetailPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { data: me } = useCurrentUser();
   const canManageProjects = isWorkspaceManager(me?.workspace?.role);
   const { projectId } = Route.useParams();
@@ -261,6 +266,7 @@ function ProjectDetailPage() {
     }: {
       id: string;
       input: {
+        title: string;
         assigneeIds: string[];
         dueDate: string | null;
         status: TaskApiStatus;
@@ -311,7 +317,11 @@ function ProjectDetailPage() {
           </Button>
           <div className="min-w-0">
             <h1 className="truncate text-2xl font-semibold tracking-tight">
-              {isLoading ? t("projects.detail.loading") : (project?.name ?? t("projects.projects"))}
+              {isLoading
+                ? t("projects.detail.loading")
+                : project
+                  ? displayProjectName(project.name, lang)
+                  : t("projects.projects")}
             </h1>
             <p className="mt-0.5 text-sm text-muted-foreground">
               {isLoading ? t("projects.detail.fetching") : t("projects.detail.headerSubtitle")}
@@ -331,7 +341,7 @@ function ProjectDetailPage() {
               }}
             />
             <DeleteProjectDialog
-              projectName={project.name}
+              projectName={displayProjectName(project.name, lang)}
               isSubmitting={deleteProjectMutation.isPending}
               onConfirm={async () => {
                 await deleteProjectMutation.mutateAsync(project.id);
@@ -367,11 +377,12 @@ function ProjectDetailPage() {
       <TaskDrawer
         task={selectedTask}
         assignees={selectedAssignees}
-        onSaveChanges={({ assigneeIds, dueDate, status, priority }) => {
+        onSaveChanges={({ title, assigneeIds, dueDate, status, priority }) => {
           if (!selectedTask || updateAssigneeMutation.isPending) return;
           updateAssigneeMutation.mutate({
             id: selectedTask.id,
             input: {
+              title,
               assigneeIds,
               dueDate,
               status: taskStatusToApi[status],
@@ -402,17 +413,17 @@ function EditProjectDialog({
     dueDate: string | null;
   }) => Promise<void>;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [open, setOpen] = useState(false);
 
   const initial = useMemo(
     () => ({
-      name: project.name,
-      description: project.description ?? "",
+      name: displayProjectName(project.name, lang),
+      description: displayProjectDescription(project.description ?? "", lang),
       status: project.status,
       dueDate: project.dueDate ? project.dueDate.slice(0, 10) : "",
     }),
-    [project.description, project.dueDate, project.name, project.status],
+    [lang, project.description, project.dueDate, project.name, project.status],
   );
 
   const [name, setName] = useState(initial.name);
@@ -455,30 +466,30 @@ function EditProjectDialog({
           }}
         >
           <div className="space-y-1.5">
-            <Label>Name</Label>
+            <Label>{t("projects.form.name")}</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Project name"
+              placeholder={t("projects.new.projectName")}
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Description</Label>
+            <Label>{t("projects.form.description")}</Label>
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What is this project about?"
+              placeholder={t("projects.new.description")}
             />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Status</Label>
+              <Label>{t("projects.detail.status")}</Label>
               <Select
                 value={status}
                 onValueChange={(value) => setStatus(value as ProjectApiStatus)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
+                  <SelectValue placeholder={t("projects.detail.status")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="PLANNING">{projectApiStatusLabel("PLANNING", t)}</SelectItem>
@@ -489,7 +500,7 @@ function EditProjectDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Due date</Label>
+              <Label>{t("projects.detail.dueDate")}</Label>
               <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
             </div>
           </div>
@@ -500,7 +511,7 @@ function EditProjectDialog({
               onClick={() => setOpen(false)}
               disabled={isSubmitting}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               type="submit"
@@ -582,7 +593,7 @@ function ProjectDetails({
   onOpenTask: (task: TaskApiItem) => void;
   canManageMembers: boolean;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const statusKey = apiStatusMap[project.status];
   const statusMeta = projectStatusMeta[statusKey];
   const statusLabel = projectStatusLabel(statusKey, t);
@@ -590,6 +601,10 @@ function ProjectDetails({
   const progress = calculateTaskProgress(projectTasks);
   const colorGradient = resolveProjectGradient(project);
   const sortedTasks = useMemo(() => sortProjectTasks(projectTasks), [projectTasks]);
+  const localizedProjectName = displayProjectName(project.name, lang);
+  const localizedProjectDescription = project.description?.trim()
+    ? displayProjectDescription(project.description, lang)
+    : null;
 
   return (
     <div className="space-y-4">
@@ -600,12 +615,10 @@ function ProjectDetails({
               <div className="min-w-0">
                 <div className={"h-2 w-16 rounded-full bg-gradient-to-r " + colorGradient} />
                 <h2 className="mt-4 truncate text-xl font-semibold tracking-tight">
-                  {project.name}
+                  {localizedProjectName}
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {project.description?.trim()
-                    ? project.description
-                    : t("projects.detail.noDescription")}
+                  {localizedProjectDescription ?? t("projects.detail.noDescription")}
                 </p>
               </div>
               <Badge variant="secondary" className={statusMeta.className + " border-0 shrink-0"}>
@@ -628,7 +641,9 @@ function ProjectDetails({
                 value={
                   <span className="inline-flex items-center gap-1">
                     <ListTodo className="size-3.5 text-muted-foreground" />
-                    {progress.done} done · {progress.total} total
+                    {t("projects.detail.tasksDoneTotal")
+                      .replace("{done}", String(progress.done))
+                      .replace("{total}", String(progress.total))}
                   </span>
                 }
               />
@@ -729,7 +744,9 @@ function ProjectDetails({
                           <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                             {task.key}
                           </span>
-                          <span className="truncate text-sm font-medium">{task.title}</span>
+                          <span className="truncate text-sm font-medium">
+                            {displayTaskTitle(task.title, lang)}
+                          </span>
                         </div>
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           <Badge
@@ -760,7 +777,8 @@ function ProjectDetails({
                                   id: assignee.id,
                                   name: assignee.name,
                                   email: assignee.email,
-                                  avatar: assignee.avatar ?? initialsFromName(assignee.name),
+                                  avatar: initialsFromName(assignee.name),
+                                  avatarUrl: assignee.avatarUrl ?? null,
                                 }))
                               : []
                           }
@@ -860,6 +878,76 @@ function ProjectMembersCard({
   );
 }
 
+function AddProjectMemberDialog({
+  open,
+  onOpenChange,
+  availableMembers,
+  isLoadingAvailable,
+  isAdding,
+  onAddMember,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  availableMembers: AvailableProjectMember[];
+  isLoadingAvailable: boolean;
+  isAdding: boolean;
+  onAddMember: (userId: string) => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm gap-0 p-0">
+        <DialogHeader className="border-b border-border px-4 py-3">
+          <DialogTitle className="text-base">{t("projects.detail.addMemberTitle")}</DialogTitle>
+          <DialogDescription className="text-xs">
+            {t("projects.detail.addMemberDesc")}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="max-h-72 overflow-y-auto p-2">
+          {isLoadingAvailable ? (
+            <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+              {t("common.loading")}
+            </p>
+          ) : availableMembers.length === 0 ? (
+            <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+              {t("projects.detail.allMembersAssigned")}
+            </p>
+          ) : (
+            <ul className="space-y-1">
+              {availableMembers.map((user) => (
+                <li key={user.id}>
+                  <button
+                    type="button"
+                    disabled={isAdding}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/50 disabled:opacity-50"
+                    onClick={() => onAddMember(user.id)}
+                  >
+                    <UserAvatar
+                      id={user.id}
+                      name={user.name}
+                      avatar={initialsFromName(user.name)}
+                      avatarUrl={user.avatarUrl}
+                      size="sm"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{user.name}</span>
+                      <span className="block truncate text-[11px] text-muted-foreground">
+                        {user.email}
+                      </span>
+                    </span>
+                    <Plus className="size-3.5 shrink-0 text-muted-foreground" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function ProjectMembersSection({
   members,
   availableMembers,
@@ -898,64 +986,29 @@ function ProjectMembersSection({
           </h3>
           <p className="mt-0.5 text-xs text-muted-foreground">{t("projects.detail.membersHint")}</p>
         </div>
-        {canManageMembers ? (
-          <Dialog open={addDialogOpen} onOpenChange={onAddDialogOpenChange}>
-            <DialogTrigger asChild>
-              <Button type="button" size="sm" variant="brand" className="h-8 gap-1.5">
-                <UserPlus className="size-3.5" />
-                {t("projects.detail.addMember")}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-sm gap-0 p-0">
-              <DialogHeader className="border-b border-border px-4 py-3">
-                <DialogTitle className="text-base">
-                  {t("projects.detail.addMemberTitle")}
-                </DialogTitle>
-                <DialogDescription className="text-xs">
-                  {t("projects.detail.addMemberDesc")}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="max-h-72 overflow-y-auto p-2">
-                {isLoadingAvailable ? (
-                  <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-                    {t("common.loading")}
-                  </p>
-                ) : availableMembers.length === 0 ? (
-                  <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-                    {t("projects.detail.allMembersAssigned")}
-                  </p>
-                ) : (
-                  <ul className="space-y-1">
-                    {availableMembers.map((user) => (
-                      <li key={user.id}>
-                        <button
-                          type="button"
-                          disabled={isAdding}
-                          className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted/50 disabled:opacity-50"
-                          onClick={() => onAddMember(user.id)}
-                        >
-                          <Avatar
-                            id={user.id}
-                            initials={user.avatar ?? initialsFromName(user.name)}
-                            size="sm"
-                          />
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-medium">{user.name}</span>
-                            <span className="block truncate text-[11px] text-muted-foreground">
-                              {user.email}
-                            </span>
-                          </span>
-                          <Plus className="size-3.5 shrink-0 text-muted-foreground" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
+        {canManageMembers && members.length > 0 ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="brand"
+            className="h-8 gap-1.5"
+            onClick={() => onAddDialogOpenChange(true)}
+          >
+            <UserPlus className="size-3.5" />
+            {t("projects.detail.addMember")}
+          </Button>
         ) : null}
       </div>
+      {canManageMembers ? (
+        <AddProjectMemberDialog
+          open={addDialogOpen}
+          onOpenChange={onAddDialogOpenChange}
+          availableMembers={availableMembers}
+          isLoadingAvailable={isLoadingAvailable}
+          isAdding={isAdding}
+          onAddMember={onAddMember}
+        />
+      ) : null}
       <div className="space-y-2">
         {isLoading ? (
           <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
@@ -1016,9 +1069,11 @@ function ProjectMemberRow({
 }) {
   return (
     <div className="flex items-center gap-2.5 rounded-xl border border-border bg-muted/10 px-2.5 py-2">
-      <Avatar
+      <UserAvatar
         id={member.user.id}
-        initials={member.user.avatar ?? initialsFromName(member.user.name)}
+        name={member.user.name}
+        avatar={initialsFromName(member.user.name)}
+        avatarUrl={member.user.avatarUrl}
         size="sm"
       />
       <div className="min-w-0 flex-1">
@@ -1161,27 +1216,29 @@ function ProjectDocumentsSection({
         <div>
           <h3 className="flex items-center gap-2 text-base font-semibold">
             <FileText className="size-4 text-muted-foreground" />
-            Documents
+            {t("projects.detail.documentsTitle")}
           </h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Briefs, specs, presentations, and other project files
+            {t("projects.detail.documentsSubtitle")}
           </p>
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="brand"
-          className="h-8 gap-1.5"
-          disabled={isUploading}
-          onClick={onPickFile}
-        >
-          {isUploading ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : (
-            <Upload className="size-3.5" />
-          )}
-          {isUploading ? t("common.loading") : t("projects.detail.uploadDocument")}
-        </Button>
+        {!isLoading && !isError && documents.length > 0 ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="brand"
+            className="h-8 gap-1.5"
+            disabled={isUploading}
+            onClick={onPickFile}
+          >
+            {isUploading ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Upload className="size-3.5" />
+            )}
+            {isUploading ? t("common.loading") : t("projects.detail.uploadDocument")}
+          </Button>
+        ) : null}
         <input
           ref={fileInputRef}
           type="file"
@@ -1199,11 +1256,11 @@ function ProjectDocumentsSection({
       <div className="space-y-2">
         {isLoading ? (
           <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
-            Loading documents…
+            {t("projects.detail.documentsLoading")}
           </p>
         ) : isError ? (
           <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-6 text-center text-sm text-destructive">
-            Could not load documents. Try refreshing the page.
+            {t("projects.detail.documentsError")}
           </p>
         ) : documents.length === 0 ? (
           <EmptyState

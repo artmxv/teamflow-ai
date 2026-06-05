@@ -25,9 +25,10 @@ export interface WorkspaceAiSummaryApiResponse {
   data: WorkspaceAiSummary;
 }
 
-export async function fetchWorkspaceAiSummary() {
+export async function fetchWorkspaceAiSummary(locale?: string) {
   const response = await apiRequest<WorkspaceAiSummaryApiResponse>("/api/ai/workspace-summary", {
     method: "POST",
+    body: locale ? { locale } : undefined,
   });
   return response.data;
 }

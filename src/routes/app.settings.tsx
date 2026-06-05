@@ -27,8 +27,15 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useI18n, type Lang, type TKey } from "@/lib/i18n";
+import {
+  displayWorkspaceName,
+  isPersonalWorkspaceName,
+  resolveWorkspaceNameForSave,
+  workspaceSettingsDisplayName,
+} from "@/lib/workspace-display";
 import { removeAvatar, updateProfile, uploadAvatar } from "@/lib/api/auth";
 import { AUTH_ME_QUERY_KEY, patchAuthMeUser } from "@/lib/auth/auth-cache";
+import { invalidateWorkspaceScopedQueries } from "@/lib/workspace-queries";
 import {
   formatLocation,
   formatPhone,
@@ -110,7 +117,24 @@ function normalizeTeamSizeValue(raw: string): string {
   return trimmed;
 }
 
-function workspaceFormFromWorkspace(workspace: {
+function workspaceFormFromWorkspace(
+  workspace: {
+    name: string;
+    slug: string;
+    industry?: string | null;
+    teamSize?: string | null;
+  },
+  lang: Lang,
+): WorkspaceFormState {
+  return {
+    name: workspaceSettingsDisplayName(workspace.name, lang),
+    slug: workspace.slug,
+    industry: workspace.industry ?? "",
+    teamSize: normalizeTeamSizeValue(workspace.teamSize ?? ""),
+  };
+}
+
+function workspaceBaselineFromWorkspace(workspace: {
   name: string;
   slug: string;
   industry?: string | null;
@@ -124,15 +148,20 @@ function workspaceFormFromWorkspace(workspace: {
   };
 }
 
+function workspaceFormDisplayName(name: string, lang: Lang): string {
+  return isPersonalWorkspaceName(name) ? displayWorkspaceName(name, lang) : name.trim();
+}
+
 function isWorkspaceFormDirty(
   form: WorkspaceFormState | null,
   baseline: WorkspaceFormState | null,
+  lang: Lang,
 ): boolean {
   if (!form || !baseline) {
     return false;
   }
   return (
-    form.name.trim() !== baseline.name.trim() ||
+    form.name.trim() !== workspaceFormDisplayName(baseline.name, lang) ||
     form.slug.trim() !== baseline.slug.trim() ||
     form.industry.trim() !== baseline.industry.trim() ||
     form.teamSize.trim() !== baseline.teamSize.trim()
@@ -240,7 +269,7 @@ type WorkspaceFormState = {
 };
 
 function SettingsPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { tab } = Route.useSearch();
   const navigate = Route.useNavigate();
   const queryClient = useQueryClient();
@@ -278,10 +307,9 @@ function SettingsPage() {
       setWorkspaceBaseline(null);
       return;
     }
-    const saved = workspaceFormFromWorkspace(workspace);
-    setWorkspaceForm(saved);
-    setWorkspaceBaseline(saved);
-  }, [workspace]);
+    setWorkspaceForm(workspaceFormFromWorkspace(workspace, lang));
+    setWorkspaceBaseline(workspaceBaselineFromWorkspace(workspace));
+  }, [workspace, lang]);
 
   const profileMutation = useMutation({
     mutationFn: updateProfile,
@@ -302,7 +330,7 @@ function SettingsPage() {
     mutationFn: uploadAvatar,
     onSuccess: async (updatedUser) => {
       patchAuthMeUser(queryClient, updatedUser);
-      await queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY });
+      await invalidateWorkspaceScopedQueries(queryClient);
       toast.success(t("settings.avatarUpdated"));
     },
     onError: (error) => {
@@ -328,7 +356,7 @@ function SettingsPage() {
     mutationFn: removeAvatar,
     onSuccess: async (updatedUser) => {
       patchAuthMeUser(queryClient, updatedUser);
-      await queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY });
+      await invalidateWorkspaceScopedQueries(queryClient);
       toast.success(t("settings.avatarRemoved"));
     },
     onError: (error) => {
@@ -342,9 +370,8 @@ function SettingsPage() {
     mutationFn: updateWorkspace,
     onSuccess: async (updated) => {
       await queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY });
-      const saved = workspaceFormFromWorkspace(updated);
-      setWorkspaceForm(saved);
-      setWorkspaceBaseline(saved);
+      setWorkspaceForm(workspaceFormFromWorkspace(updated, lang));
+      setWorkspaceBaseline(workspaceBaselineFromWorkspace(updated));
       toast.success(t("settings.workspaceUpdated"));
     },
     onError: (error) => {
@@ -415,7 +442,7 @@ function SettingsPage() {
       return;
     }
     workspaceMutation.mutate({
-      name: workspaceForm.name.trim(),
+      name: resolveWorkspaceNameForSave(workspace.name, workspaceForm.name, lang),
       slug,
       industry: workspaceForm.industry.trim(),
       teamSize: workspaceForm.teamSize.trim(),
@@ -429,7 +456,7 @@ function SettingsPage() {
     setWorkspaceForm({ ...workspaceBaseline });
   };
 
-  const workspaceHasUnsavedChanges = isWorkspaceFormDirty(workspaceForm, workspaceBaseline);
+  const workspaceHasUnsavedChanges = isWorkspaceFormDirty(workspaceForm, workspaceBaseline, lang);
   const workspaceFieldsDisabled = !workspace || workspaceMutation.isPending || !canEditWorkspace;
   const workspaceSlugPreview = workspaceForm?.slug?.trim()
     ? workspaceUrlFromSlug(workspaceForm.slug.trim())
@@ -525,7 +552,7 @@ function SettingsPage() {
                     )
                   }
                   disabled={workspaceFieldsDisabled}
-                  placeholder="e.g. Product / Software"
+                  placeholder={t("settings.industryPlaceholder")}
                 />
               </Field>
               <Field label={t("settings.teamSize")}>

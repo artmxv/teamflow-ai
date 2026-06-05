@@ -31,6 +31,7 @@ import {
 } from "@/lib/api/tasks";
 import { fetchProjects } from "@/lib/api/projects";
 import { useI18n, type TKey } from "@/lib/i18n";
+import { translateStarterProjectName, translateStarterTitle } from "@/lib/starter-content";
 import {
   Search,
   Plus,
@@ -194,7 +195,7 @@ const apiPriorityMap: Record<TaskApiPriority, Priority> = {
 };
 
 function TasksPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const urlSearch = Route.useSearch();
   const {
     taskId: taskIdFromUrl,
@@ -265,6 +266,7 @@ function TasksPage() {
     }: {
       id: string;
       input: {
+        title: string;
         assigneeIds: string[];
         dueDate: string | null;
         status: TaskApiStatus;
@@ -389,6 +391,12 @@ function TasksPage() {
   );
   const sorted = useMemo(() => sortTasks(filtered, sort), [filtered, sort]);
   const isTrulyEmpty = taskList.length === 0;
+  const hasActiveFilters =
+    q !== "" ||
+    status !== "all" ||
+    priority !== "all" ||
+    assigneeFilter !== "all" ||
+    hasUrlAnalyticsFilters;
 
   function clearFilters() {
     setQ("");
@@ -452,7 +460,7 @@ function TasksPage() {
         )}
       </div>
 
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="relative w-full sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -462,22 +470,42 @@ function TasksPage() {
             className="pl-9"
           />
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Pill active={status === "all"} onClick={() => setStatusFilter("all")}>
-            {t("tasks.allStatus")}
-          </Pill>
-          {(Object.keys(statusMeta) as TaskStatus[]).map((s) => (
-            <Pill key={s} active={status === s} onClick={() => setStatusFilter(s)}>
-              {t(statusMeta[s].labelKey)}
-            </Pill>
-          ))}
-        </div>
+        <Select
+          value={status}
+          onValueChange={(value) => setStatusFilter(value as TaskListStatusFilter)}
+        >
+          <SelectTrigger className="h-9 w-full min-w-0 border-border bg-card text-sm sm:w-[168px]">
+            <SelectValue placeholder={t("tasks.status")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("tasks.allStatus")}</SelectItem>
+            <SelectItem value="open">{t("tasks.openStatus")}</SelectItem>
+            {(Object.keys(statusMeta) as TaskStatus[]).map((s) => (
+              <SelectItem key={s} value={s}>
+                {t(statusMeta[s].labelKey)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={priority} onValueChange={(value) => setPriority(value as Priority | "all")}>
+          <SelectTrigger className="h-9 w-full min-w-0 border-border bg-card text-sm sm:w-[168px]">
+            <SelectValue placeholder={t("tasks.priority")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("tasks.filterPriorities")}</SelectItem>
+            {(["low", "medium", "high", "urgent"] as Priority[]).map((p) => (
+              <SelectItem key={p} value={p}>
+                {t(priorityMeta[p].labelKey)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={assigneeFilter} onValueChange={(value) => setAssigneeListFilter(value)}>
-          <SelectTrigger className="h-8 w-full rounded-full border-border bg-card text-xs sm:w-44">
+          <SelectTrigger className="h-9 w-full min-w-0 border-border bg-card text-sm sm:w-[168px]">
             <SelectValue placeholder={t("tasks.assignee")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t("tasks.allAssignees")}</SelectItem>
+            <SelectItem value="all">{t("tasks.filterAssignees")}</SelectItem>
             <SelectItem value="unassigned">{t("tasks.noAssignees")}</SelectItem>
             {assigneeOptions.map((option) => (
               <SelectItem key={option.id} value={option.id}>
@@ -486,46 +514,51 @@ function TasksPage() {
             ))}
           </SelectContent>
         </Select>
-        <div className="ml-auto flex flex-wrap gap-2">
-          <Pill active={priority === "all"} onClick={() => setPriority("all")}>
-            {t("tasks.allPriorities")}
-          </Pill>
-          {(["low", "medium", "high", "urgent"] as Priority[]).map((p) => (
-            <Pill key={p} active={priority === p} onClick={() => setPriority(p)}>
-              {p}
-            </Pill>
-          ))}
-        </div>
+        {hasActiveFilters ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 w-full sm:ml-auto sm:w-auto"
+            onClick={clearFilters}
+          >
+            <RotateCcw className="size-4" />
+            {t("common.resetFilters")}
+          </Button>
+        ) : null}
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
-        <div className="hidden grid-cols-[1fr_120px_120px_140px_120px_120px] gap-3 border-b border-border bg-muted/30 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground md:grid">
+        <div className="hidden grid-cols-[minmax(0,1fr)_100px_100px_120px_100px_88px] items-center gap-3 border-b border-border bg-muted/30 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground md:grid">
           <div>{t("tasks.task")}</div>
           <SortableColumnHeader
             label={t("tasks.status")}
             field="status"
             sort={sort}
             onSort={handleSort}
+            className="justify-center"
           />
           <SortableColumnHeader
             label={t("tasks.priority")}
             field="priority"
             sort={sort}
             onSort={handleSort}
+            className="justify-center"
           />
           <SortableColumnHeader
             label={t("tasks.assignee")}
             field="assignee"
             sort={sort}
             onSort={handleSort}
+            className="justify-center"
           />
           <SortableColumnHeader
             label={t("tasks.due")}
             field="dueDate"
             sort={sort}
             onSort={handleSort}
+            className="justify-center"
           />
-          <div className="text-right">{t("common.activity")}</div>
+          <div className="text-center">{t("common.activity")}</div>
         </div>
         {isLoading ? (
           <LoadingRows />
@@ -548,17 +581,17 @@ function TasksPage() {
               <li
                 key={task.id}
                 onClick={() => setSelected(task)}
-                className="grid cursor-pointer grid-cols-2 gap-3 px-4 py-3 text-sm transition hover:bg-muted/30 md:grid-cols-[1fr_120px_120px_140px_120px_120px]"
+                className="grid cursor-pointer grid-cols-2 items-center gap-3 px-4 py-3 text-sm transition hover:bg-muted/30 md:grid-cols-[minmax(0,1fr)_100px_100px_120px_100px_88px]"
               >
                 <div className="col-span-2 md:col-span-1">
                   <div className="flex items-center gap-2">
                     <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                       {task.key}
                     </span>
-                    <span className="font-medium">{task.title}</span>
+                    <span className="font-medium">{translateStarterTitle(task.title, lang)}</span>
                   </div>
                   <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{task.projectName}</span>
+                    <span>{translateStarterProjectName(task.projectName, lang)}</span>
                     {task.labels.slice(0, 2).map((label) => (
                       <Badge
                         key={label}
@@ -570,7 +603,7 @@ function TasksPage() {
                     ))}
                   </div>
                 </div>
-                <div>
+                <div className="flex justify-center">
                   <span
                     className={
                       "inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold " +
@@ -580,7 +613,7 @@ function TasksPage() {
                     {t(statusMeta[task.status].labelKey)}
                   </span>
                 </div>
-                <div>
+                <div className="flex justify-center">
                   <span
                     className={
                       "inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold " +
@@ -590,17 +623,17 @@ function TasksPage() {
                     {t(priorityMeta[task.priority].labelKey)}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2">
                   <AssigneeAvatars
                     assignees={task.assigneeOptions}
                     showUnassignedLabel
                     maxVisible={2}
                   />
                 </div>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
                   <Calendar className="size-3.5" /> {task.dueDate ?? "—"}
                 </div>
-                <div className="flex items-center justify-end gap-3 text-xs text-muted-foreground">
+                <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
                   <span className="inline-flex items-center gap-1">
                     <MessageSquare className="size-3.5" />
                     {task.commentsCount}
@@ -619,11 +652,12 @@ function TasksPage() {
       <TaskDrawer
         task={selected}
         assignees={selectedAssignees}
-        onSaveChanges={({ assigneeIds, dueDate, status, priority }) => {
+        onSaveChanges={({ title, assigneeIds, dueDate, status, priority }) => {
           if (!selected || updateAssigneeMutation.isPending) return;
           updateAssigneeMutation.mutate({
             id: selected.id,
             input: {
+              title,
               assigneeIds,
               dueDate,
               status: taskStatusToApi[status],
@@ -657,14 +691,13 @@ function mapApiTaskToRow(task: TaskApiItem): TaskRow {
     id: assignee.id,
     name: assignee.name,
     email: assignee.email,
-    avatar:
-      assignee.avatar ??
-      assignee.name
-        .split(" ")
-        .map((part) => part[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase(),
+    avatar: assignee.name
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase(),
+    avatarUrl: assignee.avatarUrl ?? null,
   }));
 
   return {
@@ -705,7 +738,7 @@ function LoadingRows() {
       {Array.from({ length: 6 }).map((_, index) => (
         <li
           key={index}
-          className="grid grid-cols-2 gap-3 px-4 py-3 md:grid-cols-[1fr_120px_120px_140px_120px_120px]"
+          className="grid grid-cols-2 items-center gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_100px_100px_120px_100px_88px]"
         >
           <div className="col-span-2 space-y-2 md:col-span-1">
             <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
@@ -818,7 +851,7 @@ function SortableColumnHeader({
             : `${label}, not sorted`
       }
       className={cn(
-        "inline-flex items-center gap-1 rounded-sm transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "inline-flex w-full items-center gap-1 rounded-sm transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         active ? "text-foreground" : "text-muted-foreground",
         className,
       )}
@@ -831,30 +864,6 @@ function SortableColumnHeader({
       ) : (
         <ArrowUpDown className="size-3 shrink-0 opacity-40" aria-hidden />
       )}
-    </button>
-  );
-}
-
-function Pill({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={
-        "rounded-full border px-2.5 py-1 text-xs capitalize transition " +
-        (active
-          ? "border-primary/30 bg-primary/10 text-primary"
-          : "border-border bg-card text-muted-foreground hover:text-foreground")
-      }
-    >
-      {children}
     </button>
   );
 }

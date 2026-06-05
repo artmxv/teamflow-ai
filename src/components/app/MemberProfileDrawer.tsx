@@ -26,6 +26,7 @@ import {
 import { fetchWorkspaceMemberProfile } from "@/lib/api/workspace-members";
 import type { TaskApiPriority, TaskApiStatus } from "@/lib/api/tasks";
 import type { ProjectApiStatus } from "@/lib/api/projects";
+import { displayProjectName, displayTaskTitle } from "@/lib/starter-content";
 import {
   dashboardPriorityLabel,
   dashboardStatusLabel,
@@ -300,7 +301,7 @@ export function MemberProfileDrawer({
                       <li key={task.id}>
                         <button
                           type="button"
-                          aria-label={`${t("team.openTask")}: ${task.title}`}
+                          aria-label={`${t("team.openTask")}: ${displayTaskTitle(task.title, lang)}`}
                           className="flex w-full flex-col gap-2 rounded-xl border border-border bg-card px-4 py-3 text-left text-sm transition hover:bg-muted/40 focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground/30 active:bg-muted/40"
                           onClick={() => {
                             void router.navigate({
@@ -314,7 +315,7 @@ export function MemberProfileDrawer({
                               {task.key}
                             </span>
                             <span className="text-muted-foreground"> · </span>
-                            {task.title}
+                            {displayTaskTitle(task.title, lang)}
                           </p>
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge
@@ -333,7 +334,7 @@ export function MemberProfileDrawer({
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                             <span className="inline-flex items-center gap-1">
                               <ListTodo className="size-3.5" />
-                              {task.projectName}
+                              {displayProjectName(task.projectName, lang)}
                             </span>
                             {task.dueDate && (
                               <span className="inline-flex items-center gap-1">

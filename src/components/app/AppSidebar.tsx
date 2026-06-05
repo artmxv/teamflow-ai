@@ -19,6 +19,8 @@ import {
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useI18n, type TKey } from "@/lib/i18n";
+import { displayWorkspaceName } from "@/lib/workspace-display";
+import { displayProjectName } from "@/lib/starter-content";
 import { nameToInitials, isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user";
 import { toast } from "sonner";
 import { ApiError, setSelectedWorkspaceId } from "@/lib/api/client";
@@ -115,7 +117,7 @@ function WorkspaceSwitcher({
   loading: boolean;
   collapsed: boolean;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -147,7 +149,7 @@ function WorkspaceSwitcher({
         )}
         aria-hidden
       >
-        <Skeleton className="size-6 shrink-0 rounded-md" />
+        <Skeleton className="size-7 shrink-0 rounded-md" />
         {!collapsed && (
           <>
             <Skeleton className="h-4 min-w-0 flex-1" />
@@ -171,19 +173,27 @@ function WorkspaceSwitcher({
     slug: workspace.slug,
   };
 
+  const displayName = displayWorkspaceName(workspace.name, lang);
+
   const trigger = (
     <button
       type="button"
-      title={workspace.name}
+      title={displayName}
       className={cn(
-        "flex w-full min-w-0 items-center rounded-xl border border-sidebar-border bg-card text-left text-sm transition hover:border-border hover:bg-card/90 hover:shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-        collapsed ? "justify-center p-2" : "gap-2 px-3 py-2",
+        "flex w-full min-w-0 items-center rounded-xl border border-sidebar-border bg-card text-left transition hover:border-border hover:bg-card/90 hover:shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0 data-[state=open]:border-border data-[state=open]:shadow-sm",
+        collapsed ? "justify-center p-2" : "gap-2.5 px-3 py-2.5",
       )}
     >
-      <WorkspaceAvatar item={currentAccentSource} initials={workspace.initials} />
+      <WorkspaceAvatar
+        item={currentAccentSource}
+        initials={workspace.initials}
+        size={collapsed ? "size-6" : "size-7"}
+      />
       {!collapsed && (
         <>
-          <span className="min-w-0 flex-1 truncate font-medium">{workspace.name}</span>
+          <span className="min-w-0 flex-1 truncate text-sm font-medium leading-none">
+            {displayName}
+          </span>
           <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
         </>
       )}
@@ -196,6 +206,7 @@ function WorkspaceSwitcher({
       <DropdownMenuContent
         align="start"
         sideOffset={8}
+        onCloseAutoFocus={(event) => event.preventDefault()}
         className="w-72 rounded-xl border border-border/80 bg-popover p-1.5 shadow-xl ring-1 ring-black/5 dark:border-border dark:bg-popover dark:ring-white/10"
         side={collapsed ? "right" : "bottom"}
       >
@@ -207,7 +218,7 @@ function WorkspaceSwitcher({
           className="gap-2.5 rounded-lg px-2 py-2 opacity-100 focus:bg-muted/60 data-[disabled]:opacity-100"
         >
           <WorkspaceAvatar item={currentAccentSource} initials={workspace.initials} />
-          <span className="min-w-0 flex-1 truncate text-sm font-medium">{workspace.name}</span>
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">{displayName}</span>
           <Check className="size-4 shrink-0 text-primary" aria-hidden />
         </DropdownMenuItem>
 
@@ -232,7 +243,9 @@ function WorkspaceSwitcher({
             onSelect={() => switchMutation.mutate(item.id)}
           >
             <WorkspaceAvatar item={item} initials={nameToInitials(item.name)} />
-            <span className="min-w-0 flex-1 truncate text-sm">{item.name}</span>
+            <span className="min-w-0 flex-1 truncate text-sm">
+              {displayWorkspaceName(item.name, lang)}
+            </span>
           </DropdownMenuItem>
         ))}
 
@@ -280,7 +293,7 @@ export function AppSidebar({
   onToggleCollapsed: () => void;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { data: me } = useCurrentUser();
   const canManageProjects = isWorkspaceManager(me?.workspace?.role);
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
@@ -397,7 +410,7 @@ export function AppSidebar({
             )}
             {projects.map((project) => {
               const projectActive = activeProjectId === project.id;
-              const projectLabel = project.name;
+              const projectLabel = displayProjectName(project.name, lang);
               const { dot: accentDot, gradient: accentGradient } = getProjectAccent(project);
               return (
                 <li key={project.id}>
@@ -428,7 +441,7 @@ export function AppSidebar({
                       ) : (
                         <>
                           <span className={cn("size-2 shrink-0 rounded-full", accentDot)} />
-                          <span className="truncate">{project.name}</span>
+                          <span className="truncate">{projectLabel}</span>
                         </>
                       )}
                     </Link>
@@ -460,7 +473,7 @@ export function AppSidebar({
           <div className="m-3 rounded-xl border border-sidebar-border bg-card p-3 shadow-soft">
             <div className="flex items-center gap-2 text-xs font-medium">
               <Sparkles className="size-3.5 text-primary" />
-              AI credits
+              {t("billing.aiCredits")}
             </div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
               <div className="h-full w-2/3 rounded-full bg-gradient-brand" />

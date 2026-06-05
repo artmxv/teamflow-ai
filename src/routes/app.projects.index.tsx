@@ -21,6 +21,7 @@ import {
   type ProjectsSearch,
 } from "@/lib/project-status-url";
 import { Plus, Search, Calendar, ListTodo, FolderKanban, RotateCcw } from "lucide-react";
+import { displayProjectDescription, displayProjectName } from "@/lib/starter-content";
 
 export const Route = createFileRoute("/app/projects/")({
   beforeLoad: requireAuth,
@@ -64,7 +65,7 @@ const apiStatusMap: Record<ProjectApiStatus, ProjectStatus> = {
 };
 
 function ProjectsIndexPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { data: me } = useCurrentUser();
   const canManageProjects = isWorkspaceManager(me?.workspace?.role);
   const { status: statusFromUrl } = Route.useSearch();
@@ -189,8 +190,12 @@ function ProjectsIndexPage() {
                     {projectStatusLabel(p.status, t)}
                   </Badge>
                 </div>
-                <h3 className="mt-4 text-base font-semibold tracking-tight">{p.name}</h3>
-                <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{p.description}</p>
+                <h3 className="mt-4 text-base font-semibold tracking-tight">
+                  {displayProjectName(p.name, lang)}
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                  {displayProjectDescription(p.description, lang)}
+                </p>
 
                 <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-muted">
                   <div

@@ -5,6 +5,7 @@ export interface ProjectMemberUser {
   name: string;
   email: string;
   avatar: string | null;
+  avatarUrl: string | null;
 }
 
 export interface ProjectMemberApiItem {
@@ -19,6 +20,7 @@ export interface AvailableProjectMember {
   name: string;
   email: string;
   avatar: string | null;
+  avatarUrl: string | null;
 }
 
 export async function fetchProjectMembers(projectId: string) {

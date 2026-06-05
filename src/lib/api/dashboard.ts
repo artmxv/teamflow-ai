@@ -25,6 +25,7 @@ export interface DashboardRecentTask {
     name: string;
     email: string;
     avatar: string | null;
+    avatarUrl: string | null;
   }[];
   /** Legacy primary assignee (first in assignees). */
   assignee: {
@@ -32,6 +33,7 @@ export interface DashboardRecentTask {
     name: string;
     email: string;
     avatar: string | null;
+    avatarUrl: string | null;
   } | null;
 }
 

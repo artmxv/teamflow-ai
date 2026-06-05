@@ -24,6 +24,8 @@ export async function invalidateWorkspaceScopedQueries(queryClient: QueryClient)
     queryClient.invalidateQueries({ queryKey: ["tasks"] }),
     queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] }),
     queryClient.invalidateQueries({ queryKey: ["workspace-members"] }),
+    queryClient.invalidateQueries({ queryKey: ["workspace-member-profile"] }),
+    queryClient.invalidateQueries({ queryKey: ["project-members"] }),
     queryClient.invalidateQueries({ queryKey: ["workspace"] }),
     queryClient.invalidateQueries({ queryKey: ["billing"] }),
     queryClient.invalidateQueries({ queryKey: ["billing", "summary"] }),

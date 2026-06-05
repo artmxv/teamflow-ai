@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -8,11 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { login } from "@/lib/api/auth";
 import { primeAuthMeAfterAuth, resetWorkspaceValidationSession } from "@/lib/auth/auth-cache";
+import { googleAuthErrorKey, startGoogleAuth } from "@/lib/auth/google-auth";
 import { getSafeRedirectPath } from "@/lib/auth/safe-redirect";
 import { getAuthToken, setAuthToken } from "@/lib/auth/token";
+import { useI18n } from "@/lib/i18n";
 
 export type SignInSearch = {
   redirect?: string;
+  error?: string;
 };
 
 export const Route = createFileRoute("/signin")({
@@ -21,6 +24,7 @@ export const Route = createFileRoute("/signin")({
       typeof search.redirect === "string" && search.redirect.length > 0
         ? search.redirect
         : undefined,
+    error: typeof search.error === "string" && search.error.length > 0 ? search.error : undefined,
   }),
   beforeLoad: ({ search }) => {
     if (typeof window === "undefined") {
@@ -37,9 +41,17 @@ export const Route = createFileRoute("/signin")({
 function SignIn() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { redirect: redirectPath } = Route.useSearch();
+  const { t } = useI18n();
+  const { redirect: redirectPath, error: googleError } = Route.useSearch();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  useEffect(() => {
+    if (!googleError) {
+      return;
+    }
+    toast.error(t(googleAuthErrorKey(googleError)));
+  }, [googleError, t]);
 
   const loginMutation = useMutation({
     mutationFn: login,
@@ -79,8 +91,13 @@ function SignIn() {
           loginMutation.mutate({ email: email.trim(), password });
         }}
       >
-        <Button type="button" variant="outline" className="w-full">
-          <GoogleIcon /> Continue with Google
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={() => startGoogleAuth(redirectPath)}
+        >
+          <GoogleIcon /> {t("auth.continueWithGoogle")}
         </Button>
         <div className="relative my-2 text-center text-xs text-muted-foreground">
           <span className="relative z-10 bg-background px-2">or with email</span>

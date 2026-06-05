@@ -10,6 +10,7 @@ export type TaskAssigneeUser = {
   name: string;
   email: string;
   avatar: string | null;
+  avatarUrl: string | null;
 };
 
 export interface TaskApiItem {
