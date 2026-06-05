@@ -22,6 +22,7 @@ import { LanguageSwitcher, useI18n } from "@/lib/i18n";
 import { ThemeToggle } from "@/lib/theme";
 import { toast } from "sonner";
 import { logout } from "@/lib/api/auth";
+import { clearSelectedWorkspaceId } from "@/lib/api/client";
 import { clearAuthToken, getAuthToken } from "@/lib/auth/token";
 import { useCurrentUser, workspaceRoleLabel } from "@/lib/auth/use-current-user";
 import { UserAvatar } from "@/components/app/UserAvatar";
@@ -91,6 +92,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
         await logout();
       } finally {
         clearAuthToken();
+        clearSelectedWorkspaceId();
       }
     },
     onSuccess: async () => {
@@ -99,6 +101,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
     },
     onError: () => {
       clearAuthToken();
+      clearSelectedWorkspaceId();
       void queryClient.removeQueries({ queryKey: ["auth"] });
       void router.navigate({ to: "/signin" });
     },

@@ -8,14 +8,14 @@ import {
   removeProjectMember,
 } from "../services/project-members.service.js";
 import { canManageProjects } from "../services/project-access.service.js";
-import { getUserWorkspaceContext } from "../services/workspace-context.service.js";
+import { resolveRequestWorkspaceContext } from "../lib/workspace-request.js";
 
 const addProjectMemberSchema = z.object({
   userId: z.string().min(1, "userId is required"),
 });
 
 async function resolveWorkspace(req: Request, res: Response) {
-  const context = await getUserWorkspaceContext(req.userId!);
+  const context = await resolveRequestWorkspaceContext(req.userId!, req);
   if (!context) {
     res.status(403).json({ message: "Workspace not found" });
     return null;

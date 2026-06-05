@@ -29,8 +29,34 @@ export type UpdateWorkspaceSettingsInput = {
   teamSize?: string;
 };
 
-export async function getUserCurrentWorkspace(userId: string): Promise<AuthWorkspace | null> {
-  const membership = await prisma.workspaceMember.findFirst({
+const workspaceSelect = {
+  id: true,
+  name: true,
+  slug: true,
+  industry: true,
+  teamSize: true,
+  plan: true,
+} as const;
+
+async function findActiveMembership(userId: string, selectedWorkspaceId?: string) {
+  if (selectedWorkspaceId) {
+    const membership = await prisma.workspaceMember.findFirst({
+      where: {
+        userId,
+        workspaceId: selectedWorkspaceId,
+        status: "ACTIVE",
+      },
+      select: {
+        role: true,
+        workspaceId: true,
+        workspace: { select: workspaceSelect },
+      },
+    });
+
+    return membership;
+  }
+
+  return prisma.workspaceMember.findFirst({
     where: {
       userId,
       status: "ACTIVE",
@@ -38,18 +64,17 @@ export async function getUserCurrentWorkspace(userId: string): Promise<AuthWorks
     orderBy: { joinedAt: "asc" },
     select: {
       role: true,
-      workspace: {
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          industry: true,
-          teamSize: true,
-          plan: true,
-        },
-      },
+      workspaceId: true,
+      workspace: { select: workspaceSelect },
     },
   });
+}
+
+export async function getUserCurrentWorkspace(
+  userId: string,
+  selectedWorkspaceId?: string,
+): Promise<AuthWorkspace | null> {
+  const membership = await findActiveMembership(userId, selectedWorkspaceId);
 
   if (!membership) {
     return null;
@@ -91,8 +116,9 @@ async function assertWorkspaceSlugAvailable(slug: string, workspaceId: string): 
 export async function updateUserWorkspaceSettings(
   userId: string,
   input: UpdateWorkspaceSettingsInput,
+  selectedWorkspaceId?: string,
 ): Promise<AuthWorkspace> {
-  const context = await getUserWorkspaceContext(userId);
+  const context = await getUserWorkspaceContext(userId, selectedWorkspaceId);
   if (!context) {
     throw new AuthError("Workspace not found", 403);
   }
@@ -141,18 +167,9 @@ export async function updateUserWorkspaceSettings(
 
 export async function getUserWorkspaceContext(
   userId: string,
+  selectedWorkspaceId?: string,
 ): Promise<UserWorkspaceContext | null> {
-  const membership = await prisma.workspaceMember.findFirst({
-    where: {
-      userId,
-      status: "ACTIVE",
-    },
-    orderBy: { joinedAt: "asc" },
-    select: {
-      role: true,
-      workspaceId: true,
-    },
-  });
+  const membership = await findActiveMembership(userId, selectedWorkspaceId);
 
   if (!membership) {
     return null;

@@ -68,10 +68,13 @@ export async function countValidPendingInvitations(workspaceId: string): Promise
   });
 }
 
+export const WORKSPACE_LIMIT_REACHED_CODE = "WORKSPACE_LIMIT_REACHED";
+
 export async function countUserWorkspaces(userId: string): Promise<number> {
   return prisma.workspaceMember.count({
     where: {
       userId,
+      role: "OWNER",
       status: "ACTIVE",
     },
   });

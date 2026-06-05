@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 
 import { searchWorkspace } from "../services/search.service.js";
-import { getUserWorkspaceContext } from "../services/workspace-context.service.js";
+import { resolveRequestWorkspaceContext } from "../lib/workspace-request.js";
 
 export async function searchWorkspaceController(req: Request, res: Response, next: NextFunction) {
   try {
@@ -10,7 +10,7 @@ export async function searchWorkspaceController(req: Request, res: Response, nex
       return;
     }
 
-    const context = await getUserWorkspaceContext(req.userId);
+    const context = await resolveRequestWorkspaceContext(req.userId, req);
     if (!context) {
       res.status(403).json({ message: "Workspace not found" });
       return;

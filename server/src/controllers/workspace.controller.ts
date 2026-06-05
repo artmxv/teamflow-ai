@@ -3,10 +3,11 @@ import { z } from "zod";
 
 import { AuthError } from "../services/auth.service.js";
 import {
-  getUserCurrentWorkspace,
-  getUserWorkspaceContext,
-  updateUserWorkspaceSettings,
-} from "../services/workspace-context.service.js";
+  getSelectedWorkspaceIdFromRequest,
+  resolveRequestCurrentWorkspace,
+  resolveRequestWorkspaceContext,
+} from "../lib/workspace-request.js";
+import { updateUserWorkspaceSettings } from "../services/workspace-context.service.js";
 import { getWorkspaceMemberProfile } from "../services/member-profile.service.js";
 import {
   getWorkspaceMembers,
@@ -50,7 +51,7 @@ export async function getWorkspaceMemberProfileController(
       return;
     }
 
-    const context = await getUserWorkspaceContext(req.userId);
+    const context = await resolveRequestWorkspaceContext(req.userId, req);
     if (!context) {
       res.status(403).json({ message: "Workspace not found" });
       return;
@@ -86,7 +87,7 @@ export async function getWorkspaceMembersController(
       return;
     }
 
-    const context = await getUserWorkspaceContext(req.userId);
+    const context = await resolveRequestWorkspaceContext(req.userId, req);
     if (!context) {
       res.status(403).json({ message: "Workspace not found" });
       return;
@@ -110,7 +111,7 @@ export async function updateWorkspaceMemberRoleController(
       return;
     }
 
-    const context = await getUserWorkspaceContext(req.userId);
+    const context = await resolveRequestWorkspaceContext(req.userId, req);
     if (!context) {
       res.status(403).json({ message: "Workspace not found" });
       return;
@@ -157,7 +158,7 @@ export async function removeWorkspaceMemberController(
       return;
     }
 
-    const context = await getUserWorkspaceContext(req.userId);
+    const context = await resolveRequestWorkspaceContext(req.userId, req);
     if (!context) {
       res.status(403).json({ message: "Workspace not found" });
       return;
@@ -193,7 +194,7 @@ export async function getWorkspaceSettingsController(
       return;
     }
 
-    const workspace = await getUserCurrentWorkspace(req.userId);
+    const workspace = await resolveRequestCurrentWorkspace(req.userId, req);
     if (!workspace) {
       res.status(403).json({ message: "Workspace not found" });
       return;
@@ -223,7 +224,12 @@ export async function updateWorkspaceController(req: Request, res: Response, nex
       return;
     }
 
-    const workspace = await updateUserWorkspaceSettings(req.userId, result.data);
+    const selectedWorkspaceId = getSelectedWorkspaceIdFromRequest(req);
+    const workspace = await updateUserWorkspaceSettings(
+      req.userId,
+      result.data,
+      selectedWorkspaceId,
+    );
     res.json({ data: { workspace } });
   } catch (error) {
     handleWorkspaceError(error, res, next);

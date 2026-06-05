@@ -19,6 +19,7 @@ import { projectsRouter } from "./routes/projects.routes.js";
 import { searchRouter } from "./routes/search.routes.js";
 import { tasksRouter } from "./routes/tasks.routes.js";
 import { workspaceRouter } from "./routes/workspace.routes.js";
+import { workspacesRouter } from "./routes/workspaces.routes.js";
 
 const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const uploadsRoot = path.join(serverRoot, "uploads");
@@ -42,6 +43,7 @@ app.use("/api/health", healthRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/billing", billingRouter);
 app.use("/api/workspace", workspaceRouter);
+app.use("/api/workspaces", workspacesRouter);
 app.use("/api/invitations", invitationsRouter);
 app.use("/api/ai", aiRouter);
 app.use("/api/dashboard", dashboardRouter);

@@ -2,6 +2,11 @@ import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { getMe, type AuthWorkspace } from "@/lib/api/auth";
+import {
+  clearSelectedWorkspaceId,
+  getSelectedWorkspaceId,
+  setSelectedWorkspaceId,
+} from "@/lib/api/client";
 import { AUTH_ME_QUERY_KEY } from "@/lib/auth/auth-cache";
 import type { TKey } from "@/lib/i18n";
 import { clearAuthToken, getAuthToken } from "./token";
@@ -25,9 +30,20 @@ export function useCurrentUser() {
       return;
     }
     clearAuthToken();
+    clearSelectedWorkspaceId();
     void queryClient.removeQueries({ queryKey: ["auth"] });
     void router.navigate({ to: "/signin", replace: true });
   }, [hasToken, query.isError, queryClient, router]);
+
+  useEffect(() => {
+    const workspaceId = query.data?.workspace?.id;
+    if (!workspaceId) {
+      return;
+    }
+    if (!getSelectedWorkspaceId()) {
+      setSelectedWorkspaceId(workspaceId);
+    }
+  }, [query.data?.workspace?.id]);
 
   return query;
 }
