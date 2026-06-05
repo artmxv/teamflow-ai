@@ -8,7 +8,7 @@ import {
   updateProject,
 } from "../services/projects.service.js";
 import { canManageProjects } from "../services/project-access.service.js";
-import { getUserWorkspaceContext } from "../services/workspace-context.service.js";
+import { resolveRequestWorkspaceContext } from "../lib/workspace-request.js";
 
 const createProjectSchema = z.object({
   workspaceId: z.string().min(1).optional(),
@@ -32,7 +32,7 @@ const updateProjectSchema = z.object({
 });
 
 async function resolveWorkspace(req: Request, res: Response) {
-  const context = await getUserWorkspaceContext(req.userId!);
+  const context = await resolveRequestWorkspaceContext(req.userId!, req);
   if (!context) {
     res.status(403).json({ message: "Workspace not found" });
     return null;

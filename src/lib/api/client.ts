@@ -1,6 +1,28 @@
 import { getAuthToken } from "@/lib/auth/token";
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
+export const SELECTED_WORKSPACE_STORAGE_KEY = "teamflow.currentWorkspaceId";
+
+export function getSelectedWorkspaceId(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  return localStorage.getItem(SELECTED_WORKSPACE_STORAGE_KEY);
+}
+
+export function setSelectedWorkspaceId(id: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  localStorage.setItem(SELECTED_WORKSPACE_STORAGE_KEY, id);
+}
+
+export function clearSelectedWorkspaceId(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  localStorage.removeItem(SELECTED_WORKSPACE_STORAGE_KEY);
+}
 
 export class ApiError extends Error {
   constructor(
@@ -31,6 +53,11 @@ export async function apiRequest<T>(path: string, options?: ApiRequestOptions): 
     const token = getAuthToken();
     if (token) {
       headers.Authorization = `Bearer ${token}`;
+    }
+
+    const workspaceId = getSelectedWorkspaceId();
+    if (workspaceId) {
+      headers["X-Workspace-Id"] = workspaceId;
     }
   }
 

@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 
 import { getWorkspaceAiSummary } from "../services/ai.service.js";
-import { getUserWorkspaceContext } from "../services/workspace-context.service.js";
+import { resolveRequestWorkspaceContext } from "../lib/workspace-request.js";
 
 function normalizeAiResponseText(value: string): string {
   return value
@@ -17,7 +17,7 @@ export async function getWorkspaceAiSummaryController(
   next: NextFunction,
 ) {
   try {
-    const context = await getUserWorkspaceContext(req.userId!);
+    const context = await resolveRequestWorkspaceContext(req.userId!, req);
     if (!context) {
       res.status(403).json({ message: "Workspace not found" });
       return;

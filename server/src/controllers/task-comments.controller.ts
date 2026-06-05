@@ -7,7 +7,7 @@ import {
   getTaskComments,
   updateTaskComment,
 } from "../services/task-comments.service.js";
-import { getUserWorkspaceContext } from "../services/workspace-context.service.js";
+import { resolveRequestWorkspaceContext } from "../lib/workspace-request.js";
 
 const commentBodySchema = z.object({
   body: z
@@ -18,7 +18,7 @@ const commentBodySchema = z.object({
 });
 
 async function resolveWorkspace(req: Request, res: Response) {
-  const context = await getUserWorkspaceContext(req.userId!);
+  const context = await resolveRequestWorkspaceContext(req.userId!, req);
   if (!context) {
     res.status(403).json({ message: "Workspace not found" });
     return null;

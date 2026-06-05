@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 
 import { createTask, deleteTask, getTasks, updateTask } from "../services/tasks.service.js";
-import { getUserWorkspaceContext } from "../services/workspace-context.service.js";
+import { resolveRequestWorkspaceContext } from "../lib/workspace-request.js";
 
 const createTaskSchema = z.object({
   projectId: z.string().min(1, "projectId is required"),
@@ -30,7 +30,7 @@ const updateTaskSchema = z.object({
 });
 
 async function resolveWorkspace(req: Request, res: Response) {
-  const context = await getUserWorkspaceContext(req.userId!);
+  const context = await resolveRequestWorkspaceContext(req.userId!, req);
   if (!context) {
     res.status(403).json({ message: "Workspace not found" });
     return null;

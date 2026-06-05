@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { AuthError } from "../services/auth.service.js";
 import { getBillingSummary, updateWorkspaceBillingPlan } from "../services/billing.service.js";
-import { getUserWorkspaceContext } from "../services/workspace-context.service.js";
+import { resolveRequestWorkspaceContext } from "../lib/workspace-request.js";
 
 const updatePlanSchema = z.object({
   plan: z.enum(["FREE", "TEAM", "BUSINESS", "ENTERPRISE"]),
@@ -27,7 +27,7 @@ export async function getBillingSummaryController(req: Request, res: Response, n
       return;
     }
 
-    const context = await getUserWorkspaceContext(req.userId);
+    const context = await resolveRequestWorkspaceContext(req.userId, req);
     if (!context) {
       res.status(403).json({ message: "Workspace not found" });
       return;
@@ -57,7 +57,7 @@ export async function updateBillingPlanController(req: Request, res: Response, n
       return;
     }
 
-    const context = await getUserWorkspaceContext(req.userId);
+    const context = await resolveRequestWorkspaceContext(req.userId, req);
     if (!context) {
       res.status(403).json({ message: "Workspace not found" });
       return;

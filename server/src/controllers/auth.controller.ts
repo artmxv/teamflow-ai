@@ -12,7 +12,7 @@ import {
   updateUserAvatarUrl,
   updateUserProfile,
 } from "../services/auth.service.js";
-import { getUserCurrentWorkspace } from "../services/workspace-context.service.js";
+import { resolveRequestCurrentWorkspace } from "../lib/workspace-request.js";
 
 const registerPasswordSchema = z
   .string()
@@ -129,7 +129,7 @@ export async function meController(req: Request, res: Response, next: NextFuncti
 
     const [user, workspace] = await Promise.all([
       getUserById(req.userId),
-      getUserCurrentWorkspace(req.userId),
+      resolveRequestCurrentWorkspace(req.userId, req),
     ]);
     res.json({ data: { user, workspace } });
   } catch (error) {

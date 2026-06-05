@@ -1,5 +1,5 @@
-import { Link, useRouterState } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -14,11 +14,19 @@ import {
   PanelLeftOpen,
   ChevronDown,
   Check,
+  Trash2,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { nameToInitials, isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user";
+import { toast } from "sonner";
+import { ApiError, setSelectedWorkspaceId } from "@/lib/api/client";
+import { fetchWorkspaces, switchWorkspace } from "@/lib/api/workspaces";
+import { invalidateWorkspaceScopedQueries, WORKSPACES_QUERY_KEY } from "@/lib/workspace-queries";
+import { getWorkspaceAccent, type WorkspaceColorInput } from "@/lib/workspace-color";
+import { CreateWorkspaceDialog } from "./CreateWorkspaceDialog";
+import { DeleteWorkspaceDialog } from "./DeleteWorkspaceDialog";
 import { NewProjectDialog } from "./QuickActionDialogs";
 import type { Workspace } from "./AppShell";
 import { fetchProjects } from "@/lib/api/projects";
@@ -28,7 +36,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -66,6 +73,39 @@ function SidebarTip({
   );
 }
 
+function WorkspaceAvatar({
+  item,
+  initials,
+  size = "size-6",
+}: {
+  item: WorkspaceColorSource;
+  initials: string;
+  size?: string;
+}) {
+  const accent = getWorkspaceAccent(item);
+  return (
+    <span
+      className={cn(
+        "grid shrink-0 place-items-center rounded-md bg-gradient-to-br text-[10px] font-semibold text-white shadow-sm",
+        size,
+        accent.gradient,
+      )}
+    >
+      {initials}
+    </span>
+  );
+}
+
+type WorkspaceColorSource = WorkspaceColorInput;
+
+function WorkspaceSwitcherSectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <div className="px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+      {children}
+    </div>
+  );
+}
+
 function WorkspaceSwitcher({
   workspace,
   loading,
@@ -76,6 +116,27 @@ function WorkspaceSwitcher({
   collapsed: boolean;
 }) {
   const { t } = useI18n();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const { data: workspaces = [], isLoading: workspacesLoading } = useQuery({
+    queryKey: WORKSPACES_QUERY_KEY,
+    queryFn: fetchWorkspaces,
+    enabled: !!workspace,
+  });
+
+  const switchMutation = useMutation({
+    mutationFn: switchWorkspace,
+    onSuccess: async (selected) => {
+      setSelectedWorkspaceId(selected.id);
+      await invalidateWorkspaceScopedQueries(queryClient);
+      toast.success(t("workspace.switched"));
+      void navigate({ to: "/app/dashboard" });
+    },
+    onError: () => {
+      toast.error(t("workspace.switchFailed"));
+    },
+  });
 
   if (loading && !workspace) {
     return (
@@ -101,18 +162,25 @@ function WorkspaceSwitcher({
     return null;
   }
 
+  const currentWorkspaceItem = workspaces.find((item) => item.id === workspace.id);
+  const canDeleteCurrent = currentWorkspaceItem?.role === "OWNER";
+  const otherWorkspaces = workspaces.filter((item) => item.id !== workspace.id);
+  const currentAccentSource: WorkspaceColorSource = {
+    id: workspace.id,
+    name: workspace.name,
+    slug: workspace.slug,
+  };
+
   const trigger = (
     <button
       type="button"
       title={workspace.name}
       className={cn(
-        "flex w-full min-w-0 items-center rounded-xl border border-sidebar-border bg-card text-left text-sm transition hover:bg-sidebar-accent outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+        "flex w-full min-w-0 items-center rounded-xl border border-sidebar-border bg-card text-left text-sm transition hover:border-border hover:bg-card/90 hover:shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
         collapsed ? "justify-center p-2" : "gap-2 px-3 py-2",
       )}
     >
-      <span className="grid size-6 shrink-0 place-items-center rounded-md bg-gradient-brand text-[10px] font-semibold text-white">
-        {workspace.initials}
-      </span>
+      <WorkspaceAvatar item={currentAccentSource} initials={workspace.initials} />
       {!collapsed && (
         <>
           <span className="min-w-0 flex-1 truncate font-medium">{workspace.name}</span>
@@ -123,30 +191,78 @@ function WorkspaceSwitcher({
   );
 
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-64" side={collapsed ? "right" : "bottom"}>
-        <DropdownMenuLabel>{t("workspace.switchWorkspace")}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem disabled className="gap-2 opacity-100 focus:bg-secondary/50">
-          <span className="grid size-6 shrink-0 place-items-center rounded-md bg-gradient-brand text-[10px] font-semibold text-white">
-            {workspace.initials}
-          </span>
-          <span className="min-w-0 flex-1 truncate font-medium">{workspace.name}</span>
+      <DropdownMenuContent
+        align="start"
+        sideOffset={8}
+        className="w-72 rounded-xl border border-border/80 bg-popover p-1.5 shadow-xl ring-1 ring-black/5 dark:border-border dark:bg-popover dark:ring-white/10"
+        side={collapsed ? "right" : "bottom"}
+      >
+        <WorkspaceSwitcherSectionLabel>
+          {t("workspace.currentWorkspace")}
+        </WorkspaceSwitcherSectionLabel>
+        <DropdownMenuItem
+          disabled
+          className="gap-2.5 rounded-lg px-2 py-2 opacity-100 focus:bg-muted/60 data-[disabled]:opacity-100"
+        >
+          <WorkspaceAvatar item={currentAccentSource} initials={workspace.initials} />
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">{workspace.name}</span>
           <Check className="size-4 shrink-0 text-primary" aria-hidden />
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
+
+        <DropdownMenuSeparator className="my-1.5 bg-border/60" />
+
+        <WorkspaceSwitcherSectionLabel>
+          {t("workspace.switchWorkspace")}
+        </WorkspaceSwitcherSectionLabel>
+        {workspacesLoading && (
+          <div className="px-2 py-1.5 text-xs text-muted-foreground">{t("common.loading")}</div>
+        )}
+        {!workspacesLoading && otherWorkspaces.length === 0 && (
+          <div className="px-2 py-1.5 text-xs text-muted-foreground">
+            {t("workspace.noOtherWorkspaces")}
+          </div>
+        )}
+        {otherWorkspaces.map((item) => (
+          <DropdownMenuItem
+            key={item.id}
+            className="gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-accent/80 focus:bg-accent/80"
+            disabled={switchMutation.isPending}
+            onSelect={() => switchMutation.mutate(item.id)}
+          >
+            <WorkspaceAvatar item={item} initials={nameToInitials(item.name)} />
+            <span className="min-w-0 flex-1 truncate text-sm">{item.name}</span>
+          </DropdownMenuItem>
+        ))}
+
+        <DropdownMenuSeparator className="my-1.5 bg-border/60" />
+
+        <WorkspaceSwitcherSectionLabel>{t("workspace.actions")}</WorkspaceSwitcherSectionLabel>
+        <DropdownMenuItem asChild className="rounded-lg px-2 py-2 text-sm">
           <Link to="/app/settings" search={{ tab: "workspace" }} className="cursor-pointer">
             {t("settings.workspaceSettings")}
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem disabled className="flex items-center justify-between gap-2">
-          <span>{t("workspace.createWorkspace")}</span>
-          <span className="shrink-0 text-[11px] text-muted-foreground">
-            {t("common.comingSoon")}
-          </span>
-        </DropdownMenuItem>
+        <CreateWorkspaceDialog>
+          <DropdownMenuItem
+            className="cursor-pointer rounded-lg px-2 py-2 text-sm"
+            onSelect={(event) => event.preventDefault()}
+          >
+            {t("workspace.createWorkspace")}
+          </DropdownMenuItem>
+        </CreateWorkspaceDialog>
+        {canDeleteCurrent ? (
+          <DeleteWorkspaceDialog workspaceId={workspace.id}>
+            <DropdownMenuItem
+              className="cursor-pointer rounded-lg px-2 py-2 text-sm text-destructive focus:text-destructive"
+              onSelect={(event) => event.preventDefault()}
+            >
+              <Trash2 className="size-4" aria-hidden />
+              {t("workspace.deleteWorkspace")}
+            </DropdownMenuItem>
+          </DeleteWorkspaceDialog>
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

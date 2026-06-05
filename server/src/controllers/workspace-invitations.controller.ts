@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { prisma } from "../lib/prisma.js";
 import { AuthError, getUserById } from "../services/auth.service.js";
-import { getUserWorkspaceContext } from "../services/workspace-context.service.js";
+import { resolveRequestWorkspaceContext } from "../lib/workspace-request.js";
 import {
   acceptWorkspaceInvitation,
   createWorkspaceInvitation,
@@ -46,7 +46,7 @@ export async function listWorkspaceInvitationsController(
       return;
     }
 
-    const context = await getUserWorkspaceContext(req.userId);
+    const context = await resolveRequestWorkspaceContext(req.userId, req);
     if (!context) {
       res.status(403).json({ message: "Workspace not found" });
       return;
@@ -80,7 +80,7 @@ export async function createWorkspaceInvitationController(
       return;
     }
 
-    const context = await getUserWorkspaceContext(req.userId);
+    const context = await resolveRequestWorkspaceContext(req.userId, req);
     if (!context) {
       res.status(403).json({ message: "Workspace not found" });
       return;
@@ -131,7 +131,7 @@ export async function revokeWorkspaceInvitationController(
       return;
     }
 
-    const context = await getUserWorkspaceContext(req.userId);
+    const context = await resolveRequestWorkspaceContext(req.userId, req);
     if (!context) {
       res.status(403).json({ message: "Workspace not found" });
       return;
