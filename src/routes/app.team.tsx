@@ -51,6 +51,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useI18n, type Lang, type TKey } from "@/lib/i18n";
+import { displayWorkspaceName } from "@/lib/workspace-display";
 import { formatJoinedDate } from "@/lib/profile-contact";
 import type { WorkspaceRole } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
@@ -150,7 +151,9 @@ function TeamPage() {
   const queryClient = useQueryClient();
   const { data: me } = useCurrentUser();
   const { data: workspace } = useCurrentWorkspace();
-  const workspaceName = workspace?.name ?? "your workspace";
+  const workspaceName = workspace?.name
+    ? displayWorkspaceName(workspace.name, lang)
+    : t("team.workspaceFallback");
   const canManageTeam = canManageWorkspaceTeam(me?.workspace?.role);
   const currentUserId = me?.user.id ?? "";
 

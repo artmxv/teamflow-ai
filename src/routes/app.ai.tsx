@@ -34,10 +34,10 @@ const SECTIONS = [
 ] as const;
 
 function AssistantPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { data, error, isError, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["workspace-ai-summary"],
-    queryFn: fetchWorkspaceAiSummary,
+    queryKey: ["workspace-ai-summary", lang],
+    queryFn: () => fetchWorkspaceAiSummary(lang),
   });
 
   function scrollToSection(id: string) {

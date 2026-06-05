@@ -1,4 +1,4 @@
-import { Avatar } from "@/components/app/Avatar";
+import { UserAvatar } from "@/components/app/UserAvatar";
 import type { AssigneeOption } from "@/lib/assignee-options";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -40,7 +40,13 @@ export function AssigneeAvatars({
       <div className="flex items-center -space-x-1.5">
         {visible.map((assignee) => (
           <span key={assignee.id} className="inline-flex rounded-full ring-2 ring-card">
-            <Avatar id={assignee.id} initials={assignee.avatar} size={size} />
+            <UserAvatar
+              id={assignee.id}
+              name={assignee.name}
+              avatar={assignee.avatar}
+              avatarUrl={assignee.avatarUrl}
+              size={size}
+            />
           </span>
         ))}
       </div>

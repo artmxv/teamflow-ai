@@ -9,7 +9,7 @@ import {
   setWorkspaceStorageUser,
 } from "@/lib/api/client";
 import { fetchWorkspaces, switchWorkspace } from "@/lib/api/workspaces";
-import { getAuthToken } from "@/lib/auth/token";
+import { getAuthToken, setAuthToken } from "@/lib/auth/token";
 import { WORKSPACES_QUERY_KEY } from "@/lib/workspace-queries";
 
 export const AUTH_ME_QUERY_KEY = ["auth", "me"] as const;
@@ -156,4 +156,17 @@ export async function primeAuthMeAfterAuth(
 ): Promise<void> {
   setAuthMeCache(queryClient, { user, workspace: null });
   await ensureValidSelectedWorkspace(queryClient, user);
+}
+
+/** Store JWT, load /me, and restore user-scoped workspace (OAuth callback and similar flows). */
+export async function completeAuthWithToken(
+  queryClient: QueryClient,
+  token: string,
+): Promise<AuthUser> {
+  resetWorkspaceValidationSession();
+  clearActiveWorkspaceId();
+  setAuthToken(token);
+  const me = await getMe();
+  await primeAuthMeAfterAuth(queryClient, me.user);
+  return me.user;
 }

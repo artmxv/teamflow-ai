@@ -23,7 +23,8 @@ export async function getWorkspaceAiSummaryController(
       return;
     }
 
-    const summary = await getWorkspaceAiSummary(context.workspaceId);
+    const locale = req.body?.locale ?? req.query.locale;
+    const summary = await getWorkspaceAiSummary(context.workspaceId, locale);
     res.json({
       data: {
         ...summary,

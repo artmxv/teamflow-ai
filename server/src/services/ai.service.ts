@@ -1,6 +1,26 @@
 import type { Project, Task, TaskStatus, User } from "@prisma/client";
 
 import { prisma } from "../lib/prisma.js";
+import { displayProjectName, displayTaskTitle } from "../lib/starter-content.js";
+import {
+  activeProjectsHighlight,
+  buildOverviewCopy,
+  completedHighlight,
+  defaultHighlight,
+  emptyStandup,
+  emptyWorkspaceHighlight,
+  highPriorityRisk,
+  inProgressHighlight,
+  noRisks,
+  overdueRisk,
+  parseAiLocale,
+  rebalanceAction,
+  reviewBoardAction,
+  starterActions,
+  updateStatusesAction,
+  urgentRisk,
+  type AiLocale,
+} from "./ai-copy.js";
 
 type AssigneeUser = Pick<User, "id" | "name" | "email">;
 
@@ -56,9 +76,9 @@ function stripTrailingPeriods(text: string): string {
   return sanitizeText(text).replace(/\.+$/, "");
 }
 
-function formatInProgressTask(task: TaskWithRelations): string {
+function formatInProgressTask(task: TaskWithRelations, locale: AiLocale): string {
   const key = sanitizeText(task.key);
-  const title = sanitizeText(task.title);
+  const title = sanitizeText(displayTaskTitle(task.title, locale));
   return `(${key}: ${title})`;
 }
 
@@ -77,7 +97,7 @@ function resolveTaskAssigneeNames(task: TaskWithRelations): string[] {
   return [];
 }
 
-function formatAssigneeSuffix(names: string[]): string {
+function formatAssigneeSuffix(names: string[], locale: AiLocale): string {
   if (names.length === 0) {
     return "";
   }
@@ -87,105 +107,87 @@ function formatAssigneeSuffix(names: string[]): string {
   if (names.length === 2) {
     return ` (${names[0]}, ${names[1]})`;
   }
-  return ` (${names[0]} + ${names.length - 1} more)`;
+  return locale === "ru"
+    ? ` (${names[0]} + ещё ${names.length - 1})`
+    : ` (${names[0]} + ${names.length - 1} more)`;
 }
 
-function formatTaskRef(task: TaskWithRelations): string {
-  const assigneeSuffix = formatAssigneeSuffix(resolveTaskAssigneeNames(task));
-  return `${task.key}: ${task.title} in ${task.project.name}${assigneeSuffix}`;
+function formatTaskRef(task: TaskWithRelations, locale: AiLocale): string {
+  const assigneeSuffix = formatAssigneeSuffix(resolveTaskAssigneeNames(task), locale);
+  const inWord = locale === "ru" ? "в" : "in";
+  const title = displayTaskTitle(task.title, locale);
+  const projectName = displayProjectName(task.project.name, locale);
+  return `${task.key}: ${title} ${inWord} ${projectName}${assigneeSuffix}`;
 }
 
-function buildOverview(metrics: WorkspaceAiMetrics): string {
-  if (metrics.totalProjects === 0) {
-    return "The workspace has no projects yet. Create a project and add tasks to start tracking delivery.";
-  }
-
-  const projectPart =
-    metrics.activeProjects === metrics.totalProjects
-      ? formatCount(metrics.totalProjects, "project", "projects")
-      : `${metrics.activeProjects} active of ${metrics.totalProjects} projects`;
-
-  if (metrics.totalTasks === 0) {
-    return `The workspace has ${projectPart} but no tasks yet. Add tasks to monitor progress and priorities.`;
-  }
-
-  const { openTasks, completedTasks } = metrics;
-  const openTasksLabel = openTasks === 1 ? "open task" : "open tasks";
-  const completedTasksLabel = completedTasks === 1 ? "completed task" : "completed tasks";
-
-  return `The workspace has ${projectPart}, ${openTasks} ${openTasksLabel}, and ${completedTasks} ${completedTasksLabel}.`;
+function buildOverview(metrics: WorkspaceAiMetrics, locale: AiLocale): string {
+  return buildOverviewCopy(locale, metrics);
 }
 
 function buildHighlights(
   metrics: WorkspaceAiMetrics,
   projects: Pick<Project, "name" | "status">[],
   tasks: TaskWithRelations[],
+  locale: AiLocale,
 ): string[] {
   const highlights: string[] = [];
 
   if (metrics.totalProjects === 0 && metrics.totalTasks === 0) {
-    highlights.push("Workspace is ready for the first project and task backlog.");
+    highlights.push(emptyWorkspaceHighlight(locale));
     return highlights;
   }
 
   if (metrics.completedTasks > 0) {
-    highlights.push(
-      `${formatCount(metrics.completedTasks, "task has", "tasks have")} been completed across the workspace.`,
-    );
+    highlights.push(completedHighlight(locale, metrics.completedTasks));
   }
 
   const inProgressCount = tasks.filter((task) => task.status === "IN_PROGRESS").length;
   if (inProgressCount > 0) {
-    highlights.push(
-      `${formatCount(inProgressCount, "task is", "tasks are")} actively in progress.`,
-    );
+    highlights.push(inProgressHighlight(locale, inProgressCount));
   }
 
   const activeProjectNames = projects
     .filter((project) => project.status === "ACTIVE")
-    .map((project) => project.name);
+    .map((project) => displayProjectName(project.name, locale));
   if (activeProjectNames.length > 0) {
-    highlights.push(
-      `Active delivery focus: ${activeProjectNames.slice(0, 3).join(", ")}${activeProjectNames.length > 3 ? ", and others" : ""}.`,
-    );
+    highlights.push(activeProjectsHighlight(locale, activeProjectNames));
   }
 
   if (highlights.length === 0) {
-    highlights.push("Work is underway; continue moving tasks through the workflow.");
+    highlights.push(defaultHighlight(locale));
   }
 
   return highlights;
 }
 
-function buildRisks(metrics: WorkspaceAiMetrics, tasks: TaskWithRelations[], now: Date): string[] {
+function buildRisks(
+  metrics: WorkspaceAiMetrics,
+  tasks: TaskWithRelations[],
+  now: Date,
+  locale: AiLocale,
+): string[] {
   const risks: string[] = [];
 
   const overdue = tasks.filter((task) => isOverdueTask(task, now));
   if (overdue.length > 0) {
-    const sample = overdue.slice(0, 3).map((task) => formatTaskRef(task));
-    risks.push(
-      `${overdue.length} overdue task${overdue.length === 1 ? "" : "s"} need attention: ${sample.join("; ")}.`,
-    );
+    const sample = overdue.slice(0, 3).map((task) => formatTaskRef(task, locale));
+    risks.push(overdueRisk(locale, overdue.length, sample.join("; ")));
   }
 
   const urgentOpen = tasks.filter((task) => task.priority === "URGENT" && task.status !== "DONE");
   if (urgentOpen.length > 0) {
-    risks.push(
-      `${urgentOpen.length} urgent open task${urgentOpen.length === 1 ? "" : "s"} may block delivery if not addressed soon.`,
-    );
+    risks.push(urgentRisk(locale, urgentOpen.length));
   }
 
   const highPriorityOpen = tasks.filter(
     (task) => task.priority === "HIGH" && task.status !== "DONE",
   );
   if (highPriorityOpen.length > 0 && metrics.urgentTasks === 0) {
-    risks.push(
-      `${highPriorityOpen.length} high-priority open task${highPriorityOpen.length === 1 ? "" : "s"} should be scheduled in the current sprint.`,
-    );
+    risks.push(highPriorityRisk(locale, highPriorityOpen.length));
   }
 
   if (risks.length === 0) {
-    risks.push("No major risks detected at this time.");
+    risks.push(noRisks(locale));
   }
 
   return risks;
@@ -195,21 +197,14 @@ function buildRecommendedNextActions(
   metrics: WorkspaceAiMetrics,
   tasks: TaskWithRelations[],
   now: Date,
+  locale: AiLocale,
 ): string[] {
   if (metrics.totalProjects === 0) {
-    return [
-      "Create the first project to organize work by initiative.",
-      "Define initial milestones and owners for the new project.",
-      "Add tasks with priorities and due dates once the project exists.",
-    ];
+    return starterActions(locale, "projects");
   }
 
   if (metrics.totalTasks === 0) {
-    return [
-      "Break active projects into actionable tasks with clear owners.",
-      "Set priorities and due dates on new tasks to enable progress tracking.",
-      "Review project scope with the team and align on the first sprint goals.",
-    ];
+    return starterActions(locale, "tasks");
   }
 
   const actions: string[] = [];
@@ -223,39 +218,59 @@ function buildRecommendedNextActions(
   };
 
   for (const task of tasks.filter((item) => isOverdueTask(item, now)).slice(0, 2)) {
-    addAction(`Resolve overdue work: ${formatTaskRef(task)}.`);
+    addAction(
+      locale === "ru"
+        ? `Закройте просроченную работу: ${formatTaskRef(task, locale)}.`
+        : `Resolve overdue work: ${formatTaskRef(task, locale)}.`,
+    );
   }
 
   for (const task of tasks
     .filter((item) => item.priority === "URGENT" && item.status !== "DONE")
     .slice(0, 2)) {
-    addAction(`Prioritize urgent task ${task.key} (${task.title}) in ${task.project.name}.`);
+    addAction(
+      locale === "ru"
+        ? `Приоритизируйте срочную задачу ${task.key} (${displayTaskTitle(task.title, locale)}) в ${displayProjectName(task.project.name, locale)}.`
+        : `Prioritize urgent task ${task.key} (${displayTaskTitle(task.title, locale)}) in ${displayProjectName(task.project.name, locale)}.`,
+    );
   }
 
   for (const task of tasks.filter((item) => item.status === "REVIEW").slice(0, 2)) {
-    addAction(`Complete review for ${task.key} and move it to done or back to in progress.`);
+    addAction(
+      locale === "ru"
+        ? `Завершите ревью ${task.key} и переведите в done или обратно в in progress.`
+        : `Complete review for ${task.key} and move it to done or back to in progress.`,
+    );
   }
 
   for (const task of tasks
     .filter((item) => item.status === "IN_PROGRESS" && item.priority === "HIGH")
     .slice(0, 1)) {
-    addAction(`Support in-progress delivery on ${task.key} in ${task.project.name}.`);
+    addAction(
+      locale === "ru"
+        ? `Поддержите задачу в работе ${task.key} в ${displayProjectName(task.project.name, locale)}.`
+        : `Support in-progress delivery on ${task.key} in ${displayProjectName(task.project.name, locale)}.`,
+    );
   }
 
   for (const task of tasks
     .filter((item) => OPEN_TASK_STATUSES.includes(item.status) && item.status === "TODO")
     .slice(0, 1)) {
-    addAction(`Start or assign ready work: ${task.key} (${task.title}).`);
+    addAction(
+      locale === "ru"
+        ? `Начните или назначьте готовую работу: ${task.key} (${displayTaskTitle(task.title, locale)}).`
+        : `Start or assign ready work: ${task.key} (${displayTaskTitle(task.title, locale)}).`,
+    );
   }
 
   if (metrics.openTasks > metrics.completedTasks) {
-    addAction("Run a short planning pass to rebalance open tasks across active projects.");
+    addAction(rebalanceAction(locale));
   }
 
-  addAction("Update task statuses after today's work to keep the workspace summary accurate.");
+  addAction(updateStatusesAction(locale));
 
   while (actions.length < 3) {
-    addAction("Review the task board with the team and confirm owners for open work.");
+    addAction(reviewBoardAction(locale));
     break;
   }
 
@@ -266,61 +281,76 @@ function buildStandupSummary(
   metrics: WorkspaceAiMetrics,
   projects: Pick<Project, "name" | "status">[],
   tasks: TaskWithRelations[],
+  locale: AiLocale,
 ): string {
   if (metrics.totalProjects === 0) {
-    const sentences = [
-      "The team workspace is set up but does not have projects yet",
-      "Today's focus can be creating the first project and defining the initial backlog",
-      "Once tasks exist, this summary will reflect in-progress and completed work",
-    ]
-      .map(stripTrailingPeriods)
-      .filter(Boolean);
-
-    return `${sentences.join(". ")}.`;
+    return emptyStandup(locale);
   }
 
   const activeNames = projects
     .filter((project) => project.status === "ACTIVE")
-    .map((project) => project.name);
+    .map((project) => displayProjectName(project.name, locale));
   const activeProjectNames = activeNames
     .slice(0, 2)
     .map((name) => sanitizeText(name))
-    .join(" and ");
+    .join(locale === "ru" ? " и " : " and ");
   const activeProjectsText =
     activeNames.length > 0
-      ? `Active projects include ${activeProjectNames}`
-      : "Projects are in planning or on hold; confirm which initiatives are active today";
+      ? locale === "ru"
+        ? `Активные проекты: ${activeProjectNames}`
+        : `Active projects include ${activeProjectNames}`
+      : locale === "ru"
+        ? "Проекты в планировании или на паузе; уточните активные инициативы на сегодня"
+        : "Projects are in planning or on hold; confirm which initiatives are active today";
 
   const inProgress = tasks.filter((task) => task.status === "IN_PROGRESS");
   const inProgressDetails = inProgress
     .slice(0, 2)
-    .map((task) => formatInProgressTask(task))
+    .map((task) => formatInProgressTask(task, locale))
     .join("; ");
   const progressText =
     inProgress.length > 0
-      ? `Currently in progress: ${inProgressDetails}`
+      ? locale === "ru"
+        ? `Сейчас в работе: ${inProgressDetails}`
+        : `Currently in progress: ${inProgressDetails}`
       : metrics.openTasks > 0
-        ? "No tasks are marked in progress yet; consider pulling the next highest-priority item"
-        : "All tracked tasks are complete for now";
+        ? locale === "ru"
+          ? "Пока нет задач в работе; возьмите следующую по приоритету"
+          : "No tasks are marked in progress yet; consider pulling the next highest-priority item"
+        : locale === "ru"
+          ? "Все отслеживаемые задачи выполнены"
+          : "All tracked tasks are complete for now";
 
   const riskText =
     metrics.overdueTasks > 0 || metrics.urgentTasks > 0
-      ? `Before the end of the day, address ${formatCount(
-          metrics.overdueTasks,
-          "overdue task",
-          "overdue tasks",
-        )} and ${formatCount(metrics.urgentTasks, "urgent open item", "urgent open items")}`
-      : "No urgent or overdue items are flagged right now";
+      ? locale === "ru"
+        ? `До конца дня закройте ${formatCount(
+            metrics.overdueTasks,
+            "просроченную задачу",
+            "просроченных задач",
+          )} и ${formatCount(metrics.urgentTasks, "срочный открытый пункт", "срочных открытых пунктов")}`
+        : `Before the end of the day, address ${formatCount(
+            metrics.overdueTasks,
+            "overdue task",
+            "overdue tasks",
+          )} and ${formatCount(metrics.urgentTasks, "urgent open item", "urgent open items")}`
+      : locale === "ru"
+        ? "Срочных и просроченных пунктов сейчас нет"
+        : "No urgent or overdue items are flagged right now";
 
   const completedText =
     metrics.completedTasks > 0
-      ? [
-          formatCount(metrics.completedTasks, "task is", "tasks are"),
-          "already",
-          "marked",
-          "done",
-        ].join(" ")
-      : "Completed work will appear here as tasks move to done";
+      ? locale === "ru"
+        ? `${formatCount(metrics.completedTasks, "задача уже", "задач уже")} отмечена выполненной`
+        : [
+            formatCount(metrics.completedTasks, "task is", "tasks are"),
+            "already",
+            "marked",
+            "done",
+          ].join(" ")
+      : locale === "ru"
+        ? "Выполненная работа появится здесь по мере закрытия задач"
+        : "Completed work will appear here as tasks move to done";
 
   const sentences = [activeProjectsText, progressText, completedText, riskText]
     .map(stripTrailingPeriods)
@@ -329,7 +359,11 @@ function buildStandupSummary(
   return `${sentences.join(". ")}.`;
 }
 
-export async function getWorkspaceAiSummary(workspaceId: string): Promise<WorkspaceAiSummary> {
+export async function getWorkspaceAiSummary(
+  workspaceId: string,
+  localeInput?: unknown,
+): Promise<WorkspaceAiSummary> {
+  const locale = parseAiLocale(localeInput);
   const now = new Date();
   const projectWhere = { workspaceId };
   const taskWhere = { project: { workspaceId } };
@@ -424,13 +458,13 @@ export async function getWorkspaceAiSummary(workspaceId: string): Promise<Worksp
   };
 
   return {
-    overview: normalizeSummaryText(buildOverview(metrics)),
-    highlights: buildHighlights(metrics, projects, tasks).map(normalizeSummaryText),
-    risks: buildRisks(metrics, tasks, now).map(normalizeSummaryText),
-    recommendedNextActions: buildRecommendedNextActions(metrics, tasks, now).map(
+    overview: normalizeSummaryText(buildOverview(metrics, locale)),
+    highlights: buildHighlights(metrics, projects, tasks, locale).map(normalizeSummaryText),
+    risks: buildRisks(metrics, tasks, now, locale).map(normalizeSummaryText),
+    recommendedNextActions: buildRecommendedNextActions(metrics, tasks, now, locale).map(
       normalizeSummaryText,
     ),
-    standupSummary: normalizeSummaryText(buildStandupSummary(metrics, projects, tasks)),
+    standupSummary: normalizeSummaryText(buildStandupSummary(metrics, projects, tasks, locale)),
     metrics,
   };
 }

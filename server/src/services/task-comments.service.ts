@@ -7,6 +7,7 @@ const authorSelect = {
   name: true,
   email: true,
   avatar: true,
+  avatarUrl: true,
 } as const;
 
 function mapComment(comment: {
@@ -18,6 +19,7 @@ function mapComment(comment: {
     name: string;
     email: string;
     avatar: string | null;
+    avatarUrl: string | null;
   };
 }) {
   return {

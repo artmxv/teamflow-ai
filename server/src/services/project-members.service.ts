@@ -9,6 +9,7 @@ const userSelect = {
   name: true,
   email: true,
   avatar: true,
+  avatarUrl: true,
 } as const;
 
 const projectMemberSelect = {
@@ -29,6 +30,7 @@ type ProjectMemberRecord = {
     name: string;
     email: string;
     avatar: string | null;
+    avatarUrl: string | null;
   };
 };
 

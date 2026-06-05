@@ -55,6 +55,7 @@ import {
 } from "@/lib/i18n";
 import { taskStatusChipClass } from "@/lib/task-status-theme";
 import { cn } from "@/lib/utils";
+import { translateStarterProjectName, translateStarterTitle } from "@/lib/starter-content";
 import {
   ChartContainer,
   ChartTooltip,
@@ -417,14 +418,14 @@ function Dashboard() {
           <div className="mt-4 space-y-3 text-sm">
             <Insight
               tone="warn"
-              title="Mobile App v3 is slipping"
-              body="2 days behind. 3 high-priority tasks are unassigned."
+              title={t("dashboard.insightMobileSlipping")}
+              body={t("dashboard.insightMobileSlippingBody")}
               target={{ to: "/app/tasks", search: { status: "open" } }}
             />
             <Insight
               tone="ok"
-              title="Orion Web App is on track"
-              body="Velocity is up 18% week-over-week."
+              title={t("dashboard.insightOrionOnTrack")}
+              body={t("dashboard.insightOrionOnTrackBody")}
               target={
                 orionProjectId
                   ? { to: "/app/projects/$projectId", params: { projectId: orionProjectId } }
@@ -433,8 +434,8 @@ function Dashboard() {
             />
             <Insight
               tone="info"
-              title="Weekly digest ready"
-              body="A standup summary has been drafted for the team."
+              title={t("dashboard.insightWeeklyDigest")}
+              body={t("dashboard.insightWeeklyDigestBody")}
               target={{ to: "/app/team" }}
             />
           </div>
@@ -463,7 +464,7 @@ function Dashboard() {
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               {dashboardProjects.map((p) => (
-                <DashboardProjectCard key={p.id} project={p} t={t} />
+                <DashboardProjectCard key={p.id} project={p} t={t} lang={lang} />
               ))}
             </div>
           )}
@@ -493,7 +494,7 @@ function Dashboard() {
         ) : (
           <ul className="divide-y divide-border">
             {data?.recentTasks.map((task) => (
-              <RecentTaskRow key={task.id} task={task} t={t} />
+              <RecentTaskRow key={task.id} task={task} t={t} lang={lang} />
             ))}
           </ul>
         )}
@@ -502,13 +503,22 @@ function Dashboard() {
   );
 }
 
-function RecentTaskRow({ task, t }: { task: DashboardRecentTask; t: (key: TKey) => string }) {
+function RecentTaskRow({
+  task,
+  t,
+  lang,
+}: {
+  task: DashboardRecentTask;
+  t: (key: TKey) => string;
+  lang: import("@/lib/i18n").Lang;
+}) {
   const status = recentStatusMeta[task.status];
   const assigneeOptions = task.assignees.map((assignee) => ({
     id: assignee.id,
     name: assignee.name,
     email: assignee.email,
-    avatar: assignee.avatar ?? initialsFromName(assignee.name),
+    avatar: initialsFromName(assignee.name),
+    avatarUrl: assignee.avatarUrl ?? null,
   }));
   const taskSearch = task.id ? { taskId: task.id } : undefined;
 
@@ -517,7 +527,7 @@ function RecentTaskRow({ task, t }: { task: DashboardRecentTask; t: (key: TKey) 
       <Link
         to="/app/tasks"
         search={taskSearch}
-        aria-label={`${t("dashboard.viewTask")}: ${task.title}`}
+        aria-label={`${t("dashboard.viewTask")}: ${translateStarterTitle(task.title, lang)}`}
         className="flex items-center gap-3 rounded-lg py-3 text-sm transition hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {assigneeOptions.length > 0 ? (
@@ -532,10 +542,10 @@ function RecentTaskRow({ task, t }: { task: DashboardRecentTask; t: (key: TKey) 
             <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
               {task.key}
             </span>
-            <span className="truncate font-medium">{task.title}</span>
+            <span className="truncate font-medium">{translateStarterTitle(task.title, lang)}</span>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span>{task.project.name}</span>
+            <span>{translateStarterProjectName(task.project.name, lang)}</span>
             <Badge variant="secondary" className={status.tone + " border-0 capitalize"}>
               {t(status.labelKey)}
             </Badge>
@@ -585,9 +595,11 @@ function mapApiProjectToDashboardCard(project: ProjectApiItem): DashboardProject
 function DashboardProjectCard({
   project,
   t,
+  lang,
 }: {
   project: DashboardProjectCard;
   t: (key: TKey) => string;
+  lang: import("@/lib/i18n").Lang;
 }) {
   const meta = projectStatusMeta[project.status];
   const cardBody = (
@@ -595,7 +607,9 @@ function DashboardProjectCard({
       <div className="flex items-start justify-between">
         <div>
           <div className={"h-1.5 w-10 rounded-full bg-gradient-to-r " + project.color} />
-          <div className="mt-2 text-sm font-semibold">{project.name}</div>
+          <div className="mt-2 text-sm font-semibold">
+            {translateStarterProjectName(project.name, lang)}
+          </div>
           <div className="text-xs text-muted-foreground">
             {project.openTasks} open · {project.totalTasks} total
           </div>
@@ -624,7 +638,7 @@ function DashboardProjectCard({
     <Link
       to="/app/projects/$projectId"
       params={{ projectId: project.id }}
-      aria-label={`${t("dashboard.viewProject")}: ${project.name}`}
+      aria-label={`${t("dashboard.viewProject")}: ${translateStarterProjectName(project.name, lang)}`}
       className="group block rounded-xl border border-border p-4 transition hover:border-primary/30 hover:bg-accent/30"
     >
       {cardBody}

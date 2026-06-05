@@ -9,6 +9,7 @@ const assigneeUserSelect = {
   name: true,
   email: true,
   avatar: true,
+  avatarUrl: true,
 } as const;
 
 function mapRecentTaskAssignees(task: {
@@ -17,6 +18,7 @@ function mapRecentTaskAssignees(task: {
     name: string;
     email: string;
     avatar: string | null;
+    avatarUrl: string | null;
   } | null;
   taskAssignees: {
     user: {
@@ -24,6 +26,7 @@ function mapRecentTaskAssignees(task: {
       name: string;
       email: string;
       avatar: string | null;
+      avatarUrl: string | null;
     };
   }[];
 }) {

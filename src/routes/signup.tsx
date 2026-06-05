@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -8,12 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { register } from "@/lib/api/auth";
 import { primeAuthMeAfterAuth, resetWorkspaceValidationSession } from "@/lib/auth/auth-cache";
+import { googleAuthErrorKey, startGoogleAuth } from "@/lib/auth/google-auth";
 import { getSafeRedirectPath } from "@/lib/auth/safe-redirect";
 import { getAuthToken, setAuthToken } from "@/lib/auth/token";
+import { useI18n } from "@/lib/i18n";
 import { PASSWORD_HELPER_TEXT, validatePassword } from "@/lib/validation/password";
 
 export type SignUpSearch = {
   redirect?: string;
+  error?: string;
 };
 
 export const Route = createFileRoute("/signup")({
@@ -22,6 +25,7 @@ export const Route = createFileRoute("/signup")({
       typeof search.redirect === "string" && search.redirect.length > 0
         ? search.redirect
         : undefined,
+    error: typeof search.error === "string" && search.error.length > 0 ? search.error : undefined,
   }),
   beforeLoad: ({ search }) => {
     if (typeof window === "undefined") {
@@ -38,7 +42,8 @@ export const Route = createFileRoute("/signup")({
 function SignUp() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { redirect: redirectPath } = Route.useSearch();
+  const { t } = useI18n();
+  const { redirect: redirectPath, error: googleError } = Route.useSearch();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -46,6 +51,13 @@ function SignUp() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!googleError) {
+      return;
+    }
+    toast.error(t(googleAuthErrorKey(googleError)));
+  }, [googleError, t]);
 
   const registerMutation = useMutation({
     mutationFn: register,
@@ -111,8 +123,13 @@ function SignUp() {
           });
         }}
       >
-        <Button type="button" variant="outline" className="w-full">
-          Continue with Google
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={() => startGoogleAuth(redirectPath)}
+        >
+          <GoogleIcon /> {t("auth.continueWithGoogle")}
         </Button>
         <div className="relative my-2 text-center text-xs text-muted-foreground">
           <span className="relative z-10 bg-background px-2">or with email</span>
@@ -219,5 +236,16 @@ function SignUp() {
         </p>
       </form>
     </AuthShell>
+  );
+}
+
+function GoogleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-4">
+      <path
+        fill="#EA4335"
+        d="M12 10.2v3.9h5.5c-.2 1.4-1.6 4-5.5 4-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.7 3.7 14.5 2.7 12 2.7 6.9 2.7 2.7 6.9 2.7 12s4.2 9.3 9.3 9.3c5.4 0 8.9-3.8 8.9-9.1 0-.6-.1-1-.1-1.5H12z"
+      />
+    </svg>
   );
 }

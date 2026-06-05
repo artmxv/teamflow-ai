@@ -29,6 +29,7 @@ const assigneeUserSelect = {
   name: true,
   email: true,
   avatar: true,
+  avatarUrl: true,
 } as const;
 
 const taskDetailSelect = {
@@ -84,6 +85,7 @@ type AssigneeUser = {
   name: string;
   email: string;
   avatar: string | null;
+  avatarUrl: string | null;
 };
 
 function mapAssigneeUser(user: AssigneeUser) {
@@ -92,6 +94,7 @@ function mapAssigneeUser(user: AssigneeUser) {
     name: user.name,
     email: user.email,
     avatar: user.avatar,
+    avatarUrl: user.avatarUrl,
   };
 }
 

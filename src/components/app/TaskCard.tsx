@@ -3,6 +3,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Calendar, GripVertical, MessageSquare, Paperclip } from "lucide-react";
 import { type Task, priorityMeta, statusColumns, type TaskStatus } from "@/lib/mock-data";
 import { priorityLabel, taskStatusLabel, useI18n } from "@/lib/i18n";
+import { translateStarterProjectName, translateStarterTitle } from "@/lib/starter-content";
 import type { AssigneeOption } from "@/lib/assignee-options";
 import { cn } from "@/lib/utils";
 import { AssigneeAvatars } from "./AssigneeAvatars";
@@ -39,7 +40,7 @@ export function TaskCard({
   /** Rendered inside DragOverlay (no drag hooks). */
   dragOverlay?: boolean;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const prio = priorityMeta[task.priority];
   const dueDateLabel = task.dueDate ? formatTaskDueDate(task.dueDate) : null;
 
@@ -75,7 +76,9 @@ export function TaskCard({
             )}
           />
         </div>
-        <div className="mt-1 text-sm font-medium leading-snug">{task.title}</div>
+        <div className="mt-1 text-sm font-medium leading-snug">
+          {translateStarterTitle(task.title, lang)}
+        </div>
 
         {task.labels.length > 0 && (
           <div className="mt-2.5 flex flex-wrap gap-1">
@@ -84,7 +87,7 @@ export function TaskCard({
                 key={l}
                 className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground"
               >
-                {l}
+                {translateStarterProjectName(l, lang)}
               </span>
             ))}
           </div>

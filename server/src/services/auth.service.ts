@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 import { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -162,6 +164,109 @@ export function verifyAuthToken(token: string): string {
   }
 }
 
+async function createUserWithStarterWorkspace(input: {
+  name: string;
+  email: string;
+  passwordHash: string;
+  avatarUrl?: string | null;
+}): Promise<PublicUser> {
+  const email = input.email.toLowerCase();
+  const workspaceName = "Workspace";
+  const workspaceSlug = await createUniqueWorkspaceSlug(input.name);
+
+  return prisma.$transaction(async (tx) => {
+    const createdUser = await tx.user.create({
+      data: {
+        name: input.name,
+        email,
+        passwordHash: input.passwordHash,
+        avatarUrl: input.avatarUrl ?? undefined,
+      },
+      select: publicUserSelect,
+    });
+
+    const workspace = await tx.workspace.create({
+      data: {
+        name: workspaceName,
+        slug: workspaceSlug,
+      },
+    });
+
+    await tx.workspaceMember.create({
+      data: {
+        workspaceId: workspace.id,
+        userId: createdUser.id,
+        role: "OWNER",
+        status: "ACTIVE",
+      },
+    });
+
+    await createStarterWorkspaceData(tx, workspace.id, createdUser.id);
+
+    return createdUser;
+  });
+}
+
+export function isGoogleOAuthConfigured(): boolean {
+  return Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.GOOGLE_REDIRECT_URI);
+}
+
+export type GoogleProfileInput = {
+  email: string;
+  name: string;
+  avatarUrl?: string | null;
+};
+
+export async function findOrCreateGoogleUser(
+  profile: GoogleProfileInput,
+): Promise<{ user: PublicUser; token: string; isNew: boolean }> {
+  const email = profile.email.toLowerCase();
+
+  const existing = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, avatarUrl: true },
+  });
+
+  if (existing) {
+    if (!existing.avatarUrl && profile.avatarUrl) {
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: { avatarUrl: profile.avatarUrl },
+      });
+    }
+
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id: existing.id },
+      select: publicUserSelect,
+    });
+
+    return { user, token: signAuthToken(existing.id), isNew: false };
+  }
+
+  // passwordHash is required by schema; OAuth users get an internal random hash (not user-facing).
+  const passwordHash = await bcrypt.hash(randomBytes(32).toString("hex"), BCRYPT_ROUNDS);
+
+  try {
+    const user = await createUserWithStarterWorkspace({
+      name: profile.name,
+      email,
+      passwordHash,
+      avatarUrl: profile.avatarUrl,
+    });
+
+    return { user, token: signAuthToken(user.id), isNew: true };
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const linkedUser = await prisma.user.findUniqueOrThrow({
+        where: { email },
+        select: publicUserSelect,
+      });
+      return { user: linkedUser, token: signAuthToken(linkedUser.id), isNew: false };
+    }
+    throw error;
+  }
+}
+
 export async function registerUser(input: {
   name: string;
   email: string;
@@ -169,39 +274,12 @@ export async function registerUser(input: {
 }): Promise<{ user: PublicUser; token: string }> {
   const email = input.email.toLowerCase();
   const passwordHash = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
-  const workspaceName = `${input.name}'s Workspace`;
-  const workspaceSlug = await createUniqueWorkspaceSlug(input.name);
 
   try {
-    const user = await prisma.$transaction(async (tx) => {
-      const createdUser = await tx.user.create({
-        data: {
-          name: input.name,
-          email,
-          passwordHash,
-        },
-        select: publicUserSelect,
-      });
-
-      const workspace = await tx.workspace.create({
-        data: {
-          name: workspaceName,
-          slug: workspaceSlug,
-        },
-      });
-
-      await tx.workspaceMember.create({
-        data: {
-          workspaceId: workspace.id,
-          userId: createdUser.id,
-          role: "OWNER",
-          status: "ACTIVE",
-        },
-      });
-
-      await createStarterWorkspaceData(tx, workspace.id, createdUser.id);
-
-      return createdUser;
+    const user = await createUserWithStarterWorkspace({
+      name: input.name,
+      email,
+      passwordHash,
     });
 
     const token = signAuthToken(user.id);

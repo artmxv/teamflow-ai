@@ -5,6 +5,7 @@ export interface TaskCommentAuthor {
   name: string;
   email: string;
   avatar: string | null;
+  avatarUrl: string | null;
 }
 
 export interface TaskCommentApiItem {

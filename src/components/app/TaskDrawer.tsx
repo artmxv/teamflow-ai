@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -32,7 +32,11 @@ import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
 import { AssigneeMultiPicker } from "@/components/app/AssigneeMultiPicker";
 import { fetchProjectMembers } from "@/lib/api/project-members";
 import { fetchWorkspaceMembers } from "@/lib/api/workspace-members";
-import { resolveEditAssigneeOptions, type AssigneeOption } from "@/lib/assignee-options";
+import {
+  enrichAssigneeOptionsWithAvatars,
+  resolveEditAssigneeOptions,
+  type AssigneeOption,
+} from "@/lib/assignee-options";
 import {
   createTaskComment,
   deleteTaskComment,
@@ -55,6 +59,11 @@ import {
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { priorityLabel, taskStatusLabel, useI18n } from "@/lib/i18n";
 import {
+  displayProjectName,
+  displayTaskDescription,
+  displayTaskTitle,
+} from "@/lib/starter-content";
+import {
   type Priority,
   type Task,
   type TaskStatus,
@@ -62,7 +71,7 @@ import {
   priorityMeta,
   statusColumns,
 } from "@/lib/mock-data";
-import { Avatar } from "./Avatar";
+import { UserAvatar } from "@/components/app/UserAvatar";
 import {
   Calendar,
   Flag,
@@ -83,6 +92,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export type TaskDrawerUpdates = {
+  title: string;
   assigneeIds: string[];
   dueDate: string | null;
   status: TaskStatus;
@@ -113,11 +123,12 @@ export function TaskDrawer({
   onDelete?: (taskId: string) => void;
   isDeleting?: boolean;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const queryClient = useQueryClient();
   const { data: me } = useCurrentUser();
   const currentUserId = me?.user.id;
   const [aiOpen, setAiOpen] = useState(false);
+  const [draftTitle, setDraftTitle] = useState("");
   const [draftAssigneeIds, setDraftAssigneeIds] = useState<string[]>([]);
   const [draftDueDate, setDraftDueDate] = useState<string | null>(null);
   const [draftStatus, setDraftStatus] = useState<TaskStatus>("backlog");
@@ -126,13 +137,26 @@ export function TaskDrawer({
   const [deleteTaskOpen, setDeleteTaskOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!task) return;
+  useLayoutEffect(() => {
+    if (!task) {
+      setDraftTitle("");
+      return;
+    }
+    setDraftTitle(displayTaskTitle(task.title, lang));
     setDraftAssigneeIds(task.assigneeIds ?? (task.assigneeId ? [task.assigneeId] : []));
     setDraftDueDate(task.dueDate);
     setDraftStatus(task.status);
     setDraftPriority(task.priority);
-  }, [task?.id, task?.assigneeIds, task?.assigneeId, task?.dueDate, task?.status, task?.priority]);
+  }, [
+    lang,
+    task?.assigneeId,
+    task?.assigneeIds,
+    task?.dueDate,
+    task?.id,
+    task?.priority,
+    task?.status,
+    task?.title,
+  ]);
 
   useEffect(() => {
     setCommentBody("");
@@ -239,11 +263,27 @@ export function TaskDrawer({
     enabled: !!task?.projectId,
   });
 
-  const resolvedAssigneeOptions = useMemo(
-    () =>
-      resolveEditAssigneeOptions(projectMembersQuery.data, workspaceMembersQuery.data, assignees),
-    [assignees, projectMembersQuery.data, workspaceMembersQuery.data],
-  );
+  const resolvedAssigneeOptions = useMemo(() => {
+    const base = resolveEditAssigneeOptions(
+      projectMembersQuery.data,
+      workspaceMembersQuery.data,
+      assignees,
+    );
+    const memberUsers = [
+      ...(workspaceMembersQuery.data ?? []),
+      ...(projectMembersQuery.data ?? []).map((member) => member.user),
+    ];
+    const authUser = me?.user
+      ? [
+          {
+            id: me.user.id,
+            name: me.user.name,
+            avatarUrl: me.user.avatarUrl,
+          },
+        ]
+      : [];
+    return enrichAssigneeOptionsWithAvatars(base, assignees, memberUsers, authUser);
+  }, [assignees, me?.user, projectMembersQuery.data, workspaceMembersQuery.data]);
 
   const assigneeOptionsLoading =
     projectMembersQuery.isLoading ||
@@ -254,20 +294,28 @@ export function TaskDrawer({
   const savedAssigneeIds = task.assigneeIds ?? (task.assigneeId ? [task.assigneeId] : []);
   const canEditTask = !!onSaveChanges;
   const canEditAssignees = canEditTask;
+  const displayedTaskTitle = displayTaskTitle(task.title, lang);
+  const hasTitleChanges = draftTitle.trim() !== displayedTaskTitle.trim();
   const hasAssigneeChanges = !sameAssigneeIds(draftAssigneeIds, savedAssigneeIds);
   const hasDueDateChanges = (draftDueDate ?? null) !== (task.dueDate ?? null);
   const hasStatusChanges = draftStatus !== task.status;
   const hasPriorityChanges = draftPriority !== task.priority;
   const hasChanges =
-    hasAssigneeChanges || hasDueDateChanges || hasStatusChanges || hasPriorityChanges;
+    hasTitleChanges ||
+    hasAssigneeChanges ||
+    hasDueDateChanges ||
+    hasStatusChanges ||
+    hasPriorityChanges;
+  const canSaveChanges = hasChanges && draftTitle.trim().length >= 2;
   const project = getProject(task.projectId);
   const prio = priorityMeta[task.priority];
   const statusLabel = taskStatusLabel(task.status, t);
 
   function handleSaveChanges() {
     if (!onSaveChanges || isSaving) return;
-    if (!hasChanges) return;
+    if (!canSaveChanges) return;
     onSaveChanges({
+      title: draftTitle.trim(),
       assigneeIds: draftAssigneeIds,
       dueDate: draftDueDate,
       status: draftStatus,
@@ -283,9 +331,30 @@ export function TaskDrawer({
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="font-mono">{task.key}</span>
               <span>·</span>
-              <span>{project?.name}</span>
+              <span>{project?.name ? displayProjectName(project.name, lang) : ""}</span>
             </div>
-            <SheetTitle className="text-xl leading-snug">{task.title}</SheetTitle>
+            {canEditTask ? (
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="task-drawer-title"
+                  className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+                >
+                  {t("tasks.taskTitle")}
+                </label>
+                <Input
+                  key={`${task.id}:${lang}`}
+                  id="task-drawer-title"
+                  value={draftTitle}
+                  disabled={isSaving}
+                  className="h-10 text-base font-semibold"
+                  onChange={(event) => setDraftTitle(event.target.value)}
+                />
+              </div>
+            ) : (
+              <SheetTitle className="text-xl leading-snug">
+                {displayTaskTitle(task.title, lang)}
+              </SheetTitle>
+            )}
             <SheetDescription className="sr-only">
               {t("tasks.sheetDescription").replace("{key}", task.key)}
             </SheetDescription>
@@ -312,7 +381,9 @@ export function TaskDrawer({
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   {t("projects.new.description")}
                 </h3>
-                <p className="text-sm leading-relaxed text-foreground/90">{task.description}</p>
+                <p className="text-sm leading-relaxed text-foreground/90">
+                  {displayTaskDescription(task.description, lang)}
+                </p>
               </section>
 
               <section className="rounded-2xl border border-border bg-gradient-to-br from-primary/5 to-transparent p-4">
@@ -456,24 +527,23 @@ export function TaskDrawer({
                 }
               />
 
-              <section>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {t("common.activity")}
-                </h3>
-                <ol className="space-y-2 border-l border-border pl-4">
-                  {task.activity.map((a) => (
-                    <li key={a.id} className="relative text-sm">
-                      <span className="absolute -left-[21px] top-1.5 size-2 rounded-full bg-primary" />
-                      <div>{a.text}</div>
-                      <div className="text-xs text-muted-foreground">{a.at}</div>
-                    </li>
-                  ))}
-                </ol>
-              </section>
+              {task.activity.length > 0 ? (
+                <section>
+                  <ol className="space-y-2 border-l border-border pl-4">
+                    {task.activity.map((a) => (
+                      <li key={a.id} className="relative text-sm">
+                        <span className="absolute -left-[21px] top-1.5 size-2 rounded-full bg-primary" />
+                        <div>{a.text}</div>
+                        <div className="text-xs text-muted-foreground">{a.at}</div>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              ) : null}
             </div>
 
             <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
-              <Field icon={CircleDot} label="Status">
+              <Field icon={CircleDot} label={t("tasks.status")}>
                 {canEditTask ? (
                   <Select
                     value={draftStatus}
@@ -497,7 +567,7 @@ export function TaskDrawer({
                   </Badge>
                 )}
               </Field>
-              <Field icon={Flag} label="Priority">
+              <Field icon={Flag} label={t("tasks.priority")}>
                 {canEditTask ? (
                   <Select
                     value={draftPriority}
@@ -531,7 +601,7 @@ export function TaskDrawer({
                   <AssigneeAvatars assignees={assignees} showUnassignedLabel />
                 </Field>
               ) : null}
-              <Field icon={Calendar} label="Due date">
+              <Field icon={Calendar} label={t("tasks.dueDate")}>
                 {canEditTask ? (
                   <Input
                     type="date"
@@ -547,25 +617,13 @@ export function TaskDrawer({
                   <span className="text-sm">{task.dueDate ?? "—"}</span>
                 )}
               </Field>
-              <Field icon={Flag} label="Labels">
-                <div className="flex flex-wrap gap-1">
-                  {task.labels.map((l) => (
-                    <span
-                      key={l}
-                      className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-medium"
-                    >
-                      {l}
-                    </span>
-                  ))}
-                </div>
-              </Field>
               {canEditTask && (
                 <Button
                   type="button"
                   size="sm"
                   variant="brand"
                   className="w-full"
-                  disabled={!hasChanges || isSaving}
+                  disabled={!canSaveChanges || isSaving}
                   onClick={handleSaveChanges}
                 >
                   {isSaving ? t("settings.saving") : t("common.saveChanges")}
@@ -688,16 +746,16 @@ function TaskCommentsSection({
   return (
     <section>
       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Comments
+        {t("tasks.sectionComments")}
       </h3>
       <div className="space-y-3">
         {isLoading ? (
           <p className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-            Loading comments…
+            {t("comments.loading")}
           </p>
         ) : isError ? (
           <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-4 text-center text-xs text-destructive">
-            Could not load comments. Try closing and reopening the task.
+            {t("comments.error")}
           </p>
         ) : comments.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
@@ -727,11 +785,13 @@ function TaskCommentsSection({
         >
           <AlertDialogContent className="max-w-sm gap-4">
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete comment?</AlertDialogTitle>
-              <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+              <AlertDialogTitle>{t("comments.deleteTitle")}</AlertDialogTitle>
+              <AlertDialogDescription>{t("comments.deleteDescription")}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeletingSelected}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={isDeletingSelected}>
+                {t("common.cancel")}
+              </AlertDialogCancel>
               <Button
                 type="button"
                 variant="destructive"
@@ -740,13 +800,13 @@ function TaskCommentsSection({
                 onClick={() => void handleConfirmDelete()}
               >
                 <Trash2 className="size-4" />
-                {isDeletingSelected ? "Deleting…" : "Delete comment"}
+                {isDeletingSelected ? t("comments.deleting") : t("comments.deleteConfirm")}
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
         <Textarea
-          placeholder="Write a comment…"
+          placeholder={t("tasks.commentPlaceholder")}
           className="min-h-20 rounded-2xl"
           value={commentBody}
           maxLength={1000}
@@ -762,7 +822,7 @@ function TaskCommentsSection({
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] text-muted-foreground">{trimmedLength}/1000</span>
           <Button type="button" size="sm" disabled={!canSubmit} onClick={onSubmit}>
-            {isSubmitting ? "Posting…" : "Comment"}
+            {isSubmitting ? t("tasks.postingComment") : t("tasks.postComment")}
           </Button>
         </div>
       </div>
@@ -828,7 +888,13 @@ function TaskCommentRow({
 
   return (
     <div className="flex gap-2.5">
-      <Avatar id={comment.author.id} initials={authorInitials(comment.author)} size="sm" />
+      <UserAvatar
+        id={comment.author.id}
+        name={comment.author.name}
+        avatar={comment.author.avatar ?? authorInitials(comment.author)}
+        avatarUrl={comment.author.avatarUrl}
+        size="sm"
+      />
       <div className="min-w-0 flex-1 rounded-xl border border-border bg-card px-2.5 py-2">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">

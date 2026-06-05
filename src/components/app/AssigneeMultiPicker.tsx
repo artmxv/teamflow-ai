@@ -1,8 +1,7 @@
 import { X } from "lucide-react";
 
-import { Avatar } from "@/components/app/Avatar";
+import { UserAvatar } from "@/components/app/UserAvatar";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Button } from "@/components/ui/button";
 import { type AssigneeOption } from "@/lib/assignee-options";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -17,7 +16,6 @@ type AssigneeMultiPickerProps = {
   emptySelectedLabel?: string;
   className?: string;
   listClassName?: string;
-  showClearAction?: boolean;
 };
 
 export function AssigneeMultiPicker({
@@ -30,7 +28,6 @@ export function AssigneeMultiPicker({
   emptySelectedLabel,
   className,
   listClassName,
-  showClearAction = true,
 }: AssigneeMultiPickerProps) {
   const { t } = useI18n();
 
@@ -77,7 +74,13 @@ export function AssigneeMultiPicker({
                   key={option.id}
                   className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-background py-0.5 pl-0.5 pr-1.5 text-xs"
                 >
-                  <Avatar id={option.id} initials={option.avatar} size="sm" />
+                  <UserAvatar
+                    id={option.id}
+                    name={option.name}
+                    avatar={option.avatar}
+                    avatarUrl={option.avatarUrl}
+                    size="sm"
+                  />
                   <span className="max-w-[8rem] truncate font-medium">{option.name}</span>
                   {!disabled ? (
                     <button
@@ -132,7 +135,13 @@ export function AssigneeMultiPicker({
                           disabled={disabled}
                           onCheckedChange={(next) => toggleAssignee(option.id, next === true)}
                         />
-                        <Avatar id={option.id} initials={option.avatar} size="sm" />
+                        <UserAvatar
+                          id={option.id}
+                          name={option.name}
+                          avatar={option.avatar}
+                          avatarUrl={option.avatarUrl}
+                          size="sm"
+                        />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-medium">{option.name}</span>
                           {option.email ? (
@@ -150,19 +159,6 @@ export function AssigneeMultiPicker({
           </div>
         </div>
       </div>
-
-      {showClearAction && value.length > 0 ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 px-2 text-xs text-muted-foreground"
-          disabled={disabled}
-          onClick={() => onChange([])}
-        >
-          {t("tasks.clearAssignees")}
-        </Button>
-      ) : null}
     </div>
   );
 }

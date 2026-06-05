@@ -43,6 +43,7 @@ export function UserAvatar({
         key={src}
         src={src}
         alt=""
+        referrerPolicy="no-referrer"
         className={cn(
           "inline-block shrink-0 rounded-full object-cover ring-2 ring-background",
           sizeClasses[size],

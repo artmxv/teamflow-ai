@@ -172,6 +172,7 @@ function Board() {
     }: {
       id: string;
       input: {
+        title: string;
         assigneeIds: string[];
         dueDate: string | null;
         status: TaskApiStatus;
@@ -488,11 +489,12 @@ function Board() {
       <TaskDrawer
         task={selected}
         assignees={selectedAssignees}
-        onSaveChanges={({ assigneeIds, dueDate, status, priority }) => {
+        onSaveChanges={({ title, assigneeIds, dueDate, status, priority }) => {
           if (!selected || updateAssigneeMutation.isPending) return;
           updateAssigneeMutation.mutate({
             id: selected.id,
             input: {
+              title,
               assigneeIds,
               dueDate,
               status: taskStatusToApi[status],
