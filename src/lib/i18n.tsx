@@ -525,6 +525,7 @@ const dict = {
     "tasks.noAccessibleProjects":
       "You are not a member of any project yet. Ask a workspace owner or admin to add you.",
     "tasks.selectProject": "Project",
+    "tasks.new.dialogDesc": "Add a task to the current view.",
     "tasks.count": "{count} tasks",
     "tasks.countOne": "1 task",
     "tasks.priorityLow": "Low",
@@ -1205,6 +1206,7 @@ const dict = {
     "tasks.noAccessibleProjects":
       "Вы пока не добавлены ни в один проект. Попросите владельца или администратора пространства добавить вас.",
     "tasks.selectProject": "Проект",
+    "tasks.new.dialogDesc": "Добавьте задачу в текущий раздел.",
     "tasks.count": "{count} задач",
     "tasks.countOne": "1 задача",
     "tasks.priorityLow": "Низкий",

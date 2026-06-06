@@ -6,10 +6,10 @@ Fullstack project workspace demo for product teams. TeamFlow AI pairs a polished
 
 After seeding the database (see [Local setup](#local-setup)), sign in with:
 
-| Field | Value |
-|-------|-------|
-| Email | `alex@teamflow.ai` |
-| Password | `Password123!` |
+| Field    | Value              |
+| -------- | ------------------ |
+| Email    | `alex@teamflow.ai` |
+| Password | `Password123!`     |
 
 The seed script also loads a starter workspace with sample projects and tasks for this user.
 
@@ -118,14 +118,14 @@ The seed script also loads a starter workspace with sample projects and tasks fo
 
 ## Tech stack
 
-| Layer | Technologies |
-|-------|----------------|
-| Frontend | TanStack Start, React 19, TypeScript, TanStack Router, TanStack Query |
-| UI | Tailwind CSS v4, shadcn/ui-style components (Radix UI), Recharts, Sonner |
-| Forms | React Hook Form, Zod |
-| Backend | Express, TypeScript, Zod validation |
-| Data | Prisma ORM, PostgreSQL (Docker Compose locally) |
-| Auth | JWT (`jsonwebtoken`), `bcryptjs` password hashing |
+| Layer    | Technologies                                                             |
+| -------- | ------------------------------------------------------------------------ |
+| Frontend | TanStack Start, React 19, TypeScript, TanStack Router, TanStack Query    |
+| UI       | Tailwind CSS v4, shadcn/ui-style components (Radix UI), Recharts, Sonner |
+| Forms    | React Hook Form, Zod                                                     |
+| Backend  | Express, TypeScript, Zod validation                                      |
+| Data     | Prisma ORM, PostgreSQL (Docker Compose locally)                          |
+| Auth     | JWT (`jsonwebtoken`), `bcryptjs` password hashing                        |
 
 ## Architecture
 
@@ -180,25 +180,25 @@ Typical local ports: frontend **8080**, API **4000**, Postgres **5433**.
 
 ## API endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/health` | Health check |
-| POST | `/api/auth/register` | Register (email/password) |
-| POST | `/api/auth/login` | Sign in |
-| GET | `/api/auth/me` | Current user and workspace |
-| PATCH | `/api/auth/profile` | Update profile |
-| POST | `/api/auth/logout` | Sign out |
-| GET | `/api/projects` | List workspace projects |
-| POST | `/api/projects` | Create project |
-| PATCH | `/api/projects/:id` | Update project |
-| DELETE | `/api/projects/:id` | Delete project |
-| GET | `/api/tasks` | List workspace tasks |
-| POST | `/api/tasks` | Create task |
-| PATCH | `/api/tasks/:id` | Update task (e.g. status) |
-| DELETE | `/api/tasks/:id` | Delete task |
-| GET | `/api/dashboard/summary` | Dashboard summary metrics |
-| PATCH | `/api/workspace` | Update workspace settings |
-| POST | `/api/ai/workspace-summary` | Deterministic workspace AI summary |
+| Method | Path                        | Description                        |
+| ------ | --------------------------- | ---------------------------------- |
+| GET    | `/api/health`               | Health check                       |
+| POST   | `/api/auth/register`        | Register (email/password)          |
+| POST   | `/api/auth/login`           | Sign in                            |
+| GET    | `/api/auth/me`              | Current user and workspace         |
+| PATCH  | `/api/auth/profile`         | Update profile                     |
+| POST   | `/api/auth/logout`          | Sign out                           |
+| GET    | `/api/projects`             | List workspace projects            |
+| POST   | `/api/projects`             | Create project                     |
+| PATCH  | `/api/projects/:id`         | Update project                     |
+| DELETE | `/api/projects/:id`         | Delete project                     |
+| GET    | `/api/tasks`                | List workspace tasks               |
+| POST   | `/api/tasks`                | Create task                        |
+| PATCH  | `/api/tasks/:id`            | Update task (e.g. status)          |
+| DELETE | `/api/tasks/:id`            | Delete task                        |
+| GET    | `/api/dashboard/summary`    | Dashboard summary metrics          |
+| PATCH  | `/api/workspace`            | Update workspace settings          |
+| POST   | `/api/ai/workspace-summary` | Deterministic workspace AI summary |
 
 ## Local setup
 
@@ -230,13 +230,13 @@ cp .env.example .env
 
 Edit `server/.env` as needed:
 
-| Variable | Local default | Notes |
-|----------|---------------|-------|
-| `DATABASE_URL` | Matches Docker Compose below | Required for Prisma migrations, seed, and the API |
-| `JWT_SECRET` | Placeholder in `.env.example` | Change before shared or production-like use |
-| `CORS_ORIGIN` | `http://localhost:8080` | Must match the URL where you open the frontend |
-| `PORT` | `4000` | API listen port |
-| `NODE_ENV` | `development` | Use `production` when deploying the API |
+| Variable       | Local default                 | Notes                                             |
+| -------------- | ----------------------------- | ------------------------------------------------- |
+| `DATABASE_URL` | Matches Docker Compose below  | Required for Prisma migrations, seed, and the API |
+| `JWT_SECRET`   | Placeholder in `.env.example` | Change before shared or production-like use       |
+| `CORS_ORIGIN`  | `http://localhost:8080`       | Must match the URL where you open the frontend    |
+| `PORT`         | `4000`                        | API listen port                                   |
+| `NODE_ENV`     | `development`                 | Use `production` when deploying the API           |
 
 **Frontend (optional)**
 
@@ -280,10 +280,10 @@ Sign in with [demo credentials](#demo-credentials): `alex@teamflow.ai` / `Passwo
 
 Example files (safe to commit; no real secrets):
 
-| File | Purpose |
-|------|---------|
+| File                  | Purpose                                                 |
+| --------------------- | ------------------------------------------------------- |
 | `server/.env.example` | Required backend variables for local dev and deployment |
-| `.env.example` | Optional frontend `VITE_API_URL` |
+| `.env.example`        | Optional frontend `VITE_API_URL`                        |
 
 Copy each to `.env` in the same directory and edit. Never commit `server/.env` or a filled-in root `.env` with deployment-specific values.
 
@@ -291,13 +291,13 @@ Copy each to `.env` in the same directory and edit. Never commit `server/.env` o
 
 Validated at API startup in `server/src/config/env.ts`. Prisma reads `DATABASE_URL` from the environment separately.
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | Yes | PostgreSQL connection string for Prisma |
-| `JWT_SECRET` | Yes | Secret for signing JWTs |
-| `PORT` | No | API port (default `4000`) |
-| `NODE_ENV` | No | `development`, `test`, or `production` (default `development`) |
-| `CORS_ORIGIN` | No | Frontend origin for CORS (default `http://localhost:8080`) |
+| Variable       | Required | Description                                                    |
+| -------------- | -------- | -------------------------------------------------------------- |
+| `DATABASE_URL` | Yes      | PostgreSQL connection string for Prisma                        |
+| `JWT_SECRET`   | Yes      | Secret for signing JWTs                                        |
+| `PORT`         | No       | API port (default `4000`)                                      |
+| `NODE_ENV`     | No       | `development`, `test`, or `production` (default `development`) |
+| `CORS_ORIGIN`  | No       | Frontend origin for CORS (default `http://localhost:8080`)     |
 
 Example `DATABASE_URL` for local Docker Compose:
 
@@ -307,9 +307,9 @@ postgresql://teamflow:teamflow@localhost:5433/teamflow_ai?schema=public
 
 ### Frontend (optional, repo root `.env`)
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `VITE_API_URL` | No | API base URL if not `http://localhost:4000` (see `src/lib/api/client.ts`) |
+| Variable       | Required | Description                                                               |
+| -------------- | -------- | ------------------------------------------------------------------------- |
+| `VITE_API_URL` | No       | API base URL if not `http://localhost:4000` (see `src/lib/api/client.ts`) |
 
 No Stripe, OpenAI, or other third-party API keys are required for the current feature set.
 
@@ -322,7 +322,12 @@ No Stripe, OpenAI, or other third-party API keys are required for the current fe
 
 ## Deployment
 
-Portfolio-ready deploy today: provision PostgreSQL, run migrations, configure env, build the frontend with the correct API URL, and start the API. Step-by-step hosting guides, Docker images, and a live demo URL are still optional follow-ups.
+Portfolio-ready deploy today: provision PostgreSQL, run migrations, configure env, build the frontend with the correct API URL, and start the API.
+
+**Detailed guides:**
+
+- [Deployment checklist](docs/DEPLOYMENT.md)
+- [QA checklist](docs/QA_CHECKLIST.md)
 
 ### Deployment checklist
 
@@ -341,13 +346,13 @@ Use this before going live:
 
 ### Backend environment (`server/.env`)
 
-| Variable | Required | Production notes |
-|----------|----------|------------------|
-| `DATABASE_URL` | Yes | PostgreSQL URL for Prisma |
-| `JWT_SECRET` | Yes | Strong secret; never commit |
-| `CORS_ORIGIN` | No (default local) | Must match deployed frontend origin |
-| `PORT` | No (default `4000`) | Often set by the host |
-| `NODE_ENV` | No | Use `production` when deployed |
+| Variable       | Required            | Production notes                    |
+| -------------- | ------------------- | ----------------------------------- |
+| `DATABASE_URL` | Yes                 | PostgreSQL URL for Prisma           |
+| `JWT_SECRET`   | Yes                 | Strong secret; never commit         |
+| `CORS_ORIGIN`  | No (default local)  | Must match deployed frontend origin |
+| `PORT`         | No (default `4000`) | Often set by the host               |
+| `NODE_ENV`     | No                  | Use `production` when deployed      |
 
 Validated at startup in `server/src/config/env.ts`. Prisma also requires `DATABASE_URL` (documented in `server/.env.example`).
 
@@ -372,8 +377,8 @@ NODE_ENV=production npm run start
 
 ### Frontend environment (repo root `.env`)
 
-| Variable | Required | Production notes |
-|----------|----------|------------------|
+| Variable       | Required   | Production notes                                                        |
+| -------------- | ---------- | ----------------------------------------------------------------------- |
 | `VITE_API_URL` | No locally | **Required at build time** if the API is not at `http://localhost:4000` |
 
 ```bash
@@ -407,27 +412,27 @@ npm run prisma:studio          # Open Prisma Studio
 
 ### Root (frontend)
 
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start frontend dev server |
-| `npm run build` | Production build |
-| `npm run preview` | Preview production build |
-| `npm run lint` | Run ESLint |
-| `npm run format` | Format with Prettier |
+| Script            | Description               |
+| ----------------- | ------------------------- |
+| `npm run dev`     | Start frontend dev server |
+| `npm run build`   | Production build          |
+| `npm run preview` | Preview production build  |
+| `npm run lint`    | Run ESLint                |
+| `npm run format`  | Format with Prettier      |
 
 ### `server/` (backend)
 
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | Start API with hot reload |
-| `npm run build` | Compile TypeScript |
-| `npm run start` | Run compiled server |
-| `npm run typecheck` | Typecheck without emit |
-| `npm run prisma:migrate` | Run Prisma migrations (local dev, interactive) |
-| `npm run prisma:migrate:deploy` | Apply migrations in production / CI |
-| `npm run prisma:generate` | Generate Prisma Client |
-| `npm run prisma:studio` | Prisma Studio |
-| `npm run db:seed` | Seed demo workspace data |
+| Script                          | Description                                    |
+| ------------------------------- | ---------------------------------------------- |
+| `npm run dev`                   | Start API with hot reload                      |
+| `npm run build`                 | Compile TypeScript                             |
+| `npm run start`                 | Run compiled server                            |
+| `npm run typecheck`             | Typecheck without emit                         |
+| `npm run prisma:migrate`        | Run Prisma migrations (local dev, interactive) |
+| `npm run prisma:migrate:deploy` | Apply migrations in production / CI            |
+| `npm run prisma:generate`       | Generate Prisma Client                         |
+| `npm run prisma:studio`         | Prisma Studio                                  |
+| `npm run db:seed`               | Seed demo workspace data                       |
 
 ## Current limitations and roadmap
 
