@@ -436,7 +436,7 @@ export function NewTaskDialog({
       <DialogContent className="app-scrollbar max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t("common.newTask")}</DialogTitle>
-          <DialogDescription>Add a mock task to the current view.</DialogDescription>
+          <DialogDescription>{t("tasks.new.dialogDesc")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(submit)} className="space-y-4">
           {showProjectSelect ? (

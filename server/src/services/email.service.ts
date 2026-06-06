@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 
-import { appUrl } from "../config/env.js";
+import { appUrl, env } from "../config/env.js";
 
 export type EmailDeliveryMode = "resend" | "console" | "dev";
 
@@ -23,11 +23,16 @@ export type SendWorkspaceInviteEmailResult = {
 };
 
 function resolveEmailProvider(): "resend" | "console" {
-  const raw = process.env.EMAIL_PROVIDER?.trim().toLowerCase();
-  if (raw === "resend") {
-    return "resend";
+  return env.EMAIL_PROVIDER;
+}
+
+function assertResendConfigured(): void {
+  if (!env.RESEND_API_KEY) {
+    throw new Error("EMAIL_PROVIDER=resend but RESEND_API_KEY is missing.");
   }
-  return "console";
+  if (!env.EMAIL_FROM) {
+    throw new Error("EMAIL_PROVIDER=resend but EMAIL_FROM is missing.");
+  }
 }
 
 function consoleDeliveryMode(): "console" | "dev" {
@@ -162,24 +167,10 @@ function toResult(
 async function sendViaResend(
   input: SendWorkspaceInviteEmailInput,
 ): Promise<SendWorkspaceInviteEmailResult> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.EMAIL_FROM?.trim();
+  assertResendConfigured();
 
-  if (!apiKey) {
-    const warning = "EMAIL_PROVIDER=resend but RESEND_API_KEY is missing; using console fallback";
-    const mode = consoleDeliveryMode();
-    logConsoleInvite(input, mode, warning);
-    return toResult(mode, false, warning);
-  }
-
-  if (!from) {
-    const warning = "EMAIL_PROVIDER=resend but EMAIL_FROM is missing; using console fallback";
-    const mode = consoleDeliveryMode();
-    logConsoleInvite(input, mode, warning);
-    return toResult(mode, false, warning);
-  }
-
-  const resend = new Resend(apiKey);
+  const resend = new Resend(env.RESEND_API_KEY!);
+  const from = env.EMAIL_FROM!;
   const { subject, html, text } = buildInviteEmailContent(input);
 
   try {
