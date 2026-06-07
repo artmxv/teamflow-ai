@@ -99,7 +99,6 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
   const showProfilePlaceholder = hasToken && !isError && !currentUser;
   const profileRoleLabel = workspaceRole ? workspaceRoleLabel(workspaceRole, t) : t("role.member");
   const [helpOpen, setHelpOpen] = useState(false);
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const notificationsQuery = useQuery({
@@ -354,9 +353,6 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
               <DropdownMenuItem asChild>
                 <Link to="/app/billing">{t("side.billing")}</Link>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShortcutsOpen(true)}>
-                {t("top.keyboardShortcuts")}
-              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => logoutMutation.mutate()}
@@ -381,46 +377,6 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
         </DialogContent>
       </Dialog>
 
-      <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </header>
-  );
-}
-
-export function KeyboardShortcutsDialog({
-  open,
-  onOpenChange,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const { t } = useI18n();
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("top.keyboardShortcuts")}</DialogTitle>
-          <DialogDescription>{t("top.shortcutsDescription")}</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-2 text-sm">
-          {[
-            ["Cmd/Ctrl + K", t("top.search")],
-            ["N", t("common.newTask")],
-            ["G then D", t("side.dashboard")],
-            ["G then B", t("side.kanban")],
-          ].map(([keys, label]) => (
-            <div
-              key={keys}
-              className="flex items-center justify-between rounded-xl border border-border p-3"
-            >
-              <span className="text-muted-foreground">{label}</span>
-              <kbd className="rounded border border-border bg-card px-2 py-1 text-xs font-medium">
-                {keys}
-              </kbd>
-            </div>
-          ))}
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }

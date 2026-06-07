@@ -4,7 +4,6 @@ import { requireAuth } from "@/lib/auth/route-guards";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
-import { KeyboardShortcutsDialog } from "@/components/app/AppTopbar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -1020,13 +1019,9 @@ function SaveBar({
   savingLabel?: string;
 }) {
   const { t } = useI18n();
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   return (
     <div className="mt-6 flex flex-wrap justify-end gap-2">
-      <Button variant="outline" onClick={() => setShortcutsOpen(true)} disabled={isSaving}>
-        {t("top.keyboardShortcuts")}
-      </Button>
       <Button variant="outline" onClick={onCancel} disabled={isSaving || cancelDisabled}>
         {cancelLabel ?? t("common.cancel")}
       </Button>
@@ -1040,7 +1035,6 @@ function SaveBar({
           (saveLabel ?? t("common.saveChanges"))
         )}
       </Button>
-      <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
   );
 }

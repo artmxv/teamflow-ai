@@ -11,13 +11,7 @@ import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickAction
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import {
   createTask,
   deleteTask,
@@ -127,6 +121,27 @@ function taskMatchesStatusFilter(task: TaskRow, filter: TaskListStatusFilter) {
   if (filter === "all") return true;
   if (filter === "open") return task.status !== "done";
   return task.status === filter;
+}
+
+function getStatusFilterTriggerLabel(filter: TaskListStatusFilter, t: (k: TKey) => string): string {
+  if (filter === "all") return t("tasks.status");
+  if (filter === "open") return t("tasks.openStatusShort");
+  return t(statusMeta[filter].labelKey);
+}
+
+function getPriorityFilterTriggerLabel(filter: Priority | "all", t: (k: TKey) => string): string {
+  if (filter === "all") return t("tasks.priority");
+  return t(priorityMeta[filter].labelKey);
+}
+
+function getAssigneeFilterTriggerLabel(
+  filter: AssigneeListFilter,
+  options: AssigneeOption[],
+  t: (k: TKey) => string,
+): string {
+  if (filter === "all") return t("tasks.assignee");
+  if (filter === "unassigned") return t("tasks.noAssignees");
+  return options.find((option) => option.id === filter)?.name ?? t("tasks.assignee");
 }
 
 function taskMatchesAssigneeListFilter(
@@ -461,7 +476,7 @@ function TasksPage() {
       </div>
 
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="relative w-full sm:max-w-xs">
+        <div className="relative min-w-0 w-full flex-1 sm:min-w-[12rem] sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={q}
@@ -470,61 +485,68 @@ function TasksPage() {
             className="pl-9"
           />
         </div>
-        <Select
-          value={status}
-          onValueChange={(value) => setStatusFilter(value as TaskListStatusFilter)}
-        >
-          <SelectTrigger className="h-9 w-full min-w-0 border-border bg-card text-sm sm:w-[168px]">
-            <SelectValue placeholder={t("tasks.status")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("tasks.allStatus")}</SelectItem>
-            <SelectItem value="open">{t("tasks.openStatus")}</SelectItem>
-            {(Object.keys(statusMeta) as TaskStatus[]).map((s) => (
-              <SelectItem key={s} value={s}>
-                {t(statusMeta[s].labelKey)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={priority} onValueChange={(value) => setPriority(value as Priority | "all")}>
-          <SelectTrigger className="h-9 w-full min-w-0 border-border bg-card text-sm sm:w-[168px]">
-            <SelectValue placeholder={t("tasks.priority")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("tasks.filterPriorities")}</SelectItem>
-            {(["low", "medium", "high", "urgent"] as Priority[]).map((p) => (
-              <SelectItem key={p} value={p}>
-                {t(priorityMeta[p].labelKey)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={assigneeFilter} onValueChange={(value) => setAssigneeListFilter(value)}>
-          <SelectTrigger className="h-9 w-full min-w-0 border-border bg-card text-sm sm:w-[168px]">
-            <SelectValue placeholder={t("tasks.assignee")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("tasks.filterAssignees")}</SelectItem>
-            <SelectItem value="unassigned">{t("tasks.noAssignees")}</SelectItem>
-            {assigneeOptions.map((option) => (
-              <SelectItem key={option.id} value={option.id}>
-                {option.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {hasActiveFilters ? (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 w-full sm:ml-auto sm:w-auto"
-            onClick={clearFilters}
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <Select
+            value={status}
+            onValueChange={(value) => setStatusFilter(value as TaskListStatusFilter)}
           >
-            <RotateCcw className="size-4" />
-            {t("common.resetFilters")}
-          </Button>
-        ) : null}
+            <SelectTrigger className="h-9 w-[7.25rem] shrink-0 border-border bg-card text-sm">
+              <span className="truncate">{getStatusFilterTriggerLabel(status, t)}</span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("tasks.allStatus")}</SelectItem>
+              <SelectItem value="open">{t("tasks.openStatus")}</SelectItem>
+              {(Object.keys(statusMeta) as TaskStatus[]).map((s) => (
+                <SelectItem key={s} value={s}>
+                  {t(statusMeta[s].labelKey)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={priority}
+            onValueChange={(value) => setPriority(value as Priority | "all")}
+          >
+            <SelectTrigger className="h-9 w-[7.25rem] shrink-0 border-border bg-card text-sm">
+              <span className="truncate">{getPriorityFilterTriggerLabel(priority, t)}</span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("tasks.filterPriorities")}</SelectItem>
+              {(["low", "medium", "high", "urgent"] as Priority[]).map((p) => (
+                <SelectItem key={p} value={p}>
+                  {t(priorityMeta[p].labelKey)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={assigneeFilter} onValueChange={(value) => setAssigneeListFilter(value)}>
+            <SelectTrigger className="h-9 w-[8.5rem] shrink-0 border-border bg-card text-sm">
+              <span className="truncate">
+                {getAssigneeFilterTriggerLabel(assigneeFilter, assigneeOptions, t)}
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("tasks.filterAssignees")}</SelectItem>
+              <SelectItem value="unassigned">{t("tasks.noAssignees")}</SelectItem>
+              {assigneeOptions.map((option) => (
+                <SelectItem key={option.id} value={option.id}>
+                  {option.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {hasActiveFilters ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 shrink-0 sm:ml-auto"
+              onClick={clearFilters}
+            >
+              <RotateCcw className="size-4" />
+              {t("common.resetFilters")}
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">

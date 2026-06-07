@@ -102,7 +102,15 @@ export function isVirtualInviteNotificationId(notificationId: string): boolean {
   return notificationId.startsWith(INVITE_NOTIFICATION_PREFIX);
 }
 
+function shouldSkipSelfNotification(recipientId: string, actorId?: string | null) {
+  return Boolean(actorId && recipientId === actorId);
+}
+
 export async function createNotification(input: CreateNotificationInput) {
+  if (shouldSkipSelfNotification(input.recipientId, input.actorId)) {
+    return;
+  }
+
   try {
     await prisma.notification.create({
       data: {
@@ -126,7 +134,9 @@ export async function createNotificationsForUsers(
   recipientIds: string[],
   input: Omit<CreateNotificationInput, "recipientId">,
 ) {
-  const uniqueRecipientIds = [...new Set(recipientIds)].filter((id) => Boolean(id));
+  const uniqueRecipientIds = [...new Set(recipientIds)]
+    .filter((id) => Boolean(id))
+    .filter((id) => !shouldSkipSelfNotification(id, input.actorId));
 
   if (uniqueRecipientIds.length === 0) {
     return;
@@ -386,13 +396,6 @@ export async function notifyTaskCommentCreated(params: {
       body: `${actorName}: ${preview}`,
     });
   }
-
-  await createNotification({
-    ...base,
-    recipientId: params.actorId,
-    title: "You added a comment",
-    body: `${task.title}: ${preview}`,
-  });
 }
 
 export async function notifyTaskAssigned(params: {
@@ -478,13 +481,6 @@ export async function notifyTaskAttachmentUploaded(params: {
       body: `${actorName} uploaded ${params.fileName}`,
     });
   }
-
-  await createNotification({
-    ...base,
-    recipientId: params.actorId,
-    title: "You uploaded an attachment",
-    body: `${task.title}: ${params.fileName}`,
-  });
 }
 
 export async function notifyProjectMemberAdded(params: {
@@ -554,11 +550,4 @@ export async function notifyProjectDocumentUploaded(params: {
       body: `${actorName} uploaded ${params.fileName}`,
     });
   }
-
-  await createNotification({
-    ...base,
-    recipientId: params.actorId,
-    title: "You uploaded a project document",
-    body: `${project.name}: ${params.fileName}`,
-  });
 }

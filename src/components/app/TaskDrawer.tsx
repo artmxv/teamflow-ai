@@ -400,31 +400,29 @@ export function TaskDrawer({
                   <div className="mt-3 space-y-3 text-sm">
                     <div className="rounded-lg bg-card p-3 shadow-soft">
                       <div className="text-xs font-semibold uppercase tracking-wide text-primary">
-                        Summary
+                        {t("tasks.aiSummaryLabel")}
                       </div>
-                      <p className="mt-1 text-foreground/90">
-                        This task involves implementing the requested feature, validating with QA,
-                        and updating the documentation. Two open dependencies were detected in
-                        linked PRs.
-                      </p>
+                      <p className="mt-1 text-foreground/90">{t("tasks.aiSummaryText")}</p>
                     </div>
                     <div className="rounded-lg bg-card p-3 shadow-soft">
                       <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary">
-                        Generated checklist
+                        {t("tasks.aiChecklistLabel")}
                       </div>
                       <ul className="space-y-1.5">
-                        {[
-                          "Confirm spec with design",
-                          "Land scaffolding PR",
-                          "Wire up state & data",
-                          "Add unit & e2e tests",
-                          "Ship behind feature flag",
-                        ].map((c) => (
-                          <li key={c} className="flex items-start gap-2 text-sm">
+                        {(
+                          [
+                            "tasks.aiChecklistItem1",
+                            "tasks.aiChecklistItem2",
+                            "tasks.aiChecklistItem3",
+                            "tasks.aiChecklistItem4",
+                            "tasks.aiChecklistItem5",
+                          ] as const
+                        ).map((key) => (
+                          <li key={key} className="flex items-start gap-2 text-sm">
                             <span className="mt-0.5 grid size-4 place-items-center rounded border border-input">
                               <Plus className="size-3 text-muted-foreground" />
                             </span>
-                            {c}
+                            {t(key)}
                           </li>
                         ))}
                       </ul>
@@ -763,17 +761,19 @@ function TaskCommentsSection({
             <p className="mt-1">{t("comments.emptyHint")}</p>
           </div>
         ) : (
-          comments.map((comment) => (
-            <TaskCommentRow
-              key={comment.id}
-              comment={comment}
-              isOwn={!!currentUserId && comment.author.id === currentUserId}
-              isUpdating={updatingCommentId === comment.id}
-              isDeleting={deletingCommentId === comment.id}
-              onUpdate={onUpdateComment}
-              onRequestDelete={setCommentToDelete}
-            />
-          ))
+          <div className="app-scrollbar max-h-[min(50vh,16rem)] space-y-3 overflow-y-auto overscroll-contain pr-1">
+            {comments.map((comment) => (
+              <TaskCommentRow
+                key={comment.id}
+                comment={comment}
+                isOwn={!!currentUserId && comment.author.id === currentUserId}
+                isUpdating={updatingCommentId === comment.id}
+                isDeleting={deletingCommentId === comment.id}
+                onUpdate={onUpdateComment}
+                onRequestDelete={setCommentToDelete}
+              />
+            ))}
+          </div>
         )}
         <AlertDialog
           open={commentToDelete != null}
@@ -1064,16 +1064,18 @@ function TaskAttachmentsSection({
             {t("tasks.attachmentsEmpty")}
           </p>
         ) : (
-          attachments.map((attachment) => (
-            <TaskAttachmentRow
-              key={attachment.id}
-              attachment={attachment}
-              isDeleting={isDeletingId === attachment.id}
-              onOpen={() => onOpen(attachment)}
-              onDownload={() => onDownload(attachment)}
-              onRequestDelete={() => setAttachmentToDelete(attachment.id)}
-            />
-          ))
+          <div className="app-scrollbar max-h-[min(50vh,16rem)] space-y-2 overflow-y-auto overscroll-contain pr-1">
+            {attachments.map((attachment) => (
+              <TaskAttachmentRow
+                key={attachment.id}
+                attachment={attachment}
+                isDeleting={isDeletingId === attachment.id}
+                onOpen={() => onOpen(attachment)}
+                onDownload={() => onDownload(attachment)}
+                onRequestDelete={() => setAttachmentToDelete(attachment.id)}
+              />
+            ))}
+          </div>
         )}
       </div>
       <AlertDialog

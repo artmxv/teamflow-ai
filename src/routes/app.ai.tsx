@@ -62,37 +62,41 @@ function AssistantPage() {
     <AppShell>
       <div className="grid h-[calc(100vh-7rem)] gap-4 lg:grid-cols-[260px_1fr]">
         <aside className="hidden flex-col rounded-2xl border border-border bg-card p-3 shadow-soft lg:flex">
-          <div className="flex items-center gap-2 px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <BarChart3 className="size-3.5" /> {t("ai.metricsTitle")}
+          <div className="border-b border-border/60 pb-3">
+            <div className="mb-2 flex items-center gap-1.5 px-2 pt-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/80">
+              <BarChart3 className="size-3" /> {t("ai.metricsTitle")}
+            </div>
+            {isLoading ? (
+              <MetricsSkeleton />
+            ) : data ? (
+              <MetricsPanel metrics={data.metrics} />
+            ) : (
+              <p className="px-2 py-2 text-xs text-muted-foreground">{t("ai.metricsPending")}</p>
+            )}
           </div>
-          {isLoading ? (
-            <MetricsSkeleton />
-          ) : data ? (
-            <MetricsPanel metrics={data.metrics} />
-          ) : (
-            <p className="px-2 py-2 text-xs text-muted-foreground">{t("ai.metricsPending")}</p>
-          )}
-          <div className="mt-4 flex items-center gap-2 px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {t("ai.sectionsTitle")}
+          <div className="mt-4 flex min-h-0 flex-1 flex-col border-b border-border/60 pb-3">
+            <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/80">
+              {t("ai.sectionsTitle")}
+            </div>
+            <ul className="flex-1 space-y-0.5 overflow-y-auto">
+              {SECTIONS.map((section) => (
+                <li key={section.id}>
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection(section.id)}
+                    disabled={!data}
+                    className="flex w-full rounded-lg px-2 py-2 text-left text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                  >
+                    {t(section.labelKey)}
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
-          <ul className="flex-1 space-y-0.5 overflow-y-auto">
-            {SECTIONS.map((section) => (
-              <li key={section.id}>
-                <button
-                  type="button"
-                  onClick={() => scrollToSection(section.id)}
-                  disabled={!data}
-                  className="flex w-full rounded-lg px-2 py-2 text-left text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
-                >
-                  {t(section.labelKey)}
-                </button>
-              </li>
-            ))}
-          </ul>
           <Button
-            variant="outline"
+            variant="brand"
             size="sm"
-            className="mt-2"
+            className="mt-4 w-full"
             disabled={isLoading || isFetching}
             onClick={() => void handleRegenerate()}
           >
@@ -107,7 +111,7 @@ function AssistantPage() {
               <Sparkles className="size-4 text-white" />
             </div>
             <div className="min-w-0">
-              <div className="text-sm font-semibold">TeamFlow AI</div>
+              <div className="text-sm font-semibold">{t("ai.assistant")}</div>
               <div className="text-xs text-muted-foreground">{t("ai.groundedContext")}</div>
             </div>
             <Button
