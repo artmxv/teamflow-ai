@@ -1288,16 +1288,18 @@ function ProjectDocumentsSection({
             }
           />
         ) : (
-          documents.map((document) => (
-            <ProjectDocumentRow
-              key={document.id}
-              document={document}
-              isDeleting={isDeletingId === document.id}
-              onOpen={() => onOpen(document)}
-              onDownload={() => onDownload(document)}
-              onRequestDelete={() => setDocumentToDelete(document.id)}
-            />
-          ))
+          <div className="app-scrollbar max-h-[min(50vh,16rem)] space-y-2 overflow-y-auto overscroll-contain pr-1">
+            {documents.map((document) => (
+              <ProjectDocumentRow
+                key={document.id}
+                document={document}
+                isDeleting={isDeletingId === document.id}
+                onOpen={() => onOpen(document)}
+                onDownload={() => onDownload(document)}
+                onRequestDelete={() => setDocumentToDelete(document.id)}
+              />
+            ))}
+          </div>
         )}
       </div>
       <AlertDialog
