@@ -376,7 +376,6 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
           </div>
         </DialogContent>
       </Dialog>
-
     </header>
   );
 }

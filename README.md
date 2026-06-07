@@ -322,11 +322,10 @@ No Stripe, OpenAI, or other third-party API keys are required for the current fe
 
 ## Deployment
 
-Portfolio-ready deploy today: provision PostgreSQL, run migrations, configure env, build the frontend with the correct API URL, and start the API.
+Portfolio-ready deploy: Vercel (frontend), Render (API), Neon (PostgreSQL), Resend (email). Full step-by-step setup: **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
 
-**Detailed guides:**
+**Also see:**
 
-- [Deployment checklist](docs/DEPLOYMENT.md)
 - [QA checklist](docs/QA_CHECKLIST.md)
 
 ### Deployment checklist
