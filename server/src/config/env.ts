@@ -11,7 +11,7 @@ const emptyToUndefined = (value: unknown) =>
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  CORS_ORIGIN: z.string().min(1).default("http://localhost:5173"),
+  CORS_ORIGIN: z.string().min(1).default("http://localhost:5173,http://localhost:8080"),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   APP_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
   JWT_SECRET: z.string().min(1, "JWT_SECRET is required"),
