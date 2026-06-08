@@ -1148,6 +1148,14 @@ function ProjectDocumentsCard({ projectId }: { projectId: string }) {
         onPickFile={() => fileInputRef.current?.click()}
         onFileSelected={(file) => {
           if (uploadMutation.isPending) return;
+          if (!projectId.trim()) {
+            toast.error("Project is not ready yet");
+            return;
+          }
+          if (!(file instanceof File) || !file.size) {
+            toast.error("Please select a file to upload");
+            return;
+          }
           uploadMutation.mutate(file);
         }}
         onOpen={(document) => {

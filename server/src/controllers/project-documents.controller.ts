@@ -1,23 +1,20 @@
 import type { NextFunction, Request, Response } from "express";
 import multer from "multer";
 
-import { MAX_PROJECT_DOCUMENT_BYTES, projectDocumentUpload } from "../lib/project-upload.js";
+import {
+  MAX_PROJECT_DOCUMENT_BYTES,
+  projectDocumentUpload,
+  removeStoredProjectDocument,
+} from "../lib/project-upload.js";
 import {
   createProjectDocument,
   deleteProjectDocument,
   getProjectDocumentFile,
   getProjectDocuments,
+  type ProjectDocumentAccessError,
 } from "../services/project-documents.service.js";
 import { resolveRequestWorkspaceContext } from "../lib/workspace-request.js";
-
-async function resolveWorkspace(req: Request, res: Response) {
-  const context = await resolveRequestWorkspaceContext(req.userId!, req);
-  if (!context) {
-    res.status(403).json({ message: "Workspace not found" });
-    return null;
-  }
-  return context;
-}
+import { resolveProjectAccessForUser } from "../services/projects.service.js";
 
 function handleUploadError(error: unknown, res: Response) {
   if (error instanceof multer.MulterError) {
@@ -35,32 +32,43 @@ function handleUploadError(error: unknown, res: Response) {
   return false;
 }
 
+function respondProjectAccessError(res: Response, reason: ProjectDocumentAccessError) {
+  if (reason === "forbidden") {
+    res.status(403).json({ message: "You don't have access to this project" });
+    return;
+  }
+
+  res.status(404).json({ message: "Project not found" });
+}
+
 export async function getProjectDocumentsController(
   req: Request,
   res: Response,
   next: NextFunction,
 ) {
   try {
-    const context = await resolveWorkspace(req, res);
-    if (!context) {
-      return;
-    }
-
     const projectId = req.params.id;
     if (typeof projectId !== "string") {
       res.status(404).json({ message: "Project not found" });
       return;
     }
 
+    const preferredContext = await resolveRequestWorkspaceContext(req.userId!, req);
+    const access = await resolveProjectAccessForUser(projectId, req.userId!, preferredContext);
+    if (!access.ok) {
+      respondProjectAccessError(res, access.reason);
+      return;
+    }
+
     const documents = await getProjectDocuments(
-      context.workspaceId,
+      access.workspaceId,
       projectId,
       req.userId!,
-      context.role,
+      access.role,
     );
 
-    if (documents === null) {
-      res.status(404).json({ message: "Project not found" });
+    if (documents === "not_found" || documents === "forbidden") {
+      respondProjectAccessError(res, documents);
       return;
     }
 
@@ -85,11 +93,6 @@ export async function uploadProjectDocumentController(
         return;
       }
 
-      const context = await resolveWorkspace(req, res);
-      if (!context) {
-        return;
-      }
-
       const projectId = req.params.id;
       if (typeof projectId !== "string") {
         res.status(404).json({ message: "Project not found" });
@@ -101,21 +104,33 @@ export async function uploadProjectDocumentController(
         return;
       }
 
+      const preferredContext = await resolveRequestWorkspaceContext(req.userId!, req);
+      const access = await resolveProjectAccessForUser(projectId, req.userId!, preferredContext);
+      if (!access.ok) {
+        removeStoredProjectDocument(projectId, req.file.filename);
+        respondProjectAccessError(res, access.reason);
+        return;
+      }
+
       const document = await createProjectDocument(
-        context.workspaceId,
+        access.workspaceId,
         projectId,
         req.userId!,
-        context.role,
+        access.role,
         req.file,
       );
 
-      if (!document) {
-        res.status(404).json({ message: "Project not found" });
+      if (document === "not_found" || document === "forbidden") {
+        respondProjectAccessError(res, document);
         return;
       }
 
       res.status(201).json({ data: document });
     } catch (uploadError) {
+      const projectId = req.params.id;
+      if (typeof projectId === "string" && req.file) {
+        removeStoredProjectDocument(projectId, req.file.filename);
+      }
       next(uploadError);
     }
   });
@@ -127,11 +142,6 @@ export async function deleteProjectDocumentController(
   next: NextFunction,
 ) {
   try {
-    const context = await resolveWorkspace(req, res);
-    if (!context) {
-      return;
-    }
-
     const projectId = req.params.id;
     const documentId = req.params.documentId;
 
@@ -140,20 +150,27 @@ export async function deleteProjectDocumentController(
       return;
     }
 
-    const deleted = await deleteProjectDocument(
-      context.workspaceId,
-      projectId,
-      documentId,
-      req.userId!,
-      context.role,
-    );
-
-    if (deleted === null) {
-      res.status(404).json({ message: "Project not found" });
+    const preferredContext = await resolveRequestWorkspaceContext(req.userId!, req);
+    const access = await resolveProjectAccessForUser(projectId, req.userId!, preferredContext);
+    if (!access.ok) {
+      respondProjectAccessError(res, access.reason);
       return;
     }
 
-    if (deleted === "not_found") {
+    const deleted = await deleteProjectDocument(
+      access.workspaceId,
+      projectId,
+      documentId,
+      req.userId!,
+      access.role,
+    );
+
+    if (deleted === "not_found" || deleted === "forbidden") {
+      respondProjectAccessError(res, deleted);
+      return;
+    }
+
+    if (deleted === "document_not_found") {
       res.status(404).json({ message: "Document not found" });
       return;
     }
@@ -170,11 +187,6 @@ export async function downloadProjectDocumentController(
   next: NextFunction,
 ) {
   try {
-    const context = await resolveWorkspace(req, res);
-    if (!context) {
-      return;
-    }
-
     const projectId = req.params.id;
     const documentId = req.params.documentId;
 
@@ -183,20 +195,27 @@ export async function downloadProjectDocumentController(
       return;
     }
 
-    const file = await getProjectDocumentFile(
-      context.workspaceId,
-      projectId,
-      documentId,
-      req.userId!,
-      context.role,
-    );
-
-    if (file === null) {
-      res.status(404).json({ message: "Project not found" });
+    const preferredContext = await resolveRequestWorkspaceContext(req.userId!, req);
+    const access = await resolveProjectAccessForUser(projectId, req.userId!, preferredContext);
+    if (!access.ok) {
+      respondProjectAccessError(res, access.reason);
       return;
     }
 
-    if (file === "not_found") {
+    const file = await getProjectDocumentFile(
+      access.workspaceId,
+      projectId,
+      documentId,
+      req.userId!,
+      access.role,
+    );
+
+    if (file === "not_found" || file === "forbidden") {
+      respondProjectAccessError(res, file);
+      return;
+    }
+
+    if (file === "document_not_found") {
       res.status(404).json({ message: "Document not found" });
       return;
     }

@@ -144,30 +144,80 @@ export type ApiRequestOptions = {
   skipWorkspaceHeader?: boolean;
 };
 
-export async function apiRequest<T>(path: string, options?: ApiRequestOptions): Promise<T> {
+export function buildAuthHeaders(
+  options?: Pick<ApiRequestOptions, "skipAuth" | "skipWorkspaceHeader">,
+): Record<string, string> {
   const headers: Record<string, string> = {};
+
+  if (options?.skipAuth) {
+    return headers;
+  }
+
+  const token = getAuthToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  if (!options?.skipWorkspaceHeader) {
+    const workspaceId = getSelectedWorkspaceId() ?? getPersistedWorkspaceId();
+    if (workspaceId) {
+      headers["X-Workspace-Id"] = workspaceId;
+    }
+  }
+
+  return headers;
+}
+
+export type ApiUploadOptions = Pick<ApiRequestOptions, "skipAuth" | "skipWorkspaceHeader"> & {
+  fieldName?: string;
+};
+
+export async function apiUpload<T>(
+  path: string,
+  file: File,
+  options?: ApiUploadOptions,
+): Promise<T> {
+  if (!(file instanceof File)) {
+    throw new ApiError("Please select a file to upload", 400);
+  }
+
+  if (!file.size) {
+    throw new ApiError("The selected file is empty", 400);
+  }
+
+  const formData = new FormData();
+  formData.append(options?.fieldName ?? "file", file, file.name);
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers: buildAuthHeaders(options),
+    credentials: "include",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      message?: string;
+      code?: string;
+    } | null;
+    const message = body?.message ?? `Upload failed with status ${response.status}`;
+    throw new ApiError(message, response.status, body?.code);
+  }
+
+  return response.json() as Promise<T>;
+}
+
+export async function apiRequest<T>(path: string, options?: ApiRequestOptions): Promise<T> {
+  const headers = buildAuthHeaders(options);
 
   if (options?.body !== undefined) {
     headers["Content-Type"] = "application/json";
   }
 
-  if (!options?.skipAuth) {
-    const token = getAuthToken();
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
-    if (!options?.skipWorkspaceHeader) {
-      const workspaceId = getSelectedWorkspaceId();
-      if (workspaceId) {
-        headers["X-Workspace-Id"] = workspaceId;
-      }
-    }
-  }
-
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: options?.method ?? (options?.body !== undefined ? "POST" : "GET"),
     headers,
+    credentials: "include",
     body: options?.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
 

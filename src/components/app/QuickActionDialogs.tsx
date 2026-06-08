@@ -215,7 +215,7 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
                 name="status"
                 render={({ field }) => (
                   <Select
-                    value={field.value}
+                    value={field.value ?? "planning"}
                     onValueChange={(value) => field.onChange(value as ProjectStatus)}
                   >
                     <SelectTrigger>
@@ -331,6 +331,7 @@ export function NewTaskDialog({
   const [selectedProjectId, setSelectedProjectId] = useState(
     fixedProjectId ?? projectOptions?.[0]?.id ?? "",
   );
+  const projectSelectValue = selectedProjectId || projectOptions?.[0]?.id || "__no_project__";
   const showProjectSelect = !!projectOptions && projectOptions.length > 0 && !fixedProjectId;
   const effectiveProjectId = fixedProjectId ?? (showProjectSelect ? selectedProjectId : undefined);
   const {
@@ -441,7 +442,14 @@ export function NewTaskDialog({
         <form onSubmit={handleSubmit(submit)} className="space-y-4">
           {showProjectSelect ? (
             <Field label={t("tasks.selectProject")}>
-              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+              <Select
+                value={projectSelectValue}
+                onValueChange={(value) => {
+                  if (value !== "__no_project__") {
+                    setSelectedProjectId(value);
+                  }
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder={t("tasks.selectProject")} />
                 </SelectTrigger>
@@ -473,7 +481,7 @@ export function NewTaskDialog({
                 name="priority"
                 render={({ field }) => (
                   <Select
-                    value={field.value}
+                    value={field.value ?? "medium"}
                     onValueChange={(value) => field.onChange(value as Priority)}
                   >
                     <SelectTrigger>
@@ -495,7 +503,7 @@ export function NewTaskDialog({
                 name="status"
                 render={({ field }) => (
                   <Select
-                    value={field.value}
+                    value={field.value ?? initialStatus}
                     onValueChange={(value) => field.onChange(value as TaskStatus)}
                   >
                     <SelectTrigger>

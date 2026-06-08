@@ -1,23 +1,20 @@
 import type { NextFunction, Request, Response } from "express";
 import multer from "multer";
 
-import { MAX_TASK_ATTACHMENT_BYTES, taskAttachmentUpload } from "../lib/task-upload.js";
+import {
+  MAX_TASK_ATTACHMENT_BYTES,
+  removeStoredTaskAttachment,
+  taskAttachmentUpload,
+} from "../lib/task-upload.js";
 import {
   createTaskAttachment,
   deleteTaskAttachment,
   getTaskAttachmentFile,
   getTaskAttachments,
+  type TaskAttachmentAccessError,
 } from "../services/task-attachments.service.js";
 import { resolveRequestWorkspaceContext } from "../lib/workspace-request.js";
-
-async function resolveWorkspace(req: Request, res: Response) {
-  const context = await resolveRequestWorkspaceContext(req.userId!, req);
-  if (!context) {
-    res.status(403).json({ message: "Workspace not found" });
-    return null;
-  }
-  return context;
-}
+import { resolveTaskAccessForUser } from "../services/tasks.service.js";
 
 function handleUploadError(error: unknown, res: Response) {
   if (error instanceof multer.MulterError) {
@@ -35,27 +32,43 @@ function handleUploadError(error: unknown, res: Response) {
   return false;
 }
 
+function respondTaskAccessError(res: Response, reason: TaskAttachmentAccessError) {
+  if (reason === "forbidden") {
+    res.status(403).json({ message: "You don't have access to this task" });
+    return;
+  }
+
+  res.status(404).json({ message: "Task not found" });
+}
+
 export async function getTaskAttachmentsController(
   req: Request,
   res: Response,
   next: NextFunction,
 ) {
   try {
-    const context = await resolveWorkspace(req, res);
-    if (!context) {
-      return;
-    }
-
     const taskId = req.params.id;
     if (typeof taskId !== "string") {
       res.status(404).json({ message: "Task not found" });
       return;
     }
 
-    const attachments = await getTaskAttachments(context.workspaceId, taskId);
+    const preferredContext = await resolveRequestWorkspaceContext(req.userId!, req);
+    const access = await resolveTaskAccessForUser(taskId, req.userId!, preferredContext);
+    if (!access.ok) {
+      respondTaskAccessError(res, access.reason);
+      return;
+    }
 
-    if (attachments === null) {
-      res.status(404).json({ message: "Task not found" });
+    const attachments = await getTaskAttachments(
+      access.workspaceId,
+      taskId,
+      req.userId!,
+      access.role,
+    );
+
+    if (attachments === "not_found" || attachments === "forbidden") {
+      respondTaskAccessError(res, attachments);
       return;
     }
 
@@ -80,11 +93,6 @@ export async function uploadTaskAttachmentController(
         return;
       }
 
-      const context = await resolveWorkspace(req, res);
-      if (!context) {
-        return;
-      }
-
       const taskId = req.params.id;
       if (typeof taskId !== "string") {
         res.status(404).json({ message: "Task not found" });
@@ -96,20 +104,33 @@ export async function uploadTaskAttachmentController(
         return;
       }
 
+      const preferredContext = await resolveRequestWorkspaceContext(req.userId!, req);
+      const access = await resolveTaskAccessForUser(taskId, req.userId!, preferredContext);
+      if (!access.ok) {
+        removeStoredTaskAttachment(taskId, req.file.filename);
+        respondTaskAccessError(res, access.reason);
+        return;
+      }
+
       const attachment = await createTaskAttachment(
-        context.workspaceId,
+        access.workspaceId,
         taskId,
         req.userId!,
+        access.role,
         req.file,
       );
 
-      if (!attachment) {
-        res.status(404).json({ message: "Task not found" });
+      if (attachment === "not_found" || attachment === "forbidden") {
+        respondTaskAccessError(res, attachment);
         return;
       }
 
       res.status(201).json({ data: attachment });
     } catch (uploadError) {
+      const taskId = req.params.id;
+      if (typeof taskId === "string" && req.file) {
+        removeStoredTaskAttachment(taskId, req.file.filename);
+      }
       next(uploadError);
     }
   });
@@ -121,11 +142,6 @@ export async function deleteTaskAttachmentController(
   next: NextFunction,
 ) {
   try {
-    const context = await resolveWorkspace(req, res);
-    if (!context) {
-      return;
-    }
-
     const taskId = req.params.id;
     const attachmentId = req.params.attachmentId;
 
@@ -134,14 +150,27 @@ export async function deleteTaskAttachmentController(
       return;
     }
 
-    const deleted = await deleteTaskAttachment(context.workspaceId, taskId, attachmentId);
-
-    if (deleted === null) {
-      res.status(404).json({ message: "Task not found" });
+    const preferredContext = await resolveRequestWorkspaceContext(req.userId!, req);
+    const access = await resolveTaskAccessForUser(taskId, req.userId!, preferredContext);
+    if (!access.ok) {
+      respondTaskAccessError(res, access.reason);
       return;
     }
 
-    if (deleted === "not_found") {
+    const deleted = await deleteTaskAttachment(
+      access.workspaceId,
+      taskId,
+      attachmentId,
+      req.userId!,
+      access.role,
+    );
+
+    if (deleted === "not_found" || deleted === "forbidden") {
+      respondTaskAccessError(res, deleted);
+      return;
+    }
+
+    if (deleted === "attachment_not_found") {
       res.status(404).json({ message: "Attachment not found" });
       return;
     }
@@ -158,11 +187,6 @@ export async function downloadTaskAttachmentController(
   next: NextFunction,
 ) {
   try {
-    const context = await resolveWorkspace(req, res);
-    if (!context) {
-      return;
-    }
-
     const taskId = req.params.id;
     const attachmentId = req.params.attachmentId;
 
@@ -171,14 +195,27 @@ export async function downloadTaskAttachmentController(
       return;
     }
 
-    const file = await getTaskAttachmentFile(context.workspaceId, taskId, attachmentId);
-
-    if (file === null) {
-      res.status(404).json({ message: "Task not found" });
+    const preferredContext = await resolveRequestWorkspaceContext(req.userId!, req);
+    const access = await resolveTaskAccessForUser(taskId, req.userId!, preferredContext);
+    if (!access.ok) {
+      respondTaskAccessError(res, access.reason);
       return;
     }
 
-    if (file === "not_found") {
+    const file = await getTaskAttachmentFile(
+      access.workspaceId,
+      taskId,
+      attachmentId,
+      req.userId!,
+      access.role,
+    );
+
+    if (file === "not_found" || file === "forbidden") {
+      respondTaskAccessError(res, file);
+      return;
+    }
+
+    if (file === "attachment_not_found") {
       res.status(404).json({ message: "Attachment not found" });
       return;
     }
