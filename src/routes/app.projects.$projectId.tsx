@@ -79,6 +79,8 @@ import {
   type ProjectMemberApiItem,
 } from "@/lib/api/project-members";
 import { invalidateNotifications } from "@/lib/api/notifications";
+import { friendlyUploadErrorMessage } from "@/lib/upload-errors";
+import { isUploadFileTooLarge } from "@/lib/upload-limits";
 import { cn } from "@/lib/utils";
 import { isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user";
 import {
@@ -1106,6 +1108,7 @@ function ProjectMemberRow({
 }
 
 function ProjectDocumentsCard({ projectId }: { projectId: string }) {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1122,9 +1125,7 @@ function ProjectDocumentsCard({ projectId }: { projectId: string }) {
       toast.success("Document uploaded");
     },
     onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Document could not be uploaded",
-      );
+      toast.error(friendlyUploadErrorMessage(mutationError, t));
     },
   });
 
@@ -1158,19 +1159,23 @@ function ProjectDocumentsCard({ projectId }: { projectId: string }) {
             return;
           }
           if (!(file instanceof File) || !file.size) {
-            toast.error("Please select a file to upload");
+            toast.error(t("uploads.selectFile"));
+            return;
+          }
+          if (isUploadFileTooLarge(file)) {
+            toast.error(t("uploads.fileTooLarge"));
             return;
           }
           uploadMutation.mutate(file);
         }}
         onOpen={(document) => {
           openProjectDocument(document).catch(() => {
-            toast.error("Could not open document");
+            toast.error(t("uploads.fileOpenLegacy"));
           });
         }}
         onDownload={(document) => {
           downloadProjectDocumentFile(document).catch(() => {
-            toast.error("Could not download document");
+            toast.error(t("uploads.fileDownloadLegacy"));
           });
         }}
         onDelete={(documentId) => {
@@ -1256,6 +1261,7 @@ function ProjectDocumentsSection({
           ref={fileInputRef}
           type="file"
           className="hidden"
+          disabled={isUploading}
           accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.ppt,.pptx,application/pdf,image/png,image/jpeg,image/webp"
           onChange={(event) => {
             const file = event.target.files?.[0];
@@ -1302,6 +1308,12 @@ function ProjectDocumentsSection({
           />
         ) : (
           <div className="app-scrollbar max-h-[min(50vh,16rem)] space-y-2 overflow-y-auto overscroll-contain pr-1">
+            {isUploading ? (
+              <div className="flex items-center gap-2.5 rounded-xl border border-dashed border-primary/30 bg-primary/5 px-2.5 py-2">
+                <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
+                <span className="text-sm text-muted-foreground">{t("uploads.uploadingFile")}</span>
+              </div>
+            ) : null}
             {documents.map((document) => (
               <ProjectDocumentRow
                 key={document.id}
@@ -1325,13 +1337,13 @@ function ProjectDocumentsSection({
       >
         <AlertDialogContent className="max-w-sm gap-4">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete document?</AlertDialogTitle>
+            <AlertDialogTitle>{t("projects.detail.deleteDocumentTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This file will be removed from the project.
+              {t("projects.detail.deleteDocumentDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeletingSelected}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeletingSelected}>{t("common.cancel")}</AlertDialogCancel>
             <Button
               type="button"
               variant="destructive"
@@ -1340,7 +1352,9 @@ function ProjectDocumentsSection({
               onClick={() => void handleConfirmDelete()}
             >
               <Trash2 className="size-4" />
-              {isDeletingSelected ? "Deleting…" : "Delete document"}
+              {isDeletingSelected
+                ? t("projects.detail.deleting")
+                : t("projects.detail.deleteDocumentConfirm")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1424,6 +1438,8 @@ function ProjectDocumentRow({
   onDownload: () => void;
   onRequestDelete: () => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <div className="flex items-start gap-2.5 rounded-xl border border-border bg-muted/10 px-2.5 py-2">
       <ProjectDocumentPreview document={document} />
@@ -1466,7 +1482,7 @@ function ProjectDocumentRow({
           size="icon"
           className="size-7 text-muted-foreground hover:text-destructive"
           disabled={isDeleting}
-          aria-label="Delete document"
+          aria-label={t("projects.detail.deleteDocumentAria")}
           onClick={onRequestDelete}
         >
           <Trash2 className="size-3.5" />

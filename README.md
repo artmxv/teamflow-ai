@@ -320,6 +320,7 @@ No Stripe, OpenAI, or other third-party API keys are required for the current fe
 ### File uploads (local disk)
 
 - Upload root: `server/uploads/tasks/` and `server/uploads/projects/` (see `server/src/lib/task-upload.ts` and `project-upload.ts`).
+- **Max file size:** 10 MB per file for project documents and task attachments (enforced on the frontend and via Multer on the API).
 - The folder is in `.gitignore`; do not commit uploaded files.
 - **Production:** many PaaS containers use an **ephemeral filesystem**. Uploads disappear on redeploy unless you mount persistent volume storage at `server/uploads` (or run on a VM with a persistent disk). Cloud object storage (S3, R2, and similar) is **not** implemented in this repo.
 - There is no `UPLOAD_DIR` env variable today; paths are relative to the API process working directory (`server/` when you run `npm run start` from `server/`).
