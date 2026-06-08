@@ -1,11 +1,13 @@
-import fs from "node:fs";
-
 import { prisma } from "../lib/prisma.js";
 import {
-  decodeMulterOriginalName,
-  removeStoredTaskAttachment,
-  taskAttachmentDiskPath,
-} from "../lib/task-upload.js";
+  buildObjectKey,
+  buildStoredObjectFilename,
+  deleteStoredFile,
+  persistUploadedFile,
+  resolveStoredFile,
+  shouldUseSupabaseForProjectTaskUploads,
+} from "../lib/file-storage/index.js";
+import { decodeMulterOriginalName } from "../lib/task-upload.js";
 import { notifyTaskAttachmentUploaded } from "./notifications.service.js";
 import { resolveTaskAccess } from "./tasks.service.js";
 import type { WorkspaceRole } from "./workspace-context.service.js";
@@ -51,6 +53,9 @@ function mapAttachment(attachment: {
   };
 }
 
+const SUPABASE_UPLOAD_REQUIRED_MESSAGE =
+  "Task attachment uploads require Supabase Storage. Set FILE_STORAGE_DRIVER=supabase with SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and SUPABASE_STORAGE_BUCKET.";
+
 export async function getTaskAttachments(
   workspaceId: string,
   taskId: string,
@@ -87,59 +92,84 @@ export async function createTaskAttachment(
   role: WorkspaceRole,
   file: Express.Multer.File,
 ) {
+  if (!shouldUseSupabaseForProjectTaskUploads()) {
+    throw new Error(SUPABASE_UPLOAD_REQUIRED_MESSAGE);
+  }
+
+  const originalName = decodeMulterOriginalName(file.originalname);
+  const filename = buildObjectKey({
+    category: "task",
+    workspaceId,
+    entityId: taskId,
+    storedFilename: buildStoredObjectFilename(originalName),
+  });
   const access = await resolveTaskAccess(taskId, workspaceId, uploaderId, role);
   if (!access.ok) {
-    removeStoredTaskAttachment(taskId, file.filename);
     return access.reason;
   }
 
-  const attachment = await prisma.taskAttachment.create({
-    data: {
-      taskId,
-      uploaderId,
-      filename: file.filename,
-      originalName: decodeMulterOriginalName(file.originalname),
+  if (!file.buffer) {
+    throw new Error("Uploaded file buffer is missing");
+  }
+
+  try {
+    await persistUploadedFile({
+      objectKey: filename,
       mimeType: file.mimetype,
-      size: file.size,
-      url: "pending",
-    },
-    select: {
-      id: true,
-      filename: true,
-      originalName: true,
-      mimeType: true,
-      size: true,
-      url: true,
-      createdAt: true,
-      uploader: { select: uploaderSelect },
-    },
-  });
+      buffer: file.buffer,
+    });
 
-  const downloadUrl = buildDownloadUrl(taskId, attachment.id);
+    const attachment = await prisma.taskAttachment.create({
+      data: {
+        taskId,
+        uploaderId,
+        filename,
+        originalName,
+        mimeType: file.mimetype,
+        size: file.size,
+        url: "pending",
+      },
+      select: {
+        id: true,
+        filename: true,
+        originalName: true,
+        mimeType: true,
+        size: true,
+        url: true,
+        createdAt: true,
+        uploader: { select: uploaderSelect },
+      },
+    });
 
-  const updated = await prisma.taskAttachment.update({
-    where: { id: attachment.id },
-    data: { url: downloadUrl },
-    select: {
-      id: true,
-      filename: true,
-      originalName: true,
-      mimeType: true,
-      size: true,
-      url: true,
-      createdAt: true,
-      uploader: { select: uploaderSelect },
-    },
-  });
+    const downloadUrl = buildDownloadUrl(taskId, attachment.id);
 
-  void notifyTaskAttachmentUploaded({
-    workspaceId,
-    taskId,
-    actorId: uploaderId,
-    fileName: updated.originalName,
-  });
+    const updated = await prisma.taskAttachment.update({
+      where: { id: attachment.id },
+      data: { url: downloadUrl },
+      select: {
+        id: true,
+        filename: true,
+        originalName: true,
+        mimeType: true,
+        size: true,
+        url: true,
+        createdAt: true,
+        uploader: { select: uploaderSelect },
+      },
+    });
 
-  return mapAttachment(updated);
+    void notifyTaskAttachmentUploaded({
+      workspaceId,
+      taskId,
+      actorId: uploaderId,
+      fileName: updated.originalName,
+    });
+
+    return mapAttachment(updated);
+  } catch (error) {
+    await deleteStoredFile({ category: "task", entityId: taskId, filename });
+    throw error;
+  }
 }
 
 export async function deleteTaskAttachment(
@@ -163,7 +193,7 @@ export async function deleteTaskAttachment(
     return "attachment_not_found" as const;
   }
 
-  removeStoredTaskAttachment(taskId, attachment.filename);
+  await deleteStoredFile({ category: "task", entityId: taskId, filename: attachment.filename });
 
   await prisma.taskAttachment.delete({
     where: { id: attachmentId },
@@ -198,15 +228,17 @@ export async function getTaskAttachmentFile(
     return "attachment_not_found" as const;
   }
 
-  const filePath = taskAttachmentDiskPath(taskId, attachment.filename);
+  const resolved = await resolveStoredFile({
+    category: "task",
+    entityId: taskId,
+    filename: attachment.filename,
+    mimeType: attachment.mimeType,
+    originalName: attachment.originalName,
+  });
 
-  if (!fs.existsSync(filePath)) {
+  if (!resolved) {
     return "missing_file" as const;
   }
 
-  return {
-    filePath,
-    mimeType: attachment.mimeType,
-    originalName: attachment.originalName,
-  };
+  return resolved;
 }

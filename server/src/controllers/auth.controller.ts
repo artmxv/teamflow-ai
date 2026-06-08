@@ -2,7 +2,15 @@ import type { NextFunction, Request, Response } from "express";
 import multer from "multer";
 import { z } from "zod";
 
-import { avatarPublicPath, avatarUpload, deleteLocalAvatarFile } from "../lib/avatar-upload.js";
+import { avatarUpload } from "../lib/avatar-upload.js";
+import {
+  buildObjectKey,
+  deleteAvatarByUrl,
+  isSupabaseStorageEnabled,
+  persistUploadedFile,
+  resolveAvatarStorageUrl,
+} from "../lib/file-storage/index.js";
+import { resolveMulterStoredFilename } from "../lib/upload-filename.js";
 import {
   AuthError,
   getUserById,
@@ -189,14 +197,34 @@ export async function uploadAvatarController(req: Request, res: Response, next: 
 
       const previousUser = await getUserById(req.userId);
       const previousAvatarUrl = previousUser.avatarUrl;
-      const avatarUrl = avatarPublicPath(req.file.filename);
+      const filename = resolveMulterStoredFilename(req.file, ".jpg");
+
+      if (isSupabaseStorageEnabled() && !req.file.buffer) {
+        res.status(500).json({ message: "Avatar upload failed" });
+        return;
+      }
+
+      if (isSupabaseStorageEnabled()) {
+        await persistUploadedFile({
+          objectKey: buildObjectKey({
+            category: "avatar",
+            workspaceId: "_",
+            entityId: "_",
+            storedFilename: filename,
+          }),
+          mimeType: req.file.mimetype,
+          buffer: req.file.buffer!,
+        });
+      }
+
+      const avatarUrl = resolveAvatarStorageUrl(filename);
 
       try {
         const user = await updateUserAvatarUrl(req.userId, avatarUrl);
-        deleteLocalAvatarFile(previousAvatarUrl);
+        await deleteAvatarByUrl(previousAvatarUrl);
         res.json({ data: { user } });
       } catch (updateError) {
-        deleteLocalAvatarFile(avatarUrl);
+        await deleteAvatarByUrl(avatarUrl);
         throw updateError;
       }
     } catch (uploadError) {
@@ -215,7 +243,7 @@ export async function removeAvatarController(req: Request, res: Response, next: 
     const previousUser = await getUserById(req.userId);
     const previousAvatarUrl = previousUser.avatarUrl;
     const user = await removeUserAvatar(req.userId);
-    deleteLocalAvatarFile(previousAvatarUrl);
+    await deleteAvatarByUrl(previousAvatarUrl);
     res.json({ data: { user } });
   } catch (error) {
     handleAuthError(error, res, next);

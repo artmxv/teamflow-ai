@@ -291,13 +291,17 @@ Copy each to `.env` in the same directory and edit. Never commit `server/.env` o
 
 Validated at API startup in `server/src/config/env.ts`. Prisma reads `DATABASE_URL` from the environment separately.
 
-| Variable       | Required | Description                                                    |
-| -------------- | -------- | -------------------------------------------------------------- |
-| `DATABASE_URL` | Yes      | PostgreSQL connection string for Prisma                        |
-| `JWT_SECRET`   | Yes      | Secret for signing JWTs                                        |
-| `PORT`         | No       | API port (default `4000`)                                      |
-| `NODE_ENV`     | No       | `development`, `test`, or `production` (default `development`) |
-| `CORS_ORIGIN`  | No       | Frontend origin for CORS (default `http://localhost:8080`)     |
+| Variable                    | Required | Description                                                    |
+| --------------------------- | -------- | -------------------------------------------------------------- |
+| `DATABASE_URL`              | Yes      | PostgreSQL connection string for Prisma                        |
+| `JWT_SECRET`                | Yes      | Secret for signing JWTs                                        |
+| `PORT`                      | No       | API port (default `4000`)                                      |
+| `NODE_ENV`                  | No       | `development`, `test`, or `production` (default `development`) |
+| `CORS_ORIGIN`               | No       | Frontend origin for CORS (default `http://localhost:8080`)     |
+| `FILE_STORAGE_DRIVER`       | No       | `local` (default) or `supabase` for durable uploads            |
+| `SUPABASE_URL`              | If supabase | Example: `https://your-project-ref.supabase.co`             |
+| `SUPABASE_SERVICE_ROLE_KEY` | If supabase | Example: `your-supabase-service-role-key` (never commit)    |
+| `SUPABASE_STORAGE_BUCKET`   | If supabase | Example: `teamflow-uploads`                                 |
 
 Example `DATABASE_URL` for local Docker Compose:
 
@@ -345,13 +349,17 @@ Use this before going live:
 
 ### Backend environment (`server/.env`)
 
-| Variable       | Required            | Production notes                    |
-| -------------- | ------------------- | ----------------------------------- |
-| `DATABASE_URL` | Yes                 | PostgreSQL URL for Prisma           |
-| `JWT_SECRET`   | Yes                 | Strong secret; never commit         |
-| `CORS_ORIGIN`  | No (default local)  | Must match deployed frontend origin |
-| `PORT`         | No (default `4000`) | Often set by the host               |
-| `NODE_ENV`     | No                  | Use `production` when deployed      |
+| Variable                    | Required            | Production notes                                      |
+| --------------------------- | ------------------- | ----------------------------------------------------- |
+| `DATABASE_URL`              | Yes                 | PostgreSQL URL for Prisma                             |
+| `JWT_SECRET`                | Yes                 | Strong secret; never commit                           |
+| `CORS_ORIGIN`               | No (default local)  | Must match deployed frontend origin                   |
+| `PORT`                      | No (default `4000`) | Often set by the host                                 |
+| `NODE_ENV`                  | No                  | Use `production` when deployed                        |
+| `FILE_STORAGE_DRIVER`       | No (default local)  | Use `supabase` on Render for uploads that survive redeploy |
+| `SUPABASE_URL`              | If supabase         | `https://your-project-ref.supabase.co`                |
+| `SUPABASE_SERVICE_ROLE_KEY` | If supabase         | `your-supabase-service-role-key`; never commit        |
+| `SUPABASE_STORAGE_BUCKET`   | If supabase         | `teamflow-uploads`                                    |
 
 Validated at startup in `server/src/config/env.ts`. Prisma also requires `DATABASE_URL` (documented in `server/.env.example`).
 
@@ -392,7 +400,7 @@ Vite embeds `VITE_*` values into the client bundle. Rebuild after changing the A
 
 - **AI Assistant:** deterministic summaries from PostgreSQL; no OpenAI, GigaChat, or other LLM API keys.
 - **Billing (demo):** UI only; no Stripe or payment webhooks.
-- **Cloud file storage:** uploads use local disk under `server/uploads/` only.
+- **Cloud file storage:** set `FILE_STORAGE_DRIVER=supabase` on the API for durable uploads (see `docs/DEPLOYMENT.md`). Default local dev uses disk under `server/uploads/`.
 
 ## Database commands
 
@@ -444,7 +452,7 @@ npm run prisma:studio          # Open Prisma Studio
 - Real team invites, email delivery, or member lifecycle APIs
 - Hosted production deployment and live demo URL (see [Deployment](#deployment) for env, migrations, and checklist)
 - Drag-and-drop Kanban
-- Cloud object storage for attachments and project documents (local disk only today)
+- Supabase Storage is supported on the API (`FILE_STORAGE_DRIVER=supabase`); local dev still defaults to disk
 
 **Possible next steps:**
 
