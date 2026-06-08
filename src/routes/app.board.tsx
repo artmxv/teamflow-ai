@@ -14,6 +14,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { invalidateNotifications } from "@/lib/api/notifications";
 import { AppShell } from "@/components/app/AppShell";
 import { statusColumns, type Priority, type Task, type TaskStatus } from "@/lib/mock-data";
 import { EmptyState } from "@/components/app/EmptyState";
@@ -113,6 +114,7 @@ function Board() {
     mutationFn: createTask,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      invalidateNotifications(queryClient);
       toast.success("Task created");
     },
     onError: (mutationError) => {
@@ -181,6 +183,7 @@ function Board() {
     }) => updateTask(id, input),
     onSuccess: async (updated) => {
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      invalidateNotifications(queryClient);
       setSelected((prev) => (prev?.id === updated.id ? mapApiTaskToTask(updated) : prev));
       setSelected(null);
       toast.success("Task updated");

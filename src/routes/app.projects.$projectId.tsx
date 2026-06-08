@@ -78,6 +78,7 @@ import {
   type AvailableProjectMember,
   type ProjectMemberApiItem,
 } from "@/lib/api/project-members";
+import { invalidateNotifications } from "@/lib/api/notifications";
 import { cn } from "@/lib/utils";
 import { isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user";
 import {
@@ -235,6 +236,7 @@ function ProjectDetailPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      invalidateNotifications(queryClient);
       toast.success("Task created");
     },
     onError: (mutationError) => {
@@ -276,6 +278,7 @@ function ProjectDetailPage() {
     onSuccess: async (updated) => {
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      invalidateNotifications(queryClient);
       setSelectedTask((prev) => {
         if (!prev || prev.id !== updated.id) return prev;
         return mapApiTaskToTask(updated);
@@ -826,6 +829,7 @@ function ProjectMembersCard({
       await queryClient.invalidateQueries({
         queryKey: ["project-available-members", projectId],
       });
+      invalidateNotifications(queryClient);
       toast.success("Member added");
       setAddDialogOpen(false);
     },
@@ -1114,6 +1118,7 @@ function ProjectDocumentsCard({ projectId }: { projectId: string }) {
     mutationFn: (file: File) => uploadProjectDocument(projectId, file),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["project-documents", projectId] });
+      invalidateNotifications(queryClient);
       toast.success("Document uploaded");
     },
     onError: (mutationError) => {
