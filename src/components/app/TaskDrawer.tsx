@@ -140,6 +140,10 @@ export function TaskDrawer({
   useLayoutEffect(() => {
     if (!task) {
       setDraftTitle("");
+      setDraftAssigneeIds([]);
+      setDraftDueDate(null);
+      setDraftStatus("backlog");
+      setDraftPriority("medium");
       return;
     }
     setDraftTitle(displayTaskTitle(task.title, lang));
@@ -224,7 +228,12 @@ export function TaskDrawer({
   });
 
   const uploadAttachmentMutation = useMutation({
-    mutationFn: (file: File) => uploadTaskAttachment(task!.id, file),
+    mutationFn: (file: File) => {
+      if (!task?.id) {
+        throw new Error("Task is not ready yet");
+      }
+      return uploadTaskAttachment(task.id, file);
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["task-attachments", task!.id] });
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
@@ -333,6 +342,9 @@ export function TaskDrawer({
               <span>·</span>
               <span>{project?.name ? displayProjectName(project.name, lang) : ""}</span>
             </div>
+            <SheetTitle className={canEditTask ? "sr-only" : "text-xl leading-snug"}>
+              {displayTaskTitle(canEditTask ? draftTitle || task.title : task.title, lang)}
+            </SheetTitle>
             {canEditTask ? (
               <div className="space-y-1.5">
                 <label
@@ -350,11 +362,7 @@ export function TaskDrawer({
                   onChange={(event) => setDraftTitle(event.target.value)}
                 />
               </div>
-            ) : (
-              <SheetTitle className="text-xl leading-snug">
-                {displayTaskTitle(task.title, lang)}
-              </SheetTitle>
-            )}
+            ) : null}
             <SheetDescription className="sr-only">
               {t("tasks.sheetDescription").replace("{key}", task.key)}
             </SheetDescription>
@@ -470,6 +478,14 @@ export function TaskDrawer({
                 onPickFile={() => fileInputRef.current?.click()}
                 onFileSelected={(file) => {
                   if (uploadAttachmentMutation.isPending) return;
+                  if (!task?.id) {
+                    toast.error("Task is not ready yet");
+                    return;
+                  }
+                  if (!(file instanceof File) || !file.size) {
+                    toast.error("Please select a file to upload");
+                    return;
+                  }
                   uploadAttachmentMutation.mutate(file);
                 }}
                 onOpen={(attachment) => {
@@ -544,6 +560,7 @@ export function TaskDrawer({
               <Field icon={CircleDot} label={t("tasks.status")}>
                 {canEditTask ? (
                   <Select
+                    key={`${task.id}-status`}
                     value={draftStatus}
                     disabled={isSaving}
                     onValueChange={(value) => setDraftStatus(value as TaskStatus)}
@@ -568,6 +585,7 @@ export function TaskDrawer({
               <Field icon={Flag} label={t("tasks.priority")}>
                 {canEditTask ? (
                   <Select
+                    key={`${task.id}-priority`}
                     value={draftPriority}
                     disabled={isSaving}
                     onValueChange={(value) => setDraftPriority(value as Priority)}

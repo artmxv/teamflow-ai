@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma.js";
-import { getAccessibleProjectWhere } from "./project-access.service.js";
+import { canAccessProject, getAccessibleProjectWhere } from "./project-access.service.js";
 import type { WorkspaceRole } from "./workspace-context.service.js";
 
 type CreateProjectInput = {
@@ -75,6 +75,101 @@ export async function findProjectInWorkspace(projectId: string, workspaceId: str
     where: { id: projectId, workspaceId },
     select: { id: true, name: true },
   });
+}
+
+export type ProjectAccessResult =
+  | { ok: true; projectId: string }
+  | { ok: false; reason: "not_found" }
+  | { ok: false; reason: "forbidden" };
+
+export type ProjectAccessContextResult =
+  | { ok: true; projectId: string; workspaceId: string; role: WorkspaceRole }
+  | { ok: false; reason: "not_found" }
+  | { ok: false; reason: "forbidden" };
+
+export async function resolveProjectAccessForUser(
+  projectId: string,
+  userId: string,
+  preferredContext?: { workspaceId: string; role: WorkspaceRole } | null,
+): Promise<ProjectAccessContextResult> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { id: true, workspaceId: true },
+  });
+
+  if (!project) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  const tryAccess = async (workspaceId: string, role: WorkspaceRole) => {
+    if (workspaceId !== project.workspaceId) {
+      return false;
+    }
+
+    return canAccessProject(userId, workspaceId, role, projectId);
+  };
+
+  if (preferredContext) {
+    if (await tryAccess(preferredContext.workspaceId, preferredContext.role)) {
+      return {
+        ok: true,
+        projectId: project.id,
+        workspaceId: project.workspaceId,
+        role: preferredContext.role,
+      };
+    }
+  }
+
+  const membership = await prisma.workspaceMember.findFirst({
+    where: {
+      userId,
+      workspaceId: project.workspaceId,
+      status: "ACTIVE",
+    },
+    select: { role: true },
+  });
+
+  if (!membership) {
+    return { ok: false, reason: "forbidden" };
+  }
+
+  if (!(await tryAccess(project.workspaceId, membership.role))) {
+    return { ok: false, reason: "forbidden" };
+  }
+
+  return {
+    ok: true,
+    projectId: project.id,
+    workspaceId: project.workspaceId,
+    role: membership.role,
+  };
+}
+
+export async function resolveProjectAccess(
+  projectId: string,
+  workspaceId: string,
+  userId: string,
+  role: WorkspaceRole,
+): Promise<ProjectAccessResult> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { id: true, workspaceId: true },
+  });
+
+  if (!project) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  if (project.workspaceId !== workspaceId) {
+    return { ok: false, reason: "forbidden" };
+  }
+
+  const hasAccess = await canAccessProject(userId, workspaceId, role, projectId);
+  if (!hasAccess) {
+    return { ok: false, reason: "forbidden" };
+  }
+
+  return { ok: true, projectId: project.id };
 }
 
 export async function getProjects(workspaceId: string, userId: string, role: WorkspaceRole) {

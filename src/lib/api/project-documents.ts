@@ -1,5 +1,4 @@
-import { getAuthToken } from "@/lib/auth/token";
-import { API_BASE_URL, apiRequest } from "./client";
+import { API_BASE_URL, ApiError, apiRequest, apiUpload, buildAuthHeaders } from "./client";
 
 export interface ProjectDocumentUploader {
   id: string;
@@ -28,28 +27,15 @@ export async function fetchProjectDocuments(projectId: string) {
 }
 
 export async function uploadProjectDocument(projectId: string, file: File) {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const headers: Record<string, string> = {};
-  const token = getAuthToken();
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  if (!projectId.trim()) {
+    throw new ApiError("Project is required", 400);
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/documents`, {
-    method: "POST",
-    headers,
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { message?: string } | null;
-    throw new Error(body?.message ?? `Upload failed with status ${response.status}`);
-  }
-
-  const json = (await response.json()) as { data: ProjectDocumentApiItem };
-  return json.data;
+  const response = await apiUpload<{ data: ProjectDocumentApiItem }>(
+    `/api/projects/${projectId}/documents`,
+    file,
+  );
+  return response.data;
 }
 
 export async function deleteProjectDocument(projectId: string, documentId: string) {
@@ -128,13 +114,7 @@ export async function fetchProjectDocumentBlob(document: ProjectDocumentApiItem)
     throw new Error("Could not load document");
   }
   const url = resolveProjectDocumentUrl(path);
-  const headers: Record<string, string> = {};
-  const token = getAuthToken();
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  const response = await fetch(url, { headers });
+  const response = await fetch(url, { headers: buildAuthHeaders(), credentials: "include" });
   if (!response.ok) {
     throw new Error("Could not load document");
   }

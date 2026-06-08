@@ -1,5 +1,4 @@
-import { getAuthToken } from "@/lib/auth/token";
-import { API_BASE_URL, apiRequest } from "./client";
+import { apiRequest, apiUpload } from "./client";
 
 export type WorkspaceRole = "OWNER" | "ADMIN" | "MEMBER";
 
@@ -118,28 +117,11 @@ export async function updateProfile(input: UpdateProfileInput): Promise<AuthUser
 }
 
 export async function uploadAvatar(file: File): Promise<AuthUser> {
-  const formData = new FormData();
-  formData.append("avatar", file);
-
-  const headers: Record<string, string> = {};
-  const token = getAuthToken();
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  const response = await fetch(`${API_BASE_URL}/api/auth/avatar`, {
-    method: "POST",
-    headers,
-    body: formData,
+  const response = await apiUpload<UpdateProfileResponse>("/api/auth/avatar", file, {
+    fieldName: "avatar",
+    skipWorkspaceHeader: true,
   });
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { message?: string } | null;
-    throw new Error(body?.message ?? `Upload failed with status ${response.status}`);
-  }
-
-  const json = (await response.json()) as UpdateProfileResponse;
-  return json.data.user;
+  return response.data.user;
 }
 
 export async function removeAvatar(): Promise<AuthUser> {

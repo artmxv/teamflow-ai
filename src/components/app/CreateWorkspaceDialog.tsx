@@ -33,6 +33,8 @@ import { getWorkspaceAccent } from "@/lib/workspace-color";
 import { nameToInitials } from "@/lib/auth/use-current-user";
 import { cn } from "@/lib/utils";
 
+const TEAM_SIZE_SELECT_EMPTY = "__unset__";
+
 const TEAM_SIZE_OPTIONS: { value: string; labelKey: TKey }[] = [
   { value: "0-5", labelKey: "settings.teamSize0to5" },
   { value: "6-10", labelKey: "settings.teamSize6to10" },
@@ -185,13 +187,18 @@ export function CreateWorkspaceDialog({ children }: CreateWorkspaceDialogProps) 
           <div className="space-y-1.5">
             <Label>{t("settings.teamSize")}</Label>
             <Select
-              value={teamSize || undefined}
-              onValueChange={(value) => setValue("teamSize", value, { shouldValidate: true })}
+              value={teamSize ? teamSize : TEAM_SIZE_SELECT_EMPTY}
+              onValueChange={(value) =>
+                setValue("teamSize", value === TEAM_SIZE_SELECT_EMPTY ? "" : value, {
+                  shouldValidate: true,
+                })
+              }
             >
               <SelectTrigger>
                 <SelectValue placeholder={t("settings.teamSize")} />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value={TEAM_SIZE_SELECT_EMPTY}>—</SelectItem>
                 {TEAM_SIZE_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {t(option.labelKey)}

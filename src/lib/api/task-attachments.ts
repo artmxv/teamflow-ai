@@ -1,5 +1,4 @@
-import { getAuthToken } from "@/lib/auth/token";
-import { API_BASE_URL, apiRequest } from "./client";
+import { API_BASE_URL, ApiError, apiRequest, apiUpload, buildAuthHeaders } from "./client";
 
 export interface TaskAttachmentUploader {
   id: string;
@@ -28,28 +27,15 @@ export async function fetchTaskAttachments(taskId: string) {
 }
 
 export async function uploadTaskAttachment(taskId: string, file: File) {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const headers: Record<string, string> = {};
-  const token = getAuthToken();
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  if (!taskId.trim()) {
+    throw new ApiError("Task is required", 400);
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/attachments`, {
-    method: "POST",
-    headers,
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { message?: string } | null;
-    throw new Error(body?.message ?? `Upload failed with status ${response.status}`);
-  }
-
-  const json = (await response.json()) as { data: TaskAttachmentApiItem };
-  return json.data;
+  const response = await apiUpload<{ data: TaskAttachmentApiItem }>(
+    `/api/tasks/${taskId}/attachments`,
+    file,
+  );
+  return response.data;
 }
 
 export async function deleteTaskAttachment(taskId: string, attachmentId: string) {
@@ -124,13 +110,7 @@ export function getAttachmentFileTypeBadge(originalName: string, mimeType: strin
 
 export async function fetchTaskAttachmentBlob(attachment: TaskAttachmentApiItem): Promise<Blob> {
   const url = resolveTaskAttachmentUrl(attachment.downloadUrl || attachment.url);
-  const headers: Record<string, string> = {};
-  const token = getAuthToken();
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  const response = await fetch(url, { headers });
+  const response = await fetch(url, { headers: buildAuthHeaders(), credentials: "include" });
   if (!response.ok) {
     throw new Error("Could not load attachment");
   }

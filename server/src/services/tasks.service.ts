@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { notifyTaskAssigned } from "./notifications.service.js";
 import { canAccessProject, getAccessibleTaskWhere } from "./project-access.service.js";
+import { resolveProjectAccessForUser } from "./projects.service.js";
 import type { WorkspaceRole } from "./workspace-context.service.js";
 
 type CreateTaskInput = {
@@ -176,6 +177,80 @@ export async function findTaskInWorkspace(taskId: string, workspaceId: string) {
     where: { id: taskId, project: { workspaceId } },
     select: { id: true },
   });
+}
+
+export type TaskAccessResult =
+  | { ok: true; taskId: string; projectId: string }
+  | { ok: false; reason: "not_found" }
+  | { ok: false; reason: "forbidden" };
+
+export type TaskAccessContextResult =
+  | { ok: true; taskId: string; projectId: string; workspaceId: string; role: WorkspaceRole }
+  | { ok: false; reason: "not_found" }
+  | { ok: false; reason: "forbidden" };
+
+export async function resolveTaskAccessForUser(
+  taskId: string,
+  userId: string,
+  preferredContext?: { workspaceId: string; role: WorkspaceRole } | null,
+): Promise<TaskAccessContextResult> {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: {
+      id: true,
+      projectId: true,
+      project: { select: { workspaceId: true } },
+    },
+  });
+
+  if (!task) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  const projectAccess = await resolveProjectAccessForUser(task.projectId, userId, preferredContext);
+
+  if (!projectAccess.ok) {
+    return { ok: false, reason: projectAccess.reason };
+  }
+
+  return {
+    ok: true,
+    taskId: task.id,
+    projectId: task.projectId,
+    workspaceId: projectAccess.workspaceId,
+    role: projectAccess.role,
+  };
+}
+
+export async function resolveTaskAccess(
+  taskId: string,
+  workspaceId: string,
+  userId: string,
+  role: WorkspaceRole,
+): Promise<TaskAccessResult> {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: {
+      id: true,
+      projectId: true,
+      project: { select: { workspaceId: true } },
+    },
+  });
+
+  if (!task) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  if (task.project.workspaceId !== workspaceId) {
+    return { ok: false, reason: "forbidden" };
+  }
+
+  const hasAccess = await canAccessProject(userId, workspaceId, role, task.projectId);
+  if (!hasAccess) {
+    return { ok: false, reason: "forbidden" };
+  }
+
+  return { ok: true, taskId: task.id, projectId: task.projectId };
 }
 
 async function resolveAssigneeIds(

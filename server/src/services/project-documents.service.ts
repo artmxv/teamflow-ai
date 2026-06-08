@@ -7,7 +7,7 @@ import {
   removeStoredProjectDocument,
 } from "../lib/project-upload.js";
 import { notifyProjectDocumentUploaded } from "./notifications.service.js";
-import { canAccessProject } from "./project-access.service.js";
+import { resolveProjectAccess } from "./projects.service.js";
 import type { WorkspaceRole } from "./workspace-context.service.js";
 
 const uploaderSelect = {
@@ -16,6 +16,8 @@ const uploaderSelect = {
   email: true,
   avatar: true,
 } as const;
+
+export type ProjectDocumentAccessError = "not_found" | "forbidden";
 
 function buildDownloadUrl(projectId: string, documentId: string) {
   return `/api/projects/${projectId}/documents/${documentId}/file`;
@@ -55,9 +57,9 @@ export async function getProjectDocuments(
   userId: string,
   role: WorkspaceRole,
 ) {
-  const hasAccess = await canAccessProject(userId, workspaceId, role, projectId);
-  if (!hasAccess) {
-    return null;
+  const access = await resolveProjectAccess(projectId, workspaceId, userId, role);
+  if (!access.ok) {
+    return access.reason;
   }
 
   const documents = await prisma.projectDocument.findMany({
@@ -85,10 +87,10 @@ export async function createProjectDocument(
   role: WorkspaceRole,
   file: Express.Multer.File,
 ) {
-  const hasAccess = await canAccessProject(uploaderId, workspaceId, role, projectId);
-  if (!hasAccess) {
+  const access = await resolveProjectAccess(projectId, workspaceId, uploaderId, role);
+  if (!access.ok) {
     removeStoredProjectDocument(projectId, file.filename);
-    return null;
+    return access.reason;
   }
 
   const document = await prisma.projectDocument.create({
@@ -147,9 +149,9 @@ export async function deleteProjectDocument(
   userId: string,
   role: WorkspaceRole,
 ) {
-  const hasAccess = await canAccessProject(userId, workspaceId, role, projectId);
-  if (!hasAccess) {
-    return null;
+  const access = await resolveProjectAccess(projectId, workspaceId, userId, role);
+  if (!access.ok) {
+    return access.reason;
   }
 
   const document = await prisma.projectDocument.findFirst({
@@ -158,7 +160,7 @@ export async function deleteProjectDocument(
   });
 
   if (!document) {
-    return "not_found" as const;
+    return "document_not_found" as const;
   }
 
   removeStoredProjectDocument(projectId, document.filename);
@@ -177,9 +179,9 @@ export async function getProjectDocumentFile(
   userId: string,
   role: WorkspaceRole,
 ) {
-  const hasAccess = await canAccessProject(userId, workspaceId, role, projectId);
-  if (!hasAccess) {
-    return null;
+  const access = await resolveProjectAccess(projectId, workspaceId, userId, role);
+  if (!access.ok) {
+    return access.reason;
   }
 
   const document = await prisma.projectDocument.findFirst({
@@ -193,7 +195,7 @@ export async function getProjectDocumentFile(
   });
 
   if (!document) {
-    return "not_found" as const;
+    return "document_not_found" as const;
   }
 
   const filePath = projectDocumentDiskPath(projectId, document.filename);
