@@ -24,20 +24,48 @@ import { workspacesRouter } from "./routes/workspaces.routes.js";
 const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const uploadsRoot = path.join(serverRoot, "uploads");
 
+const allowedOrigins = new Set(env.CORS_ORIGINS);
+
+function normalizeOrigin(origin: string): string {
+  return origin.replace(/\/$/, "");
+}
+
 export const app = express();
 
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      const normalized = normalizeOrigin(origin);
+      if (allowedOrigins.has(normalized)) {
+        callback(null, normalized);
+        return;
+      }
+
+      callback(null, false);
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Workspace-Id",
+      "x-workspace-id",
+      "x-current-workspace-id",
+    ],
+    optionsSuccessStatus: 204,
+  }),
+);
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
   }),
 );
 app.use("/uploads", express.static(uploadsRoot));
-app.use(
-  cors({
-    origin:
-      env.CORS_ORIGINS.length <= 1 ? (env.CORS_ORIGINS[0] ?? env.CORS_ORIGIN) : env.CORS_ORIGINS,
-  }),
-);
 app.use(express.json());
 
 if (env.NODE_ENV !== "production") {
