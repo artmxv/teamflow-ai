@@ -1,4 +1,17 @@
+import type { QueryClient } from "@tanstack/react-query";
+
 import { apiRequest } from "./client";
+
+export const NOTIFICATIONS_QUERY_KEY = ["notifications"] as const;
+export const NOTIFICATIONS_POLL_MS = 5_000;
+
+export function invalidateNotifications(queryClient: QueryClient) {
+  void queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
+}
+
+export function refetchNotifications(queryClient: QueryClient) {
+  void queryClient.refetchQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
+}
 
 export interface NotificationItem {
   id: string;

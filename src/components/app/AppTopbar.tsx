@@ -34,12 +34,13 @@ import {
   isWorkspaceInvitationNotification,
   markAllNotificationsRead,
   markNotificationRead,
+  NOTIFICATIONS_POLL_MS,
+  NOTIFICATIONS_QUERY_KEY,
+  refetchNotifications,
   resolveNotificationTarget,
   type NotificationItem,
 } from "@/lib/api/notifications";
 import { activateWorkspace } from "@/lib/workspace-queries";
-const NOTIFICATIONS_QUERY_KEY = ["notifications"] as const;
-const NOTIFICATIONS_POLL_MS = 45_000;
 
 function formatNotificationTime(createdAt: string, lang: string) {
   const date = new Date(createdAt);
@@ -106,6 +107,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
     queryFn: fetchNotifications,
     enabled: hasToken,
     refetchInterval: NOTIFICATIONS_POLL_MS,
+    refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
   });
 
@@ -142,7 +144,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
   const markAllReadMutation = useMutation({
     mutationFn: markAllNotificationsRead,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
+      refetchNotifications(queryClient);
       toast.success(t("top.allMarkedAsRead"));
     },
   });
@@ -164,7 +166,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
 
         if (!notification.isRead && !isWorkspaceInvitationNotification(notification)) {
           await markNotificationRead(notification.id);
-          void queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
+          refetchNotifications(queryClient);
         }
 
         const target = resolveNotificationTarget(notification);

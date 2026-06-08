@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 
 import { AUTH_ME_QUERY_KEY } from "@/lib/auth/auth-cache";
 import { getSelectedWorkspaceId, setSelectedWorkspaceId } from "@/lib/api/client";
+import { NOTIFICATIONS_QUERY_KEY } from "@/lib/api/notifications";
 import { switchWorkspace } from "@/lib/api/workspaces";
 
 export const WORKSPACES_QUERY_KEY = ["workspaces"] as const;
@@ -29,7 +30,7 @@ export async function invalidateWorkspaceScopedQueries(queryClient: QueryClient)
     queryClient.invalidateQueries({ queryKey: ["workspace"] }),
     queryClient.invalidateQueries({ queryKey: ["billing"] }),
     queryClient.invalidateQueries({ queryKey: ["billing", "summary"] }),
-    queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+    queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY }),
     queryClient.invalidateQueries({ queryKey: ["workspace-ai-summary"] }),
     queryClient.invalidateQueries({ queryKey: ["global-search"] }),
   ]);

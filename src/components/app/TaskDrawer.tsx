@@ -44,6 +44,7 @@ import {
   updateTaskComment,
   type TaskCommentApiItem,
 } from "@/lib/api/task-comments";
+import { invalidateNotifications } from "@/lib/api/notifications";
 import {
   deleteTaskAttachment,
   downloadTaskAttachmentFile,
@@ -184,6 +185,7 @@ export function TaskDrawer({
       setCommentBody("");
       await queryClient.invalidateQueries({ queryKey: ["task-comments", task!.id] });
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      invalidateNotifications(queryClient);
       toast.success("Comment added");
     },
     onError: (mutationError) => {
@@ -237,6 +239,7 @@ export function TaskDrawer({
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["task-attachments", task!.id] });
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      invalidateNotifications(queryClient);
       toast.success("Attachment uploaded");
     },
     onError: (mutationError) => {
