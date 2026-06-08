@@ -21,6 +21,10 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.preprocess(emptyToUndefined, z.string().optional()),
   GOOGLE_CLIENT_SECRET: z.preprocess(emptyToUndefined, z.string().optional()),
   GOOGLE_REDIRECT_URI: z.preprocess(emptyToUndefined, z.string().url().optional()),
+  FILE_STORAGE_DRIVER: z.enum(["local", "supabase"]).default("local"),
+  SUPABASE_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
+  SUPABASE_SERVICE_ROLE_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
+  SUPABASE_STORAGE_BUCKET: z.preprocess(emptyToUndefined, z.string().optional()),
 });
 
 const parsed = envSchema.parse(process.env);
@@ -81,6 +85,29 @@ function validateEmailConfig(): void {
   }
 }
 
+function validateFileStorageConfig(): void {
+  if (parsed.FILE_STORAGE_DRIVER !== "supabase") {
+    return;
+  }
+
+  const missing: string[] = [];
+  if (!parsed.SUPABASE_URL?.trim()) {
+    missing.push("SUPABASE_URL");
+  }
+  if (!parsed.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
+    missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  }
+  if (!parsed.SUPABASE_STORAGE_BUCKET?.trim()) {
+    missing.push("SUPABASE_STORAGE_BUCKET");
+  }
+
+  if (missing.length > 0) {
+    throw new Error(
+      `FILE_STORAGE_DRIVER=supabase requires ${missing.join(", ")}. Leave FILE_STORAGE_DRIVER=local for disk uploads.`,
+    );
+  }
+}
+
 function validateProductionConfig(): void {
   if (parsed.NODE_ENV !== "production") {
     return;
@@ -109,8 +136,20 @@ function validateProductionConfig(): void {
   }
 }
 
+function normalizeSupabaseUrl(url: string | undefined): string | undefined {
+  if (!url) {
+    return undefined;
+  }
+
+  return url
+    .trim()
+    .replace(/\/rest\/v1\/?$/i, "")
+    .replace(/\/$/, "");
+}
+
 validateGoogleOAuthConfig();
 validateEmailConfig();
+validateFileStorageConfig();
 validateProductionConfig();
 
 export const env = {
@@ -122,4 +161,7 @@ export const env = {
   GOOGLE_REDIRECT_URI: parsed.GOOGLE_REDIRECT_URI?.trim() || undefined,
   EMAIL_FROM: parsed.EMAIL_FROM?.trim() || undefined,
   RESEND_API_KEY: parsed.RESEND_API_KEY?.trim() || undefined,
+  SUPABASE_URL: normalizeSupabaseUrl(parsed.SUPABASE_URL),
+  SUPABASE_SERVICE_ROLE_KEY: parsed.SUPABASE_SERVICE_ROLE_KEY?.trim() || undefined,
+  SUPABASE_STORAGE_BUCKET: parsed.SUPABASE_STORAGE_BUCKET?.trim() || undefined,
 };

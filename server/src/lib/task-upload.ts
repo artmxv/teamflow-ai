@@ -1,9 +1,9 @@
-import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import multer from "multer";
+
 
 const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -70,25 +70,7 @@ export function removeStoredTaskAttachment(taskId: string, filename: string) {
 }
 
 export const taskAttachmentUpload = multer({
-  storage: multer.diskStorage({
-    destination(req, _file, cb) {
-      const taskId = req.params.id;
-      if (typeof taskId !== "string") {
-        cb(new Error("Task id is required"), "");
-        return;
-      }
-      try {
-        cb(null, ensureTaskUploadDir(taskId));
-      } catch (error) {
-        cb(error instanceof Error ? error : new Error("Could not prepare upload folder"), "");
-      }
-    },
-    filename(_req, file, cb) {
-      const originalName = decodeMulterOriginalName(file.originalname);
-      const extension = path.extname(originalName).toLowerCase();
-      cb(null, `${randomUUID()}${extension}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: MAX_TASK_ATTACHMENT_BYTES },
   fileFilter(_req, file, cb) {
     const originalName = decodeMulterOriginalName(file.originalname);

@@ -1,10 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
 import multer from "multer";
 
+import { sendResolvedStoredFile } from "../lib/file-storage/index.js";
 import {
   MAX_PROJECT_DOCUMENT_BYTES,
   projectDocumentUpload,
-  removeStoredProjectDocument,
 } from "../lib/project-upload.js";
 import {
   createProjectDocument,
@@ -26,6 +26,22 @@ function handleUploadError(error: unknown, res: Response) {
 
   if (error instanceof Error && error.message === "Unsupported file type") {
     res.status(400).json({ message: error.message });
+    return true;
+  }
+
+  return false;
+}
+
+function handleStorageUploadError(error: unknown, res: Response) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  if (
+    error.message.includes("Supabase Storage") ||
+    error.message.includes("require Supabase Storage")
+  ) {
+    res.status(500).json({ message: error.message });
     return true;
   }
 
@@ -107,7 +123,6 @@ export async function uploadProjectDocumentController(
       const preferredContext = await resolveRequestWorkspaceContext(req.userId!, req);
       const access = await resolveProjectAccessForUser(projectId, req.userId!, preferredContext);
       if (!access.ok) {
-        removeStoredProjectDocument(projectId, req.file.filename);
         respondProjectAccessError(res, access.reason);
         return;
       }
@@ -127,9 +142,8 @@ export async function uploadProjectDocumentController(
 
       res.status(201).json({ data: document });
     } catch (uploadError) {
-      const projectId = req.params.id;
-      if (typeof projectId === "string" && req.file) {
-        removeStoredProjectDocument(projectId, req.file.filename);
+      if (handleStorageUploadError(uploadError, res)) {
+        return;
       }
       next(uploadError);
     }
@@ -225,16 +239,7 @@ export async function downloadProjectDocumentController(
       return;
     }
 
-    res.setHeader("Content-Type", file.mimeType);
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="${encodeURIComponent(file.originalName)}"`,
-    );
-    res.sendFile(file.filePath, { maxAge: 0 }, (sendError) => {
-      if (sendError && !res.headersSent) {
-        next(sendError);
-      }
-    });
+    await sendResolvedStoredFile(res, file, next);
   } catch (error) {
     next(error);
   }

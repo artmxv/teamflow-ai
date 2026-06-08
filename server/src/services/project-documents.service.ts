@@ -1,11 +1,13 @@
-import fs from "node:fs";
-
 import { prisma } from "../lib/prisma.js";
 import {
-  decodeMulterOriginalName,
-  projectDocumentDiskPath,
-  removeStoredProjectDocument,
-} from "../lib/project-upload.js";
+  buildObjectKey,
+  buildStoredObjectFilename,
+  deleteStoredFile,
+  persistUploadedFile,
+  resolveStoredFile,
+  shouldUseSupabaseForProjectTaskUploads,
+} from "../lib/file-storage/index.js";
+import { decodeMulterOriginalName } from "../lib/project-upload.js";
 import { notifyProjectDocumentUploaded } from "./notifications.service.js";
 import { resolveProjectAccess } from "./projects.service.js";
 import type { WorkspaceRole } from "./workspace-context.service.js";
@@ -51,6 +53,9 @@ function mapDocument(document: {
   };
 }
 
+const SUPABASE_UPLOAD_REQUIRED_MESSAGE =
+  "Project document uploads require Supabase Storage. Set FILE_STORAGE_DRIVER=supabase with SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and SUPABASE_STORAGE_BUCKET.";
+
 export async function getProjectDocuments(
   workspaceId: string,
   projectId: string,
@@ -87,59 +92,84 @@ export async function createProjectDocument(
   role: WorkspaceRole,
   file: Express.Multer.File,
 ) {
+  if (!shouldUseSupabaseForProjectTaskUploads()) {
+    throw new Error(SUPABASE_UPLOAD_REQUIRED_MESSAGE);
+  }
+
+  const originalName = decodeMulterOriginalName(file.originalname);
+  const filename = buildObjectKey({
+    category: "project",
+    workspaceId,
+    entityId: projectId,
+    storedFilename: buildStoredObjectFilename(originalName),
+  });
   const access = await resolveProjectAccess(projectId, workspaceId, uploaderId, role);
   if (!access.ok) {
-    removeStoredProjectDocument(projectId, file.filename);
     return access.reason;
   }
 
-  const document = await prisma.projectDocument.create({
-    data: {
-      projectId,
-      uploaderId,
-      filename: file.filename,
-      originalName: decodeMulterOriginalName(file.originalname),
+  if (!file.buffer) {
+    throw new Error("Uploaded file buffer is missing");
+  }
+
+  try {
+    await persistUploadedFile({
+      objectKey: filename,
       mimeType: file.mimetype,
-      size: file.size,
-      url: "pending",
-    },
-    select: {
-      id: true,
-      filename: true,
-      originalName: true,
-      mimeType: true,
-      size: true,
-      url: true,
-      createdAt: true,
-      uploader: { select: uploaderSelect },
-    },
-  });
+      buffer: file.buffer,
+    });
 
-  const downloadUrl = buildDownloadUrl(projectId, document.id);
+    const document = await prisma.projectDocument.create({
+      data: {
+        projectId,
+        uploaderId,
+        filename,
+        originalName,
+        mimeType: file.mimetype,
+        size: file.size,
+        url: "pending",
+      },
+      select: {
+        id: true,
+        filename: true,
+        originalName: true,
+        mimeType: true,
+        size: true,
+        url: true,
+        createdAt: true,
+        uploader: { select: uploaderSelect },
+      },
+    });
 
-  const updated = await prisma.projectDocument.update({
-    where: { id: document.id },
-    data: { url: downloadUrl },
-    select: {
-      id: true,
-      filename: true,
-      originalName: true,
-      mimeType: true,
-      size: true,
-      url: true,
-      createdAt: true,
-      uploader: { select: uploaderSelect },
-    },
-  });
+    const downloadUrl = buildDownloadUrl(projectId, document.id);
 
-  void notifyProjectDocumentUploaded({
-    workspaceId,
-    projectId,
-    actorId: uploaderId,
-    fileName: updated.originalName,
-  });
+    const updated = await prisma.projectDocument.update({
+      where: { id: document.id },
+      data: { url: downloadUrl },
+      select: {
+        id: true,
+        filename: true,
+        originalName: true,
+        mimeType: true,
+        size: true,
+        url: true,
+        createdAt: true,
+        uploader: { select: uploaderSelect },
+      },
+    });
 
-  return mapDocument(updated);
+    void notifyProjectDocumentUploaded({
+      workspaceId,
+      projectId,
+      actorId: uploaderId,
+      fileName: updated.originalName,
+    });
+
+    return mapDocument(updated);
+  } catch (error) {
+    await deleteStoredFile({ category: "project", entityId: projectId, filename });
+    throw error;
+  }
 }
 
 export async function deleteProjectDocument(
@@ -163,7 +193,11 @@ export async function deleteProjectDocument(
     return "document_not_found" as const;
   }
 
-  removeStoredProjectDocument(projectId, document.filename);
+  await deleteStoredFile({
+    category: "project",
+    entityId: projectId,
+    filename: document.filename,
+  });
 
   await prisma.projectDocument.delete({
     where: { id: documentId },
@@ -198,15 +232,17 @@ export async function getProjectDocumentFile(
     return "document_not_found" as const;
   }
 
-  const filePath = projectDocumentDiskPath(projectId, document.filename);
+  const resolved = await resolveStoredFile({
+    category: "project",
+    entityId: projectId,
+    filename: document.filename,
+    mimeType: document.mimeType,
+    originalName: document.originalName,
+  });
 
-  if (!fs.existsSync(filePath)) {
+  if (!resolved) {
     return "missing_file" as const;
   }
 
-  return {
-    filePath,
-    mimeType: document.mimeType,
-    originalName: document.originalName,
-  };
+  return resolved;
 }

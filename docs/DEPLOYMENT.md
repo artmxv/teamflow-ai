@@ -127,17 +127,44 @@ For local dev without Resend, use `EMAIL_PROVIDER=console` (invites are logged t
 
 ---
 
-## 6. File uploads (local disk)
+## 6. File uploads (local disk or Supabase Storage)
 
-Uploads (avatars, task attachments, project documents) are stored under `server/uploads/` on the API filesystem. See `server/src/lib/avatar-upload.ts`, `task-upload.ts`, and `project-upload.ts`.
+Uploads (avatars, task attachments, project documents) are handled in `server/src/lib/file-storage/`.
 
-**For first deploy / portfolio demo:**
+| `FILE_STORAGE_DRIVER` | Behavior |
+| --------------------- | -------- |
+| `local` (default)     | Files on disk under `server/uploads/` (fine for local dev) |
+| `supabase`            | Durable object storage via Supabase Storage (recommended on Render) |
 
-- Local disk uploads are acceptable for a demo or portfolio deployment.
+**Local disk (`FILE_STORAGE_DRIVER=local`):**
+
 - On Render, the default filesystem is **ephemeral**. Uploads may be **lost on redeploy** unless you attach a **persistent disk** mounted at `server/uploads`.
-- Cloud object storage (S3, R2, Supabase Storage, and similar) is **not implemented** in this repo. Plan to move uploads to object storage before a serious production launch.
 
-There is no `UPLOAD_DIR` env variable today; paths are relative to the API process working directory (`server/` when you run `npm run start` from `server/`).
+**Supabase Storage (`FILE_STORAGE_DRIVER=supabase`):**
+
+1. Create a [Supabase](https://supabase.com) project.
+2. In **Storage**, create a bucket (for example `teamflow-uploads`).
+3. Make the `avatars/` folder publicly readable (bucket public, or a storage policy for `avatars/*`). Task and project files stay private; the API redirects to short-lived signed URLs from authenticated `GET .../file` routes using the service role key.
+4. Copy **Project URL**, **service role key** (Settings → API), and bucket name to Render:
+
+```bash
+FILE_STORAGE_DRIVER=supabase
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+SUPABASE_STORAGE_BUCKET=teamflow-uploads
+```
+
+**Never commit** `SUPABASE_SERVICE_ROLE_KEY` or expose it to the frontend. The Vite app does not talk to Supabase directly for uploads.
+
+Object keys inside the bucket:
+
+- `avatars/{filename}`
+- `workspaces/{workspaceId}/projects/{projectId}/{uuid}-{safeFilename}`
+- `workspaces/{workspaceId}/tasks/{taskId}/{uuid}-{safeFilename}`
+
+Legacy keys (`projects/{projectId}/{filename}`, `tasks/{taskId}/{filename}`) are still resolved for older uploads.
+
+Private task and project files are opened via authenticated `GET .../file` routes. The API checks permissions, then redirects to a short-lived Supabase signed URL (about 2 minutes). The frontend never talks to Supabase directly.
 
 ---
 
@@ -182,6 +209,10 @@ RESEND_API_KEY=re_...
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 GOOGLE_REDIRECT_URI=https://your-api-domain/api/auth/google/callback
+FILE_STORAGE_DRIVER=supabase
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+SUPABASE_STORAGE_BUCKET=teamflow-uploads
 ```
 
 Notes:
@@ -269,7 +300,7 @@ After deploy, verify:
 6. **Invite link:** send a workspace invite; the email link host must match `APP_URL`, not localhost.
 7. **Resend email:** invitation email is delivered (not only console log).
 8. **Task CRUD:** create, edit, complete, and delete a task.
-9. **Avatar display:** upload an avatar and confirm it renders (note: may disappear after redeploy without persistent disk).
+9. **File uploads:** upload an avatar, task attachment, and project document. With `FILE_STORAGE_DRIVER=supabase`, files should survive an API redeploy.
 10. **Notifications:** trigger an action that creates a notification and confirm it appears.
 11. **Billing mock:** switch workspace plan in settings (mock billing, no real payments).
 12. **RU/EN switch:** change language and confirm UI strings update.

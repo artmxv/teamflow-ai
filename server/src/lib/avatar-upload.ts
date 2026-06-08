@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 
 import multer from "multer";
 
+import { shouldBufferUploadsInMemory } from "./file-storage/driver.js";
+
 const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 export const AVATAR_UPLOAD_ROOT = path.join(serverRoot, "uploads", "avatars");
@@ -94,8 +96,12 @@ export function ensureAvatarUploadDir() {
   return AVATAR_UPLOAD_ROOT;
 }
 
-export const avatarUpload = multer({
-  storage: multer.diskStorage({
+function createAvatarStorage() {
+  if (shouldBufferUploadsInMemory()) {
+    return multer.memoryStorage();
+  }
+
+  return multer.diskStorage({
     destination(_req, _file, cb) {
       try {
         cb(null, ensureAvatarUploadDir());
@@ -107,7 +113,11 @@ export const avatarUpload = multer({
       const extension = path.extname(file.originalname).toLowerCase() || ".jpg";
       cb(null, `${randomUUID()}${extension}`);
     },
-  }),
+  });
+}
+
+export const avatarUpload = multer({
+  storage: createAvatarStorage(),
   limits: { fileSize: MAX_AVATAR_BYTES },
   fileFilter(_req, file, cb) {
     if (!isAllowedAvatarImage(file.mimetype, file.originalname)) {

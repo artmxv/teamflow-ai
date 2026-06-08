@@ -1,9 +1,9 @@
-import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import multer from "multer";
+
 
 const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -66,25 +66,7 @@ export function removeStoredProjectDocument(projectId: string, filename: string)
 }
 
 export const projectDocumentUpload = multer({
-  storage: multer.diskStorage({
-    destination(req, _file, cb) {
-      const projectId = req.params.id;
-      if (typeof projectId !== "string") {
-        cb(new Error("Project id is required"), "");
-        return;
-      }
-      try {
-        cb(null, ensureProjectUploadDir(projectId));
-      } catch (error) {
-        cb(error instanceof Error ? error : new Error("Could not prepare upload folder"), "");
-      }
-    },
-    filename(_req, file, cb) {
-      const originalName = decodeMulterOriginalName(file.originalname);
-      const extension = path.extname(originalName).toLowerCase();
-      cb(null, `${randomUUID()}${extension}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: MAX_PROJECT_DOCUMENT_BYTES },
   fileFilter(_req, file, cb) {
     const originalName = decodeMulterOriginalName(file.originalname);
