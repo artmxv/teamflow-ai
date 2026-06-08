@@ -9,7 +9,7 @@ const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 
 export const PROJECT_UPLOAD_ROOT = path.join(serverRoot, "uploads", "projects");
 
-export const MAX_PROJECT_DOCUMENT_BYTES = 20 * 1024 * 1024;
+export const MAX_PROJECT_DOCUMENT_BYTES = 10 * 1024 * 1024;
 
 const allowedMimeTypes = new Set([
   "application/pdf",

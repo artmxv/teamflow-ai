@@ -19,7 +19,7 @@ import { resolveProjectAccessForUser } from "../services/projects.service.js";
 function handleUploadError(error: unknown, res: Response) {
   if (error instanceof multer.MulterError) {
     if (error.code === "LIMIT_FILE_SIZE") {
-      res.status(400).json({ message: "File must be 20 MB or smaller" });
+      res.status(400).json({ message: "File must be 10 MB or smaller" });
       return true;
     }
   }

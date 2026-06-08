@@ -72,7 +72,10 @@ import {
   priorityMeta,
   statusColumns,
 } from "@/lib/mock-data";
+import { EmptyState } from "@/components/app/EmptyState";
 import { UserAvatar } from "@/components/app/UserAvatar";
+import { friendlyUploadErrorMessage } from "@/lib/upload-errors";
+import { isUploadFileTooLarge } from "@/lib/upload-limits";
 import {
   Calendar,
   Flag,
@@ -243,9 +246,7 @@ export function TaskDrawer({
       toast.success("Attachment uploaded");
     },
     onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Attachment could not be uploaded",
-      );
+      toast.error(friendlyUploadErrorMessage(mutationError, t));
     },
   });
 
@@ -486,19 +487,23 @@ export function TaskDrawer({
                     return;
                   }
                   if (!(file instanceof File) || !file.size) {
-                    toast.error("Please select a file to upload");
+                    toast.error(t("uploads.selectFile"));
+                    return;
+                  }
+                  if (isUploadFileTooLarge(file)) {
+                    toast.error(t("uploads.fileTooLarge"));
                     return;
                   }
                   uploadAttachmentMutation.mutate(file);
                 }}
                 onOpen={(attachment) => {
                   openTaskAttachment(attachment).catch(() => {
-                    toast.error("Could not open attachment");
+                    toast.error(t("uploads.fileOpenLegacy"));
                   });
                 }}
                 onDownload={(attachment) => {
                   downloadTaskAttachmentFile(attachment).catch(() => {
-                    toast.error("Could not download attachment");
+                    toast.error(t("uploads.fileDownloadLegacy"));
                   });
                 }}
                 onDelete={(attachmentId) => {
@@ -1061,6 +1066,7 @@ function TaskAttachmentsSection({
           ref={fileInputRef}
           type="file"
           className="hidden"
+          disabled={isUploading}
           accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.ppt,.pptx,application/pdf,image/png,image/jpeg,image/webp"
           onChange={(event) => {
             const file = event.target.files?.[0];
@@ -1081,11 +1087,38 @@ function TaskAttachmentsSection({
             {t("tasks.attachmentsError")}
           </p>
         ) : attachments.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-            {t("tasks.attachmentsEmpty")}
-          </p>
+          <EmptyState
+            compact
+            className="border-0 bg-transparent px-3 py-6 shadow-none"
+            icon={Paperclip}
+            title={t("tasks.attachmentsEmptyTitle")}
+            description={t("tasks.attachmentsEmptyHint")}
+            primaryAction={
+              <Button
+                type="button"
+                size="sm"
+                variant="brand"
+                className="h-7 gap-1.5 px-2 text-xs"
+                disabled={isUploading}
+                onClick={onPickFile}
+              >
+                {isUploading ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Upload className="size-3.5" />
+                )}
+                {isUploading ? t("tasks.uploading") : t("tasks.upload")}
+              </Button>
+            }
+          />
         ) : (
           <div className="app-scrollbar max-h-[min(50vh,16rem)] space-y-2 overflow-y-auto overscroll-contain pr-1">
+            {isUploading ? (
+              <div className="flex items-center gap-2.5 rounded-xl border border-dashed border-primary/30 bg-primary/5 px-2.5 py-2">
+                <Loader2 className="size-4 shrink-0 animate-spin text-primary" />
+                <span className="text-xs text-muted-foreground">{t("uploads.uploadingFile")}</span>
+              </div>
+            ) : null}
             {attachments.map((attachment) => (
               <TaskAttachmentRow
                 key={attachment.id}
@@ -1109,13 +1142,13 @@ function TaskAttachmentsSection({
       >
         <AlertDialogContent className="max-w-sm gap-4">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete attachment?</AlertDialogTitle>
+            <AlertDialogTitle>{t("tasks.deleteAttachmentTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              This file will be removed from the task.
+              {t("tasks.deleteAttachmentDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeletingSelected}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeletingSelected}>{t("common.cancel")}</AlertDialogCancel>
             <Button
               type="button"
               variant="destructive"
@@ -1124,7 +1157,7 @@ function TaskAttachmentsSection({
               onClick={() => void handleConfirmDelete()}
             >
               <Trash2 className="size-4" />
-              {isDeletingSelected ? "Deleting…" : "Delete attachment"}
+              {isDeletingSelected ? t("tasks.deleting") : t("tasks.deleteAttachmentConfirm")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1208,6 +1241,8 @@ function TaskAttachmentRow({
   onDownload: () => void;
   onRequestDelete: () => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <div className="flex items-start gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2">
       <TaskAttachmentPreview attachment={attachment} />
@@ -1250,7 +1285,7 @@ function TaskAttachmentRow({
           size="icon"
           className="size-7 text-muted-foreground hover:text-destructive"
           disabled={isDeleting}
-          aria-label="Delete attachment"
+          aria-label={t("tasks.deleteAttachmentAria")}
           onClick={onRequestDelete}
         >
           <Trash2 className="size-3.5" />

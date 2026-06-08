@@ -434,12 +434,16 @@ export function NewTaskDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="app-scrollbar max-h-[90vh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent
+        closeClassName="top-5 right-5"
+        className="flex max-h-[min(90vh,640px)] min-h-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-lg"
+      >
+        <DialogHeader className="shrink-0 space-y-1 px-6 pb-3 pt-7 pr-12">
           <DialogTitle>{t("common.newTask")}</DialogTitle>
           <DialogDescription>{t("tasks.new.dialogDesc")}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(submit)} className="space-y-4">
+        <form onSubmit={handleSubmit(submit)} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="app-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-6 pb-4 pt-1">
           {showProjectSelect ? (
             <Field label={t("tasks.selectProject")}>
               <Select
@@ -463,16 +467,21 @@ export function NewTaskDialog({
               </Select>
             </Field>
           ) : null}
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Field label={t("tasks.task")} error={errors.title?.message}>
-              <Input {...register("title")} placeholder="Write release notes" />
+              <Input {...register("title")} placeholder={t("tasks.new.titlePlaceholder")} />
             </Field>
             <Field label={t("tasks.dueDate")} error={errors.dueDate?.message}>
               <Input type="date" className="date-input-native" {...register("dueDate")} />
             </Field>
             <div className="sm:col-span-2">
-              <Field label="Description" error={errors.description?.message}>
-                <Textarea {...register("description")} placeholder="Add context for the team" />
+              <Field label={t("tasks.description")} error={errors.description?.message}>
+                <Textarea
+                  {...register("description")}
+                  rows={2}
+                  className="min-h-[52px] resize-none"
+                  placeholder={t("tasks.new.descriptionPlaceholder")}
+                />
               </Field>
             </div>
             <Field label={t("tasks.priority")} error={errors.priority?.message}>
@@ -485,7 +494,7 @@ export function NewTaskDialog({
                     onValueChange={(value) => field.onChange(value as Priority)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select priority" />
+                      <SelectValue placeholder={t("tasks.new.selectPriority")} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="low">{t("tasks.priorityLow")}</SelectItem>
@@ -507,7 +516,7 @@ export function NewTaskDialog({
                     onValueChange={(value) => field.onChange(value as TaskStatus)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select status" />
+                      <SelectValue placeholder={t("tasks.new.selectStatus")} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="backlog">{t("board.backlog")}</SelectItem>
@@ -527,6 +536,7 @@ export function NewTaskDialog({
                   name="assigneeIds"
                   render={({ field }) => (
                     <AssigneeMultiPicker
+                      compact
                       options={resolvedAssigneeOptions}
                       value={field.value ?? []}
                       disabled={isSubmitting}
@@ -538,7 +548,8 @@ export function NewTaskDialog({
               </Field>
             </div>
           </div>
-          <DialogFooter>
+          </div>
+          <DialogFooter className="shrink-0 border-t border-border bg-background px-6 py-3">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
@@ -547,7 +558,7 @@ export function NewTaskDialog({
               disabled={!isValid || isSubmitting || (showProjectSelect && !selectedProjectId)}
               className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
             >
-              {isSubmitting ? "Creating..." : t("common.createTask")}
+              {isSubmitting ? t("tasks.new.creating") : t("common.createTask")}
             </Button>
           </DialogFooter>
         </form>
@@ -558,7 +569,7 @@ export function NewTaskDialog({
 
 function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
       <Label>{label}</Label>
       {children}
       {error && <p className="text-xs text-destructive">{error}</p>}
