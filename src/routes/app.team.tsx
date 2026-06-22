@@ -10,11 +10,13 @@ import {
 } from "@/lib/auth/use-current-user";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
+import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { EmptyState } from "@/components/app/EmptyState";
 import { MemberProfileDrawer } from "@/components/app/MemberProfileDrawer";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -482,19 +484,16 @@ function TeamPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {membersQuery.isLoading && (
-              <tr>
-                <td colSpan={4} className="px-5 py-8 text-center text-muted-foreground">
-                  …
-                </td>
-              </tr>
-            )}
+            {membersQuery.isLoading && <MembersTableSkeleton />}
             {membersQuery.isError && (
               <tr>
-                <td colSpan={4} className="px-5 py-8 text-center text-destructive">
-                  {membersQuery.error instanceof Error
-                    ? membersQuery.error.message
-                    : t("team.error.updateFailed")}
+                <td colSpan={4} className="px-5 py-6">
+                  <ApiErrorState
+                    titleKey="team.loadErrorTitle"
+                    error={membersQuery.error}
+                    onRetry={() => void membersQuery.refetch()}
+                    className="border-0 bg-transparent p-4 shadow-none"
+                  />
                 </td>
               </tr>
             )}
@@ -637,5 +636,34 @@ function TeamPage() {
         </AlertDialogContent>
       </AlertDialog>
     </AppShell>
+  );
+}
+
+function MembersTableSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 5 }).map((_, index) => (
+        <tr key={index}>
+          <td className="px-5 py-3">
+            <div className="flex items-center gap-3">
+              <Skeleton className="size-9 rounded-full" />
+              <div className="space-y-1.5">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-40" />
+              </div>
+            </div>
+          </td>
+          <td className="px-5 py-3">
+            <Skeleton className="h-5 w-16 rounded-full" />
+          </td>
+          <td className="px-5 py-3">
+            <Skeleton className="h-4 w-24" />
+          </td>
+          <td className="px-5 py-3">
+            <Skeleton className="ml-auto h-8 w-8 rounded-md" />
+          </td>
+        </tr>
+      ))}
+    </>
   );
 }

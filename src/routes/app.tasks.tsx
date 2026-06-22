@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { invalidateNotifications } from "@/lib/api/notifications";
 import { AppShell } from "@/components/app/AppShell";
+import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { type Task, type TaskStatus, type Priority } from "@/lib/mock-data";
 import { EmptyState } from "@/components/app/EmptyState";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
@@ -12,6 +13,7 @@ import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickAction
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import {
   createTask,
@@ -588,7 +590,12 @@ function TasksPage() {
         {isLoading ? (
           <LoadingRows />
         ) : isError ? (
-          <ErrorState error={error} onRetry={() => void refetch()} />
+          <ApiErrorState
+            titleKey="tasks.loadErrorTitle"
+            error={error}
+            onRetry={() => void refetch()}
+            className="border-0 bg-transparent shadow-none"
+          />
         ) : filtered.length === 0 ? (
           isTrulyEmpty ? (
             <TasksEmptyState
@@ -766,32 +773,17 @@ function LoadingRows() {
           className="grid grid-cols-2 items-center gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_100px_100px_120px_100px_88px]"
         >
           <div className="col-span-2 space-y-2 md:col-span-1">
-            <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
-            <div className="h-3 w-1/3 animate-pulse rounded bg-muted" />
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-3 w-1/3" />
           </div>
-          <div className="h-5 w-16 animate-pulse rounded-full bg-muted" />
-          <div className="h-5 w-16 animate-pulse rounded-full bg-muted" />
-          <div className="h-5 w-24 animate-pulse rounded bg-muted" />
-          <div className="h-5 w-20 animate-pulse rounded bg-muted" />
-          <div className="ml-auto h-5 w-16 animate-pulse rounded bg-muted" />
+          <Skeleton className="h-5 w-16 rounded-full" />
+          <Skeleton className="h-5 w-16 rounded-full" />
+          <Skeleton className="h-5 w-24" />
+          <Skeleton className="h-5 w-20" />
+          <Skeleton className="ml-auto h-5 w-16" />
         </li>
       ))}
     </ul>
-  );
-}
-
-function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
-  const { t } = useI18n();
-  return (
-    <div className="px-4 py-12 text-center sm:px-8">
-      <h3 className="text-base font-semibold">{t("tasks.loadErrorTitle")}</h3>
-      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-        {error?.message ?? t("common.errorServerHint")}
-      </p>
-      <Button variant="outline" onClick={onRetry} className="mt-5">
-        {t("common.retry")}
-      </Button>
-    </div>
   );
 }
 
