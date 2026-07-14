@@ -134,7 +134,7 @@ function getStatusFilterTriggerLabel(filter: TaskListStatusFilter, t: (k: TKey) 
 }
 
 function getPriorityFilterTriggerLabel(filter: Priority | "all", t: (k: TKey) => string): string {
-  if (filter === "all") return t("tasks.priority");
+  if (filter === "all") return t("tasks.allPriorities");
   return t(priorityMeta[filter].labelKey);
 }
 
@@ -513,11 +513,11 @@ function TasksPage() {
             value={priority}
             onValueChange={(value) => setPriority(value as Priority | "all")}
           >
-            <SelectTrigger className="h-9 w-[7.25rem] shrink-0 border-border bg-card text-sm">
+            <SelectTrigger className="h-9 w-[10rem] shrink-0 border-border bg-card text-sm">
               <span className="truncate">{getPriorityFilterTriggerLabel(priority, t)}</span>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{t("tasks.filterPriorities")}</SelectItem>
+              <SelectItem value="all">{t("tasks.allPriorities")}</SelectItem>
               {(["low", "medium", "high", "urgent"] as Priority[]).map((p) => (
                 <SelectItem key={p} value={p}>
                   {t(priorityMeta[p].labelKey)}
