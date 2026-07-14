@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { AppShell } from "@/components/app/AppShell";
+import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { EmptyState } from "@/components/app/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -130,7 +131,11 @@ function AssistantPage() {
             {isLoading ? (
               <SummarySkeleton />
             ) : isError ? (
-              <ErrorState error={error} onRetry={() => void refetch()} />
+              <ApiErrorState
+                titleKey="ai.errorTitle"
+                error={error}
+                onRetry={() => void refetch()}
+              />
             ) : data ? (
               data.metrics.totalProjects === 0 && data.metrics.totalTasks === 0 ? (
                 <EmptyState
@@ -337,20 +342,5 @@ function MetricsSkeleton() {
         </li>
       ))}
     </ul>
-  );
-}
-
-function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
-  const { t } = useI18n();
-  return (
-    <div className="rounded-2xl border border-destructive/20 bg-card p-8 text-center shadow-soft">
-      <h3 className="text-base font-semibold">{t("ai.errorTitle")}</h3>
-      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-        {error?.message ?? t("board.errorHint")}
-      </p>
-      <Button variant="outline" onClick={onRetry} className="mt-5">
-        {t("common.retry")}
-      </Button>
-    </div>
   );
 }
