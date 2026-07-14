@@ -77,6 +77,7 @@ const dict = {
     "billing.seatsControlledByPlan":
       "Seats are controlled by the plan. Choose a higher plan to increase the limit.",
     "billing.previewBilling": "Preview billing",
+    "billing.loadErrorTitle": "Could not load billing",
     "billing.addCard": "Add card",
     "billing.switchToPlan": "Switch to {plan}",
     "billing.overview": "Billing overview",
@@ -193,6 +194,9 @@ const dict = {
     "common.filters": "Filters",
     "common.errorServerHint":
       "We could not reach the server. Check that the backend is running, then try again.",
+    "common.errorNetwork": "Network error. Check your connection and try again.",
+    "common.errorAccessDenied": "You do not have access to this data.",
+    "dashboard.loadErrorTitle": "Dashboard could not load",
     "dashboard.activeProjects": "Active projects",
     "dashboard.aiInsights": "AI insights",
     "dashboard.completed": "Completed",
@@ -490,7 +494,8 @@ const dict = {
     "side.billing": "Billing",
     "side.collapseSidebar": "Collapse sidebar",
     "side.expandSidebar": "Expand sidebar",
-    "tasks.allPriorities": "All priorities",
+    "side.tagline": "AI workspace",
+    "nav.openMenu": "Open navigation menu",
     "tasks.filterPriorities": "Priorities",
     "tasks.filterAssignees": "Assignees",
     "tasks.allStatus": "All statuses",
@@ -566,6 +571,8 @@ const dict = {
     "tasks.attachmentsLoading": "Loading attachments…",
     "tasks.attachmentsError": "Could not load attachments. Try closing and reopening the task.",
     "uploads.fileTooLarge": "This file is too large. Maximum size is 10 MB.",
+    "uploads.storageTemporarilyUnavailable":
+      "File storage is temporarily unavailable. Please try again in a minute.",
     "uploads.uploadFailed": "File upload failed. Please try again.",
     "uploads.uploadingFile": "Uploading file…",
     "uploads.fileOpenLegacy":
@@ -606,6 +613,7 @@ const dict = {
     "team.team": "Team",
     "team.workspaceFallback": "your workspace",
     "team.previewTitle": "Team",
+    "team.loadErrorTitle": "Could not load team",
     "team.previewSubtitle": "{count} people in {workspace}.",
     "team.previewNote": "Pending invitations are listed below when you can invite members.",
     "team.inviteTitle": "Invite by email",
@@ -786,6 +794,7 @@ const dict = {
     "billing.seatsControlledByPlan":
       "Места управляются тарифом. Выберите тариф выше, чтобы увеличить лимит.",
     "billing.previewBilling": "Предпросмотр оплаты",
+    "billing.loadErrorTitle": "Не удалось загрузить оплату",
     "billing.addCard": "Добавить карту",
     "billing.switchToPlan": "Перейти на {plan}",
     "billing.overview": "Обзор оплаты",
@@ -902,6 +911,9 @@ const dict = {
     "common.filters": "Фильтры",
     "common.errorServerHint":
       "Не удалось связаться с сервером. Проверьте, что бэкенд запущен, и попробуйте снова.",
+    "common.errorNetwork": "Ошибка сети. Проверьте подключение и попробуйте снова.",
+    "common.errorAccessDenied": "У вас нет доступа к этим данным.",
+    "dashboard.loadErrorTitle": "Не удалось загрузить обзор",
     "dashboard.activeProjects": "Активные проекты",
     "dashboard.aiInsights": "AI-инсайты",
     "dashboard.completed": "Завершено",
@@ -1206,7 +1218,8 @@ const dict = {
     "side.billing": "Оплата",
     "side.collapseSidebar": "Свернуть боковую панель",
     "side.expandSidebar": "Развернуть боковую панель",
-    "tasks.allPriorities": "Все приоритеты",
+    "side.tagline": "AI-пространство",
+    "nav.openMenu": "Открыть меню навигации",
     "tasks.filterPriorities": "Приоритеты",
     "tasks.filterAssignees": "Исполнители",
     "tasks.allStatus": "Все статусы",
@@ -1283,6 +1296,8 @@ const dict = {
     "tasks.attachmentsLoading": "Загрузка вложений…",
     "tasks.attachmentsError": "Не удалось загрузить вложения. Закройте и снова откройте задачу.",
     "uploads.fileTooLarge": "Файл слишком большой. Максимальный размер — 10 МБ.",
+    "uploads.storageTemporarilyUnavailable":
+      "Хранилище файлов временно недоступно. Попробуйте ещё раз через минуту.",
     "uploads.uploadFailed": "Не удалось загрузить файл. Попробуйте ещё раз.",
     "uploads.uploadingFile": "Загрузка файла…",
     "uploads.fileOpenLegacy":
@@ -1323,6 +1338,7 @@ const dict = {
     "team.team": "Команда",
     "team.workspaceFallback": "ваше пространство",
     "team.previewTitle": "Команда",
+    "team.loadErrorTitle": "Не удалось загрузить команду",
     "team.previewSubtitle": "{count} человек в {workspace}.",
     "team.previewNote":
       "Ожидающие приглашения отображаются ниже, если вы можете приглашать участников.",

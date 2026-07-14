@@ -12,6 +12,17 @@ export function friendlyUploadErrorMessage(error: unknown, t: (key: TKey) => str
     ) {
       return t("uploads.fileTooLarge");
     }
+
+    if (
+      error.status >= 500 &&
+      message.includes("could not upload file to supabase storage") &&
+      (message.includes("fetch failed") ||
+        message.includes("network") ||
+        message.includes("timeout") ||
+        message.includes("temporarily unavailable"))
+    ) {
+      return t("uploads.storageTemporarilyUnavailable");
+    }
   }
 
   return t("uploads.uploadFailed");

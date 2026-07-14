@@ -11,6 +11,8 @@ import {
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import { EmptyState } from "@/components/app/EmptyState";
+import { ApiErrorState } from "@/components/app/ApiErrorState";
+import { PageHeader } from "@/components/app/PageHeader";
 import { MemberProfileDrawer } from "@/components/app/MemberProfileDrawer";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { Badge } from "@/components/ui/badge";
@@ -316,95 +318,93 @@ function TeamPage() {
 
   return (
     <AppShell>
-      <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("team.previewTitle")}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t("team.previewSubtitle")
-              .replace("{count}", String(members.length))
-              .replace("{workspace}", workspaceName)}
-          </p>
-        </div>
-        {canManageTeam && (
-          <Dialog
-            open={inviteOpen}
-            onOpenChange={(open) => {
-              setInviteOpen(open);
-              if (!open) {
-                setLastAcceptUrl(null);
-              }
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button variant="brand">
-                <Plus className="size-4" /> {t("team.inviteMember")}
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{t("team.inviteTitle")}</DialogTitle>
-                <DialogDescription>{t("team.inviteDesc")}</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="invite-email">{t("team.memberEmail")}</Label>
-                  <Input
-                    id="invite-email"
-                    type="email"
-                    placeholder="teammate@company.com"
-                    value={inviteEmail}
-                    onChange={(event) => setInviteEmail(event.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>{t("team.role")}</Label>
-                  <Select
-                    value={inviteRole}
-                    onValueChange={(value) => setInviteRole(value as InviteRole)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="MEMBER">{workspaceRoleLabel("MEMBER", t)}</SelectItem>
-                      <SelectItem value="ADMIN">{workspaceRoleLabel("ADMIN", t)}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {lastAcceptUrl && (
-                  <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-3">
-                    <div className="text-xs font-medium text-muted-foreground">
-                      {t("team.invitationLink")}
-                    </div>
-                    <p className="break-all text-xs">{lastAcceptUrl}</p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => void handleCopyInviteLink(lastAcceptUrl)}
-                    >
-                      <Copy className="size-4" /> {t("team.copyInviteLink")}
-                    </Button>
+      <PageHeader
+        title={t("team.previewTitle")}
+        subtitle={t("team.previewSubtitle")
+          .replace("{count}", String(members.length))
+          .replace("{workspace}", workspaceName)}
+        actions={
+          canManageTeam ? (
+            <Dialog
+              open={inviteOpen}
+              onOpenChange={(open) => {
+                setInviteOpen(open);
+                if (!open) {
+                  setLastAcceptUrl(null);
+                }
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button variant="brand">
+                  <Plus className="size-4" /> {t("team.inviteMember")}
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{t("team.inviteTitle")}</DialogTitle>
+                  <DialogDescription>{t("team.inviteDesc")}</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="invite-email">{t("team.memberEmail")}</Label>
+                    <Input
+                      id="invite-email"
+                      type="email"
+                      placeholder="teammate@company.com"
+                      value={inviteEmail}
+                      onChange={(event) => setInviteEmail(event.target.value)}
+                    />
                   </div>
-                )}
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setInviteOpen(false)}>
-                  {t("common.cancel")}
-                </Button>
-                <Button
-                  onClick={handleSendInvite}
-                  className="bg-gradient-brand text-white"
-                  disabled={createInviteMutation.isPending}
-                >
-                  {createInviteMutation.isPending ? t("team.sendingInvite") : t("team.sendInvite")}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
-      </div>
+                  <div className="space-y-1.5">
+                    <Label>{t("team.role")}</Label>
+                    <Select
+                      value={inviteRole}
+                      onValueChange={(value) => setInviteRole(value as InviteRole)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="MEMBER">{workspaceRoleLabel("MEMBER", t)}</SelectItem>
+                        <SelectItem value="ADMIN">{workspaceRoleLabel("ADMIN", t)}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {lastAcceptUrl && (
+                    <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-3">
+                      <div className="text-xs font-medium text-muted-foreground">
+                        {t("team.invitationLink")}
+                      </div>
+                      <p className="break-all text-xs">{lastAcceptUrl}</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => void handleCopyInviteLink(lastAcceptUrl)}
+                      >
+                        <Copy className="size-4" /> {t("team.copyInviteLink")}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setInviteOpen(false)}>
+                    {t("common.cancel")}
+                  </Button>
+                  <Button
+                    onClick={handleSendInvite}
+                    className="bg-gradient-brand text-white"
+                    disabled={createInviteMutation.isPending}
+                  >
+                    {createInviteMutation.isPending ? t("team.sendingInvite") : t("team.sendInvite")}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          ) : undefined
+        }
+      />
 
       {!canManageTeam && (
         <Alert className="mb-6 border-border bg-muted/30">
@@ -491,10 +491,14 @@ function TeamPage() {
             )}
             {membersQuery.isError && (
               <tr>
-                <td colSpan={4} className="px-5 py-8 text-center text-destructive">
-                  {membersQuery.error instanceof Error
-                    ? membersQuery.error.message
-                    : t("team.error.updateFailed")}
+                <td colSpan={4} className="px-5 py-6">
+                  <ApiErrorState
+                    compact
+                    className="border-0 bg-transparent shadow-none"
+                    title={t("team.loadErrorTitle")}
+                    error={membersQuery.error}
+                    onRetry={() => void membersQuery.refetch()}
+                  />
                 </td>
               </tr>
             )}

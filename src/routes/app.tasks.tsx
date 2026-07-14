@@ -7,6 +7,8 @@ import { invalidateNotifications } from "@/lib/api/notifications";
 import { AppShell } from "@/components/app/AppShell";
 import { type Task, type TaskStatus, type Priority } from "@/lib/mock-data";
 import { EmptyState } from "@/components/app/EmptyState";
+import { ApiErrorState } from "@/components/app/ApiErrorState";
+import { PageHeader } from "@/components/app/PageHeader";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
 import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
 import { Button } from "@/components/ui/button";
@@ -454,29 +456,29 @@ function TasksPage() {
 
   return (
     <AppShell>
-      <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("tasks.tasks")}</h1>
-          <p className="text-sm text-muted-foreground">
-            {filtered.length === 1
-              ? t("tasks.countOne")
-              : t("tasks.count").replace("{count}", String(filtered.length))}
-          </p>
-        </div>
-        {hasAccessibleProjects ? (
-          <NewTaskDialog
-            isSubmitting={createTaskMutation.isPending}
-            projectOptions={projectOptions}
-            onSubmit={handleCreateTask}
-          >
-            <Button size="sm" variant="brand">
-              <Plus className="size-4" /> {t("common.newTask")}
-            </Button>
-          </NewTaskDialog>
-        ) : (
-          <p className="text-sm text-muted-foreground">{t("tasks.noAccessibleProjects")}</p>
-        )}
-      </div>
+      <PageHeader
+        title={t("tasks.tasks")}
+        subtitle={
+          filtered.length === 1
+            ? t("tasks.countOne")
+            : t("tasks.count").replace("{count}", String(filtered.length))
+        }
+        actions={
+          hasAccessibleProjects ? (
+            <NewTaskDialog
+              isSubmitting={createTaskMutation.isPending}
+              projectOptions={projectOptions}
+              onSubmit={handleCreateTask}
+            >
+              <Button size="sm" variant="brand">
+                <Plus className="size-4" /> {t("common.newTask")}
+              </Button>
+            </NewTaskDialog>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t("tasks.noAccessibleProjects")}</p>
+          )
+        }
+      />
 
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="relative min-w-0 w-full flex-1 sm:min-w-[12rem] sm:max-w-sm">
@@ -588,7 +590,13 @@ function TasksPage() {
         {isLoading ? (
           <LoadingRows />
         ) : isError ? (
-          <ErrorState error={error} onRetry={() => void refetch()} />
+          <ApiErrorState
+            compact
+            className="border-0 bg-transparent shadow-none"
+            title={t("tasks.loadErrorTitle")}
+            error={error}
+            onRetry={() => void refetch()}
+          />
         ) : filtered.length === 0 ? (
           isTrulyEmpty ? (
             <TasksEmptyState
@@ -777,21 +785,6 @@ function LoadingRows() {
         </li>
       ))}
     </ul>
-  );
-}
-
-function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
-  const { t } = useI18n();
-  return (
-    <div className="px-4 py-12 text-center sm:px-8">
-      <h3 className="text-base font-semibold">{t("tasks.loadErrorTitle")}</h3>
-      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-        {error?.message ?? t("common.errorServerHint")}
-      </p>
-      <Button variant="outline" onClick={onRetry} className="mt-5">
-        {t("common.retry")}
-      </Button>
-    </div>
   );
 }
 

@@ -37,6 +37,8 @@ import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib
 import { resolveProjectGradient } from "@/lib/project-color";
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
 import { EmptyState } from "@/components/app/EmptyState";
+import { ApiErrorState } from "@/components/app/ApiErrorState";
+import { PageHeader } from "@/components/app/PageHeader";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import {
   canManageWorkspaceTeam,
@@ -266,19 +268,19 @@ function Dashboard() {
 
   return (
     <AppShell>
-      <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("dashboard.overviewTitle")}</h1>
-          <p className="text-sm text-muted-foreground">{t("dashboard.overviewSubtitle")}</p>
-        </div>
-        {canManageProjects ? (
-          <NewProjectDialog>
-            <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-              {t("common.newProject")} <ArrowUpRight className="size-4" />
-            </Button>
-          </NewProjectDialog>
-        ) : null}
-      </div>
+      <PageHeader
+        title={t("dashboard.overviewTitle")}
+        subtitle={t("dashboard.overviewSubtitle")}
+        actions={
+          canManageProjects ? (
+            <NewProjectDialog>
+              <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+                {t("common.newProject")} <ArrowUpRight className="size-4" />
+              </Button>
+            </NewProjectDialog>
+          ) : undefined
+        }
+      />
 
       {isEmptyWorkspace ? (
         <EmptyState
@@ -312,7 +314,11 @@ function Dashboard() {
       {isLoading ? (
         <StatCardSkeletons />
       ) : isError ? (
-        <DashboardErrorState error={error} onRetry={() => void refetch()} />
+        <ApiErrorState
+          title={t("dashboard.loadErrorTitle")}
+          error={error}
+          onRetry={() => void refetch()}
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {stats.map((s) => (
@@ -704,20 +710,6 @@ function RecentTasksSkeleton() {
         </li>
       ))}
     </ul>
-  );
-}
-
-function DashboardErrorState({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
-  return (
-    <div className="rounded-2xl border border-destructive/20 bg-card p-8 text-center shadow-soft">
-      <h3 className="text-base font-semibold">Dashboard could not load</h3>
-      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-        {error?.message ?? "Check that the backend is running and try again."}
-      </p>
-      <Button variant="outline" onClick={onRetry} className="mt-5">
-        Retry
-      </Button>
-    </div>
   );
 }
 

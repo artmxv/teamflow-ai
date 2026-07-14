@@ -18,6 +18,8 @@ import { invalidateNotifications } from "@/lib/api/notifications";
 import { AppShell } from "@/components/app/AppShell";
 import { statusColumns, type Priority, type Task, type TaskStatus } from "@/lib/mock-data";
 import { EmptyState } from "@/components/app/EmptyState";
+import { ApiErrorState } from "@/components/app/ApiErrorState";
+import { PageHeader } from "@/components/app/PageHeader";
 import { TaskCard, type TaskDragData } from "@/components/app/TaskCard";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
 import {
@@ -297,13 +299,11 @@ function Board() {
 
   return (
     <AppShell>
-      <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("board.title")}</h1>
-          <p className="text-sm text-muted-foreground">{t("board.subtitle")}</p>
-        </div>
-        <div className="flex gap-2">
-          {hasAccessibleProjects ? (
+      <PageHeader
+        title={t("board.title")}
+        subtitle={t("board.subtitle")}
+        actions={
+          hasAccessibleProjects ? (
             <NewTaskDialog
               isSubmitting={createTaskMutation.isPending}
               projectOptions={projectOptions}
@@ -318,9 +318,9 @@ function Board() {
             </NewTaskDialog>
           ) : (
             <p className="text-sm text-muted-foreground">{t("tasks.noAccessibleProjects")}</p>
-          )}
-        </div>
-      </div>
+          )
+        }
+      />
 
       <div className="mb-4 flex flex-col gap-2 rounded-2xl border border-border bg-card p-3 shadow-soft sm:flex-row sm:items-center">
         <div className="flex items-center gap-2 text-sm font-medium">
@@ -369,7 +369,12 @@ function Board() {
       </div>
 
       {isError ? (
-        <ErrorState error={error} onRetry={() => void refetch()} />
+        <ApiErrorState
+          title={t("board.errorTitle")}
+          error={error}
+          hintKey="board.errorHint"
+          onRetry={() => void refetch()}
+        />
       ) : showPageEmptyState ? (
         <EmptyState
           icon={isKanbanWithoutProjects ? FolderKanban : ListTodo}
@@ -615,21 +620,6 @@ function LoadingCards() {
         </div>
       ))}
     </>
-  );
-}
-
-function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
-  const { t } = useI18n();
-  return (
-    <div className="rounded-2xl border border-destructive/20 bg-card p-8 text-center shadow-soft">
-      <h3 className="text-base font-semibold">{t("board.errorTitle")}</h3>
-      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-        {error?.message ?? t("board.errorHint")}
-      </p>
-      <Button variant="outline" onClick={onRetry} className="mt-5">
-        {t("common.retry")}
-      </Button>
-    </div>
   );
 }
 

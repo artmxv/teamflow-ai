@@ -1,5 +1,7 @@
 import { Bell, ChevronDown, HelpCircle } from "lucide-react";
+import { useRouterState } from "@tanstack/react-router";
 import { GlobalSearch } from "@/components/app/GlobalSearch";
+import { MobileNav } from "@/components/app/MobileNav";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -91,6 +93,7 @@ function getNotificationBody(
 
 export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | null }) {
   const { t, lang } = useI18n();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const router = useRouter();
   const queryClient = useQueryClient();
   const hasToken = typeof window !== "undefined" && !!getAuthToken();
@@ -184,6 +187,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur sm:gap-3 sm:px-6">
+      <MobileNav pathname={pathname} />
       <GlobalSearch />
 
       <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">

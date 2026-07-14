@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { AvatarStack } from "@/components/app/Avatar";
 import { EmptyState } from "@/components/app/EmptyState";
+import { ApiErrorState } from "@/components/app/ApiErrorState";
+import { PageHeader } from "@/components/app/PageHeader";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import { members, projectStatusMeta, type Project, type ProjectStatus } from "@/lib/mock-data";
 import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
@@ -113,21 +115,19 @@ function ProjectsIndexPage() {
 
   return (
     <AppShell>
-      <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("projects.projects")}</h1>
-          <p className="text-sm text-muted-foreground">
-            {canManageProjects ? t("projects.subtitle") : t("access.memberProjectsHint")}
-          </p>
-        </div>
-        {canManageProjects ? (
-          <NewProjectDialog>
-            <Button variant="brand">
-              <Plus className="size-4" /> {t("common.newProject")}
-            </Button>
-          </NewProjectDialog>
-        ) : null}
-      </div>
+      <PageHeader
+        title={t("projects.projects")}
+        subtitle={canManageProjects ? t("projects.subtitle") : t("access.memberProjectsHint")}
+        actions={
+          canManageProjects ? (
+            <NewProjectDialog>
+              <Button variant="brand">
+                <Plus className="size-4" /> {t("common.newProject")}
+              </Button>
+            </NewProjectDialog>
+          ) : undefined
+        }
+      />
 
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-1.5">
@@ -160,7 +160,11 @@ function ProjectsIndexPage() {
       {isLoading ? (
         <LoadingGrid />
       ) : isError ? (
-        <ErrorState error={error} onRetry={() => void refetch()} />
+        <ApiErrorState
+          title={t("projects.loadErrorTitle")}
+          error={error}
+          onRetry={() => void refetch()}
+        />
       ) : filtered.length === 0 ? (
         isTrulyEmpty ? (
           <ProjectsEmptyState canManageProjects={canManageProjects} />
@@ -260,21 +264,6 @@ function LoadingGrid() {
           <div className="mt-4 h-4 w-1/2 animate-pulse rounded bg-muted" />
         </div>
       ))}
-    </div>
-  );
-}
-
-function ErrorState({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
-  const { t } = useI18n();
-  return (
-    <div className="rounded-2xl border border-destructive/20 bg-card p-8 text-center shadow-soft">
-      <h3 className="text-base font-semibold">{t("projects.loadErrorTitle")}</h3>
-      <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-        {error?.message ?? t("common.errorServerHint")}
-      </p>
-      <Button variant="outline" onClick={onRetry} className="mt-5">
-        {t("common.retry")}
-      </Button>
     </div>
   );
 }
