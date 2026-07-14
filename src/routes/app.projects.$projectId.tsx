@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { EmptyState } from "@/components/app/EmptyState";
+import { PageHeader } from "@/components/app/PageHeader";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
 import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
 import { projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
@@ -96,7 +97,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Calendar,
-  ChevronLeft,
   Download,
   ExternalLink,
   FileText,
@@ -315,54 +315,55 @@ function ProjectDetailPage() {
 
   return (
     <AppShell>
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" asChild>
-            <Link to="/app/projects">
-              <ChevronLeft className="size-4" /> {t("projects.back")}
-            </Link>
-          </Button>
-          <div className="min-w-0">
-            <h1 className="truncate text-2xl font-semibold tracking-tight">
-              {isLoading
-                ? t("projects.detail.loading")
-                : project
-                  ? displayProjectName(project.name, lang)
-                  : t("projects.projects")}
-            </h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {isLoading ? t("projects.detail.fetching") : t("projects.detail.headerSubtitle")}
-            </p>
-          </div>
-        </div>
-        {project && canManageProjects ? (
-          <div className="flex items-center gap-2">
-            <EditProjectDialog
-              project={project}
-              isSubmitting={updateProjectMutation.isPending}
-              onSubmit={async (values) => {
-                await updateProjectMutation.mutateAsync({
-                  projectId: project.id,
-                  ...values,
-                });
-              }}
-            />
-            <DeleteProjectDialog
-              projectName={displayProjectName(project.name, lang)}
-              isSubmitting={deleteProjectMutation.isPending}
-              onConfirm={async () => {
-                await deleteProjectMutation.mutateAsync(project.id);
-              }}
-            />
-          </div>
-        ) : null}
-      </div>
+      <PageHeader
+        breadcrumbs={[
+          { label: t("projects.projects"), to: "/app/projects" },
+          {
+            label: isLoading
+              ? t("projects.detail.loading")
+              : project
+                ? displayProjectName(project.name, lang)
+                : t("projects.projects"),
+          },
+        ]}
+        title={
+          isLoading
+            ? t("projects.detail.loading")
+            : project
+              ? displayProjectName(project.name, lang)
+              : t("projects.projects")
+        }
+        subtitle={isLoading ? t("projects.detail.fetching") : t("projects.detail.headerSubtitle")}
+        actions={
+          project && canManageProjects ? (
+            <div className="flex items-center gap-2">
+              <EditProjectDialog
+                project={project}
+                isSubmitting={updateProjectMutation.isPending}
+                onSubmit={async (values) => {
+                  await updateProjectMutation.mutateAsync({
+                    projectId: project.id,
+                    ...values,
+                  });
+                }}
+              />
+              <DeleteProjectDialog
+                projectName={displayProjectName(project.name, lang)}
+                isSubmitting={deleteProjectMutation.isPending}
+                onConfirm={async () => {
+                  await deleteProjectMutation.mutateAsync(project.id);
+                }}
+              />
+            </div>
+          ) : undefined
+        }
+      />
 
       {isLoading ? (
         <LoadingState />
       ) : isError ? (
         <ApiErrorState
-          titleKey="projects.detail.loadErrorTitle"
+          title={t("projects.detail.loadErrorTitle")}
           error={error}
           onRetry={() => {
             void projectsQuery.refetch();
@@ -1553,15 +1554,15 @@ function LoadingState() {
 function NotFoundState() {
   const { t } = useI18n();
   return (
-    <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
-      <h3 className="text-base font-semibold">{t("projects.detail.notFoundTitle")}</h3>
-      <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-        {t("access.projectDenied")}
-      </p>
-      <Button variant="outline" className="mt-5" asChild>
-        <Link to="/app/projects">{t("projects.back")}</Link>
-      </Button>
-    </div>
+    <EmptyState
+      title={t("projects.detail.notFoundTitle")}
+      description={t("access.projectDenied")}
+      primaryAction={
+        <Button variant="outline" asChild>
+          <Link to="/app/projects">{t("projects.back")}</Link>
+        </Button>
+      }
+    />
   );
 }
 

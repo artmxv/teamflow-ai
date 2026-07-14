@@ -38,6 +38,7 @@ import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib
 import { resolveProjectGradient } from "@/lib/project-color";
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
 import { EmptyState } from "@/components/app/EmptyState";
+import { PageHeader } from "@/components/app/PageHeader";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import {
   canManageWorkspaceTeam,
@@ -267,19 +268,19 @@ function Dashboard() {
 
   return (
     <AppShell>
-      <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("dashboard.overviewTitle")}</h1>
-          <p className="text-sm text-muted-foreground">{t("dashboard.overviewSubtitle")}</p>
-        </div>
-        {canManageProjects ? (
-          <NewProjectDialog>
-            <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-              {t("common.newProject")} <ArrowUpRight className="size-4" />
-            </Button>
-          </NewProjectDialog>
-        ) : null}
-      </div>
+      <PageHeader
+        title={t("dashboard.overviewTitle")}
+        subtitle={t("dashboard.overviewSubtitle")}
+        actions={
+          canManageProjects ? (
+            <NewProjectDialog>
+              <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+                {t("common.newProject")} <ArrowUpRight className="size-4" />
+              </Button>
+            </NewProjectDialog>
+          ) : undefined
+        }
+      />
 
       {isEmptyWorkspace ? (
         <EmptyState
@@ -314,7 +315,7 @@ function Dashboard() {
         <StatCardSkeletons />
       ) : isError ? (
         <ApiErrorState
-          titleKey="dashboard.loadErrorTitle"
+          title={t("dashboard.loadErrorTitle")}
           error={error}
           onRetry={() => void refetch()}
         />

@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth/route-guards";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
+import { PageHeader } from "@/components/app/PageHeader";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -465,10 +466,7 @@ function SettingsPage() {
 
   return (
     <AppShell>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("side.settings")}</h1>
-        <p className="text-sm text-muted-foreground">{t("settings.pageSubtitle")}</p>
-      </div>
+      <PageHeader title={t("side.settings")} subtitle={t("settings.pageSubtitle")} />
 
       <Tabs
         value={activeTab}

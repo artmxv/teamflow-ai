@@ -8,6 +8,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { type Task, type TaskStatus, type Priority } from "@/lib/mock-data";
 import { EmptyState } from "@/components/app/EmptyState";
+import { PageHeader } from "@/components/app/PageHeader";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
 import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
 import { Button } from "@/components/ui/button";
@@ -133,7 +134,7 @@ function getStatusFilterTriggerLabel(filter: TaskListStatusFilter, t: (k: TKey) 
 }
 
 function getPriorityFilterTriggerLabel(filter: Priority | "all", t: (k: TKey) => string): string {
-  if (filter === "all") return t("tasks.priority");
+  if (filter === "all") return t("tasks.allPriorities");
   return t(priorityMeta[filter].labelKey);
 }
 
@@ -456,29 +457,29 @@ function TasksPage() {
 
   return (
     <AppShell>
-      <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("tasks.tasks")}</h1>
-          <p className="text-sm text-muted-foreground">
-            {filtered.length === 1
-              ? t("tasks.countOne")
-              : t("tasks.count").replace("{count}", String(filtered.length))}
-          </p>
-        </div>
-        {hasAccessibleProjects ? (
-          <NewTaskDialog
-            isSubmitting={createTaskMutation.isPending}
-            projectOptions={projectOptions}
-            onSubmit={handleCreateTask}
-          >
-            <Button size="sm" variant="brand">
-              <Plus className="size-4" /> {t("common.newTask")}
-            </Button>
-          </NewTaskDialog>
-        ) : (
-          <p className="text-sm text-muted-foreground">{t("tasks.noAccessibleProjects")}</p>
-        )}
-      </div>
+      <PageHeader
+        title={t("tasks.tasks")}
+        subtitle={
+          filtered.length === 1
+            ? t("tasks.countOne")
+            : t("tasks.count").replace("{count}", String(filtered.length))
+        }
+        actions={
+          hasAccessibleProjects ? (
+            <NewTaskDialog
+              isSubmitting={createTaskMutation.isPending}
+              projectOptions={projectOptions}
+              onSubmit={handleCreateTask}
+            >
+              <Button size="sm" variant="brand">
+                <Plus className="size-4" /> {t("common.newTask")}
+              </Button>
+            </NewTaskDialog>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t("tasks.noAccessibleProjects")}</p>
+          )
+        }
+      />
 
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="relative min-w-0 w-full flex-1 sm:min-w-[12rem] sm:max-w-sm">
@@ -512,11 +513,11 @@ function TasksPage() {
             value={priority}
             onValueChange={(value) => setPriority(value as Priority | "all")}
           >
-            <SelectTrigger className="h-9 w-[7.25rem] shrink-0 border-border bg-card text-sm">
+            <SelectTrigger className="h-9 w-[10rem] shrink-0 border-border bg-card text-sm">
               <span className="truncate">{getPriorityFilterTriggerLabel(priority, t)}</span>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{t("tasks.filterPriorities")}</SelectItem>
+              <SelectItem value="all">{t("tasks.allPriorities")}</SelectItem>
               {(["low", "medium", "high", "urgent"] as Priority[]).map((p) => (
                 <SelectItem key={p} value={p}>
                   {t(priorityMeta[p].labelKey)}
@@ -591,10 +592,11 @@ function TasksPage() {
           <LoadingRows />
         ) : isError ? (
           <ApiErrorState
-            titleKey="tasks.loadErrorTitle"
+            compact
+            className="border-0 bg-transparent shadow-none"
+            title={t("tasks.loadErrorTitle")}
             error={error}
             onRetry={() => void refetch()}
-            className="border-0 bg-transparent shadow-none"
           />
         ) : filtered.length === 0 ? (
           isTrulyEmpty ? (

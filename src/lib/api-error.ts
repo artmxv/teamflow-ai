@@ -1,9 +1,26 @@
 import { ApiError } from "@/lib/api/client";
 import type { TKey } from "@/lib/i18n";
 
+const API_ERROR_KEYS: Record<string, TKey> = {
+  "Failed to fetch": "common.errorNetwork",
+  "NetworkError when attempting to fetch resource.": "common.errorNetwork",
+  "Load failed": "common.errorNetwork",
+};
+
+function isNetworkError(error: unknown): boolean {
+  if (error instanceof TypeError) {
+    return true;
+  }
+  if (error instanceof Error) {
+    const lower = error.message.toLowerCase();
+    return lower.includes("failed to fetch") || lower.includes("network");
+  }
+  return false;
+}
+
 /** Network blips or hosting cold starts — safe to retry. */
 export function isTransientApiError(error: unknown): boolean {
-  if (error instanceof TypeError) {
+  if (isNetworkError(error)) {
     return true;
   }
   if (error instanceof ApiError) {
@@ -16,16 +33,44 @@ export function isAuthApiError(error: unknown): boolean {
   return error instanceof ApiError && error.status === 401;
 }
 
-/** User-facing copy — never expose raw fetch/status messages. */
-export function friendlyApiErrorMessage(error: unknown, t: (key: TKey) => string): string {
+/** Map API/network errors to localized, user-friendly copy (no raw stack traces). */
+export function friendlyApiErrorMessage(
+  error: unknown,
+  t: (key: TKey) => string,
+  fallbackKey: TKey = "common.errorServerHint",
+): string {
+  if (isNetworkError(error)) {
+    return t("common.errorNetwork");
+  }
+
   if (isTransientApiError(error)) {
     return t("common.errorServerHint");
   }
-  if (error instanceof ApiError && error.status === 403) {
-    return t("common.errorForbiddenHint");
+
+  if (error instanceof ApiError) {
+    if (error.status === 401 || error.status === 403) {
+      return error.status === 401
+        ? t("common.errorAccessDenied")
+        : t("common.errorForbiddenHint");
+    }
+    if (error.status === 404) {
+      return t("common.errorNotFoundHint");
+    }
+    if (error.status >= 500) {
+      return t(fallbackKey);
+    }
+    const key = API_ERROR_KEYS[error.message];
+    if (key) {
+      return t(key);
+    }
   }
-  if (error instanceof ApiError && error.status === 404) {
-    return t("common.errorNotFoundHint");
+
+  if (error instanceof Error) {
+    const key = API_ERROR_KEYS[error.message];
+    if (key) {
+      return t(key);
+    }
   }
+
   return t("common.errorGenericHint");
 }

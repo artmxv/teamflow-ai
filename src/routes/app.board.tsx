@@ -19,6 +19,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { statusColumns, type Priority, type Task, type TaskStatus } from "@/lib/mock-data";
 import { EmptyState } from "@/components/app/EmptyState";
+import { PageHeader } from "@/components/app/PageHeader";
 import { TaskCard, type TaskDragData } from "@/components/app/TaskCard";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
 import {
@@ -299,13 +300,11 @@ function Board() {
 
   return (
     <AppShell>
-      <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("board.title")}</h1>
-          <p className="text-sm text-muted-foreground">{t("board.subtitle")}</p>
-        </div>
-        <div className="flex gap-2">
-          {hasAccessibleProjects ? (
+      <PageHeader
+        title={t("board.title")}
+        subtitle={t("board.subtitle")}
+        actions={
+          hasAccessibleProjects ? (
             <NewTaskDialog
               isSubmitting={createTaskMutation.isPending}
               projectOptions={projectOptions}
@@ -320,9 +319,9 @@ function Board() {
             </NewTaskDialog>
           ) : (
             <p className="text-sm text-muted-foreground">{t("tasks.noAccessibleProjects")}</p>
-          )}
-        </div>
-      </div>
+          )
+        }
+      />
 
       <div className="mb-4 flex flex-col gap-2 rounded-2xl border border-border bg-card p-3 shadow-soft sm:flex-row sm:items-center">
         <div className="flex items-center gap-2 text-sm font-medium">
@@ -372,8 +371,9 @@ function Board() {
 
       {isError ? (
         <ApiErrorState
-          titleKey="board.errorTitle"
+          title={t("board.errorTitle")}
           error={error}
+          hintKey="board.errorHint"
           onRetry={() => void refetch()}
         />
       ) : showPageEmptyState ? (

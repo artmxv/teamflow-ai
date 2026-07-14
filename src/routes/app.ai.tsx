@@ -5,6 +5,7 @@ import { requireAuth } from "@/lib/auth/route-guards";
 import { AppShell } from "@/components/app/AppShell";
 import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { EmptyState } from "@/components/app/EmptyState";
+import { PageHeader } from "@/components/app/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -61,7 +62,9 @@ function AssistantPage() {
 
   return (
     <AppShell>
-      <div className="grid h-[calc(100vh-7rem)] gap-4 lg:grid-cols-[260px_1fr]">
+      <PageHeader title={t("ai.assistant")} subtitle={t("ai.groundedContext")} className="mb-4" />
+
+      <div className="grid h-[calc(100vh-11rem)] gap-4 lg:grid-cols-[260px_1fr]">
         <aside className="hidden flex-col rounded-2xl border border-border bg-card p-3 shadow-soft lg:flex">
           <div className="border-b border-border/60 pb-3">
             <div className="mb-2 flex items-center gap-1.5 px-2 pt-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/80">
@@ -132,9 +135,11 @@ function AssistantPage() {
               <SummarySkeleton />
             ) : isError ? (
               <ApiErrorState
-                titleKey="ai.errorTitle"
+                title={t("ai.errorTitle")}
                 error={error}
+                hintKey="board.errorHint"
                 onRetry={() => void refetch()}
+                isRetrying={isFetching}
               />
             ) : data ? (
               data.metrics.totalProjects === 0 && data.metrics.totalTasks === 0 ? (

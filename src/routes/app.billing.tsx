@@ -4,6 +4,8 @@ import { requireAuth } from "@/lib/auth/route-guards";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
+import { ApiErrorState } from "@/components/app/ApiErrorState";
+import { PageHeader } from "@/components/app/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -153,16 +155,16 @@ function BillingPage() {
 
   return (
     <AppShell>
-      <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-2">
+      <PageHeader
+        title={t("side.billing")}
+        subtitle={t("billing.previewSubtitle")}
+        actions={
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
             <Sparkles className="size-3.5 shrink-0" />
             {t("billing.previewBilling")}
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("side.billing")}</h1>
-          <p className="max-w-2xl text-sm text-muted-foreground">{t("billing.previewSubtitle")}</p>
-        </div>
-      </header>
+        }
+      />
 
       <Alert className="mb-6 border-border/80 bg-card shadow-soft ring-1 ring-primary/15">
         <Info className="size-4 text-primary" />
@@ -175,9 +177,11 @@ function BillingPage() {
       {summaryQuery.isLoading ? (
         <BillingSkeleton />
       ) : summaryQuery.isError || !summary ? (
-        <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground shadow-soft">
-          {t("board.errorTitle")}
-        </div>
+        <ApiErrorState
+          title={t("billing.loadErrorTitle")}
+          error={summaryQuery.error}
+          onRetry={() => void summaryQuery.refetch()}
+        />
       ) : (
         <BillingContent
           summary={summary}

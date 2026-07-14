@@ -1,15 +1,8 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  LayoutDashboard,
-  FolderKanban,
-  Trello,
-  Users,
-  Settings,
   Sparkles,
   Plus,
-  ListChecks,
-  CreditCard,
   PanelLeftClose,
   PanelLeftOpen,
   ChevronDown,
@@ -42,17 +35,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
-
-const nav: { to: string; key: TKey; icon: typeof LayoutDashboard }[] = [
-  { to: "/app/dashboard", key: "side.dashboard", icon: LayoutDashboard },
-  { to: "/app/projects", key: "side.projects", icon: FolderKanban },
-  { to: "/app/board", key: "side.kanban", icon: Trello },
-  { to: "/app/tasks", key: "side.tasks", icon: ListChecks },
-  { to: "/app/team", key: "side.team", icon: Users },
-  { to: "/app/ai", key: "side.assistant", icon: Sparkles },
-  { to: "/app/settings", key: "side.settings", icon: Settings },
-  { to: "/app/billing", key: "side.billing", icon: CreditCard },
-];
+import { APP_NAV_ITEMS, isAppNavItemActive } from "@/lib/app-nav";
 
 function SidebarTip({
   collapsed,
@@ -323,7 +306,7 @@ export function AppSidebar({
           {!collapsed && (
             <div className="min-w-0 flex-1 leading-tight">
               <div className="text-sm font-semibold text-sidebar-foreground">TeamFlow</div>
-              <div className="text-[11px] text-muted-foreground">AI workspace</div>
+              <div className="text-[11px] text-muted-foreground">{t("side.tagline")}</div>
             </div>
           )}
           <button
@@ -359,8 +342,8 @@ export function AppSidebar({
             </div>
           )}
           <ul className="space-y-0.5">
-            {nav.map((item) => {
-              const active = pathname === item.to || pathname.startsWith(item.to + "/");
+            {APP_NAV_ITEMS.map((item) => {
+              const active = isAppNavItemActive(pathname, item.to);
               const Icon = item.icon;
               const label = t(item.key);
               return (
@@ -369,18 +352,20 @@ export function AppSidebar({
                     <Link
                       to={item.to}
                       title={collapsed ? label : undefined}
+                      aria-current={active ? "page" : undefined}
                       className={cn(
-                        "group flex items-center rounded-lg text-sm transition",
+                        "group relative flex items-center rounded-lg text-sm transition",
                         collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2",
                         active
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                          ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-border"
                           : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                        !collapsed && active && "border-l-2 border-l-primary pl-[calc(0.75rem-2px)]",
                       )}
                     >
                       <Icon
                         className={cn(
                           "size-4 shrink-0",
-                          active ? "text-primary" : "text-muted-foreground",
+                          active ? "text-primary" : "text-muted-foreground group-hover:text-sidebar-foreground",
                         )}
                       />
                       {!collapsed && <span>{label}</span>}
@@ -419,12 +404,14 @@ export function AppSidebar({
                       to="/app/projects/$projectId"
                       params={{ projectId: project.id }}
                       title={collapsed ? projectLabel : undefined}
+                      aria-current={projectActive ? "page" : undefined}
                       className={cn(
-                        "flex w-full items-center rounded-lg text-left text-sm hover:bg-sidebar-accent/60",
+                        "flex w-full items-center rounded-lg text-left text-sm transition hover:bg-sidebar-accent/60",
                         collapsed ? "justify-center px-2 py-2" : "gap-2 px-3 py-1.5",
                         projectActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                          ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-border"
                           : "text-sidebar-foreground/80",
+                        !collapsed && projectActive && "border-l-2 border-l-primary pl-[calc(0.75rem-2px)]",
                       )}
                     >
                       {collapsed ? (

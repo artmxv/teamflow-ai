@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AvatarStack } from "@/components/app/Avatar";
 import { EmptyState } from "@/components/app/EmptyState";
+import { PageHeader } from "@/components/app/PageHeader";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import { members, projectStatusMeta, type Project, type ProjectStatus } from "@/lib/mock-data";
 import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
@@ -115,21 +116,19 @@ function ProjectsIndexPage() {
 
   return (
     <AppShell>
-      <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-end">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t("projects.projects")}</h1>
-          <p className="text-sm text-muted-foreground">
-            {canManageProjects ? t("projects.subtitle") : t("access.memberProjectsHint")}
-          </p>
-        </div>
-        {canManageProjects ? (
-          <NewProjectDialog>
-            <Button variant="brand">
-              <Plus className="size-4" /> {t("common.newProject")}
-            </Button>
-          </NewProjectDialog>
-        ) : null}
-      </div>
+      <PageHeader
+        title={t("projects.projects")}
+        subtitle={canManageProjects ? t("projects.subtitle") : t("access.memberProjectsHint")}
+        actions={
+          canManageProjects ? (
+            <NewProjectDialog>
+              <Button variant="brand">
+                <Plus className="size-4" /> {t("common.newProject")}
+              </Button>
+            </NewProjectDialog>
+          ) : undefined
+        }
+      />
 
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-1.5">
@@ -163,7 +162,7 @@ function ProjectsIndexPage() {
         <LoadingGrid />
       ) : isError ? (
         <ApiErrorState
-          titleKey="projects.loadErrorTitle"
+          title={t("projects.loadErrorTitle")}
           error={error}
           onRetry={() => void refetch()}
         />
