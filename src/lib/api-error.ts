@@ -18,6 +18,21 @@ function isNetworkError(error: unknown): boolean {
   return false;
 }
 
+/** Network blips or hosting cold starts — safe to retry. */
+export function isTransientApiError(error: unknown): boolean {
+  if (isNetworkError(error)) {
+    return true;
+  }
+  if (error instanceof ApiError) {
+    return error.status === 0 || error.status === 408 || error.status >= 502;
+  }
+  return false;
+}
+
+export function isAuthApiError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 401;
+}
+
 /** Map API/network errors to localized, user-friendly copy (no raw stack traces). */
 export function friendlyApiErrorMessage(
   error: unknown,
@@ -28,9 +43,18 @@ export function friendlyApiErrorMessage(
     return t("common.errorNetwork");
   }
 
+  if (isTransientApiError(error)) {
+    return t("common.errorServerHint");
+  }
+
   if (error instanceof ApiError) {
     if (error.status === 401 || error.status === 403) {
-      return t("common.errorAccessDenied");
+      return error.status === 401
+        ? t("common.errorAccessDenied")
+        : t("common.errorForbiddenHint");
+    }
+    if (error.status === 404) {
+      return t("common.errorNotFoundHint");
     }
     if (error.status >= 500) {
       return t(fallbackKey);
@@ -48,5 +72,5 @@ export function friendlyApiErrorMessage(
     }
   }
 
-  return t(fallbackKey);
+  return t("common.errorGenericHint");
 }

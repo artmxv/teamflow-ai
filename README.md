@@ -329,6 +329,8 @@ No Stripe, OpenAI, or other third-party API keys are required for the current fe
 
 Portfolio-ready deploy: Vercel (frontend), Render (API), Neon (PostgreSQL), Resend (email). Full step-by-step setup: **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
 
+**Render free tier:** the API may **cold start** after idle time (often 30–60 seconds on first request). The UI shows skeleton loaders and friendly “Starting workspace…” copy while the backend wakes up, with retry buttons if a request fails temporarily.
+
 **Also see:**
 
 - [QA checklist](docs/QA_CHECKLIST.md)

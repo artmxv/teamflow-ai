@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { getMe, type AuthWorkspace } from "@/lib/api/auth";
+import { isAuthApiError, isTransientApiError } from "@/lib/api-error";
 import { clearActiveWorkspaceId, setWorkspaceStorageUser } from "@/lib/api/client";
 import {
   AUTH_ME_QUERY_KEY,
@@ -39,7 +40,9 @@ export function useCurrentUser() {
     queryKey: AUTH_ME_QUERY_KEY,
     queryFn: getMe,
     enabled: hasToken && workspaceReady,
-    retry: false,
+    retry: (failureCount, error) =>
+      failureCount < 3 && isTransientApiError(error),
+    retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 8_000),
     staleTime: 30 * 60 * 1000,
     placeholderData: (previous) => previous,
   });
@@ -51,7 +54,7 @@ export function useCurrentUser() {
   }, [query.data?.user]);
 
   useEffect(() => {
-    if (!hasToken || !query.isError) {
+    if (!hasToken || !query.isError || !isAuthApiError(query.error)) {
       return;
     }
     clearAuthToken();
@@ -59,7 +62,7 @@ export function useCurrentUser() {
     resetWorkspaceValidationSession();
     void queryClient.removeQueries({ queryKey: ["auth"] });
     void router.navigate({ to: "/signin", replace: true });
-  }, [hasToken, query.isError, queryClient, router]);
+  }, [hasToken, query.isError, query.error, queryClient, router]);
 
   return query;
 }

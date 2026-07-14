@@ -3,6 +3,7 @@ import { createFileRoute, Link, type LinkProps } from "@tanstack/react-router";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
+import { ApiErrorState } from "@/components/app/ApiErrorState";
 import {
   FolderKanban,
   CheckCircle2,
@@ -37,7 +38,6 @@ import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib
 import { resolveProjectGradient } from "@/lib/project-color";
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
 import { EmptyState } from "@/components/app/EmptyState";
-import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { PageHeader } from "@/components/app/PageHeader";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import {
@@ -421,33 +421,39 @@ function Dashboard() {
           <div className="flex items-center gap-2 text-sm font-semibold">
             <Sparkles className="size-4 text-primary" /> {t("dashboard.aiInsights")}
           </div>
-          <div className="mt-4 space-y-3 text-sm">
-            <Insight
-              tone="warn"
-              title={t("dashboard.insightMobileSlipping")}
-              body={t("dashboard.insightMobileSlippingBody")}
-              target={{ to: "/app/tasks", search: { status: "open" } }}
-            />
-            <Insight
-              tone="ok"
-              title={t("dashboard.insightOrionOnTrack")}
-              body={t("dashboard.insightOrionOnTrackBody")}
-              target={
-                orionProjectId
-                  ? { to: "/app/projects/$projectId", params: { projectId: orionProjectId } }
-                  : undefined
-              }
-            />
-            <Insight
-              tone="info"
-              title={t("dashboard.insightWeeklyDigest")}
-              body={t("dashboard.insightWeeklyDigestBody")}
-              target={{ to: "/app/team" }}
-            />
-          </div>
-          <Button variant="outline" className="mt-4 w-full" asChild>
-            <Link to="/app/ai">{t("dashboard.openAiAssistant")}</Link>
-          </Button>
+          {isLoading ? (
+            <AiInsightsSkeleton />
+          ) : (
+            <>
+              <div className="mt-4 space-y-3 text-sm">
+                <Insight
+                  tone="warn"
+                  title={t("dashboard.insightMobileSlipping")}
+                  body={t("dashboard.insightMobileSlippingBody")}
+                  target={{ to: "/app/tasks", search: { status: "open" } }}
+                />
+                <Insight
+                  tone="ok"
+                  title={t("dashboard.insightOrionOnTrack")}
+                  body={t("dashboard.insightOrionOnTrackBody")}
+                  target={
+                    orionProjectId
+                      ? { to: "/app/projects/$projectId", params: { projectId: orionProjectId } }
+                      : undefined
+                  }
+                />
+                <Insight
+                  tone="info"
+                  title={t("dashboard.insightWeeklyDigest")}
+                  body={t("dashboard.insightWeeklyDigestBody")}
+                  target={{ to: "/app/team" }}
+                />
+              </div>
+              <Button variant="outline" className="mt-4 w-full" asChild>
+                <Link to="/app/ai">{t("dashboard.openAiAssistant")}</Link>
+              </Button>
+            </>
+          )}
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-5 shadow-soft xl:col-span-2">
@@ -649,6 +655,21 @@ function DashboardProjectCard({
     >
       {cardBody}
     </Link>
+  );
+}
+
+function AiInsightsSkeleton() {
+  return (
+    <div className="mt-4 space-y-3">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div key={index} className="rounded-xl border border-border/60 bg-card/50 p-3">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="mt-2 h-3 w-full" />
+          <Skeleton className="mt-1 h-3 w-4/5" />
+        </div>
+      ))}
+      <Skeleton className="mt-4 h-9 w-full rounded-md" />
+    </div>
   );
 }
 

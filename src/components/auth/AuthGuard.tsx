@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "@tanstack/react-router";
+import { AppBootScreen } from "@/components/app/AppBootScreen";
 import { getAuthToken } from "@/lib/auth/token";
 
 type AuthStatus = "checking" | "authenticated" | "unauthenticated";
@@ -24,8 +25,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   }, [router]);
 
   if (status !== "authenticated") {
-    // Small stable fallback avoids hydration mismatch and is OK UX-wise.
-    return <div className="min-h-screen bg-background" />;
+    return <AppBootScreen variant="minimal" />;
   }
 
   return <>{children}</>;

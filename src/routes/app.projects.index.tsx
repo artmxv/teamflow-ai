@@ -3,12 +3,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
+import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AvatarStack } from "@/components/app/Avatar";
 import { EmptyState } from "@/components/app/EmptyState";
-import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { PageHeader } from "@/components/app/PageHeader";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import { members, projectStatusMeta, type Project, type ProjectStatus } from "@/lib/mock-data";
@@ -257,11 +258,11 @@ function LoadingGrid() {
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {Array.from({ length: 6 }).map((_, index) => (
         <div key={index} className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-          <div className="h-2 w-12 animate-pulse rounded-full bg-muted" />
-          <div className="mt-4 h-5 w-2/3 animate-pulse rounded bg-muted" />
-          <div className="mt-2 h-4 w-full animate-pulse rounded bg-muted" />
-          <div className="mt-5 h-1.5 animate-pulse rounded-full bg-muted" />
-          <div className="mt-4 h-4 w-1/2 animate-pulse rounded bg-muted" />
+          <Skeleton className="h-2 w-12 rounded-full" />
+          <Skeleton className="mt-4 h-5 w-2/3" />
+          <Skeleton className="mt-2 h-4 w-full" />
+          <Skeleton className="mt-5 h-1.5 w-full rounded-full" />
+          <Skeleton className="mt-4 h-4 w-1/2" />
         </div>
       ))}
     </div>

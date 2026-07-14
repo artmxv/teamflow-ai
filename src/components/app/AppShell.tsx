@@ -1,5 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import { AuthGuard } from "@/components/auth/AuthGuard";
+import { ApiErrorState } from "@/components/app/ApiErrorState";
+import { AppBootScreen } from "@/components/app/AppBootScreen";
 import type { AuthWorkspace } from "@/lib/api/auth";
 import { nameToInitials, useCurrentUser } from "@/lib/auth/use-current-user";
 import { useSidebarCollapsed } from "@/lib/sidebar-preference";
@@ -23,7 +25,7 @@ export function authWorkspaceToShell(workspace: AuthWorkspace): Workspace {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { data: me, isPending, isFetching } = useCurrentUser();
+  const { data: me, isPending, isFetching, isError, error, refetch } = useCurrentUser();
   const { collapsed: sidebarCollapsed, toggle: toggleSidebarCollapsed } = useSidebarCollapsed();
 
   const workspace = useMemo(
@@ -32,9 +34,22 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 
   const workspaceLoading = !workspace && (isPending || isFetching);
+  const isBootstrapping = (isPending || isFetching) && !me;
 
   return (
     <AuthGuard>
+      {isBootstrapping ? (
+        <AppBootScreen />
+      ) : isError && !me ? (
+        <div className="flex min-h-screen items-center justify-center bg-muted/30 p-6">
+          <ApiErrorState
+            titleKey="loading.workspaceLoadErrorTitle"
+            error={error}
+            onRetry={() => void refetch()}
+            className="w-full max-w-lg"
+          />
+        </div>
+      ) : (
       <div className="flex min-h-screen w-full bg-muted/30">
         <AppSidebar
           workspace={workspace}
@@ -47,6 +62,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <main className="flex-1 overflow-x-hidden px-4 py-6 sm:px-6 lg:px-8">{children}</main>
         </div>
       </div>
+      )}
     </AuthGuard>
   );
 }

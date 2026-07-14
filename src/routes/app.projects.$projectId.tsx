@@ -5,6 +5,7 @@ import { requireAuth } from "@/lib/auth/route-guards";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
+import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -28,7 +29,6 @@ import {
 } from "@/components/ui/dialog";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { EmptyState } from "@/components/app/EmptyState";
-import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { PageHeader } from "@/components/app/PageHeader";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
 import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
@@ -83,6 +83,7 @@ import {
 import { invalidateNotifications } from "@/lib/api/notifications";
 import { friendlyUploadErrorMessage } from "@/lib/upload-errors";
 import { isUploadFileTooLarge } from "@/lib/upload-limits";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user";
 import {
@@ -1518,31 +1519,31 @@ function LoadingState() {
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       <div className="rounded-2xl border border-border bg-card p-5 shadow-soft lg:col-span-2">
-        <div className="h-2 w-16 animate-pulse rounded-full bg-muted" />
-        <div className="mt-4 h-6 w-2/3 animate-pulse rounded bg-muted" />
-        <div className="mt-2 h-4 w-full animate-pulse rounded bg-muted" />
+        <Skeleton className="h-2 w-16 rounded-full" />
+        <Skeleton className="mt-4 h-6 w-2/3" />
+        <Skeleton className="mt-2 h-4 w-full" />
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="rounded-xl border border-border bg-muted/20 p-3">
-              <div className="h-3 w-20 animate-pulse rounded bg-muted" />
-              <div className="mt-2 h-4 w-32 animate-pulse rounded bg-muted" />
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="mt-2 h-4 w-32" />
             </div>
           ))}
         </div>
         <div className="mt-6">
           <div className="flex items-center justify-between">
-            <div className="h-3 w-16 animate-pulse rounded bg-muted" />
-            <div className="h-3 w-10 animate-pulse rounded bg-muted" />
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-3 w-10" />
           </div>
-          <div className="mt-2 h-1.5 animate-pulse rounded-full bg-muted" />
+          <Skeleton className="mt-2 h-1.5 w-full rounded-full" />
         </div>
       </div>
       <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-        <div className="h-5 w-20 animate-pulse rounded bg-muted" />
-        <div className="mt-2 h-3 w-48 animate-pulse rounded bg-muted" />
+        <Skeleton className="h-5 w-20" />
+        <Skeleton className="mt-2 h-3 w-48" />
         <div className="mt-4 space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-12 animate-pulse rounded bg-muted/40" />
+            <Skeleton key={i} className="h-12 w-full rounded-xl" />
           ))}
         </div>
       </div>

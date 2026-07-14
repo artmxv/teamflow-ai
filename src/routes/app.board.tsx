@@ -16,9 +16,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { invalidateNotifications } from "@/lib/api/notifications";
 import { AppShell } from "@/components/app/AppShell";
+import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { statusColumns, type Priority, type Task, type TaskStatus } from "@/lib/mock-data";
 import { EmptyState } from "@/components/app/EmptyState";
-import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { PageHeader } from "@/components/app/PageHeader";
 import { TaskCard, type TaskDragData } from "@/components/app/TaskCard";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
@@ -29,6 +29,7 @@ import {
 } from "@/components/app/QuickActionDialogs";
 import { isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -610,12 +611,12 @@ function LoadingCards() {
     <>
       {Array.from({ length: 3 }).map((_, index) => (
         <div key={index} className="rounded-2xl border border-border bg-card p-3.5 shadow-soft">
-          <div className="h-3 w-16 animate-pulse rounded bg-muted" />
-          <div className="mt-3 h-4 w-3/4 animate-pulse rounded bg-muted" />
-          <div className="mt-2 h-4 w-1/2 animate-pulse rounded bg-muted" />
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="mt-3 h-4 w-3/4" />
+          <Skeleton className="mt-2 h-4 w-1/2" />
           <div className="mt-4 flex items-center justify-between">
-            <div className="h-5 w-20 animate-pulse rounded-full bg-muted" />
-            <div className="size-7 animate-pulse rounded-md bg-muted" />
+            <Skeleton className="h-5 w-20 rounded-full" />
+            <Skeleton className="size-7 rounded-md" />
           </div>
         </div>
       ))}
