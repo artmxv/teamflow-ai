@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, HelpCircle } from "lucide-react";
+import { Bell, ChevronDown, HelpCircle, Loader2 } from "lucide-react";
 import { useRouterState } from "@tanstack/react-router";
 import { GlobalSearch } from "@/components/app/GlobalSearch";
 import { MobileNav } from "@/components/app/MobileNav";
@@ -31,8 +31,15 @@ import { useCurrentUser, workspaceRoleLabel } from "@/lib/auth/use-current-user"
 import { UserAvatar } from "@/components/app/UserAvatar";
 import type { WorkspaceRole } from "@/lib/api/auth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ApiErrorState } from "@/components/app/ApiErrorState";
 import {
+  applyAllNotificationsReadInCache,
+  applyNotificationReadInCache,
+  countMarkableUnreadNotifications,
   fetchNotifications,
+  formatNotificationTime,
+  getLocalizedNotificationBody,
+  getLocalizedNotificationTitle,
   isWorkspaceInvitationNotification,
   markAllNotificationsRead,
   markNotificationRead,
@@ -43,53 +50,6 @@ import {
   type NotificationItem,
 } from "@/lib/api/notifications";
 import { activateWorkspace } from "@/lib/workspace-queries";
-
-function formatNotificationTime(createdAt: string, lang: string) {
-  const date = new Date(createdAt);
-  const diffMs = Date.now() - date.getTime();
-  const diffMinutes = Math.floor(diffMs / 60_000);
-
-  if (diffMinutes < 1) {
-    return lang === "ru" ? "только что" : "just now";
-  }
-  if (diffMinutes < 60) {
-    return lang === "ru" ? `${diffMinutes} мин назад` : `${diffMinutes}m ago`;
-  }
-
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) {
-    return lang === "ru" ? `${diffHours} ч назад` : `${diffHours}h ago`;
-  }
-
-  return date.toLocaleDateString(lang === "ru" ? "ru-RU" : "en-US", {
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function getNotificationTitle(
-  notification: NotificationItem,
-  t: ReturnType<typeof useI18n>["t"],
-): string {
-  if (isWorkspaceInvitationNotification(notification)) {
-    return t("invite.bellTitle");
-  }
-  return notification.title;
-}
-
-function getNotificationBody(
-  notification: NotificationItem,
-  t: ReturnType<typeof useI18n>["t"],
-): string | null {
-  if (isWorkspaceInvitationNotification(notification)) {
-    const role = notification.invitationRole
-      ? workspaceRoleLabel(notification.invitationRole as WorkspaceRole, t)
-      : "";
-    const workspace = notification.workspaceName ?? notification.body ?? "";
-    return t("invite.bellBody").replace("{workspace}", workspace).replace("{role}", role);
-  }
-  return notification.body;
-}
 
 export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | null }) {
   const { t, lang } = useI18n();
@@ -116,6 +76,66 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
 
   const notifications = notificationsQuery.data?.notifications ?? [];
   const unreadCount = notificationsQuery.data?.unreadCount ?? 0;
+  const markableUnreadCount = countMarkableUnreadNotifications(notifications);
+  const bellLabel =
+    unreadCount > 0
+      ? t("top.notificationsBellLabel").replace("{count}", String(unreadCount))
+      : t("top.notificationsBellLabelEmpty");
+
+  const markAllReadMutation = useMutation({
+    mutationFn: markAllNotificationsRead,
+    onMutate: () => {
+      applyAllNotificationsReadInCache(queryClient);
+    },
+    onSuccess: () => {
+      toast.success(t("top.allMarkedAsRead"));
+    },
+    onError: () => {
+      void refetchNotifications(queryClient);
+      toast.error(t("top.markAllAsReadFailed"));
+    },
+  });
+
+  function handleNotificationClick(notification: NotificationItem) {
+    setNotificationsOpen(false);
+
+    void (async () => {
+      const shouldMarkRead =
+        !notification.isRead && !isWorkspaceInvitationNotification(notification);
+
+      try {
+        const shouldSwitchWorkspace =
+          notification.workspaceId &&
+          !isWorkspaceInvitationNotification(notification) &&
+          notification.workspaceId !== getSelectedWorkspaceId();
+
+        if (shouldSwitchWorkspace) {
+          await activateWorkspace(queryClient, notification.workspaceId!);
+          toast.success(t("workspace.switched"));
+        }
+
+        if (shouldMarkRead) {
+          applyNotificationReadInCache(queryClient, notification.id);
+          try {
+            await markNotificationRead(notification.id);
+          } catch {
+            void refetchNotifications(queryClient);
+            throw new Error("mark-read-failed");
+          }
+        }
+
+        const target = resolveNotificationTarget(notification);
+        if (target) {
+          await router.navigate({
+            to: target.to,
+            ...(target.search ? { search: target.search } : {}),
+          });
+        }
+      } catch {
+        toast.error(t("top.couldNotOpenNotification"));
+      }
+    })();
+  }
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
@@ -144,47 +164,6 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
     },
   });
 
-  const markAllReadMutation = useMutation({
-    mutationFn: markAllNotificationsRead,
-    onSuccess: () => {
-      refetchNotifications(queryClient);
-      toast.success(t("top.allMarkedAsRead"));
-    },
-  });
-
-  function handleNotificationClick(notification: NotificationItem) {
-    setNotificationsOpen(false);
-
-    void (async () => {
-      try {
-        const shouldSwitchWorkspace =
-          notification.workspaceId &&
-          !isWorkspaceInvitationNotification(notification) &&
-          notification.workspaceId !== getSelectedWorkspaceId();
-
-        if (shouldSwitchWorkspace) {
-          await activateWorkspace(queryClient, notification.workspaceId!);
-          toast.success(t("workspace.switched"));
-        }
-
-        if (!notification.isRead && !isWorkspaceInvitationNotification(notification)) {
-          await markNotificationRead(notification.id);
-          refetchNotifications(queryClient);
-        }
-
-        const target = resolveNotificationTarget(notification);
-        if (target) {
-          await router.navigate({
-            to: target.to,
-            ...(target.search ? { search: target.search } : {}),
-          });
-        }
-      } catch {
-        toast.error(t("top.couldNotOpenNotification"));
-      }
-    })();
-  }
-
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur sm:gap-3 sm:px-6">
       <MobileNav pathname={pathname} />
@@ -212,6 +191,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
           <DropdownMenuTrigger asChild>
             <button
               type="button"
+              aria-label={bellLabel}
               className="relative grid size-9 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground outline-none focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground/30"
             >
               <Bell className="size-4" />
@@ -224,7 +204,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
                 }
                 aria-hidden={unreadCount === 0}
               >
-                {unreadCount > 9 ? "9+" : unreadCount || "0"}
+                {unreadCount > 9 ? "9+" : unreadCount}
               </span>
             </button>
           </DropdownMenuTrigger>
@@ -233,55 +213,98 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
             className="flex w-80 flex-col overflow-hidden p-1"
             onCloseAutoFocus={(event) => event.preventDefault()}
           >
-            <DropdownMenuLabel className="flex shrink-0 items-center justify-between">
-              {t("top.notifications")}
-              {unreadCount > 0 && (
-                <span className="text-[11px] font-normal text-muted-foreground">
-                  {t("top.notificationsUnread").replace("{count}", String(unreadCount))}
-                </span>
-              )}
+            <DropdownMenuLabel className="flex shrink-0 items-center justify-between gap-2">
+              <span>{t("top.notifications")}</span>
+              <span className="flex items-center gap-1.5 text-[11px] font-normal text-muted-foreground">
+                {notificationsQuery.isFetching && !notificationsQuery.isLoading ? (
+                  <Loader2 className="size-3 animate-spin" aria-hidden />
+                ) : null}
+                {unreadCount > 0 ? (
+                  <span>{t("top.notificationsUnread").replace("{count}", String(unreadCount))}</span>
+                ) : null}
+              </span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator className="shrink-0" />
             {notificationsQuery.isLoading && (
-              <p className="shrink-0 px-2 py-3 text-xs text-muted-foreground">…</p>
-            )}
-            {!notificationsQuery.isLoading && notifications.length === 0 && (
-              <div className="flex shrink-0 flex-col items-center gap-1 px-3 py-6 text-center">
-                <span className="grid size-9 place-items-center rounded-full bg-muted/60 text-muted-foreground">
-                  <Bell className="size-4" />
-                </span>
-                <p className="text-sm font-medium text-foreground">{t("top.notificationsEmpty")}</p>
+              <div className="flex shrink-0 flex-col gap-2 px-2 py-2">
+                {[0, 1, 2].map((index) => (
+                  <div key={index} className="flex gap-2 py-1">
+                    <Skeleton className="mt-2 size-2 shrink-0 rounded-full" />
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <Skeleton className="h-3.5 w-3/4" />
+                      <Skeleton className="h-3 w-full" />
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
-            {notifications.length > 0 && (
+            {notificationsQuery.isError && !notificationsQuery.isLoading && (
+              <ApiErrorState
+                compact
+                titleKey="top.notificationsLoadError"
+                error={notificationsQuery.error}
+                onRetry={() => void notificationsQuery.refetch()}
+                isRetrying={notificationsQuery.isFetching}
+                className="mx-1 my-2 border-0 bg-transparent shadow-none"
+              />
+            )}
+            {!notificationsQuery.isLoading &&
+              !notificationsQuery.isError &&
+              notifications.length === 0 && (
+                <div className="flex shrink-0 flex-col items-center gap-2 px-3 py-6 text-center">
+                  <span className="grid size-9 place-items-center rounded-full bg-muted/60 text-muted-foreground">
+                    <Bell className="size-4" />
+                  </span>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">
+                      {t("top.notificationsEmpty")}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {t("top.notificationsEmptyHint")}
+                    </p>
+                  </div>
+                </div>
+              )}
+            {!notificationsQuery.isError && notifications.length > 0 && (
               <div className="app-scrollbar max-h-80 min-h-0 overflow-y-auto overscroll-contain">
                 {notifications.map((item) => {
-                  const body = getNotificationBody(item, t);
+                  const body = getLocalizedNotificationBody(item, t, (role) =>
+                    workspaceRoleLabel(role as WorkspaceRole, t),
+                  );
                   return (
                     <DropdownMenuItem
                       key={item.id}
                       className={
-                        "items-start gap-2 py-2 " + (!item.isRead ? "bg-secondary/50" : "")
+                        "items-start gap-2 border-l-2 py-2 " +
+                        (!item.isRead
+                          ? "border-l-primary bg-secondary/50"
+                          : "border-l-transparent")
                       }
                       onClick={() => handleNotificationClick(item)}
                     >
                       <span
                         className={
                           "mt-1.5 size-2 shrink-0 rounded-full " +
-                          (item.isRead ? "bg-muted" : "bg-primary")
+                          (item.isRead ? "bg-muted-foreground/30" : "bg-primary")
                         }
+                        aria-hidden
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-medium leading-snug">
-                          {getNotificationTitle(item, t)}
+                        <span
+                          className={
+                            "block text-sm leading-snug " +
+                            (item.isRead ? "font-normal text-foreground/90" : "font-medium")
+                          }
+                        >
+                          {getLocalizedNotificationTitle(item, t)}
                         </span>
-                        {body && (
+                        {body ? (
                           <span className="block text-xs text-muted-foreground line-clamp-2">
                             {body}
                           </span>
-                        )}
+                        ) : null}
                         <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                          {formatNotificationTime(item.createdAt, lang)}
+                          {formatNotificationTime(item.createdAt, t, lang)}
                         </span>
                       </span>
                     </DropdownMenuItem>
@@ -289,14 +312,17 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
                 })}
               </div>
             )}
-            {notifications.length > 0 && (
+            {!notificationsQuery.isError && notifications.length > 0 && (
               <>
                 <DropdownMenuSeparator className="shrink-0" />
                 <DropdownMenuItem
-                  className="shrink-0"
+                  className="shrink-0 justify-center text-center text-xs font-medium"
                   onClick={() => markAllReadMutation.mutate()}
-                  disabled={unreadCount === 0 || markAllReadMutation.isPending}
+                  disabled={markableUnreadCount === 0 || markAllReadMutation.isPending}
                 >
+                  {markAllReadMutation.isPending ? (
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                  ) : null}
                   {t("top.markAllAsRead")}
                 </DropdownMenuItem>
               </>
