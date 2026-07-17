@@ -29,6 +29,7 @@ import {
 } from "@/lib/api/tasks";
 import { fetchProjects } from "@/lib/api/projects";
 import { useI18n, type TKey } from "@/lib/i18n";
+import { formatDueDateTimeShort } from "@/lib/due-datetime";
 import { translateStarterProjectName, translateStarterTitle } from "@/lib/starter-content";
 import {
   Search,
@@ -665,7 +666,7 @@ function TasksPage() {
                   />
                 </div>
                 <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                  <Calendar className="size-3.5" /> {task.dueDate ?? "—"}
+                  <Calendar className="size-3.5" /> {formatDueDateTimeShort(task.dueDate)}
                 </div>
                 <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
                   <span className="inline-flex items-center gap-1">
@@ -744,7 +745,7 @@ function mapApiTaskToRow(task: TaskApiItem): TaskRow {
     assigneeIds: task.assigneeIds,
     assigneeId: task.assigneeId,
     projectId: task.projectId,
-    dueDate: formatDate(task.dueDate),
+    dueDate: task.dueDate,
     labels: [],
     comments: [],
     checklist: [],
@@ -758,12 +759,6 @@ function mapApiTaskToRow(task: TaskApiItem): TaskRow {
     checklistDone: task.checklistDone,
     attachmentsCount: task.attachmentsCount,
   };
-}
-
-function formatDate(value: string | null) {
-  if (!value) return null;
-  // Keep YYYY-MM-DD so <input type="date" /> works consistently.
-  return value.slice(0, 10);
 }
 
 function LoadingRows() {

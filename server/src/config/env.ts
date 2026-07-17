@@ -25,6 +25,7 @@ const envSchema = z.object({
   SUPABASE_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
   SUPABASE_SERVICE_ROLE_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
   SUPABASE_STORAGE_BUCKET: z.preprocess(emptyToUndefined, z.string().optional()),
+  TASK_REMINDER_CRON_SECRET: z.preprocess(emptyToUndefined, z.string().optional()),
 });
 
 const parsed = envSchema.parse(process.env);
@@ -164,4 +165,5 @@ export const env = {
   SUPABASE_URL: normalizeSupabaseUrl(parsed.SUPABASE_URL),
   SUPABASE_SERVICE_ROLE_KEY: parsed.SUPABASE_SERVICE_ROLE_KEY?.trim() || undefined,
   SUPABASE_STORAGE_BUCKET: parsed.SUPABASE_STORAGE_BUCKET?.trim() || undefined,
+  TASK_REMINDER_CRON_SECRET: parsed.TASK_REMINDER_CRON_SECRET?.trim() || undefined,
 };

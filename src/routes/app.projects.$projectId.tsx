@@ -34,8 +34,17 @@ import { TaskDrawer } from "@/components/app/TaskDrawer";
 import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
 import { projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
 import { projectApiStatusLabel, projectStatusLabel, useI18n, type TKey } from "@/lib/i18n";
+import {
+  combineLocalDateAndTime,
+  formatDueDateTime,
+  formatDueDateTimeShort,
+  splitLocalDateTime,
+} from "@/lib/due-datetime";
 import { resolveTaskAssignees } from "@/lib/assignee-options";
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
+import { DeadlineDatePicker } from "@/components/app/DeadlineDatePicker";
+import { DeadlineTimePicker } from "@/components/app/DeadlineTimePicker";
+import { deadlineStatusDateTimeRowClassName } from "@/components/app/deadline-field-styles";
 import { resolveProjectGradient } from "@/lib/project-color";
 import {
   displayProjectDescription,
@@ -425,20 +434,23 @@ function EditProjectDialog({
   const { t, lang } = useI18n();
   const [open, setOpen] = useState(false);
 
-  const initial = useMemo(
-    () => ({
+  const initial = useMemo(() => {
+    const dueParts = splitLocalDateTime(project.dueDate);
+    return {
       name: displayProjectName(project.name, lang),
       description: displayProjectDescription(project.description ?? "", lang),
       status: project.status,
-      dueDate: project.dueDate ? project.dueDate.slice(0, 10) : "",
-    }),
-    [lang, project.description, project.dueDate, project.name, project.status],
-  );
+      dueDate: dueParts.date,
+      dueTime: dueParts.time,
+    };
+  }, [lang, project.description, project.dueDate, project.name, project.status]);
 
   const [name, setName] = useState(initial.name);
   const [description, setDescription] = useState(initial.description);
   const [status, setStatus] = useState<ProjectApiStatus>(initial.status);
   const [dueDate, setDueDate] = useState(initial.dueDate);
+  const [dueTime, setDueTime] = useState(initial.dueTime);
+  const [dueDateTimeError, setDueDateTimeError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -446,7 +458,9 @@ function EditProjectDialog({
     setDescription(initial.description);
     setStatus(initial.status);
     setDueDate(initial.dueDate);
-  }, [initial.description, initial.dueDate, initial.name, initial.status, open]);
+    setDueTime(initial.dueTime);
+    setDueDateTimeError(null);
+  }, [initial.description, initial.dueDate, initial.dueTime, initial.name, initial.status, open]);
 
   const isValid = name.trim().length >= 2;
 
@@ -466,11 +480,23 @@ function EditProjectDialog({
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
+            const hasDate = Boolean(dueDate.trim());
+            const hasTime = Boolean(dueTime.trim());
+            if (hasDate !== hasTime) {
+              setDueDateTimeError(
+                hasDate ? t("validation.dueTimeRequired") : t("validation.dueDateRequired"),
+              );
+              return;
+            }
+            setDueDateTimeError(null);
             void onSubmit({
               name: name.trim(),
               description: description.trim(),
               status,
-              dueDate: dueDate ? dueDate : null,
+              dueDate:
+                hasDate && hasTime
+                  ? combineLocalDateAndTime(dueDate.trim(), dueTime.trim())
+                  : null,
             }).then(() => setOpen(false));
           }}
         >
@@ -490,9 +516,9 @@ function EditProjectDialog({
               placeholder={t("projects.new.description")}
             />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>{t("projects.detail.status")}</Label>
+          <div className={deadlineStatusDateTimeRowClassName}>
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label className="block h-4 leading-none">{t("projects.detail.status")}</Label>
               <Select
                 value={status}
                 onValueChange={(value) => setStatus(value as ProjectApiStatus)}
@@ -508,11 +534,34 @@ function EditProjectDialog({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label>{t("projects.detail.dueDate")}</Label>
-              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label className="block h-4 leading-none">{t("projects.detail.dueDate")}</Label>
+              <DeadlineDatePicker
+                value={dueDate}
+                aria-label={t("projects.detail.dueDate")}
+                onChange={(next) => {
+                  setDueDate(next);
+                  setDueDateTimeError(null);
+                }}
+              />
+            </div>
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label className="block h-4 leading-none whitespace-nowrap">
+                {t("projects.detail.dueTime")}
+              </Label>
+              <DeadlineTimePicker
+                value={dueTime}
+                aria-label={t("projects.detail.dueTime")}
+                onChange={(next) => {
+                  setDueTime(next);
+                  setDueDateTimeError(null);
+                }}
+              />
             </div>
           </div>
+          {dueDateTimeError ? (
+            <p className="text-xs text-destructive">{dueDateTimeError}</p>
+          ) : null}
           <DialogFooter>
             <Button
               type="button"
@@ -606,7 +655,7 @@ function ProjectDetails({
   const statusKey = apiStatusMap[project.status];
   const statusMeta = projectStatusMeta[statusKey];
   const statusLabel = projectStatusLabel(statusKey, t);
-  const due = formatDate(project.dueDate);
+  const due = formatDueDateTime(project.dueDate);
   const progress = calculateTaskProgress(projectTasks);
   const colorGradient = resolveProjectGradient(project);
   const sortedTasks = useMemo(() => sortProjectTasks(projectTasks), [projectTasks]);
@@ -773,7 +822,7 @@ function ProjectDetails({
                           {task.dueDate ? (
                             <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                               <Calendar className="size-3" />
-                              {formatDate(task.dueDate)}
+                              {formatDueDateTimeShort(task.dueDate)}
                             </span>
                           ) : null}
                         </div>
@@ -1623,7 +1672,7 @@ function mapApiTaskToTask(task: TaskApiItem): Task {
     assigneeIds: task.assigneeIds,
     assigneeId: task.assigneeId,
     projectId: task.projectId,
-    dueDate: formatTaskDueDate(task.dueDate),
+    dueDate: task.dueDate,
     labels: [task.project.name],
     comments: [],
     commentsCount: task.commentsCount,
@@ -1636,16 +1685,6 @@ function mapApiTaskToTask(task: TaskApiItem): Task {
     activity: [],
     attachments: [],
   };
-}
-
-function formatTaskDueDate(value: string | null) {
-  if (!value) return null;
-  return value.slice(0, 10);
-}
-
-function formatDate(value: string | null) {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString();
 }
 
 function initialsFromName(name: string) {

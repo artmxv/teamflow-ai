@@ -7,6 +7,9 @@ import { z } from "zod";
 
 import { Avatar } from "@/components/app/Avatar";
 import { AssigneeMultiPicker } from "@/components/app/AssigneeMultiPicker";
+import { DeadlineDatePicker } from "@/components/app/DeadlineDatePicker";
+import { DeadlineTimePicker } from "@/components/app/DeadlineTimePicker";
+import { deadlineStatusDateTimeRowClassName } from "@/components/app/deadline-field-styles";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -34,18 +37,46 @@ import { fetchWorkspaceMembers } from "@/lib/api/workspace-members";
 import { nameToInitials, useCurrentWorkspace } from "@/lib/auth/use-current-user";
 import { resolveEditAssigneeOptions } from "@/lib/assignee-options";
 import { useI18n, type TKey } from "@/lib/i18n";
+import { dueDateTimeToIso } from "@/lib/due-datetime";
 import { type Priority, type ProjectStatus, type TaskStatus } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 type Translate = (key: TKey) => string;
 
-const getProjectSchema = (t: Translate) =>
-  z.object({
-    name: z.string().trim().min(2, t("validation.projectNameMin")),
-    description: z.string().max(300, t("validation.projectDescriptionMax")).optional(),
-    status: z.enum(["planning", "active", "on_hold", "completed"]),
-    dueDate: z.string().optional(),
+const dueDateTimeRefine = <T extends { dueDate?: string; dueTime?: string }>(
+  t: Translate,
+  schema: z.ZodType<T>,
+) =>
+  schema.superRefine((data, ctx) => {
+    const hasDate = Boolean(data.dueDate?.trim());
+    const hasTime = Boolean(data.dueTime?.trim());
+    if (hasDate && !hasTime) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: t("validation.dueTimeRequired"),
+        path: ["dueTime"],
+      });
+    }
+    if (hasTime && !hasDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: t("validation.dueDateRequired"),
+        path: ["dueDate"],
+      });
+    }
   });
+
+const getProjectSchema = (t: Translate) =>
+  dueDateTimeRefine(
+    t,
+    z.object({
+      name: z.string().trim().min(2, t("validation.projectNameMin")),
+      description: z.string().max(300, t("validation.projectDescriptionMax")).optional(),
+      status: z.enum(["planning", "active", "on_hold", "completed"]),
+      dueDate: z.string().optional(),
+      dueTime: z.string().optional(),
+    }),
+  );
 
 export type NewProjectFormValues = z.infer<ReturnType<typeof getProjectSchema>> & {
   memberUserIds: string[];
@@ -61,14 +92,18 @@ const projectStatusToApi: Record<ProjectStatus, ProjectApiStatus> = {
 };
 
 const getTaskSchema = (t: Translate) =>
-  z.object({
-    title: z.string().trim().min(2, t("validation.taskTitleMin")),
-    description: z.string().max(500, t("validation.taskDescriptionMax")).optional(),
-    priority: z.enum(["low", "medium", "high", "urgent"]),
-    status: z.enum(["backlog", "todo", "in_progress", "review", "done"]),
-    assigneeIds: z.array(z.string()).optional(),
-    dueDate: z.string().optional(),
-  });
+  dueDateTimeRefine(
+    t,
+    z.object({
+      title: z.string().trim().min(2, t("validation.taskTitleMin")),
+      description: z.string().max(500, t("validation.taskDescriptionMax")).optional(),
+      priority: z.enum(["low", "medium", "high", "urgent"]),
+      status: z.enum(["backlog", "todo", "in_progress", "review", "done"]),
+      assigneeIds: z.array(z.string()).optional(),
+      dueDate: z.string().optional(),
+      dueTime: z.string().optional(),
+    }),
+  );
 
 export type TaskFormValues = z.infer<ReturnType<typeof getTaskSchema>> & {
   projectId?: string;
@@ -101,6 +136,7 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
       description: "",
       status: "planning",
       dueDate: "",
+      dueTime: "",
     },
   });
 
@@ -121,7 +157,7 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
         name: values.name.trim(),
         description: values.description?.trim() ?? "",
         status: projectStatusToApi[values.status],
-        dueDate: values.dueDate?.trim() ? values.dueDate.trim() : null,
+        dueDate: dueDateTimeToIso(values.dueDate, values.dueTime),
       });
 
       const memberResults = await Promise.allSettled(
@@ -161,6 +197,7 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
       description: "",
       status: "planning",
       dueDate: "",
+      dueTime: "",
     });
     setSelectedMemberIds([]);
   }
@@ -172,6 +209,7 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
       description: "",
       status: "planning",
       dueDate: "",
+      dueTime: "",
     });
     setSelectedMemberIds([]);
   }, [open, reset]);
@@ -208,8 +246,12 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
               rows={3}
             />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={t("projects.new.status")} error={errors.status?.message}>
+          <div className={deadlineStatusDateTimeRowClassName}>
+            <Field
+              className="min-w-0"
+              label={t("projects.new.status")}
+              error={errors.status?.message}
+            >
               <Controller
                 control={control}
                 name="status"
@@ -231,8 +273,42 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
                 )}
               />
             </Field>
-            <Field label={t("projects.new.dueDate")} error={errors.dueDate?.message}>
-              <Input type="date" className="date-input-native" {...register("dueDate")} />
+            <Field
+              className="min-w-0"
+              label={t("projects.new.dueDate")}
+              error={errors.dueDate?.message}
+            >
+              <Controller
+                control={control}
+                name="dueDate"
+                render={({ field }) => (
+                  <DeadlineDatePicker
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    aria-label={t("projects.new.dueDate")}
+                    aria-invalid={Boolean(errors.dueDate)}
+                  />
+                )}
+              />
+            </Field>
+            <Field
+              className="min-w-0"
+              label={t("projects.new.dueTime")}
+              labelClassName="whitespace-nowrap"
+              error={errors.dueTime?.message}
+            >
+              <Controller
+                control={control}
+                name="dueTime"
+                render={({ field }) => (
+                  <DeadlineTimePicker
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    aria-label={t("projects.new.dueTime")}
+                    aria-invalid={Boolean(errors.dueTime)}
+                  />
+                )}
+              />
             </Field>
           </div>
           <div className="space-y-2">
@@ -351,6 +427,7 @@ export function NewTaskDialog({
       status: initialStatus,
       assigneeIds: [],
       dueDate: "",
+      dueTime: "",
     },
   });
 
@@ -397,6 +474,7 @@ export function NewTaskDialog({
       status: initialStatus,
       assigneeIds: [],
       dueDate: "",
+      dueTime: "",
     });
   }, [open, initialStatus, fixedProjectId, projectOptions, reset]);
 
@@ -414,6 +492,7 @@ export function NewTaskDialog({
       );
       await onSubmit({
         ...values,
+        dueDate: dueDateTimeToIso(values.dueDate, values.dueTime) ?? "",
         assigneeIds: normalizedAssigneeIds,
         projectId: targetProjectId,
       });
@@ -467,85 +546,125 @@ export function NewTaskDialog({
               </Select>
             </Field>
           ) : null}
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-3">
             <Field label={t("tasks.task")} error={errors.title?.message}>
               <Input {...register("title")} placeholder={t("tasks.new.titlePlaceholder")} />
             </Field>
-            <Field label={t("tasks.dueDate")} error={errors.dueDate?.message}>
-              <Input type="date" className="date-input-native" {...register("dueDate")} />
-            </Field>
-            <div className="sm:col-span-2">
-              <Field label={t("tasks.description")} error={errors.description?.message}>
-                <Textarea
-                  {...register("description")}
-                  rows={2}
-                  className="min-h-[52px] resize-none"
-                  placeholder={t("tasks.new.descriptionPlaceholder")}
-                />
-              </Field>
-            </div>
-            <Field label={t("tasks.priority")} error={errors.priority?.message}>
-              <Controller
-                control={control}
-                name="priority"
-                render={({ field }) => (
-                  <Select
-                    value={field.value ?? "medium"}
-                    onValueChange={(value) => field.onChange(value as Priority)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("tasks.new.selectPriority")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">{t("tasks.priorityLow")}</SelectItem>
-                      <SelectItem value="medium">{t("tasks.priorityMedium")}</SelectItem>
-                      <SelectItem value="high">{t("tasks.priorityHigh")}</SelectItem>
-                      <SelectItem value="urgent">{t("tasks.priorityUrgent")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </Field>
-            <Field label={t("tasks.status")} error={errors.status?.message}>
-              <Controller
-                control={control}
-                name="status"
-                render={({ field }) => (
-                  <Select
-                    value={field.value ?? initialStatus}
-                    onValueChange={(value) => field.onChange(value as TaskStatus)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("tasks.new.selectStatus")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="backlog">{t("board.backlog")}</SelectItem>
-                      <SelectItem value="todo">{t("board.todo")}</SelectItem>
-                      <SelectItem value="in_progress">{t("board.inProgress")}</SelectItem>
-                      <SelectItem value="review">{t("board.review")}</SelectItem>
-                      <SelectItem value="done">{t("board.done")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </Field>
-            <div className="sm:col-span-2">
-              <Field label={t("tasks.assignees")} error={errors.assigneeIds?.message}>
+            <div className={deadlineStatusDateTimeRowClassName}>
+              <Field
+                className="min-w-0"
+                label={t("tasks.status")}
+                error={errors.status?.message}
+              >
                 <Controller
                   control={control}
-                  name="assigneeIds"
+                  name="status"
                   render={({ field }) => (
-                    <AssigneeMultiPicker
-                      compact
-                      options={resolvedAssigneeOptions}
-                      value={field.value ?? []}
-                      disabled={isSubmitting}
-                      isLoading={assigneeOptionsLoading}
+                    <Select
+                      value={field.value ?? initialStatus}
+                      onValueChange={(value) => field.onChange(value as TaskStatus)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={t("tasks.new.selectStatus")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="backlog">{t("board.backlog")}</SelectItem>
+                        <SelectItem value="todo">{t("board.todo")}</SelectItem>
+                        <SelectItem value="in_progress">{t("board.inProgress")}</SelectItem>
+                        <SelectItem value="review">{t("board.review")}</SelectItem>
+                        <SelectItem value="done">{t("board.done")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </Field>
+              <Field
+                className="min-w-0"
+                label={t("tasks.dueDate")}
+                error={errors.dueDate?.message}
+              >
+                <Controller
+                  control={control}
+                  name="dueDate"
+                  render={({ field }) => (
+                    <DeadlineDatePicker
+                      value={field.value ?? ""}
                       onChange={field.onChange}
+                      aria-label={t("tasks.dueDate")}
+                      aria-invalid={Boolean(errors.dueDate)}
                     />
                   )}
                 />
               </Field>
+              <Field
+                className="min-w-0"
+                label={t("tasks.dueTime")}
+                labelClassName="whitespace-nowrap"
+                error={errors.dueTime?.message}
+              >
+                <Controller
+                  control={control}
+                  name="dueTime"
+                  render={({ field }) => (
+                    <DeadlineTimePicker
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      aria-label={t("tasks.dueTime")}
+                      aria-invalid={Boolean(errors.dueTime)}
+                    />
+                  )}
+                />
+              </Field>
+            </div>
+            <Field label={t("tasks.description")} error={errors.description?.message}>
+              <Textarea
+                {...register("description")}
+                rows={2}
+                className="min-h-[52px] resize-none"
+                placeholder={t("tasks.new.descriptionPlaceholder")}
+              />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label={t("tasks.priority")} error={errors.priority?.message}>
+                <Controller
+                  control={control}
+                  name="priority"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value ?? "medium"}
+                      onValueChange={(value) => field.onChange(value as Priority)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={t("tasks.new.selectPriority")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">{t("tasks.priorityLow")}</SelectItem>
+                        <SelectItem value="medium">{t("tasks.priorityMedium")}</SelectItem>
+                        <SelectItem value="high">{t("tasks.priorityHigh")}</SelectItem>
+                        <SelectItem value="urgent">{t("tasks.priorityUrgent")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </Field>
+              <div className="sm:col-span-2">
+                <Field label={t("tasks.assignees")} error={errors.assigneeIds?.message}>
+                  <Controller
+                    control={control}
+                    name="assigneeIds"
+                    render={({ field }) => (
+                      <AssigneeMultiPicker
+                        compact
+                        options={resolvedAssigneeOptions}
+                        value={field.value ?? []}
+                        disabled={isSubmitting}
+                        isLoading={assigneeOptionsLoading}
+                        onChange={field.onChange}
+                      />
+                    )}
+                  />
+                </Field>
+              </div>
             </div>
           </div>
           </div>
@@ -567,12 +686,24 @@ export function NewTaskDialog({
   );
 }
 
-function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
+function Field({
+  label,
+  error,
+  children,
+  className,
+  labelClassName,
+}: {
+  label: string;
+  error?: string;
+  children: ReactNode;
+  className?: string;
+  labelClassName?: string;
+}) {
   return (
-    <div className="space-y-1">
-      <Label>{label}</Label>
+    <div className={cn("flex flex-col items-stretch gap-1.5", className)}>
+      <Label className={cn("block h-4 leading-none", labelClassName)}>{label}</Label>
       {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error ? <p className="text-xs leading-4 text-destructive">{error}</p> : null}
     </div>
   );
 }

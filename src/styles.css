@@ -258,30 +258,4 @@
     display: none;
     height: 0;
   }
-
-  /* Native date inputs: readable field + calendar icon in light and dark */
-  .date-input-native {
-    color-scheme: light;
-    background-color: var(--color-background);
-    color: var(--color-foreground);
-  }
-
-  .date-input-native::-webkit-calendar-picker-indicator {
-    cursor: pointer;
-    opacity: 0.75;
-  }
-
-  .dark .date-input-native {
-    color-scheme: dark;
-    background-color: var(--color-card);
-    color: var(--color-card-foreground);
-    border-color: var(--color-border);
-  }
-
-  .dark .date-input-native::-webkit-calendar-picker-indicator {
-    cursor: pointer;
-    opacity: 0.85;
-    /* Force a light icon regardless of native color-scheme styling */
-    filter: brightness(0) invert(1);
-  }
 }

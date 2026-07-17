@@ -225,6 +225,14 @@ function extractNotificationContext(notification: NotificationItem): Notificatio
         file: bodyMatch?.[2],
       };
     }
+    case "TASK_DUE_SOON": {
+      const match = title.match(/^Task "(.+)" is due within 24 hours$/);
+      return { task: match?.[1] };
+    }
+    case "TASK_OVERDUE": {
+      const match = title.match(/^Task "(.+)" is overdue$/);
+      return { task: match?.[1] };
+    }
     default:
       return {};
   }
@@ -264,6 +272,16 @@ export function getLocalizedNotificationTitle(
     case "PROJECT_DOCUMENT":
       if (ctx.project) {
         return t("notifications.projectDocument").replace("{project}", ctx.project);
+      }
+      break;
+    case "TASK_DUE_SOON":
+      if (ctx.task) {
+        return t("notifications.taskDueSoon").replace("{task}", ctx.task);
+      }
+      break;
+    case "TASK_OVERDUE":
+      if (ctx.task) {
+        return t("notifications.taskOverdue").replace("{task}", ctx.task);
       }
       break;
   }
@@ -318,6 +336,9 @@ export function getLocalizedNotificationBody(
           .replace("{file}", ctx.file);
       }
       break;
+    case "TASK_DUE_SOON":
+    case "TASK_OVERDUE":
+      return null;
   }
 
   return notification.body;
