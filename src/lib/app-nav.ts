@@ -7,6 +7,7 @@ import {
   Sparkles,
   ListChecks,
   CreditCard,
+  MessageSquare,
 } from "lucide-react";
 import type { TKey } from "@/lib/i18n";
 
@@ -22,6 +23,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   { to: "/app/board", key: "side.kanban", icon: Trello },
   { to: "/app/tasks", key: "side.tasks", icon: ListChecks },
   { to: "/app/team", key: "side.team", icon: Users },
+  { to: "/app/chat", key: "side.chat", icon: MessageSquare },
   { to: "/app/ai", key: "side.assistant", icon: Sparkles },
   { to: "/app/settings", key: "side.settings", icon: Settings },
   { to: "/app/billing", key: "side.billing", icon: CreditCard },

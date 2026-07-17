@@ -90,6 +90,7 @@ model User {
   uploadedProjectDocuments     ProjectDocument[]
   notificationsReceived        Notification[]        @relation("NotificationRecipient")
   notificationsSent            Notification[]        @relation("NotificationActor")
+  chatMessages                 WorkspaceChatMessage[]
 }
 
 model Workspace {
@@ -107,6 +108,7 @@ model Workspace {
   projects      Project[]
   aiSummaries   AiSummary[]
   notifications Notification[]
+  chatMessages  WorkspaceChatMessage[]
 }
 
 model WorkspaceMember {
@@ -345,4 +347,19 @@ model Notification {
 
   @@index([workspaceId, recipientId, createdAt])
   @@index([recipientId, readAt])
+}
+
+model WorkspaceChatMessage {
+  id          String   @id @default(cuid())
+  workspaceId String
+  senderId    String
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sender    User      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@index([senderId])
 }
