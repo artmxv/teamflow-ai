@@ -1,0 +1,28 @@
+name: Task deadline reminders
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: task-deadline-reminders
+  cancel-in-progress: false
+
+jobs:
+  run-reminders:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Trigger task reminder endpoint
+        env:
+          TASK_REMINDER_CRON_SECRET: ${{ secrets.TASK_REMINDER_CRON_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${TASK_REMINDER_CRON_SECRET}" \
+            https://teamflow-ai-api.onrender.com/api/internal/task-reminders/run
