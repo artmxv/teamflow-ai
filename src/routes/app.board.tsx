@@ -531,7 +531,7 @@ function mapApiTaskToTask(task: TaskApiItem): Task {
     assigneeIds: task.assigneeIds,
     assigneeId: task.assigneeId,
     projectId: task.projectId,
-    dueDate: formatDate(task.dueDate),
+    dueDate: task.dueDate,
     labels: [task.project.name],
     comments: [],
     commentsCount: task.commentsCount,
@@ -544,12 +544,6 @@ function mapApiTaskToTask(task: TaskApiItem): Task {
     activity: [],
     attachments: [],
   };
-}
-
-function formatDate(value: string | null) {
-  if (!value) return null;
-  // Keep YYYY-MM-DD so <input type="date" /> works consistently.
-  return value.slice(0, 10);
 }
 
 function KanbanBoardViewport({ children }: { children: React.ReactNode }) {

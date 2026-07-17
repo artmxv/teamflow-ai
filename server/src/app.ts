@@ -17,6 +17,7 @@ import { invitationsRouter } from "./routes/invitations.routes.js";
 import { notificationsRouter } from "./routes/notifications.routes.js";
 import { projectsRouter } from "./routes/projects.routes.js";
 import { searchRouter } from "./routes/search.routes.js";
+import { taskRemindersRouter } from "./routes/task-reminders.routes.js";
 import { tasksRouter } from "./routes/tasks.routes.js";
 import { workspaceRouter } from "./routes/workspace.routes.js";
 import { workspacesRouter } from "./routes/workspaces.routes.js";
@@ -83,6 +84,7 @@ app.use("/api/dashboard", dashboardRouter);
 app.use("/api/projects", projectsRouter);
 app.use("/api/tasks", tasksRouter);
 app.use("/api/notifications", notificationsRouter);
+app.use("/api/internal/task-reminders", taskRemindersRouter);
 app.use("/api/search", searchRouter);
 
 app.use(notFoundMiddleware);

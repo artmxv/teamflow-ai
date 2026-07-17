@@ -17,6 +17,7 @@ import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib
 import { getProjectAccent } from "@/lib/project-color";
 import { isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user";
 import { projectStatusLabel, useI18n, type TKey } from "@/lib/i18n";
+import { formatDueDateTimeShort } from "@/lib/due-datetime";
 import {
   parseProjectsUrlStatus,
   projectListStatusFromUrl,
@@ -243,12 +244,17 @@ function mapApiProjectToCard(project: ProjectApiItem): ProjectCard {
     totalTasks: project.totalTasks,
     members: [],
     color: getProjectAccent(project).gradient,
-    dueDate: formatDate(project.dueDate),
-    updatedAt: formatDate(project.updatedAt),
+    dueDate: formatDueDate(project.dueDate),
+    updatedAt: formatUpdatedAt(project.updatedAt),
   };
 }
 
-function formatDate(value: string | null) {
+function formatDueDate(value: string | null) {
+  if (!value) return "—";
+  return formatDueDateTimeShort(value);
+}
+
+function formatUpdatedAt(value: string | null) {
   if (!value) return "—";
   return new Date(value).toLocaleDateString();
 }

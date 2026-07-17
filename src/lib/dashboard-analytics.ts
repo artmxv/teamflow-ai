@@ -1,4 +1,5 @@
 import type { TaskApiItem, TaskApiPriority, TaskApiStatus } from "@/lib/api/tasks";
+import { effectiveDueDate } from "@/lib/due-datetime";
 
 export type DashboardAnalyticsPeriod = "week" | "month" | "year";
 
@@ -51,13 +52,9 @@ function parseInstant(value: string) {
 }
 
 function parseDueDateMs(value: string) {
-  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
-  if (dateOnly) {
-    const local = new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
-    return startOfLocalDay(local).getTime();
-  }
-  const ms = parseInstant(value);
-  return ms === null ? null : startOfLocalDay(new Date(ms)).getTime();
+  const date = effectiveDueDate(value);
+  const ms = date.getTime();
+  return Number.isFinite(ms) ? ms : null;
 }
 
 export function taskMatchesUrlDueFilter(
@@ -67,14 +64,14 @@ export function taskMatchesUrlDueFilter(
 ): boolean {
   if (!isOpenStatus(task.status) || !task.dueDate) return false;
 
-  const dueDayMs = parseDueDateMs(task.dueDate);
-  if (dueDayMs === null) return false;
+  const dueMs = parseDueDateMs(task.dueDate);
+  if (dueMs === null) return false;
 
-  const todayMs = startOfLocalDay(now).getTime();
+  const nowMs = now.getTime();
   const dueSoonEndMs = addLocalDays(startOfLocalDay(now), 8).getTime();
 
-  if (due === "overdue") return dueDayMs < todayMs;
-  return dueDayMs >= todayMs && dueDayMs < dueSoonEndMs;
+  if (due === "overdue") return dueMs < nowMs;
+  return dueMs >= nowMs && dueMs < dueSoonEndMs;
 }
 
 export function taskMatchesUrlPriorityFilter(
@@ -124,9 +121,8 @@ export function computeTaskAnalyticsCounts(
   tasks: TaskAnalyticsRecord[],
   now = new Date(),
 ): TaskAnalyticsCounts {
-  const today = startOfLocalDay(now);
-  const todayMs = today.getTime();
-  const dueSoonEndMs = addLocalDays(today, 8).getTime();
+  const nowMs = now.getTime();
+  const dueSoonEndMs = addLocalDays(startOfLocalDay(now), 8).getTime();
 
   let overdue = 0;
   let dueSoon = 0;
@@ -137,10 +133,10 @@ export function computeTaskAnalyticsCounts(
     if (!isOpenStatus(task.status)) continue;
 
     if (task.dueDate) {
-      const dueDayMs = parseDueDateMs(task.dueDate);
-      if (dueDayMs !== null) {
-        if (dueDayMs < todayMs) overdue += 1;
-        else if (dueDayMs >= todayMs && dueDayMs < dueSoonEndMs) dueSoon += 1;
+      const dueMs = parseDueDateMs(task.dueDate);
+      if (dueMs !== null) {
+        if (dueMs < nowMs) overdue += 1;
+        else if (dueMs >= nowMs && dueMs < dueSoonEndMs) dueSoon += 1;
       }
     }
 

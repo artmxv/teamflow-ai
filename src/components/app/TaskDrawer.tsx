@@ -30,6 +30,8 @@ import {
 } from "@/components/ui/select";
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
 import { AssigneeMultiPicker } from "@/components/app/AssigneeMultiPicker";
+import { DeadlineDatePicker } from "@/components/app/DeadlineDatePicker";
+import { DeadlineTimePicker } from "@/components/app/DeadlineTimePicker";
 import { fetchProjectMembers } from "@/lib/api/project-members";
 import { fetchWorkspaceMembers } from "@/lib/api/workspace-members";
 import {
@@ -94,6 +96,11 @@ import {
   Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  combineLocalDateAndTime,
+  formatDueDateTime,
+  splitLocalDateTime,
+} from "@/lib/due-datetime";
 
 export type TaskDrawerUpdates = {
   title: string;
@@ -134,27 +141,34 @@ export function TaskDrawer({
   const [aiOpen, setAiOpen] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftAssigneeIds, setDraftAssigneeIds] = useState<string[]>([]);
-  const [draftDueDate, setDraftDueDate] = useState<string | null>(null);
+  const [draftDueDate, setDraftDueDate] = useState("");
+  const [draftDueTime, setDraftDueTime] = useState("");
   const [draftStatus, setDraftStatus] = useState<TaskStatus>("backlog");
   const [draftPriority, setDraftPriority] = useState<Priority>("medium");
   const [commentBody, setCommentBody] = useState("");
   const [deleteTaskOpen, setDeleteTaskOpen] = useState(false);
+  const [dueDateTimeError, setDueDateTimeError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useLayoutEffect(() => {
     if (!task) {
       setDraftTitle("");
       setDraftAssigneeIds([]);
-      setDraftDueDate(null);
+      setDraftDueDate("");
+      setDraftDueTime("");
       setDraftStatus("backlog");
       setDraftPriority("medium");
+      setDueDateTimeError(null);
       return;
     }
+    const dueParts = splitLocalDateTime(task.dueDate);
     setDraftTitle(displayTaskTitle(task.title, lang));
     setDraftAssigneeIds(task.assigneeIds ?? (task.assigneeId ? [task.assigneeId] : []));
-    setDraftDueDate(task.dueDate);
+    setDraftDueDate(dueParts.date);
+    setDraftDueTime(dueParts.time);
     setDraftStatus(task.status);
     setDraftPriority(task.priority);
+    setDueDateTimeError(null);
   }, [
     lang,
     task?.assigneeId,
@@ -308,9 +322,11 @@ export function TaskDrawer({
   const canEditTask = !!onSaveChanges;
   const canEditAssignees = canEditTask;
   const displayedTaskTitle = displayTaskTitle(task.title, lang);
+  const initialDueParts = splitLocalDateTime(task.dueDate);
   const hasTitleChanges = draftTitle.trim() !== displayedTaskTitle.trim();
   const hasAssigneeChanges = !sameAssigneeIds(draftAssigneeIds, savedAssigneeIds);
-  const hasDueDateChanges = (draftDueDate ?? null) !== (task.dueDate ?? null);
+  const hasDueDateChanges =
+    draftDueDate !== initialDueParts.date || draftDueTime !== initialDueParts.time;
   const hasStatusChanges = draftStatus !== task.status;
   const hasPriorityChanges = draftPriority !== task.priority;
   const hasChanges =
@@ -327,10 +343,22 @@ export function TaskDrawer({
   function handleSaveChanges() {
     if (!onSaveChanges || isSaving) return;
     if (!canSaveChanges) return;
+
+    const hasDate = Boolean(draftDueDate.trim());
+    const hasTime = Boolean(draftDueTime.trim());
+    if (hasDate !== hasTime) {
+      setDueDateTimeError(
+        hasDate ? t("validation.dueTimeRequired") : t("validation.dueDateRequired"),
+      );
+      return;
+    }
+
+    setDueDateTimeError(null);
     onSaveChanges({
       title: draftTitle.trim(),
       assigneeIds: draftAssigneeIds,
-      dueDate: draftDueDate,
+      dueDate:
+        hasDate && hasTime ? combineLocalDateAndTime(draftDueDate.trim(), draftDueTime.trim()) : null,
       status: draftStatus,
       priority: draftPriority,
     });
@@ -627,18 +655,35 @@ export function TaskDrawer({
               ) : null}
               <Field icon={Calendar} label={t("tasks.dueDate")}>
                 {canEditTask ? (
-                  <Input
-                    type="date"
-                    className={cn("date-input-native h-9")}
-                    disabled={isSaving}
-                    value={draftDueDate ?? ""}
-                    onChange={(event) => {
-                      const next = event.target.value;
-                      setDraftDueDate(next === "" ? null : next);
-                    }}
-                  />
+                  <div className="flex flex-wrap items-start gap-2.5">
+                    <div className="min-w-[min(100%,14.375rem)] flex-[1.15_1_14.375rem]">
+                      <DeadlineDatePicker
+                        disabled={isSaving}
+                        value={draftDueDate}
+                        aria-label={t("tasks.dueDate")}
+                        onChange={(next) => {
+                          setDraftDueDate(next);
+                          setDueDateTimeError(null);
+                        }}
+                      />
+                    </div>
+                    <div className="min-w-[min(100%,11.875rem)] flex-[1_1_11.875rem]">
+                      <DeadlineTimePicker
+                        disabled={isSaving}
+                        value={draftDueTime}
+                        aria-label={t("tasks.dueTime")}
+                        onChange={(next) => {
+                          setDraftDueTime(next);
+                          setDueDateTimeError(null);
+                        }}
+                      />
+                    </div>
+                    {dueDateTimeError ? (
+                      <p className="basis-full text-xs leading-4 text-destructive">{dueDateTimeError}</p>
+                    ) : null}
+                  </div>
                 ) : (
-                  <span className="text-sm">{task.dueDate ?? "—"}</span>
+                  <span className="text-sm">{formatDueDateTime(task.dueDate)}</span>
                 )}
               </Field>
               {canEditTask && (

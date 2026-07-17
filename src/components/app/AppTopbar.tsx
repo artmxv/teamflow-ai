@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, HelpCircle, Loader2 } from "lucide-react";
+import { AlertTriangle, Bell, ChevronDown, Clock, HelpCircle, Loader2 } from "lucide-react";
 import { useRouterState } from "@tanstack/react-router";
 import { GlobalSearch } from "@/components/app/GlobalSearch";
 import { MobileNav } from "@/components/app/MobileNav";
@@ -271,24 +271,46 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
                   const body = getLocalizedNotificationBody(item, t, (role) =>
                     workspaceRoleLabel(role as WorkspaceRole, t),
                   );
+                  const isDueSoon = item.type === "TASK_DUE_SOON";
+                  const isOverdue = item.type === "TASK_OVERDUE";
+                  const unreadBorderClass = !item.isRead
+                    ? isOverdue
+                      ? "border-l-destructive/80 bg-destructive/5"
+                      : isDueSoon
+                        ? "border-l-amber-500/80 bg-amber-500/5"
+                        : "border-l-primary bg-secondary/50"
+                    : "border-l-transparent";
                   return (
                     <DropdownMenuItem
                       key={item.id}
-                      className={
-                        "items-start gap-2 border-l-2 py-2 " +
-                        (!item.isRead
-                          ? "border-l-primary bg-secondary/50"
-                          : "border-l-transparent")
-                      }
+                      className={"items-start gap-2 border-l-2 py-2 " + unreadBorderClass}
                       onClick={() => handleNotificationClick(item)}
                     >
-                      <span
-                        className={
-                          "mt-1.5 size-2 shrink-0 rounded-full " +
-                          (item.isRead ? "bg-muted-foreground/30" : "bg-primary")
-                        }
-                        aria-hidden
-                      />
+                      {isDueSoon ? (
+                        <Clock
+                          className={
+                            "mt-1.5 size-3.5 shrink-0 " +
+                            (item.isRead ? "text-muted-foreground/50" : "text-amber-600 dark:text-amber-400")
+                          }
+                          aria-hidden
+                        />
+                      ) : isOverdue ? (
+                        <AlertTriangle
+                          className={
+                            "mt-1.5 size-3.5 shrink-0 " +
+                            (item.isRead ? "text-muted-foreground/50" : "text-destructive")
+                          }
+                          aria-hidden
+                        />
+                      ) : (
+                        <span
+                          className={
+                            "mt-1.5 size-2 shrink-0 rounded-full " +
+                            (item.isRead ? "bg-muted-foreground/30" : "bg-primary")
+                          }
+                          aria-hidden
+                        />
+                      )}
                       <span className="min-w-0 flex-1">
                         <span
                           className={

@@ -27,6 +27,7 @@ import { fetchWorkspaceMemberProfile } from "@/lib/api/workspace-members";
 import type { TaskApiPriority, TaskApiStatus } from "@/lib/api/tasks";
 import type { ProjectApiStatus } from "@/lib/api/projects";
 import { displayProjectName, displayTaskTitle } from "@/lib/starter-content";
+import { formatDueDateTimeShort } from "@/lib/due-datetime";
 import {
   dashboardPriorityLabel,
   dashboardStatusLabel,
@@ -339,7 +340,7 @@ export function MemberProfileDrawer({
                             {task.dueDate && (
                               <span className="inline-flex items-center gap-1">
                                 <Calendar className="size-3.5" />
-                                {new Date(task.dueDate).toLocaleDateString()}
+                                {formatDueDateTimeShort(task.dueDate)}
                               </span>
                             )}
                           </div>

@@ -3,6 +3,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Calendar, GripVertical, MessageSquare, Paperclip } from "lucide-react";
 import { type Task, priorityMeta, statusColumns, type TaskStatus } from "@/lib/mock-data";
 import { priorityLabel, taskStatusLabel, useI18n } from "@/lib/i18n";
+import { formatDueDateTimeShort } from "@/lib/due-datetime";
 import { translateStarterProjectName, translateStarterTitle } from "@/lib/starter-content";
 import type { AssigneeOption } from "@/lib/assignee-options";
 import { cn } from "@/lib/utils";
@@ -42,7 +43,7 @@ export function TaskCard({
 }) {
   const { t, lang } = useI18n();
   const prio = priorityMeta[task.priority];
-  const dueDateLabel = task.dueDate ? formatTaskDueDate(task.dueDate) : null;
+  const dueDateLabel = task.dueDate ? formatDueDateTimeShort(task.dueDate) : null;
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
@@ -145,16 +146,4 @@ export function TaskCard({
       )}
     </div>
   );
-}
-
-function formatTaskDueDate(value: string) {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    const [year, month, day] = value.split("-").map(Number);
-    return new Date(year, month - 1, day).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-    });
-  }
-
-  return value;
 }
