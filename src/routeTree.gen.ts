@@ -21,6 +21,7 @@ import { Route as AppTasksRouteImport } from './routes/app.tasks'
 import { Route as AppSettingsRouteImport } from './routes/app.settings'
 import { Route as AppProjectsRouteImport } from './routes/app.projects'
 import { Route as AppDashboardRouteImport } from './routes/app.dashboard'
+import { Route as AppChatRouteImport } from './routes/app.chat'
 import { Route as AppBoardRouteImport } from './routes/app.board'
 import { Route as AppBillingRouteImport } from './routes/app.billing'
 import { Route as AppAiRouteImport } from './routes/app.ai'
@@ -87,6 +88,11 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   path: '/app/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppChatRoute = AppChatRouteImport.update({
+  id: '/app/chat',
+  path: '/app/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppBoardRoute = AppBoardRouteImport.update({
   id: '/app/board',
   path: '/app/board',
@@ -121,6 +127,7 @@ export interface FileRoutesByFullPath {
   '/app/ai': typeof AppAiRoute
   '/app/billing': typeof AppBillingRoute
   '/app/board': typeof AppBoardRoute
+  '/app/chat': typeof AppChatRoute
   '/app/dashboard': typeof AppDashboardRoute
   '/app/projects': typeof AppProjectsRouteWithChildren
   '/app/settings': typeof AppSettingsRoute
@@ -140,6 +147,7 @@ export interface FileRoutesByTo {
   '/app/ai': typeof AppAiRoute
   '/app/billing': typeof AppBillingRoute
   '/app/board': typeof AppBoardRoute
+  '/app/chat': typeof AppChatRoute
   '/app/dashboard': typeof AppDashboardRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/tasks': typeof AppTasksRoute
@@ -159,6 +167,7 @@ export interface FileRoutesById {
   '/app/ai': typeof AppAiRoute
   '/app/billing': typeof AppBillingRoute
   '/app/board': typeof AppBoardRoute
+  '/app/chat': typeof AppChatRoute
   '/app/dashboard': typeof AppDashboardRoute
   '/app/projects': typeof AppProjectsRouteWithChildren
   '/app/settings': typeof AppSettingsRoute
@@ -180,6 +189,7 @@ export interface FileRouteTypes {
     | '/app/ai'
     | '/app/billing'
     | '/app/board'
+    | '/app/chat'
     | '/app/dashboard'
     | '/app/projects'
     | '/app/settings'
@@ -199,6 +209,7 @@ export interface FileRouteTypes {
     | '/app/ai'
     | '/app/billing'
     | '/app/board'
+    | '/app/chat'
     | '/app/dashboard'
     | '/app/settings'
     | '/app/tasks'
@@ -217,6 +228,7 @@ export interface FileRouteTypes {
     | '/app/ai'
     | '/app/billing'
     | '/app/board'
+    | '/app/chat'
     | '/app/dashboard'
     | '/app/projects'
     | '/app/settings'
@@ -237,6 +249,7 @@ export interface RootRouteChildren {
   AppAiRoute: typeof AppAiRoute
   AppBillingRoute: typeof AppBillingRoute
   AppBoardRoute: typeof AppBoardRoute
+  AppChatRoute: typeof AppChatRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppProjectsRoute: typeof AppProjectsRouteWithChildren
   AppSettingsRoute: typeof AppSettingsRoute
@@ -333,6 +346,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/chat': {
+      id: '/app/chat'
+      path: '/app/chat'
+      fullPath: '/app/chat'
+      preLoaderRoute: typeof AppChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app/board': {
       id: '/app/board'
       path: '/app/board'
@@ -393,6 +413,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppAiRoute: AppAiRoute,
   AppBillingRoute: AppBillingRoute,
   AppBoardRoute: AppBoardRoute,
+  AppChatRoute: AppChatRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppProjectsRoute: AppProjectsRouteWithChildren,
   AppSettingsRoute: AppSettingsRoute,
