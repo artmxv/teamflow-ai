@@ -4,6 +4,7 @@ import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { AppBootScreen } from "@/components/app/AppBootScreen";
 import type { AuthWorkspace } from "@/lib/api/auth";
 import { nameToInitials, useCurrentUser } from "@/lib/auth/use-current-user";
+import { useChatRealtime } from "@/lib/realtime/use-chat-realtime";
 import { useSidebarCollapsed } from "@/lib/sidebar-preference";
 import { AppSidebar } from "./AppSidebar";
 import { AppTopbar } from "./AppTopbar";
@@ -32,6 +33,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     () => (me?.workspace ? authWorkspaceToShell(me.workspace) : null),
     [me?.workspace],
   );
+
+  useChatRealtime({
+    workspaceId: workspace?.id,
+    currentUserId: me?.user.id,
+    enabled: Boolean(me?.user.id && workspace?.id),
+  });
 
   const workspaceLoading = !workspace && (isPending || isFetching);
   const isBootstrapping = (isPending || isFetching) && !me;

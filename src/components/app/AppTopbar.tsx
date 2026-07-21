@@ -28,6 +28,7 @@ import { getSelectedWorkspaceId, preserveWorkspaceSelectionForUser } from "@/lib
 import { resetWorkspaceValidationSession } from "@/lib/auth/auth-cache";
 import { clearAuthToken, getAuthToken } from "@/lib/auth/token";
 import { useCurrentUser, workspaceRoleLabel } from "@/lib/auth/use-current-user";
+import { disconnectChatSocket } from "@/lib/realtime/socket";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import type { WorkspaceRole } from "@/lib/api/auth";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -146,6 +147,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
         await logout();
       } finally {
         clearAuthToken();
+        disconnectChatSocket();
       }
     },
     onSuccess: async () => {
@@ -158,6 +160,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
         preserveWorkspaceSelectionForUser(currentUser.id, currentUser.email);
       }
       clearAuthToken();
+      disconnectChatSocket();
       resetWorkspaceValidationSession();
       void queryClient.removeQueries({ queryKey: ["auth"] });
       void router.navigate({ to: "/signin" });

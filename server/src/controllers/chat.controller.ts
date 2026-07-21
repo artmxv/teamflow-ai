@@ -7,6 +7,10 @@ import {
 } from "../lib/chat-message-utils.js";
 import { resolveRequestWorkspaceContext } from "../lib/workspace-request.js";
 import {
+  emitChatMessageCreated,
+  emitChatMessageDeleted,
+} from "../realtime/chat-realtime.js";
+import {
   createConversationMessage,
   deleteConversationMessage,
   getOrCreateDirectConversation,
@@ -296,6 +300,15 @@ export async function createConversationMessageController(
       return;
     }
 
+    void emitChatMessageCreated({
+      conversationId,
+      workspaceId: context.workspaceId,
+      message,
+      createdAt: message.createdAt,
+    }).catch((error) => {
+      console.error("Failed to emit chat:message-created:", error);
+    });
+
     res.status(201).json({ data: message });
   } catch (error) {
     next(error);
@@ -336,6 +349,14 @@ export async function deleteConversationMessageController(
       res.status(403).json({ message: "You can only delete your own messages" });
       return;
     }
+
+    void emitChatMessageDeleted({
+      conversationId,
+      workspaceId: context.workspaceId,
+      messageId: deleted.id,
+    }).catch((error) => {
+      console.error("Failed to emit chat:message-deleted:", error);
+    });
 
     res.json({ data: deleted });
   } catch (error) {

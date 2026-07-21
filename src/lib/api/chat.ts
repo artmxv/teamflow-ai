@@ -4,11 +4,18 @@ import { getSelectedWorkspaceId, apiRequest } from "./client";
 
 export const CHAT_MESSAGE_MAX_LENGTH = 2000;
 export const CHAT_MESSAGES_PAGE_SIZE = 30;
-export const CHAT_MESSAGES_POLL_MS = 5_000;
-export const CHAT_CONVERSATIONS_POLL_MS = 10_000;
 
-/** @deprecated Use CHAT_MESSAGES_POLL_MS */
-export const CHAT_POLL_MS = CHAT_MESSAGES_POLL_MS;
+/** Fallback polling while Socket.IO is disconnected. */
+export const CHAT_MESSAGES_FALLBACK_POLL_MS = 20_000;
+export const CHAT_CONVERSATIONS_FALLBACK_POLL_MS = 25_000;
+
+/** @deprecated Prefer CHAT_MESSAGES_FALLBACK_POLL_MS with socket-aware intervals */
+export const CHAT_MESSAGES_POLL_MS = CHAT_MESSAGES_FALLBACK_POLL_MS;
+/** @deprecated Prefer CHAT_CONVERSATIONS_FALLBACK_POLL_MS with socket-aware intervals */
+export const CHAT_CONVERSATIONS_POLL_MS = CHAT_CONVERSATIONS_FALLBACK_POLL_MS;
+
+/** @deprecated Use CHAT_MESSAGES_FALLBACK_POLL_MS */
+export const CHAT_POLL_MS = CHAT_MESSAGES_FALLBACK_POLL_MS;
 
 export type ChatSender = {
   id: string;
