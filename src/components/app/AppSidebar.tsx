@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { APP_NAV_ITEMS, isAppNavItemActive } from "@/lib/app-nav";
+import { useChatUnreadCount } from "@/lib/api/use-chat-unread-count";
 
 function SidebarTip({
   collapsed,
@@ -278,6 +279,7 @@ export function AppSidebar({
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { t, lang } = useI18n();
   const { data: me } = useCurrentUser();
+  const { unreadCount: chatUnreadCount } = useChatUnreadCount(Boolean(workspace));
   const canManageProjects = isWorkspaceManager(me?.workspace?.role);
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["projects"],
@@ -346,13 +348,22 @@ export function AppSidebar({
               const active = isAppNavItemActive(pathname, item.to);
               const Icon = item.icon;
               const label = t(item.key);
+              const showUnread = item.to === "/app/chat" && chatUnreadCount > 0;
+              const tipLabel = showUnread
+                ? `${label} (${chatUnreadCount > 99 ? "99+" : chatUnreadCount})`
+                : label;
               return (
                 <li key={item.to}>
-                  <SidebarTip collapsed={collapsed} label={label}>
+                  <SidebarTip collapsed={collapsed} label={tipLabel}>
                     <Link
                       to={item.to}
-                      title={collapsed ? label : undefined}
+                      title={collapsed ? tipLabel : undefined}
                       aria-current={active ? "page" : undefined}
+                      aria-label={
+                        showUnread
+                          ? t("chat.navUnread").replace("{count}", String(chatUnreadCount))
+                          : undefined
+                      }
                       className={cn(
                         "group relative flex items-center rounded-lg text-sm transition",
                         collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2",
@@ -368,7 +379,19 @@ export function AppSidebar({
                           active ? "text-primary" : "text-muted-foreground group-hover:text-sidebar-foreground",
                         )}
                       />
-                      {!collapsed && <span>{label}</span>}
+                      {!collapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}
+                      {showUnread ? (
+                        <span
+                          className={cn(
+                            "inline-flex items-center justify-center rounded-full bg-primary font-semibold text-primary-foreground",
+                            collapsed
+                              ? "absolute top-1.5 right-1.5 size-2"
+                              : "h-5 min-w-5 px-1.5 text-[10px]",
+                          )}
+                        >
+                          {collapsed ? null : chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+                        </span>
+                      ) : null}
                     </Link>
                   </SidebarTip>
                 </li>

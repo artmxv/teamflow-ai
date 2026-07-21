@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import type { BillingPlan, WorkspaceInvitationStatus, WorkspaceRole } from "@prisma/client";
 
 import { env } from "../config/env.js";
+import { ensureUserInWorkspaceGeneralConversation } from "../lib/chat-conversation-ensure.js";
 import { prisma } from "../lib/prisma.js";
 import type { PublicUser } from "./auth.service.js";
 import { AuthError } from "./auth.service.js";
@@ -434,6 +435,12 @@ export async function acceptWorkspaceInvitation(
         status: "ACTIVE",
       },
     });
+
+    await ensureUserInWorkspaceGeneralConversation(
+      tx,
+      resolved.workspaceId,
+      currentUser.id,
+    );
 
     await tx.workspaceInvitation.update({
       where: { id: resolved.id },

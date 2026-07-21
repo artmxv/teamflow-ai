@@ -4,7 +4,11 @@ import { getSelectedWorkspaceId, apiRequest } from "./client";
 
 export const CHAT_MESSAGE_MAX_LENGTH = 2000;
 export const CHAT_MESSAGES_PAGE_SIZE = 30;
-export const CHAT_POLL_MS = 7_000;
+export const CHAT_MESSAGES_POLL_MS = 5_000;
+export const CHAT_CONVERSATIONS_POLL_MS = 10_000;
+
+/** @deprecated Use CHAT_MESSAGES_POLL_MS */
+export const CHAT_POLL_MS = CHAT_MESSAGES_POLL_MS;
 
 export type ChatSender = {
   id: string;
@@ -33,12 +37,49 @@ export type ChatMessagesPage = {
   pageInfo: ChatPageInfo;
 };
 
-export function chatMessagesQueryKey(workspaceId: string | null | undefined) {
-  return ["chat-messages", workspaceId ?? "none"] as const;
+export type ChatConversationType = "WORKSPACE" | "DIRECT";
+
+export type ChatConversation = {
+  id: string;
+  type: ChatConversationType;
+  title: string | null;
+  displayName: string;
+  avatar: string | null;
+  avatarUrl: string | null;
+  otherParticipant: ChatSender | null;
+  latestMessage: {
+    id: string;
+    content: string;
+    createdAt: string;
+    senderId: string;
+  } | null;
+  latestMessageAt: string | null;
+  unreadCount: number;
+  isPinned: boolean;
+  updatedAt: string;
+};
+
+export function chatConversationsQueryKey(workspaceId: string | null | undefined) {
+  return ["chat-conversations", workspaceId ?? "none"] as const;
 }
 
-export function getChatMessagesQueryKey() {
-  return chatMessagesQueryKey(getSelectedWorkspaceId());
+export function chatMessagesQueryKey(
+  workspaceId: string | null | undefined,
+  conversationId: string | null | undefined,
+) {
+  return ["chat-messages", workspaceId ?? "none", conversationId ?? "none"] as const;
+}
+
+export function chatUnreadCountQueryKey(workspaceId: string | null | undefined) {
+  return ["chat-unread-count", workspaceId ?? "none"] as const;
+}
+
+export function getChatConversationsQueryKey() {
+  return chatConversationsQueryKey(getSelectedWorkspaceId());
+}
+
+export function getChatMessagesQueryKey(conversationId: string | null | undefined) {
+  return chatMessagesQueryKey(getSelectedWorkspaceId(), conversationId);
 }
 
 export function mergeChatMessages(existing: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
@@ -61,17 +102,67 @@ export function mergeChatMessages(existing: ChatMessage[], incoming: ChatMessage
 
 export function updateChatMessagesCache(
   queryClient: QueryClient,
+  conversationId: string,
   updater: (data: ChatMessagesPage) => ChatMessagesPage,
 ) {
-  const key = getChatMessagesQueryKey();
+  const key = getChatMessagesQueryKey(conversationId);
   queryClient.setQueryData<ChatMessagesPage>(key, (old) => (old ? updater(old) : old));
 }
 
-export async function fetchChatMessages(params?: {
-  limit?: number;
-  before?: string;
-  after?: string;
-}) {
+export function updateChatConversationsCache(
+  queryClient: QueryClient,
+  updater: (data: ChatConversation[]) => ChatConversation[],
+) {
+  const key = getChatConversationsQueryKey();
+  queryClient.setQueryData<ChatConversation[]>(key, (old) => (old ? updater(old) : old));
+}
+
+export async function fetchChatConversations() {
+  const response = await apiRequest<{ data: ChatConversation[] }>("/api/chat/conversations");
+  return response.data;
+}
+
+export async function fetchChatUnreadCount() {
+  const response = await apiRequest<{ data: { unreadCount: number } }>("/api/chat/unread-count");
+  return response.data.unreadCount;
+}
+
+export async function createDirectConversation(userId: string) {
+  const response = await apiRequest<{ data: ChatConversation }>("/api/chat/conversations/direct", {
+    method: "POST",
+    body: { userId },
+  });
+  return response.data;
+}
+
+export async function setConversationPinned(conversationId: string, isPinned: boolean) {
+  const response = await apiRequest<{ data: { id: string; isPinned: boolean } }>(
+    `/api/chat/conversations/${conversationId}/pin`,
+    {
+      method: "PATCH",
+      body: { isPinned },
+    },
+  );
+  return response.data;
+}
+
+export async function markConversationRead(conversationId: string) {
+  const response = await apiRequest<{
+    data: { id: string; unreadCount: number; lastReadAt: string };
+  }>(`/api/chat/conversations/${conversationId}/read`, {
+    method: "POST",
+  });
+  return response.data;
+}
+
+export async function fetchChatMessages(
+  conversationId: string,
+  params?: {
+    limit?: number;
+    before?: string;
+    after?: string;
+  },
+) {
   const search = new URLSearchParams();
   if (params?.limit != null) {
     search.set("limit", String(params.limit));
@@ -84,27 +175,37 @@ export async function fetchChatMessages(params?: {
   }
 
   const query = search.toString();
-  const path = query ? `/api/chat/messages?${query}` : "/api/chat/messages";
+  const path = query
+    ? `/api/chat/conversations/${conversationId}/messages?${query}`
+    : `/api/chat/conversations/${conversationId}/messages`;
   const response = await apiRequest<{ data: ChatMessagesPage }>(path);
   return response.data;
 }
 
-export async function sendChatMessage(content: string) {
-  const response = await apiRequest<{ data: ChatMessage }>("/api/chat/messages", {
-    method: "POST",
-    body: { content },
-  });
+export async function sendChatMessage(conversationId: string, content: string) {
+  const response = await apiRequest<{ data: ChatMessage }>(
+    `/api/chat/conversations/${conversationId}/messages`,
+    {
+      method: "POST",
+      body: { content },
+    },
+  );
   return response.data;
 }
 
-export async function deleteChatMessage(id: string) {
-  const response = await apiRequest<{ data: { id: string } }>(`/api/chat/messages/${id}`, {
-    method: "DELETE",
-  });
+export async function deleteChatMessage(conversationId: string, messageId: string) {
+  const response = await apiRequest<{ data: { id: string } }>(
+    `/api/chat/conversations/${conversationId}/messages/${messageId}`,
+    {
+      method: "DELETE",
+    },
+  );
   return response.data;
 }
 
-export function validateChatDraft(raw: string): { ok: true; content: string } | { ok: false; reason: "empty" | "too_long" } {
+export function validateChatDraft(
+  raw: string,
+): { ok: true; content: string } | { ok: false; reason: "empty" | "too_long" } {
   const content = raw.trim();
   if (!content) {
     return { ok: false, reason: "empty" };
@@ -123,4 +224,35 @@ export function encodeChatCursor(createdAt: string, id: string): string {
     binary += String.fromCharCode(byte);
   }
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+export function resolveInitialConversationId(input: {
+  requestedId: string | null | undefined;
+  conversations: Array<{ id: string; type: ChatConversationType }>;
+}): string | null {
+  const { requestedId, conversations } = input;
+  if (conversations.length === 0) {
+    return null;
+  }
+
+  if (requestedId && conversations.some((item) => item.id === requestedId)) {
+    return requestedId;
+  }
+
+  const general = conversations.find((item) => item.type === "WORKSPACE");
+  if (general) {
+    return general.id;
+  }
+
+  return conversations[0]!.id;
+}
+
+export function conversationDisplayName(
+  conversation: Pick<ChatConversation, "type" | "displayName" | "otherParticipant" | "title">,
+  generalLabel: string,
+): string {
+  if (conversation.type === "WORKSPACE") {
+    return conversation.title?.trim() || generalLabel;
+  }
+  return conversation.otherParticipant?.name || conversation.displayName;
 }
