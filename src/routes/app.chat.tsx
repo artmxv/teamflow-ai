@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type FormEvent,
   type KeyboardEvent,
   type ReactNode,
@@ -48,10 +49,10 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  CHAT_CONVERSATIONS_POLL_MS,
+  CHAT_CONVERSATIONS_FALLBACK_POLL_MS,
   CHAT_MESSAGE_MAX_LENGTH,
+  CHAT_MESSAGES_FALLBACK_POLL_MS,
   CHAT_MESSAGES_PAGE_SIZE,
-  CHAT_MESSAGES_POLL_MS,
   chatConversationsQueryKey,
   chatMessagesQueryKey,
   conversationDisplayName,
@@ -73,6 +74,12 @@ import {
 } from "@/lib/api/chat";
 import { getSelectedWorkspaceId } from "@/lib/api/client";
 import { useI18n, type Lang } from "@/lib/i18n";
+import {
+  getChatSocketStatus,
+  isChatSocketConnected,
+  setOpenChatConversationId,
+  subscribeChatSocketStatus,
+} from "@/lib/realtime/chat-socket-state";
 import { cn } from "@/lib/utils";
 
 export type ChatSearch = {
@@ -201,6 +208,12 @@ function WorkspaceChatPage() {
     [workspaceId],
   );
 
+  const socketStatus = useSyncExternalStore(
+    subscribeChatSocketStatus,
+    getChatSocketStatus,
+    () => "idle" as const,
+  );
+
   const conversationsQuery = useQuery({
     queryKey: conversationsQueryKey,
     queryFn: fetchChatConversations,
@@ -210,7 +223,13 @@ function WorkspaceChatPage() {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") {
         return false;
       }
-      return query.state.error ? false : CHAT_CONVERSATIONS_POLL_MS;
+      if (query.state.error) {
+        return false;
+      }
+      if (isChatSocketConnected()) {
+        return false;
+      }
+      return CHAT_CONVERSATIONS_FALLBACK_POLL_MS;
     },
   });
 
@@ -225,6 +244,13 @@ function WorkspaceChatPage() {
       conversations,
     });
   }, [conversationFromUrl, conversations]);
+
+  useEffect(() => {
+    setOpenChatConversationId(selectedConversationId);
+    return () => {
+      setOpenChatConversationId(null);
+    };
+  }, [selectedConversationId]);
 
   const selectedConversation =
     conversations.find((item) => item.id === selectedConversationId) ?? null;
@@ -336,6 +362,7 @@ function WorkspaceChatPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("chat.chats")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{t("chat.subtitle")}</p>
         </div>
+        <ChatRealtimeStatus status={socketStatus} />
       </div>
 
       <div className="relative flex h-[calc(100dvh-10.5rem)] min-h-0 overflow-hidden rounded-2xl border border-border bg-card shadow-soft md:h-[calc(100vh-11rem)] md:min-h-112">
@@ -494,6 +521,41 @@ function WorkspaceChatPage() {
         />
       ) : null}
     </AppShell>
+  );
+}
+
+function ChatRealtimeStatus({
+  status,
+}: {
+  status: ReturnType<typeof getChatSocketStatus>;
+}) {
+  const { t } = useI18n();
+
+  const label =
+    status === "connected"
+      ? t("chat.realtimeConnected")
+      : status === "connecting"
+        ? t("chat.realtimeConnecting")
+        : status === "reconnecting"
+          ? t("chat.realtimeReconnecting")
+          : status === "disconnected"
+            ? t("chat.realtimeDisconnected")
+            : null;
+
+  if (!label) {
+    return null;
+  }
+
+  return (
+    <p
+      className={cn(
+        "shrink-0 text-xs",
+        status === "connected" ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400",
+      )}
+      aria-live="polite"
+    >
+      {label}
+    </p>
   );
 }
 
@@ -656,6 +718,11 @@ function ConversationMessagePane({
         return;
       }
 
+      // While Socket.IO is connected, skip frequent REST polling.
+      if (isChatSocketConnected()) {
+        return;
+      }
+
       pollInFlightRef.current = true;
       try {
         const current = queryClient.getQueryData<ChatMessagesPage>(queryKey);
@@ -732,7 +799,7 @@ function ConversationMessagePane({
 
     const intervalId = window.setInterval(() => {
       void pollNewer();
-    }, CHAT_MESSAGES_POLL_MS);
+    }, CHAT_MESSAGES_FALLBACK_POLL_MS);
 
     function onVisibility() {
       if (document.visibilityState === "visible") {
@@ -748,6 +815,30 @@ function ConversationMessagePane({
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [workspaceId, conversationId, queryClient, queryKey]);
+
+  const previousNewestIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const newest = messages[messages.length - 1] ?? null;
+    const newestId = newest?.id ?? null;
+
+    if (!initialScrollDoneRef.current) {
+      previousNewestIdRef.current = newestId;
+      return;
+    }
+
+    if (newestId && newestId !== previousNewestIdRef.current) {
+      previousNewestIdRef.current = newestId;
+      if (
+        !stickToBottomRef.current &&
+        newest &&
+        currentUserId &&
+        newest.sender.id !== currentUserId
+      ) {
+        setShowNewMessages(true);
+      }
+    }
+  }, [messages, currentUserId]);
 
   useLayoutEffect(() => {
     const el = listRef.current;
@@ -779,6 +870,7 @@ function ConversationMessagePane({
   useEffect(() => {
     initialScrollDoneRef.current = false;
     stickToBottomRef.current = true;
+    previousNewestIdRef.current = null;
     setShowNewMessages(false);
     markedReadForNewestRef.current = null;
     setDraft("");
