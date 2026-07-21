@@ -1,5 +1,6 @@
 import type { BillingPlan } from "@prisma/client";
 
+import { ensureUserInWorkspaceGeneralConversation } from "../lib/chat-conversation-ensure.js";
 import { prisma } from "../lib/prisma.js";
 import { AuthError } from "./auth.service.js";
 import { getBillingPlanConfig } from "./billing-plans.service.js";
@@ -192,6 +193,8 @@ export async function createWorkspaceForUser(input: {
         status: "ACTIVE",
       },
     });
+
+    await ensureUserInWorkspaceGeneralConversation(tx, created.id, input.userId);
 
     return created;
   });

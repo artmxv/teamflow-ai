@@ -33,5 +33,8 @@ export async function invalidateWorkspaceScopedQueries(queryClient: QueryClient)
     queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY }),
     queryClient.invalidateQueries({ queryKey: ["workspace-ai-summary"] }),
     queryClient.invalidateQueries({ queryKey: ["global-search"] }),
+    queryClient.invalidateQueries({ queryKey: ["chat-conversations"] }),
+    queryClient.invalidateQueries({ queryKey: ["chat-messages"] }),
+    queryClient.invalidateQueries({ queryKey: ["chat-unread-count"] }),
   ]);
 }

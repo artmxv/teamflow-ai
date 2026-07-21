@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
 import { env } from "../config/env.js";
+import { ensureUserInWorkspaceGeneralConversation } from "../lib/chat-conversation-ensure.js";
 import { prisma } from "../lib/prisma.js";
 
 const BCRYPT_ROUNDS = 10;
@@ -201,6 +202,7 @@ async function createUserWithStarterWorkspace(input: {
       },
     });
 
+    await ensureUserInWorkspaceGeneralConversation(tx, workspace.id, createdUser.id);
     await createStarterWorkspaceData(tx, workspace.id, createdUser.id);
 
     return createdUser;

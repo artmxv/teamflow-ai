@@ -7,6 +7,8 @@ import {
 } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
+import { ensureActiveMembersInWorkspaceGeneralConversation } from "../src/lib/chat-conversation-ensure.js";
+
 const prisma = new PrismaClient();
 
 const DEMO_WORKSPACE_SLUG = "acme-studio";
@@ -304,6 +306,8 @@ async function seedDemoWorkspace() {
       },
     });
   }
+
+  await ensureActiveMembersInWorkspaceGeneralConversation(prisma, workspace.id);
 
   const projects = await Promise.all(
     DEMO_PROJECTS.map((project) =>
