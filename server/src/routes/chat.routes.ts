@@ -4,6 +4,7 @@ import {
   createConversationMessageController,
   createDirectConversationController,
   deleteConversationMessageController,
+  downloadChatAttachmentController,
   getChatConversationsController,
   getChatUnreadCountController,
   getConversationMessagesController,
@@ -29,6 +30,10 @@ chatRouter.get(
 chatRouter.post(
   "/conversations/:conversationId/messages",
   createConversationMessageController,
+);
+chatRouter.get(
+  "/conversations/:conversationId/attachments/:attachmentId/file",
+  downloadChatAttachmentController,
 );
 chatRouter.delete(
   "/conversations/:conversationId/messages/:messageId",

@@ -261,7 +261,7 @@ npm run prisma:migrate:deploy
 - Do not edit applied migration history on a live database.
 - Do not add new Prisma migrations unless schema changes require them.
 
-Latest migration: `20260604200000_add_workspace_billing_plan`.
+Latest migration: `20260722010000_chat_message_attachments`.
 
 ---
 

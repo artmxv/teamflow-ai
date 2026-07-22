@@ -32,6 +32,8 @@ export function localDiskPath(input: {
         throw new Error("Project id is required for project file storage");
       }
       return projectDocumentDiskPath(input.entityId, input.filename);
+    case "chat":
+      throw new Error("Chat attachments require Supabase Storage");
     default: {
       const exhaustive: never = input.category;
       return exhaustive;
@@ -59,6 +61,9 @@ export function deleteLocalStoredFile(input: {
         return;
       }
       removeStoredProjectDocument(input.entityId, input.filename);
+      return;
+    case "chat":
+      // Chat files are stored only in Supabase.
       return;
     default: {
       const exhaustive: never = input.category;

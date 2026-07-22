@@ -30,6 +30,8 @@ import {
 } from "@/components/ui/select";
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
 import { AssigneeMultiPicker } from "@/components/app/AssigneeMultiPicker";
+import { AuthenticatedImagePreview } from "@/components/app/files/AuthenticatedImagePreview";
+import { useAuthenticatedImageLightbox } from "@/components/app/files/AuthenticatedImageLightbox";
 import { DeadlineDatePicker } from "@/components/app/DeadlineDatePicker";
 import { DeadlineTimePicker } from "@/components/app/DeadlineTimePicker";
 import { fetchProjectMembers } from "@/lib/api/project-members";
@@ -1211,65 +1213,38 @@ function TaskAttachmentsSection({
   );
 }
 
-function TaskAttachmentPreview({ attachment }: { attachment: TaskAttachmentApiItem }) {
-  const isImage = isImageAttachment(attachment);
+function TaskAttachmentPreview({
+  attachment,
+  onDownload,
+}: {
+  attachment: TaskAttachmentApiItem;
+  onDownload: () => void;
+}) {
   const badge = getAttachmentFileTypeBadge(attachment.originalName, attachment.mimeType);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    if (!isImage) {
-      return;
-    }
-
-    let cancelled = false;
-    let objectUrl: string | null = null;
-
-    setPreviewUrl(null);
-    setFailed(false);
-
-    fetchTaskAttachmentBlob(attachment)
-      .then((blob) => {
-        if (cancelled) {
-          return;
-        }
-        objectUrl = URL.createObjectURL(blob);
-        setPreviewUrl(objectUrl);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setFailed(true);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [attachment.id, attachment.downloadUrl, attachment.url, isImage]);
-
   const previewClassName =
     "size-8 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-secondary";
 
-  if (isImage && previewUrl && !failed) {
-    return (
-      <div className={previewClassName}>
-        <img src={previewUrl} alt="" className="size-full object-cover" loading="lazy" />
-      </div>
-    );
-  }
-
   return (
-    <div
-      className={cn(
-        previewClassName,
-        "grid place-items-center text-[10px] font-semibold text-muted-foreground",
-      )}
-    >
-      {isImage && !failed && !previewUrl ? <Loader2 className="size-3.5 animate-spin" /> : badge}
-    </div>
+    <AuthenticatedImagePreview
+      downloadUrl={attachment.downloadUrl || attachment.url}
+      filename={attachment.originalName}
+      mimeType={attachment.mimeType}
+      className={previewClassName}
+      imageClassName="size-full"
+      objectFit="cover"
+      fetchBlob={() => fetchTaskAttachmentBlob(attachment)}
+      onDownload={onDownload}
+      fallback={
+        <div
+          className={cn(
+            previewClassName,
+            "grid place-items-center text-[10px] font-semibold text-muted-foreground",
+          )}
+        >
+          {badge}
+        </div>
+      }
+    />
   );
 }
 
@@ -1287,10 +1262,27 @@ function TaskAttachmentRow({
   onRequestDelete: () => void;
 }) {
   const { t } = useI18n();
+  const { openLightbox } = useAuthenticatedImageLightbox();
+  const isImage = isImageAttachment(attachment);
+
+  function handleOpen() {
+    if (isImage) {
+      openLightbox({
+        downloadUrl: attachment.downloadUrl || attachment.url,
+        filename: attachment.originalName,
+        onDownload: () => onDownload(),
+      });
+      return;
+    }
+    onOpen();
+  }
 
   return (
     <div className="flex items-start gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2">
-      <TaskAttachmentPreview attachment={attachment} />
+      <TaskAttachmentPreview
+        attachment={attachment}
+        onDownload={() => onDownload()}
+      />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{attachment.originalName}</div>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
@@ -1308,8 +1300,8 @@ function TaskAttachmentRow({
           size="icon"
           className="size-7 text-muted-foreground hover:text-foreground"
           disabled={isDeleting}
-          aria-label="Open attachment"
-          onClick={onOpen}
+          aria-label={isImage ? t("files.viewImage").replace("{name}", attachment.originalName) : t("files.openAttachment")}
+          onClick={handleOpen}
         >
           <ExternalLink className="size-3.5" />
         </Button>
@@ -1319,7 +1311,7 @@ function TaskAttachmentRow({
           size="icon"
           className="size-7 text-muted-foreground hover:text-foreground"
           disabled={isDeleting}
-          aria-label="Download attachment"
+          aria-label={t("files.downloadAttachment")}
           onClick={onDownload}
         >
           <Download className="size-3.5" />

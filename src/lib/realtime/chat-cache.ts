@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 
 import {
+  buildChatAttachmentPreviewLabel,
   chatConversationsQueryKey,
   chatMessagesQueryKey,
   chatUnreadCountQueryKey,
@@ -35,6 +36,21 @@ export type ChatConversationUpdatedEvent = {
   } | null;
   latestMessageAt: string | null;
 };
+
+function previewForMessage(message: ChatMessage): string {
+  // Server already sends English preview in conversation-updated; for message-created
+  // we derive a stable English fallback matching backend tokens.
+  return (
+    buildChatAttachmentPreviewLabel(message.content, message.attachments ?? [], {
+      file: "File",
+      files: "Files",
+      task: "Task",
+      tasks: "Tasks",
+      project: "Project",
+      projects: "Projects",
+    }) || message.content
+  );
+}
 
 export function shouldIncrementUnreadOnIncomingMessage(input: {
   senderId: string;
@@ -76,7 +92,7 @@ export function applyIncomingMessageToConversations(
       ...item,
       latestMessage: {
         id: input.message.id,
-        content: input.message.content,
+        content: previewForMessage(input.message),
         createdAt: input.message.createdAt,
         senderId: input.message.sender.id,
       },

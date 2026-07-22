@@ -42,6 +42,8 @@ import {
 } from "@/lib/due-datetime";
 import { resolveTaskAssignees } from "@/lib/assignee-options";
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
+import { AuthenticatedImagePreview } from "@/components/app/files/AuthenticatedImagePreview";
+import { useAuthenticatedImageLightbox } from "@/components/app/files/AuthenticatedImageLightbox";
 import { DeadlineDatePicker } from "@/components/app/DeadlineDatePicker";
 import { DeadlineTimePicker } from "@/components/app/DeadlineTimePicker";
 import { deadlineStatusDateTimeRowClassName } from "@/components/app/deadline-field-styles";
@@ -1416,65 +1418,38 @@ function ProjectDocumentsSection({
   );
 }
 
-function ProjectDocumentPreview({ document }: { document: ProjectDocumentApiItem }) {
-  const isImage = isImageProjectDocument(document);
+function ProjectDocumentPreview({
+  document,
+  onDownload,
+}: {
+  document: ProjectDocumentApiItem;
+  onDownload: () => void;
+}) {
   const badge = getProjectDocumentFileTypeBadge(document.originalName, document.mimeType);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    if (!isImage) {
-      return;
-    }
-
-    let cancelled = false;
-    let objectUrl: string | null = null;
-
-    setPreviewUrl(null);
-    setFailed(false);
-
-    fetchProjectDocumentBlob(document)
-      .then((blob) => {
-        if (cancelled) {
-          return;
-        }
-        objectUrl = URL.createObjectURL(blob);
-        setPreviewUrl(objectUrl);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setFailed(true);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [document.id, document.downloadUrl, document.url, isImage]);
-
   const previewClassName =
     "size-9 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-secondary";
 
-  if (isImage && previewUrl && !failed) {
-    return (
-      <div className={previewClassName}>
-        <img src={previewUrl} alt="" className="size-full object-cover" loading="lazy" />
-      </div>
-    );
-  }
-
   return (
-    <div
-      className={cn(
-        previewClassName,
-        "grid place-items-center text-[10px] font-semibold text-muted-foreground",
-      )}
-    >
-      {isImage && !failed && !previewUrl ? <Loader2 className="size-3.5 animate-spin" /> : badge}
-    </div>
+    <AuthenticatedImagePreview
+      downloadUrl={document.downloadUrl || document.url}
+      filename={document.originalName}
+      mimeType={document.mimeType}
+      className={previewClassName}
+      imageClassName="size-full"
+      objectFit="cover"
+      fetchBlob={() => fetchProjectDocumentBlob(document)}
+      onDownload={onDownload}
+      fallback={
+        <div
+          className={cn(
+            previewClassName,
+            "grid place-items-center text-[10px] font-semibold text-muted-foreground",
+          )}
+        >
+          {badge}
+        </div>
+      }
+    />
   );
 }
 
@@ -1492,10 +1467,24 @@ function ProjectDocumentRow({
   onRequestDelete: () => void;
 }) {
   const { t } = useI18n();
+  const { openLightbox } = useAuthenticatedImageLightbox();
+  const isImage = isImageProjectDocument(document);
+
+  function handleOpen() {
+    if (isImage) {
+      openLightbox({
+        downloadUrl: document.downloadUrl || document.url,
+        filename: document.originalName,
+        onDownload: () => onDownload(),
+      });
+      return;
+    }
+    onOpen();
+  }
 
   return (
     <div className="flex items-start gap-2.5 rounded-xl border border-border bg-muted/10 px-2.5 py-2">
-      <ProjectDocumentPreview document={document} />
+      <ProjectDocumentPreview document={document} onDownload={() => onDownload()} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{document.originalName}</div>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
@@ -1513,8 +1502,8 @@ function ProjectDocumentRow({
           size="icon"
           className="size-7 text-muted-foreground hover:text-foreground"
           disabled={isDeleting}
-          aria-label="Open document"
-          onClick={onOpen}
+          aria-label={isImage ? t("files.viewImage").replace("{name}", document.originalName) : t("files.openDocument")}
+          onClick={handleOpen}
         >
           <ExternalLink className="size-3.5" />
         </Button>
@@ -1524,7 +1513,7 @@ function ProjectDocumentRow({
           size="icon"
           className="size-7 text-muted-foreground hover:text-foreground"
           disabled={isDeleting}
-          aria-label="Download document"
+          aria-label={t("files.downloadDocument")}
           onClick={onDownload}
         >
           <Download className="size-3.5" />

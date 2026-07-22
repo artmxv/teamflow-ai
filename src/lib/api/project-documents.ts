@@ -1,4 +1,6 @@
-import { API_BASE_URL, ApiError, apiRequest, apiUpload, buildAuthHeaders } from "./client";
+import { API_BASE_URL, ApiError, apiRequest, apiUpload } from "./client";
+import { downloadBlobAsFile, fetchAuthenticatedBlob } from "./authenticated-blob";
+import { isPreviewableImageMimeType } from "@/lib/files/image-preview";
 
 export interface ProjectDocumentUploader {
   id: string;
@@ -64,12 +66,7 @@ export async function openProjectDocument(document: ProjectDocumentApiItem) {
 
 export async function downloadProjectDocumentFile(document: ProjectDocumentApiItem) {
   const blob = await fetchProjectDocumentBlob(document);
-  const objectUrl = URL.createObjectURL(blob);
-  const link = window.document.createElement("a");
-  link.href = objectUrl;
-  link.download = document.originalName;
-  link.click();
-  URL.revokeObjectURL(objectUrl);
+  downloadBlobAsFile(blob, document.originalName);
 }
 
 export function formatDocumentSize(bytes: number) {
@@ -78,10 +75,8 @@ export function formatDocumentSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-const imageDocumentMimeTypes = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
-
 export function isImageProjectDocument(document: Pick<ProjectDocumentApiItem, "mimeType">) {
-  return imageDocumentMimeTypes.has(document.mimeType.toLowerCase());
+  return isPreviewableImageMimeType(document.mimeType);
 }
 
 function documentExtensionFromName(name: string) {
@@ -113,11 +108,5 @@ export async function fetchProjectDocumentBlob(document: ProjectDocumentApiItem)
   if (!path) {
     throw new Error("Could not load document");
   }
-  const url = resolveProjectDocumentUrl(path);
-  const response = await fetch(url, { headers: buildAuthHeaders(), credentials: "include" });
-  if (!response.ok) {
-    throw new Error("Could not load document");
-  }
-
-  return response.blob();
+  return fetchAuthenticatedBlob(path);
 }

@@ -2,6 +2,7 @@ import type { Server as HttpServer } from "node:http";
 
 import { Server, type Socket } from "socket.io";
 
+import { buildAttachmentPreviewText } from "../lib/chat-attachment-utils.js";
 import { env } from "../config/env.js";
 import { AuthError } from "../services/auth.service.js";
 import { prisma } from "../lib/prisma.js";
@@ -144,7 +145,10 @@ export async function emitChatMessageCreated(payload: ChatMessageCreatedPayload)
     workspaceId: payload.workspaceId,
     latestMessage: {
       id: payload.message.id,
-      content: payload.message.content,
+      content: buildAttachmentPreviewText(
+        payload.message.content,
+        payload.message.attachments.map((attachment) => ({ type: attachment.type })),
+      ),
       createdAt: payload.message.createdAt,
       senderId: payload.message.sender.id,
     },
