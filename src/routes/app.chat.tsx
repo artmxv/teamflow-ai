@@ -13,22 +13,8 @@ import {
   type UIEvent,
 } from "react";
 import { toast } from "sonner";
-import {
-  ArrowDown,
-  ArrowLeft,
-  Loader2,
-  MessageSquare,
-  Pin,
-  PinOff,
-  Plus,
-  Search,
-  Send,
-  Trash2,
-  Users,
-} from "lucide-react";
-
 import { requireAuth } from "@/lib/auth/route-guards";
-import { useCurrentUser } from "@/lib/auth/use-current-user";
+import { isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user";
 import { AppShell } from "@/components/app/AppShell";
 import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { EmptyState } from "@/components/app/EmptyState";
@@ -50,6 +36,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -68,6 +62,7 @@ import {
   fetchChatMessages,
   markConversationRead,
   mergeChatMessages,
+  renameChatConversation,
   resolveInitialConversationId,
   sendChatMessage,
   setConversationPinned,
@@ -82,6 +77,17 @@ import {
   type PendingChatProject,
   type PendingChatTask,
 } from "@/lib/api/chat";
+import {
+  focusChatComposer,
+  isFocusInsideAttachmentPicker,
+  shouldRestoreComposerFocus,
+  shouldSubmitOnComposerKeyDown,
+} from "@/lib/chat/composer-focus";
+import {
+  CHAT_CONVERSATION_TITLE_MAX_LENGTH,
+  validateChatConversationTitle,
+} from "@/lib/chat/conversation-title";
+import { resolveInitialScrollTarget } from "@/lib/chat/scroll";
 import { getSelectedWorkspaceId } from "@/lib/api/client";
 import { useI18n, type Lang } from "@/lib/i18n";
 import {
@@ -91,6 +97,20 @@ import {
   subscribeChatSocketStatus,
 } from "@/lib/realtime/chat-socket-state";
 import { cn } from "@/lib/utils";
+import {
+  ArrowDown,
+  ArrowLeft,
+  Loader2,
+  MessageSquare,
+  Pencil,
+  Pin,
+  PinOff,
+  Plus,
+  Search,
+  Send,
+  Trash2,
+  Users,
+} from "lucide-react";
 
 export type ChatSearch = {
   conversation?: string;
@@ -336,12 +356,8 @@ function WorkspaceChatPage() {
   }, [conversationFilter, conversations, t]);
 
   const pinned = filteredConversations.filter((item) => item.isPinned);
-  const general = filteredConversations.filter(
-    (item) => !item.isPinned && item.type === "WORKSPACE",
-  );
-  const directs = filteredConversations.filter(
-    (item) => !item.isPinned && item.type === "DIRECT",
-  );
+  const unpinned = filteredConversations.filter((item) => !item.isPinned);
+  const canRenameGeneral = isWorkspaceManager(me?.workspace?.role);
 
   const pinMutation = useMutation({
     mutationFn: ({ id, isPinned }: { id: string; isPinned: boolean }) =>
@@ -434,53 +450,19 @@ function WorkspaceChatPage() {
                   />
                 ) : (
                   <div className="space-y-3 p-2">
-                    {pinned.length > 0 ? (
-                      <ConversationSection title={t("chat.pinned")}>
-                        {pinned.map((item) => (
-                          <ConversationRow
-                            key={item.id}
-                            conversation={item}
-                            active={item.id === selectedConversationId && !mobileShowList}
-                            onSelect={() => selectConversation(item.id)}
-                            onTogglePin={() =>
-                              pinMutation.mutate({ id: item.id, isPinned: !item.isPinned })
-                            }
-                          />
-                        ))}
-                      </ConversationSection>
-                    ) : null}
-
-                    {general.length > 0 ? (
-                      <ConversationSection title={t("chat.generalChat")}>
-                        {general.map((item) => (
-                          <ConversationRow
-                            key={item.id}
-                            conversation={item}
-                            active={item.id === selectedConversationId && !mobileShowList}
-                            onSelect={() => selectConversation(item.id)}
-                            onTogglePin={() =>
-                              pinMutation.mutate({ id: item.id, isPinned: !item.isPinned })
-                            }
-                          />
-                        ))}
-                      </ConversationSection>
-                    ) : null}
-
-                    {directs.length > 0 ? (
-                      <ConversationSection title={t("chat.directMessages")}>
-                        {directs.map((item) => (
-                          <ConversationRow
-                            key={item.id}
-                            conversation={item}
-                            active={item.id === selectedConversationId && !mobileShowList}
-                            onSelect={() => selectConversation(item.id)}
-                            onTogglePin={() =>
-                              pinMutation.mutate({ id: item.id, isPinned: !item.isPinned })
-                            }
-                          />
-                        ))}
-                      </ConversationSection>
-                    ) : null}
+                    <ConversationSection title={t("chat.chats")}>
+                      {[...pinned, ...unpinned].map((item) => (
+                        <ConversationRow
+                          key={item.id}
+                          conversation={item}
+                          active={item.id === selectedConversationId && !mobileShowList}
+                          onSelect={() => selectConversation(item.id)}
+                          onTogglePin={() =>
+                            pinMutation.mutate({ id: item.id, isPinned: !item.isPinned })
+                          }
+                        />
+                      ))}
+                    </ConversationSection>
                   </div>
                 )}
               </div>
@@ -500,6 +482,7 @@ function WorkspaceChatPage() {
                   conversationId={selectedConversationId}
                   workspaceId={workspaceId}
                   currentUserId={user?.id}
+                  canRenameGeneral={canRenameGeneral}
                   showBackButton={!isDesktop}
                   onBack={handleBackToList}
                   onPinnedChange={(isPinned) =>
@@ -676,6 +659,7 @@ function ConversationMessagePane({
   conversationId,
   workspaceId,
   currentUserId,
+  canRenameGeneral,
   showBackButton,
   onBack,
   onPinnedChange,
@@ -684,6 +668,7 @@ function ConversationMessagePane({
   conversationId: string;
   workspaceId: string | null;
   currentUserId?: string;
+  canRenameGeneral: boolean;
   showBackButton: boolean;
   onBack: () => void;
   onPinnedChange: (isPinned: boolean) => void;
@@ -701,13 +686,21 @@ function ConversationMessagePane({
 
   const listRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  /** Set after send success/error; applied once textarea is enabled again. */
+  const composerFocusRequestRef = useRef(false);
   const stickToBottomRef = useRef(true);
   const initialScrollDoneRef = useRef(false);
+  /** Captured once per open; used before mark-as-read clears the server cursor. */
+  const capturedLastReadAtRef = useRef<string | null | undefined>(undefined);
+  const unreadAnchorIdRef = useRef<string | null>(null);
+  const layoutAnchorModeRef = useRef<"bottom" | "unread" | null>(null);
   const pendingScrollRestoreRef = useRef<{ previousHeight: number; previousTop: number } | null>(
     null,
   );
   const pollInFlightRef = useRef(false);
   const markedReadForNewestRef = useRef<string | null>(null);
+  const readyToMarkReadRef = useRef(false);
+  const ignoreScrollEventsRef = useRef(false);
 
   const [draft, setDraft] = useState("");
   const [draftError, setDraftError] = useState<string | null>(null);
@@ -717,6 +710,9 @@ function ConversationMessagePane({
   const [showNewMessages, setShowNewMessages] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ChatMessage | null>(null);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [renameError, setRenameError] = useState<string | null>(null);
 
   useEffect(() => {
     setDraft("");
@@ -724,6 +720,8 @@ function ConversationMessagePane({
     setPendingFiles([]);
     setPendingTasks([]);
     setPendingProjects([]);
+    // Reset only; do not auto-focus on conversation switch / chat open (mobile keyboard).
+    composerFocusRequestRef.current = false;
   }, [conversationId]);
 
   const messagesQuery = useQuery({
@@ -737,6 +735,69 @@ function ConversationMessagePane({
   const page = messagesQuery.data;
   const messages = page?.messages ?? [];
   const title = conversationDisplayName(conversation, t("chat.generalChat"));
+
+  // Capture the unread boundary once before any mark-as-read call.
+  if (capturedLastReadAtRef.current === undefined) {
+    capturedLastReadAtRef.current = conversation.lastReadAt ?? null;
+  }
+
+  const unreadBoundaryId = useMemo(() => {
+    if (!currentUserId || messages.length === 0) {
+      return null;
+    }
+    const target = resolveInitialScrollTarget({
+      messages: messages.map((message) => ({
+        id: message.id,
+        senderId: message.sender.id,
+        createdAt: message.createdAt,
+      })),
+      currentUserId,
+      lastReadAt: capturedLastReadAtRef.current ?? null,
+    });
+    return target.type === "message" ? target.messageId : null;
+  }, [messages, currentUserId]);
+
+  useEffect(() => {
+    unreadAnchorIdRef.current = unreadBoundaryId;
+  }, [unreadBoundaryId]);
+
+  function applyScrollAnchor() {
+    const el = listRef.current;
+    if (!el) {
+      return;
+    }
+
+    const mode = layoutAnchorModeRef.current;
+    if (mode === "bottom" && stickToBottomRef.current) {
+      ignoreScrollEventsRef.current = true;
+      el.scrollTop = el.scrollHeight;
+      setShowNewMessages(false);
+      requestAnimationFrame(() => {
+        ignoreScrollEventsRef.current = false;
+      });
+      return;
+    }
+
+    if (mode === "unread" && unreadAnchorIdRef.current) {
+      const target = el.querySelector<HTMLElement>(
+        `[data-message-id="${unreadAnchorIdRef.current}"]`,
+      );
+      if (target) {
+        ignoreScrollEventsRef.current = true;
+        target.scrollIntoView({ block: "start" });
+        requestAnimationFrame(() => {
+          ignoreScrollEventsRef.current = false;
+        });
+      }
+    }
+  }
+
+  function handlePreviewLayoutSettle() {
+    if (!initialScrollDoneRef.current) {
+      return;
+    }
+    applyScrollAnchor();
+  }
 
   useEffect(() => {
     if (!workspaceId || !conversationId) {
@@ -887,30 +948,64 @@ function ConversationMessagePane({
     }
 
     if (!initialScrollDoneRef.current) {
-      el.scrollTop = el.scrollHeight;
-      stickToBottomRef.current = true;
+      const target = currentUserId
+        ? resolveInitialScrollTarget({
+            messages: messages.map((message) => ({
+              id: message.id,
+              senderId: message.sender.id,
+              createdAt: message.createdAt,
+            })),
+            currentUserId,
+            lastReadAt: capturedLastReadAtRef.current ?? null,
+          })
+        : ({ type: "bottom" } as const);
+
+      ignoreScrollEventsRef.current = true;
+
+      if (target.type === "message") {
+        const node = el.querySelector<HTMLElement>(`[data-message-id="${target.messageId}"]`);
+        if (node) {
+          node.scrollIntoView({ block: "start" });
+          stickToBottomRef.current = false;
+          layoutAnchorModeRef.current = "unread";
+          unreadAnchorIdRef.current = target.messageId;
+        } else {
+          // Oldest unread is older than the loaded window: stay at the oldest loaded.
+          el.scrollTop = 0;
+          stickToBottomRef.current = false;
+          layoutAnchorModeRef.current = "unread";
+        }
+      } else {
+        el.scrollTop = el.scrollHeight;
+        stickToBottomRef.current = true;
+        layoutAnchorModeRef.current = "bottom";
+      }
+
       initialScrollDoneRef.current = true;
+      readyToMarkReadRef.current = true;
+      requestAnimationFrame(() => {
+        ignoreScrollEventsRef.current = false;
+      });
       return;
     }
 
     if (stickToBottomRef.current) {
+      ignoreScrollEventsRef.current = true;
       el.scrollTop = el.scrollHeight;
       setShowNewMessages(false);
+      layoutAnchorModeRef.current = "bottom";
+      requestAnimationFrame(() => {
+        ignoreScrollEventsRef.current = false;
+      });
     }
-  }, [messages]);
-
-  useEffect(() => {
-    initialScrollDoneRef.current = false;
-    stickToBottomRef.current = true;
-    previousNewestIdRef.current = null;
-    setShowNewMessages(false);
-    markedReadForNewestRef.current = null;
-    setDraft("");
-    setDraftError(null);
-  }, [conversationId]);
+  }, [messages, currentUserId]);
 
   useEffect(() => {
     if (!conversationId || !page?.pageInfo.newestCursor) {
+      return;
+    }
+    // Wait until the unread boundary was used for the first scroll.
+    if (!readyToMarkReadRef.current || !initialScrollDoneRef.current) {
       return;
     }
     if (!stickToBottomRef.current && document.visibilityState !== "visible") {
@@ -930,7 +1025,11 @@ function ConversationMessagePane({
         updateChatConversationsCache(queryClient, (old) =>
           old.map((item) =>
             item.id === conversationId
-              ? { ...item, unreadCount: result.unreadCount }
+              ? {
+                  ...item,
+                  unreadCount: result.unreadCount,
+                  lastReadAt: result.lastReadAt,
+                }
               : item,
           ),
         );
@@ -944,15 +1043,26 @@ function ConversationMessagePane({
     conversationId,
     page?.pageInfo.newestCursor,
     queryClient,
+    messages.length,
   ]);
 
   function handleScroll(event: UIEvent<HTMLDivElement>) {
+    if (ignoreScrollEventsRef.current) {
+      return;
+    }
+
     const el = event.currentTarget;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     const nearBottom = distanceFromBottom <= NEAR_BOTTOM_PX;
     stickToBottomRef.current = nearBottom;
     if (nearBottom) {
       setShowNewMessages(false);
+      layoutAnchorModeRef.current = "bottom";
+    } else if (layoutAnchorModeRef.current === "bottom") {
+      layoutAnchorModeRef.current = null;
+    } else if (layoutAnchorModeRef.current === "unread") {
+      // User moved away from the unread anchor: stop chasing image layout shifts.
+      layoutAnchorModeRef.current = null;
     }
   }
 
@@ -961,9 +1071,14 @@ function ConversationMessagePane({
     if (!el) {
       return;
     }
+    ignoreScrollEventsRef.current = true;
     el.scrollTop = el.scrollHeight;
     stickToBottomRef.current = true;
+    layoutAnchorModeRef.current = "bottom";
     setShowNewMessages(false);
+    requestAnimationFrame(() => {
+      ignoreScrollEventsRef.current = false;
+    });
   }
 
   async function handleLoadOlder() {
@@ -1070,16 +1185,20 @@ function ConversationMessagePane({
       );
 
       stickToBottomRef.current = true;
+      layoutAnchorModeRef.current = "bottom";
       setShowNewMessages(false);
       setDraft("");
       setPendingFiles([]);
       setPendingTasks([]);
       setPendingProjects([]);
       setDraftError(null);
+      composerFocusRequestRef.current = true;
       void queryClient.invalidateQueries({ queryKey: conversationsQueryKey });
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : t("chat.sendFailed"));
+      // Keep draft + attachments; restore focus so the user can retry.
+      composerFocusRequestRef.current = true;
     },
   });
 
@@ -1097,6 +1216,69 @@ function ConversationMessagePane({
       toast.error(error instanceof Error ? error.message : t("chat.deleteFailed"));
     },
   });
+
+  const renameMutation = useMutation({
+    mutationFn: (nextTitle: string) => renameChatConversation(conversationId, nextTitle),
+    onMutate: async (nextTitle) => {
+      await queryClient.cancelQueries({ queryKey: conversationsQueryKey });
+      const previous = queryClient.getQueryData<ChatConversation[]>(conversationsQueryKey);
+      updateChatConversationsCache(queryClient, (old) =>
+        old.map((item) =>
+          item.id === conversationId
+            ? { ...item, title: nextTitle, displayName: nextTitle }
+            : item,
+        ),
+      );
+      return { previous };
+    },
+    onSuccess: (result) => {
+      updateChatConversationsCache(queryClient, (old) =>
+        old.map((item) =>
+          item.id === conversationId
+            ? {
+                ...item,
+                title: result.title,
+                displayName: result.displayName,
+                updatedAt: result.updatedAt,
+              }
+            : item,
+        ),
+      );
+      setRenameOpen(false);
+      setRenameError(null);
+    },
+    onError: (error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(conversationsQueryKey, context.previous);
+      }
+      toast.error(error instanceof Error ? error.message : t("chat.renameFailed"));
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: conversationsQueryKey });
+    },
+  });
+
+  function openRenameDialog() {
+    setRenameDraft(conversation.title?.trim() || title);
+    setRenameError(null);
+    setRenameOpen(true);
+  }
+
+  function submitRename() {
+    const validated = validateChatConversationTitle(renameDraft);
+    if (!validated.ok) {
+      setRenameError(
+        validated.reason === "too_long"
+          ? t("chat.renameValidationTooLong").replace(
+              "{max}",
+              String(CHAT_CONVERSATION_TITLE_MAX_LENGTH),
+            )
+          : t("chat.renameValidationEmpty"),
+      );
+      return;
+    }
+    renameMutation.mutate(validated.title);
+  }
 
   function submitDraft() {
     const hasAttachments =
@@ -1129,16 +1311,50 @@ function ConversationMessagePane({
   }
 
   function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.nativeEvent.isComposing) {
+    if (
+      !shouldSubmitOnComposerKeyDown({
+        key: event.key,
+        shiftKey: event.shiftKey,
+        isComposing: event.nativeEvent.isComposing,
+        isSending: sendMutation.isPending,
+      })
+    ) {
       return;
     }
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      if (!sendMutation.isPending) {
-        submitDraft();
-      }
-    }
+    // Prevent Enter from also submitting the form (duplicate send).
+    event.preventDefault();
+    submitDraft();
   }
+
+  useLayoutEffect(() => {
+    if (
+      !shouldRestoreComposerFocus({
+        focusRequested: composerFocusRequestRef.current,
+        isSending: sendMutation.isPending,
+        isFocusInAttachmentPicker: isFocusInsideAttachmentPicker(document.activeElement),
+      })
+    ) {
+      return;
+    }
+
+    const el = composerRef.current;
+    if (!el || el.disabled) {
+      return;
+    }
+
+    composerFocusRequestRef.current = false;
+    // After React applied cleared/restored draft; rAF keeps caret after layout height sync.
+    requestAnimationFrame(() => {
+      const latest = composerRef.current;
+      if (!latest || latest.disabled) {
+        return;
+      }
+      if (isFocusInsideAttachmentPicker(document.activeElement)) {
+        return;
+      }
+      focusChatComposer(latest);
+    });
+  }, [sendMutation.isPending, draft, pendingFiles, pendingTasks, pendingProjects]);
 
   const hasAttachments =
     pendingFiles.length > 0 || pendingTasks.length > 0 || pendingProjects.length > 0;
@@ -1198,6 +1414,18 @@ function ConversationMessagePane({
             </p>
           ) : null}
         </div>
+        {conversation.type === "WORKSPACE" && canRenameGeneral ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 shrink-0"
+            aria-label={t("chat.renameChat")}
+            onClick={openRenameDialog}
+          >
+            <Pencil className="size-4" />
+          </Button>
+        ) : null}
         <Button
           type="button"
           variant="ghost"
@@ -1266,11 +1494,26 @@ function ConversationMessagePane({
             ) : (
               messages.map((message) => {
                 const isOwn = currentUserId === message.sender.id;
+                const showUnreadDivider = message.id === unreadBoundaryId;
                 return (
-                  <div
-                    key={message.id}
-                    className={cn("flex gap-2.5", isOwn ? "flex-row-reverse" : "flex-row")}
-                  >
+                  <div key={message.id} className="space-y-3">
+                    {showUnreadDivider ? (
+                      <div
+                        className="flex items-center gap-3 py-1"
+                        role="separator"
+                        aria-label={t("chat.unreadBoundary")}
+                      >
+                        <div className="h-px flex-1 bg-border" />
+                        <span className="shrink-0 text-[11px] font-medium tracking-wide text-muted-foreground">
+                          {t("chat.unreadBoundary")}
+                        </span>
+                        <div className="h-px flex-1 bg-border" />
+                      </div>
+                    ) : null}
+                    <div
+                      data-message-id={message.id}
+                      className={cn("flex gap-2.5", isOwn ? "flex-row-reverse" : "flex-row")}
+                    >
                     <UserAvatar
                       id={message.sender.id}
                       name={message.sender.name}
@@ -1313,8 +1556,12 @@ function ConversationMessagePane({
                           {message.content}
                         </p>
                       ) : null}
-                      <ChatMessageAttachments attachments={message.attachments ?? []} />
+                      <ChatMessageAttachments
+                        attachments={message.attachments ?? []}
+                        onPreviewLayoutSettle={handlePreviewLayoutSettle}
+                      />
                     </div>
+                  </div>
                   </div>
                 );
               })
@@ -1445,6 +1692,64 @@ function ConversationMessagePane({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={renameOpen}
+        onOpenChange={(open) => {
+          setRenameOpen(open);
+          if (!open) {
+            setRenameError(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("chat.renameTitle")}</DialogTitle>
+            <DialogDescription>{t("chat.renameDescription")}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Input
+              value={renameDraft}
+              onChange={(event) => {
+                setRenameDraft(event.target.value);
+                if (renameError) {
+                  setRenameError(null);
+                }
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  submitRename();
+                }
+              }}
+              maxLength={CHAT_CONVERSATION_TITLE_MAX_LENGTH + 20}
+              disabled={renameMutation.isPending}
+              autoFocus
+            />
+            {renameError ? <p className="text-xs text-destructive">{renameError}</p> : null}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setRenameOpen(false)}
+              disabled={renameMutation.isPending}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button type="button" onClick={submitRename} disabled={renameMutation.isPending}>
+              {renameMutation.isPending ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  {t("common.loading")}
+                </>
+              ) : (
+                t("chat.renameSave")
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

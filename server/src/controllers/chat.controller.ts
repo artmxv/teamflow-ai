@@ -15,10 +15,6 @@ import { chatAttachmentUpload } from "../lib/chat-upload.js";
 import { sendResolvedStoredFile } from "../lib/file-storage/index.js";
 import { resolveRequestWorkspaceContext } from "../lib/workspace-request.js";
 import {
-  emitChatMessageCreated,
-  emitChatMessageDeleted,
-} from "../realtime/chat-realtime.js";
-import {
   createConversationMessage,
   createConversationMessageWithAttachments,
   deleteConversationMessage,
@@ -28,10 +24,17 @@ import {
   listChatConversations,
   listConversationMessages,
   markConversationRead,
+  renameChatConversation,
   setConversationPinned,
   SUPABASE_UPLOAD_REQUIRED_MESSAGE,
   validateConversationAccess,
 } from "../services/chat.service.js";
+import { CHAT_CONVERSATION_TITLE_MAX_LENGTH } from "../lib/chat-conversation-utils.js";
+import {
+  emitChatConversationRenamed,
+  emitChatMessageCreated,
+  emitChatMessageDeleted,
+} from "../realtime/chat-realtime.js";
 
 const createMessageSchema = z.object({
   content: z
@@ -47,6 +50,15 @@ const createDirectSchema = z.object({
 
 const pinSchema = z.object({
   isPinned: z.boolean(),
+});
+
+const renameConversationSchema = z.object({
+  title: z
+    .string({ required_error: "title is required" })
+    .max(
+      CHAT_CONVERSATION_TITLE_MAX_LENGTH,
+      `title must be at most ${CHAT_CONVERSATION_TITLE_MAX_LENGTH} characters`,
+    ),
 });
 
 async function resolveWorkspace(req: Request, res: Response) {
@@ -253,6 +265,87 @@ export async function pinConversationController(
       res.status(404).json({ message: "Conversation not found" });
       return;
     }
+
+    res.json({ data: result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function renameConversationController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const context = await resolveWorkspace(req, res);
+    if (!context) {
+      return;
+    }
+
+    const conversationId = getConversationIdParam(req);
+    if (!conversationId) {
+      res.status(404).json({ message: "Conversation not found" });
+      return;
+    }
+
+    const parsed = renameConversationSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      const tooLong = parsed.error.issues.some(
+        (issue) => issue.code === "too_big",
+      );
+      res.status(400).json({
+        message: tooLong
+          ? `title must be at most ${CHAT_CONVERSATION_TITLE_MAX_LENGTH} characters`
+          : "title is required",
+        issues: parsed.error.issues,
+      });
+      return;
+    }
+
+    const result = await renameChatConversation({
+      workspaceId: context.workspaceId,
+      conversationId,
+      userId: req.userId!,
+      role: context.role,
+      title: parsed.data.title,
+    });
+
+    if (result === "not_found") {
+      res.status(404).json({ message: "Conversation not found" });
+      return;
+    }
+
+    if (result === "forbidden") {
+      res.status(403).json({
+        message: "Only workspace owners and admins can rename the general chat",
+      });
+      return;
+    }
+
+    if (result === "invalid_type") {
+      res.status(400).json({ message: "Direct conversations cannot be renamed" });
+      return;
+    }
+
+    if (result === "empty") {
+      res.status(400).json({ message: "title cannot be empty" });
+      return;
+    }
+
+    if (result === "too_long") {
+      res.status(400).json({
+        message: `title must be at most ${CHAT_CONVERSATION_TITLE_MAX_LENGTH} characters`,
+      });
+      return;
+    }
+
+    await emitChatConversationRenamed({
+      conversationId: result.id,
+      workspaceId: context.workspaceId,
+      title: result.title,
+      displayName: result.displayName,
+    });
 
     res.json({ data: result });
   } catch (error) {

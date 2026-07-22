@@ -1,5 +1,5 @@
 import { Loader2 } from "lucide-react";
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import { useAuthenticatedImageLightbox } from "@/components/app/files/AuthenticatedImageLightbox";
 import { useAuthenticatedBlobUrl } from "@/hooks/use-authenticated-blob-url";
@@ -17,6 +17,8 @@ export type AuthenticatedImagePreviewProps = {
   fallback: ReactNode;
   onDownload?: () => void | Promise<void>;
   fetchBlob?: () => Promise<Blob>;
+  /** Fires when the preview finishes loading or fails (layout may settle). */
+  onPreviewLayoutSettle?: () => void;
 };
 
 export function AuthenticatedImagePreview({
@@ -29,6 +31,7 @@ export function AuthenticatedImagePreview({
   fallback,
   onDownload,
   fetchBlob,
+  onPreviewLayoutSettle,
 }: AuthenticatedImagePreviewProps) {
   const { t } = useI18n();
   const { openLightbox } = useAuthenticatedImageLightbox();
@@ -38,6 +41,12 @@ export function AuthenticatedImagePreview({
     isImage,
     fetchBlob,
   );
+
+  useEffect(() => {
+    if (isImage && isError) {
+      onPreviewLayoutSettle?.();
+    }
+  }, [isImage, isError, onPreviewLayoutSettle]);
 
   if (!isImage) {
     return <>{fallback}</>;
@@ -88,6 +97,8 @@ export function AuthenticatedImagePreview({
         )}
         loading="lazy"
         decoding="async"
+        onLoad={() => onPreviewLayoutSettle?.()}
+        onError={() => onPreviewLayoutSettle?.()}
       />
     </button>
   );

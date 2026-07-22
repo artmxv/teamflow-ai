@@ -28,13 +28,15 @@ export type ChatMessageDeletedEvent = {
 export type ChatConversationUpdatedEvent = {
   conversationId: string;
   workspaceId: string;
-  latestMessage: {
+  latestMessage?: {
     id: string;
     content: string;
     createdAt: string;
     senderId: string;
   } | null;
-  latestMessageAt: string | null;
+  latestMessageAt?: string | null;
+  title?: string | null;
+  displayName?: string;
 };
 
 function previewForMessage(message: ChatMessage): string {
@@ -223,16 +225,30 @@ export function applyChatConversationUpdatedToCache(input: {
       if (!old) {
         return old;
       }
-      return old.map((item) =>
-        item.id === event.conversationId
-          ? {
-              ...item,
-              latestMessage: event.latestMessage,
-              latestMessageAt: event.latestMessageAt,
-              updatedAt: event.latestMessageAt ?? item.updatedAt,
-            }
-          : item,
-      );
+      return old.map((item) => {
+        if (item.id !== event.conversationId) {
+          return item;
+        }
+
+        return {
+          ...item,
+          ...(event.latestMessage !== undefined
+            ? { latestMessage: event.latestMessage }
+            : {}),
+          ...(event.latestMessageAt !== undefined
+            ? {
+                latestMessageAt: event.latestMessageAt,
+                updatedAt: event.latestMessageAt ?? item.updatedAt,
+              }
+            : {}),
+          ...(event.title !== undefined
+            ? {
+                title: event.title,
+                displayName: event.displayName ?? event.title ?? item.displayName,
+              }
+            : {}),
+        };
+      });
     },
   );
 }

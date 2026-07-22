@@ -162,6 +162,22 @@ export async function emitChatMessageDeleted(payload: ChatMessageDeletedPayload)
   emitToUsers(memberIds, CHAT_MESSAGE_DELETED, payload);
 }
 
+export async function emitChatConversationRenamed(payload: {
+  conversationId: string;
+  workspaceId: string;
+  title: string;
+  displayName: string;
+}) {
+  const memberIds = await listConversationMemberUserIds(payload.conversationId);
+  const conversationPayload: ChatConversationUpdatedPayload = {
+    conversationId: payload.conversationId,
+    workspaceId: payload.workspaceId,
+    title: payload.title,
+    displayName: payload.displayName,
+  };
+  emitToUsers(memberIds, CHAT_CONVERSATION_UPDATED, conversationPayload);
+}
+
 export async function closeChatRealtime(): Promise<void> {
   if (!io) {
     return;

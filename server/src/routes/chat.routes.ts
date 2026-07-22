@@ -10,6 +10,7 @@ import {
   getConversationMessagesController,
   markConversationReadController,
   pinConversationController,
+  renameConversationController,
 } from "../controllers/chat.controller.js";
 import { requireAuth } from "../middleware/require-auth.middleware.js";
 
@@ -21,6 +22,7 @@ chatRouter.get("/conversations", getChatConversationsController);
 chatRouter.get("/unread-count", getChatUnreadCountController);
 chatRouter.post("/conversations/direct", createDirectConversationController);
 chatRouter.patch("/conversations/:conversationId/pin", pinConversationController);
+chatRouter.patch("/conversations/:conversationId", renameConversationController);
 chatRouter.post("/conversations/:conversationId/read", markConversationReadController);
 chatRouter.patch("/conversations/:conversationId/read", markConversationReadController);
 chatRouter.get(

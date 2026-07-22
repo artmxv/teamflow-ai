@@ -99,6 +99,8 @@ export type ChatConversation = {
   } | null;
   latestMessageAt: string | null;
   unreadCount: number;
+  /** Member read cursor; capture before mark-as-read for unread scroll. */
+  lastReadAt: string | null;
   isPinned: boolean;
   updatedAt: string;
 };
@@ -212,6 +214,22 @@ export async function setConversationPinned(conversationId: string, isPinned: bo
       body: { isPinned },
     },
   );
+  return response.data;
+}
+
+export async function renameChatConversation(conversationId: string, title: string) {
+  const response = await apiRequest<{
+    data: {
+      id: string;
+      title: string;
+      displayName: string;
+      type: "WORKSPACE";
+      updatedAt: string;
+    };
+  }>(`/api/chat/conversations/${conversationId}`, {
+    method: "PATCH",
+    body: { title },
+  });
   return response.data;
 }
 

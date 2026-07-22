@@ -11,12 +11,15 @@ import { ChatFileAttachmentCard } from "./ChatFileAttachmentCard";
 type ChatImageAttachmentPreviewProps = {
   attachment: ChatFileAttachment;
   className?: string;
+  onPreviewLayoutSettle?: () => void;
 };
 
 export function ChatImageAttachmentPreviewGrid({
   attachments,
+  onPreviewLayoutSettle,
 }: {
   attachments: ChatFileAttachment[];
+  onPreviewLayoutSettle?: () => void;
 }) {
   if (!attachments.length) {
     return null;
@@ -32,7 +35,11 @@ export function ChatImageAttachmentPreviewGrid({
   return (
     <div className={cn("grid w-full max-w-sm gap-1", gridClassName)}>
       {attachments.map((attachment) => (
-        <ChatImageAttachmentPreview key={attachment.id} attachment={attachment} />
+        <ChatImageAttachmentPreview
+          key={attachment.id}
+          attachment={attachment}
+          onPreviewLayoutSettle={onPreviewLayoutSettle}
+        />
       ))}
     </div>
   );
@@ -41,6 +48,7 @@ export function ChatImageAttachmentPreviewGrid({
 export function ChatImageAttachmentPreview({
   attachment,
   className,
+  onPreviewLayoutSettle,
 }: ChatImageAttachmentPreviewProps) {
   return (
     <AuthenticatedImagePreview
@@ -54,6 +62,7 @@ export function ChatImageAttachmentPreview({
       onDownload={() =>
         downloadChatAttachmentFile(attachment.downloadUrl, attachment.originalName)
       }
+      onPreviewLayoutSettle={onPreviewLayoutSettle}
       fallback={<ChatFileAttachmentCard attachment={attachment} />}
     />
   );
