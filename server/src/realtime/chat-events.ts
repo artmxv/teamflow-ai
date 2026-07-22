@@ -1,7 +1,9 @@
+import type { ChatReactionDto } from "../lib/chat-reaction-utils.js";
 import type { ChatMessageDto } from "../services/chat.service.js";
 
 export const CHAT_MESSAGE_CREATED = "chat:message-created" as const;
 export const CHAT_MESSAGE_DELETED = "chat:message-deleted" as const;
+export const CHAT_MESSAGE_REACTION_UPDATED = "chat:message-reaction-updated" as const;
 export const CHAT_CONVERSATION_UPDATED = "chat:conversation-updated" as const;
 export const CHAT_PRESENCE_SNAPSHOT = "chat:presence-snapshot" as const;
 export const CHAT_PRESENCE_UPDATED = "chat:presence-updated" as const;
@@ -17,6 +19,13 @@ export type ChatMessageDeletedPayload = {
   conversationId: string;
   workspaceId: string;
   messageId: string;
+};
+
+export type ChatMessageReactionUpdatedPayload = {
+  workspaceId: string;
+  conversationId: string;
+  messageId: string;
+  reactions: ChatReactionDto[];
 };
 
 export type ChatConversationUpdatedPayload = {

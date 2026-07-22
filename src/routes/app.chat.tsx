@@ -20,6 +20,11 @@ import { EmptyState } from "@/components/app/EmptyState";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { NewDirectMessageDialog } from "@/components/app/chat/NewDirectMessageDialog";
 import { ChatMessageAttachments } from "@/components/app/chat/ChatMessageAttachments";
+import {
+  ChatMessageReactionChips,
+  ChatMessageReactionPicker,
+  ChatMessageReactionProvider,
+} from "@/components/app/chat/ChatMessageReactions";
 import { ChatOnlineDot } from "@/components/app/chat/ChatOnlineDot";
 import {
   ChatAttachMenu,
@@ -526,16 +531,23 @@ function ChatRealtimeStatus({
 }) {
   const { t } = useI18n();
 
+  if (status === "connected") {
+    // Connection is healthy: keep status for assistive tech only (no visible "Online").
+    return (
+      <p className="sr-only" aria-live="polite">
+        {t("chat.realtimeConnected")}
+      </p>
+    );
+  }
+
   const label =
-    status === "connected"
-      ? t("chat.realtimeConnected")
-      : status === "connecting"
-        ? t("chat.realtimeConnecting")
-        : status === "reconnecting"
-          ? t("chat.realtimeReconnecting")
-          : status === "disconnected"
-            ? t("chat.realtimeDisconnected")
-            : null;
+    status === "connecting"
+      ? t("chat.realtimeConnecting")
+      : status === "reconnecting"
+        ? t("chat.realtimeReconnecting")
+        : status === "disconnected"
+          ? t("chat.realtimeDisconnected")
+          : null;
 
   if (!label) {
     return null;
@@ -543,10 +555,7 @@ function ChatRealtimeStatus({
 
   return (
     <p
-      className={cn(
-        "shrink-0 text-xs",
-        status === "connected" ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400",
-      )}
+      className="shrink-0 text-xs text-amber-700 dark:text-amber-400"
       aria-live="polite"
     >
       {label}
@@ -1522,7 +1531,10 @@ function ConversationMessagePane({
                     ) : null}
                     <div
                       data-message-id={message.id}
-                      className={cn("flex gap-2.5", isOwn ? "flex-row-reverse" : "flex-row")}
+                      className={cn(
+                        "group flex gap-2.5",
+                        isOwn ? "flex-row-reverse" : "flex-row",
+                      )}
                     >
                     <UserAvatar
                       id={message.sender.id}
@@ -1532,45 +1544,86 @@ function ConversationMessagePane({
                       size="sm"
                       className="mt-0.5 shrink-0"
                     />
-                    <div
-                      className={cn(
-                        "max-w-[min(100%,36rem)] min-w-0 rounded-2xl border px-3.5 py-2.5",
-                        isOwn
-                          ? "border-primary/25 bg-primary/10"
-                          : "border-border/80 bg-background/60",
-                      )}
-                    >
+                    {currentUserId ? (
+                      <ChatMessageReactionProvider
+                        conversationId={conversationId}
+                        message={message}
+                        currentUserId={currentUserId}
+                        align={isOwn ? "end" : "start"}
+                      >
+                        <div
+                          className={cn(
+                            "max-w-[min(100%,36rem)] min-w-0 rounded-2xl border px-3.5 py-2.5",
+                            isOwn
+                              ? "border-primary/25 bg-primary/10"
+                              : "border-border/80 bg-background/60",
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5",
+                              isOwn ? "justify-end" : "justify-start",
+                            )}
+                          >
+                            <span className="text-xs font-medium text-foreground/90">
+                              {isOwn ? t("chat.you") : message.sender.name}
+                            </span>
+                            <ChatTimestamp iso={message.createdAt} />
+                            <ChatMessageReactionPicker />
+                            {isOwn ? (
+                              <button
+                                type="button"
+                                className="inline-flex size-5 items-center justify-center rounded text-muted-foreground/70 transition hover:bg-destructive/10 hover:text-destructive"
+                                aria-label={t("chat.deleteConfirm")}
+                                onClick={() => setDeleteTarget(message)}
+                              >
+                                <Trash2 className="size-3" />
+                              </button>
+                            ) : null}
+                          </div>
+                          {message.content.trim() ? (
+                            <p className="whitespace-pre-wrap wrap-break-word text-sm leading-relaxed text-foreground/95">
+                              {message.content}
+                            </p>
+                          ) : null}
+                          <ChatMessageAttachments
+                            attachments={message.attachments ?? []}
+                            onPreviewLayoutSettle={handlePreviewLayoutSettle}
+                          />
+                          <ChatMessageReactionChips />
+                        </div>
+                      </ChatMessageReactionProvider>
+                    ) : (
                       <div
                         className={cn(
-                          "mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5",
-                          isOwn ? "justify-end" : "justify-start",
+                          "max-w-[min(100%,36rem)] min-w-0 rounded-2xl border px-3.5 py-2.5",
+                          isOwn
+                            ? "border-primary/25 bg-primary/10"
+                            : "border-border/80 bg-background/60",
                         )}
                       >
-                        <span className="text-xs font-medium text-foreground/90">
-                          {isOwn ? t("chat.you") : message.sender.name}
-                        </span>
-                        <ChatTimestamp iso={message.createdAt} />
-                        {isOwn ? (
-                          <button
-                            type="button"
-                            className="inline-flex size-5 items-center justify-center rounded text-muted-foreground/70 transition hover:bg-destructive/10 hover:text-destructive"
-                            aria-label={t("chat.deleteConfirm")}
-                            onClick={() => setDeleteTarget(message)}
-                          >
-                            <Trash2 className="size-3" />
-                          </button>
+                        <div
+                          className={cn(
+                            "mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5",
+                            isOwn ? "justify-end" : "justify-start",
+                          )}
+                        >
+                          <span className="text-xs font-medium text-foreground/90">
+                            {isOwn ? t("chat.you") : message.sender.name}
+                          </span>
+                          <ChatTimestamp iso={message.createdAt} />
+                        </div>
+                        {message.content.trim() ? (
+                          <p className="whitespace-pre-wrap wrap-break-word text-sm leading-relaxed text-foreground/95">
+                            {message.content}
+                          </p>
                         ) : null}
+                        <ChatMessageAttachments
+                          attachments={message.attachments ?? []}
+                          onPreviewLayoutSettle={handlePreviewLayoutSettle}
+                        />
                       </div>
-                      {message.content.trim() ? (
-                        <p className="whitespace-pre-wrap wrap-break-word text-sm leading-relaxed text-foreground/95">
-                          {message.content}
-                        </p>
-                      ) : null}
-                      <ChatMessageAttachments
-                        attachments={message.attachments ?? []}
-                        onPreviewLayoutSettle={handlePreviewLayoutSettle}
-                      />
-                    </div>
+                    )}
                   </div>
                   </div>
                 );

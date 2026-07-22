@@ -61,6 +61,19 @@ export type ChatProjectAttachment = {
 
 export type ChatAttachment = ChatFileAttachment | ChatTaskAttachment | ChatProjectAttachment;
 
+export type ChatMessageReactionUser = {
+  id: string;
+  name: string;
+  avatarUrl?: string | null;
+};
+
+export type ChatMessageReaction = {
+  emoji: string;
+  count: number;
+  userIds: string[];
+  reactedBy: ChatMessageReactionUser[];
+};
+
 export type ChatMessage = {
   id: string;
   content: string;
@@ -68,6 +81,7 @@ export type ChatMessage = {
   updatedAt: string;
   sender: ChatSender;
   attachments: ChatAttachment[];
+  reactions: ChatMessageReaction[];
 };
 
 export type ChatPageInfo = {
@@ -150,6 +164,13 @@ export function normalizeChatMessage(message: ChatMessage): ChatMessage {
   return {
     ...message,
     attachments: Array.isArray(message.attachments) ? message.attachments : [],
+    reactions: Array.isArray(message.reactions)
+      ? message.reactions.map((reaction) => ({
+          ...reaction,
+          userIds: Array.isArray(reaction.userIds) ? reaction.userIds : [],
+          reactedBy: Array.isArray(reaction.reactedBy) ? reaction.reactedBy : [],
+        }))
+      : [],
   };
 }
 
@@ -348,6 +369,36 @@ export async function deleteChatMessage(conversationId: string, messageId: strin
     },
   );
   return response.data;
+}
+
+export async function addChatMessageReaction(
+  conversationId: string,
+  messageId: string,
+  emoji: string,
+) {
+  const response = await apiRequest<{ data: { reactions: ChatMessageReaction[] } }>(
+    `/api/chat/conversations/${conversationId}/messages/${messageId}/reactions`,
+    {
+      method: "PUT",
+      body: { emoji },
+    },
+  );
+  return response.data.reactions;
+}
+
+export async function removeChatMessageReaction(
+  conversationId: string,
+  messageId: string,
+  emoji: string,
+) {
+  const response = await apiRequest<{ data: { reactions: ChatMessageReaction[] } }>(
+    `/api/chat/conversations/${conversationId}/messages/${messageId}/reactions`,
+    {
+      method: "DELETE",
+      body: { emoji },
+    },
+  );
+  return response.data.reactions;
 }
 
 export function isChatImagePreviewAttachment(

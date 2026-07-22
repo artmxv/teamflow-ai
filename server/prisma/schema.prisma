@@ -103,6 +103,7 @@ model User {
   notificationsSent            Notification[]        @relation("NotificationActor")
   chatMessages                 WorkspaceChatMessage[]
   chatConversationMemberships  ChatConversationMember[]
+  chatMessageReactions         ChatMessageReaction[]
 }
 
 model Workspace {
@@ -406,9 +407,25 @@ model WorkspaceChatMessage {
   conversation ChatConversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User                    @relation(fields: [senderId], references: [id], onDelete: Cascade)
   attachments  ChatMessageAttachment[]
+  reactions    ChatMessageReaction[]
 
   @@index([conversationId, createdAt, id])
   @@index([senderId])
+}
+
+model ChatMessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message WorkspaceChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@index([userId])
 }
 
 model ChatMessageAttachment {
