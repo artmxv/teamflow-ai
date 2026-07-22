@@ -1,4 +1,6 @@
-import { API_BASE_URL, ApiError, apiRequest, apiUpload, buildAuthHeaders } from "./client";
+import { API_BASE_URL, ApiError, apiRequest, apiUpload } from "./client";
+import { downloadBlobAsFile, fetchAuthenticatedBlob } from "./authenticated-blob";
+import { isPreviewableImageMimeType } from "@/lib/files/image-preview";
 
 export interface TaskAttachmentUploader {
   id: string;
@@ -64,12 +66,7 @@ export async function openTaskAttachment(attachment: TaskAttachmentApiItem) {
 
 export async function downloadTaskAttachmentFile(attachment: TaskAttachmentApiItem) {
   const blob = await fetchTaskAttachmentBlob(attachment);
-  const objectUrl = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = objectUrl;
-  link.download = attachment.originalName;
-  link.click();
-  URL.revokeObjectURL(objectUrl);
+  downloadBlobAsFile(blob, attachment.originalName);
 }
 
 export function formatAttachmentSize(bytes: number) {
@@ -78,10 +75,8 @@ export function formatAttachmentSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-const imageAttachmentMimeTypes = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
-
 export function isImageAttachment(attachment: Pick<TaskAttachmentApiItem, "mimeType">) {
-  return imageAttachmentMimeTypes.has(attachment.mimeType.toLowerCase());
+  return isPreviewableImageMimeType(attachment.mimeType);
 }
 
 export function attachmentExtensionFromName(name: string) {
@@ -109,11 +104,6 @@ export function getAttachmentFileTypeBadge(originalName: string, mimeType: strin
 }
 
 export async function fetchTaskAttachmentBlob(attachment: TaskAttachmentApiItem): Promise<Blob> {
-  const url = resolveTaskAttachmentUrl(attachment.downloadUrl || attachment.url);
-  const response = await fetch(url, { headers: buildAuthHeaders(), credentials: "include" });
-  if (!response.ok) {
-    throw new Error("Could not load attachment");
-  }
-
-  return response.blob();
+  const path = attachment.downloadUrl || attachment.url;
+  return fetchAuthenticatedBlob(path);
 }

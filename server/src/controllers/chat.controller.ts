@@ -1,10 +1,18 @@
 import type { NextFunction, Request, Response } from "express";
+import multer from "multer";
 import { z } from "zod";
 
+import {
+  CHAT_MAX_FILE_ATTACHMENTS,
+  parseIdListField,
+} from "../lib/chat-attachment-utils.js";
+import { runMultipartUploadIfAuthorized } from "../lib/chat-multipart-upload.js";
 import {
   CHAT_MESSAGE_MAX_LENGTH,
   validateChatMessageContent,
 } from "../lib/chat-message-utils.js";
+import { chatAttachmentUpload } from "../lib/chat-upload.js";
+import { sendResolvedStoredFile } from "../lib/file-storage/index.js";
 import { resolveRequestWorkspaceContext } from "../lib/workspace-request.js";
 import {
   emitChatMessageCreated,
@@ -12,13 +20,17 @@ import {
 } from "../realtime/chat-realtime.js";
 import {
   createConversationMessage,
+  createConversationMessageWithAttachments,
   deleteConversationMessage,
+  getChatAttachmentFile,
   getOrCreateDirectConversation,
   getTotalUnreadChatCount,
   listChatConversations,
   listConversationMessages,
   markConversationRead,
   setConversationPinned,
+  SUPABASE_UPLOAD_REQUIRED_MESSAGE,
+  validateConversationAccess,
 } from "../services/chat.service.js";
 
 const createMessageSchema = z.object({
@@ -51,6 +63,79 @@ function getConversationIdParam(req: Request): string | null {
   return typeof conversationId === "string" && conversationId.length > 0
     ? conversationId
     : null;
+}
+
+function isMultipartRequest(req: Request): boolean {
+  const contentType = req.headers["content-type"];
+  return typeof contentType === "string" && contentType.includes("multipart/form-data");
+}
+
+function handleChatUploadError(error: unknown, res: Response): boolean {
+  if (error instanceof multer.MulterError) {
+    if (error.code === "LIMIT_FILE_SIZE") {
+      res.status(400).json({ message: "File must be 10 MB or smaller" });
+      return true;
+    }
+    if (error.code === "LIMIT_FILE_COUNT" || error.code === "LIMIT_UNEXPECTED_FILE") {
+      res.status(400).json({
+        message: `You can attach at most ${CHAT_MAX_FILE_ATTACHMENTS} files`,
+      });
+      return true;
+    }
+  }
+
+  if (error instanceof Error) {
+    if (
+      error.message === "Unsupported file type" ||
+      error.message === "Invalid file name"
+    ) {
+      res.status(400).json({ message: error.message });
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function mapCreateMessageError(error: string, res: Response): boolean {
+  switch (error) {
+    case "not_found":
+      res.status(404).json({ message: "Conversation not found" });
+      return true;
+    case "invalid_content":
+      res.status(400).json({ message: "Invalid chat message payload" });
+      return true;
+    case "empty":
+      res.status(400).json({ message: "Message text or attachments are required" });
+      return true;
+    case "too_long":
+      res.status(400).json({
+        message: `content must be at most ${CHAT_MESSAGE_MAX_LENGTH} characters`,
+      });
+      return true;
+    case "too_many_files":
+      res.status(400).json({
+        message: `You can attach at most ${CHAT_MAX_FILE_ATTACHMENTS} files`,
+      });
+      return true;
+    case "invalid_file":
+      res.status(400).json({ message: "One or more files are invalid" });
+      return true;
+    case "duplicate_entity":
+      res.status(400).json({ message: "Duplicate task or project attachments are not allowed" });
+      return true;
+    case "task_not_found":
+      res.status(400).json({ message: "One or more tasks were not found in this workspace" });
+      return true;
+    case "project_not_found":
+      res.status(400).json({ message: "One or more projects were not found in this workspace" });
+      return true;
+    case "storage_unavailable":
+      res.status(503).json({ message: SUPABASE_UPLOAD_REQUIRED_MESSAGE });
+      return true;
+    default:
+      return false;
+  }
 }
 
 export async function getChatConversationsController(
@@ -253,6 +338,31 @@ export async function getConversationMessagesController(
   }
 }
 
+async function respondCreatedMessage(
+  res: Response,
+  conversationId: string,
+  workspaceId: string,
+  message: Awaited<ReturnType<typeof createConversationMessageWithAttachments>>,
+) {
+  if (typeof message === "string") {
+    if (!mapCreateMessageError(message, res)) {
+      res.status(400).json({ message: "Invalid chat message payload" });
+    }
+    return;
+  }
+
+  void emitChatMessageCreated({
+    conversationId,
+    workspaceId,
+    message,
+    createdAt: message.createdAt,
+  }).catch((error) => {
+    console.error("Failed to emit chat:message-created:", error);
+  });
+
+  res.status(201).json({ data: message });
+}
+
 export async function createConversationMessageController(
   req: Request,
   res: Response,
@@ -267,6 +377,78 @@ export async function createConversationMessageController(
     const conversationId = getConversationIdParam(req);
     if (!conversationId) {
       res.status(404).json({ message: "Conversation not found" });
+      return;
+    }
+
+    if (isMultipartRequest(req)) {
+      const multipartResult = await runMultipartUploadIfAuthorized({
+        validateAccess: () =>
+          validateConversationAccess({
+            workspaceId: context.workspaceId,
+            conversationId,
+            userId: req.userId!,
+          }),
+        parseUpload: async () => {
+          await new Promise<void>((resolve, reject) => {
+            chatAttachmentUpload.array("files", CHAT_MAX_FILE_ATTACHMENTS)(
+              req,
+              res,
+              (error) => {
+                if (error) {
+                  reject(error);
+                  return;
+                }
+                resolve();
+              },
+            );
+          });
+
+          return Array.isArray(req.files)
+            ? (req.files as Express.Multer.File[])
+            : [];
+        },
+      });
+
+      if (multipartResult.status === "not_found") {
+        res.status(404).json({ message: "Conversation not found" });
+        return;
+      }
+
+      const files = multipartResult.result;
+
+      const message = await createConversationMessageWithAttachments(
+        context.workspaceId,
+        conversationId,
+        req.userId!,
+        {
+          content: req.body?.content,
+          taskIds: req.body?.taskIds,
+          projectIds: req.body?.projectIds,
+          files,
+        },
+      );
+
+      await respondCreatedMessage(res, conversationId, context.workspaceId, message);
+      return;
+    }
+
+    const hasAttachmentIds =
+      parseIdListField(req.body?.taskIds).length > 0 ||
+      parseIdListField(req.body?.projectIds).length > 0;
+
+    if (hasAttachmentIds) {
+      const message = await createConversationMessageWithAttachments(
+        context.workspaceId,
+        conversationId,
+        req.userId!,
+        {
+          content: req.body?.content,
+          taskIds: req.body?.taskIds,
+          projectIds: req.body?.projectIds,
+          files: [],
+        },
+      );
+      await respondCreatedMessage(res, conversationId, context.workspaceId, message);
       return;
     }
 
@@ -311,6 +493,13 @@ export async function createConversationMessageController(
 
     res.status(201).json({ data: message });
   } catch (error) {
+    if (handleChatUploadError(error, res)) {
+      return;
+    }
+    if (error instanceof Error && error.message.includes("Supabase Storage")) {
+      res.status(503).json({ message: SUPABASE_UPLOAD_REQUIRED_MESSAGE });
+      return;
+    }
     next(error);
   }
 }
@@ -359,6 +548,54 @@ export async function deleteConversationMessageController(
     });
 
     res.json({ data: deleted });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function downloadChatAttachmentController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const context = await resolveWorkspace(req, res);
+    if (!context) {
+      return;
+    }
+
+    const conversationId = getConversationIdParam(req);
+    const attachmentId = req.params.attachmentId;
+    if (!conversationId || typeof attachmentId !== "string") {
+      res.status(404).json({ message: "Attachment not found" });
+      return;
+    }
+
+    const file = await getChatAttachmentFile({
+      workspaceId: context.workspaceId,
+      conversationId,
+      attachmentId,
+      userId: req.userId!,
+      isAuthenticated: Boolean(req.userId),
+      isActiveWorkspaceMember: true,
+    });
+
+    if (file === "unauthenticated") {
+      res.status(401).json({ message: "Authentication required" });
+      return;
+    }
+
+    if (file === "forbidden") {
+      res.status(403).json({ message: "You cannot download this attachment" });
+      return;
+    }
+
+    if (file === "not_found") {
+      res.status(404).json({ message: "Attachment not found" });
+      return;
+    }
+
+    await sendResolvedStoredFile(res, file, next);
   } catch (error) {
     next(error);
   }

@@ -34,6 +34,11 @@ import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { EmptyState } from "@/components/app/EmptyState";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { NewDirectMessageDialog } from "@/components/app/chat/NewDirectMessageDialog";
+import { ChatMessageAttachments } from "@/components/app/chat/ChatMessageAttachments";
+import {
+  ChatAttachMenu,
+  ChatPendingAttachmentChips,
+} from "@/components/app/chat/ChatComposerAttachments";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,6 +54,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  buildChatAttachmentPreviewLabel,
   CHAT_CONVERSATIONS_FALLBACK_POLL_MS,
   CHAT_MESSAGE_MAX_LENGTH,
   CHAT_MESSAGES_FALLBACK_POLL_MS,
@@ -68,9 +74,13 @@ import {
   updateChatConversationsCache,
   updateChatMessagesCache,
   validateChatDraft,
+  localizeChatPreviewContent,
   type ChatConversation,
   type ChatMessage,
   type ChatMessagesPage,
+  type PendingChatFile,
+  type PendingChatProject,
+  type PendingChatTask,
 } from "@/lib/api/chat";
 import { getSelectedWorkspaceId } from "@/lib/api/client";
 import { useI18n, type Lang } from "@/lib/i18n";
@@ -589,7 +599,18 @@ function ConversationRow({
 }) {
   const { t } = useI18n();
   const name = conversationDisplayName(conversation, t("chat.generalChat"));
-  const preview = conversation.latestMessage?.content ?? t("chat.noPreview");
+  const previewLabels = {
+    file: t("chat.previewFile"),
+    files: t("chat.previewFiles"),
+    task: t("chat.previewTask"),
+    tasks: t("chat.previewTasks"),
+    project: t("chat.previewProject"),
+    projects: t("chat.previewProjects"),
+  };
+  const preview = conversation.latestMessage
+    ? localizeChatPreviewContent(conversation.latestMessage.content, previewLabels) ||
+      t("chat.noPreview")
+    : t("chat.noPreview");
 
   return (
     <li>
@@ -690,9 +711,20 @@ function ConversationMessagePane({
 
   const [draft, setDraft] = useState("");
   const [draftError, setDraftError] = useState<string | null>(null);
+  const [pendingFiles, setPendingFiles] = useState<PendingChatFile[]>([]);
+  const [pendingTasks, setPendingTasks] = useState<PendingChatTask[]>([]);
+  const [pendingProjects, setPendingProjects] = useState<PendingChatProject[]>([]);
   const [showNewMessages, setShowNewMessages] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ChatMessage | null>(null);
+
+  useEffect(() => {
+    setDraft("");
+    setDraftError(null);
+    setPendingFiles([]);
+    setPendingTasks([]);
+    setPendingProjects([]);
+  }, [conversationId]);
 
   const messagesQuery = useQuery({
     queryKey,
@@ -978,7 +1010,12 @@ function ConversationMessagePane({
   }
 
   const sendMutation = useMutation({
-    mutationFn: (content: string) => sendChatMessage(conversationId, content),
+    mutationFn: (input: {
+      content: string;
+      files: File[];
+      taskIds: string[];
+      projectIds: string[];
+    }) => sendChatMessage(conversationId, input),
     onSuccess: (message) => {
       queryClient.setQueryData<ChatMessagesPage>(queryKey, (old) => {
         if (!old) {
@@ -1004,6 +1041,15 @@ function ConversationMessagePane({
         };
       });
 
+      const preview = buildChatAttachmentPreviewLabel(message.content, message.attachments, {
+        file: t("chat.previewFile"),
+        files: t("chat.previewFiles"),
+        task: t("chat.previewTask"),
+        tasks: t("chat.previewTasks"),
+        project: t("chat.previewProject"),
+        projects: t("chat.previewProjects"),
+      });
+
       updateChatConversationsCache(queryClient, (old) =>
         old.map((item) =>
           item.id === conversationId
@@ -1011,7 +1057,7 @@ function ConversationMessagePane({
                 ...item,
                 latestMessage: {
                   id: message.id,
-                  content: message.content,
+                  content: preview || message.content,
                   createdAt: message.createdAt,
                   senderId: message.sender.id,
                 },
@@ -1026,6 +1072,9 @@ function ConversationMessagePane({
       stickToBottomRef.current = true;
       setShowNewMessages(false);
       setDraft("");
+      setPendingFiles([]);
+      setPendingTasks([]);
+      setPendingProjects([]);
       setDraftError(null);
       void queryClient.invalidateQueries({ queryKey: conversationsQueryKey });
     },
@@ -1050,7 +1099,9 @@ function ConversationMessagePane({
   });
 
   function submitDraft() {
-    const validation = validateChatDraft(draft);
+    const hasAttachments =
+      pendingFiles.length > 0 || pendingTasks.length > 0 || pendingProjects.length > 0;
+    const validation = validateChatDraft(draft, { allowEmpty: hasAttachments });
     if (!validation.ok) {
       setDraftError(
         validation.reason === "too_long"
@@ -1061,7 +1112,12 @@ function ConversationMessagePane({
     }
 
     setDraftError(null);
-    sendMutation.mutate(validation.content);
+    sendMutation.mutate({
+      content: validation.content,
+      files: pendingFiles.map((item) => item.file),
+      taskIds: pendingTasks.map((task) => task.id),
+      projectIds: pendingProjects.map((project) => project.id),
+    });
   }
 
   function handleSubmit(event: FormEvent) {
@@ -1084,10 +1140,15 @@ function ConversationMessagePane({
     }
   }
 
+  const hasAttachments =
+    pendingFiles.length > 0 || pendingTasks.length > 0 || pendingProjects.length > 0;
   const remaining = CHAT_MESSAGE_MAX_LENGTH - draft.length;
-  const canSend = draft.trim().length > 0 && draft.trim().length <= CHAT_MESSAGE_MAX_LENGTH;
+  const canSend =
+    (draft.trim().length > 0 || hasAttachments) &&
+    draft.trim().length <= CHAT_MESSAGE_MAX_LENGTH;
   const showCharCounter = draft.length >= COMPOSER_COUNTER_SOFT_LIMIT || remaining < 0;
   const showComposerMeta = Boolean(draftError) || showCharCounter;
+  const showConversationMeta = page?.pageInfo.hasMoreOlder;
 
   useLayoutEffect(() => {
     const el = composerRef.current;
@@ -1163,31 +1224,27 @@ function ConversationMessagePane({
         </div>
       ) : (
         <>
+          {showConversationMeta ? (
           <div className="flex items-center justify-center border-b border-border/60 px-4 py-2">
-            {page?.pageInfo.hasMoreOlder ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-8 text-xs text-muted-foreground"
-                disabled={loadingOlder}
-                onClick={() => void handleLoadOlder()}
-              >
-                {loadingOlder ? (
-                  <>
-                    <Loader2 className="size-3.5 animate-spin" />
-                    {t("common.loading")}
-                  </>
-                ) : (
-                  t("chat.loadOlder")
-                )}
-              </Button>
-            ) : (
-              <span className="text-[11px] text-muted-foreground/70">
-                {messages.length > 0 ? title : ""}
-              </span>
-            )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs text-muted-foreground"
+              disabled={loadingOlder}
+              onClick={() => void handleLoadOlder()}
+            >
+              {loadingOlder ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" />
+                  {t("common.loading")}
+                </>
+              ) : (
+                t("chat.loadOlder")
+              )}
+            </Button>
           </div>
+          ) : null}
 
           <div
             ref={listRef}
@@ -1251,9 +1308,12 @@ function ConversationMessagePane({
                           </button>
                         ) : null}
                       </div>
-                      <p className="whitespace-pre-wrap wrap-break-word text-sm leading-relaxed text-foreground/95">
-                        {message.content}
-                      </p>
+                      {message.content.trim() ? (
+                        <p className="whitespace-pre-wrap wrap-break-word text-sm leading-relaxed text-foreground/95">
+                          {message.content}
+                        </p>
+                      ) : null}
+                      <ChatMessageAttachments attachments={message.attachments ?? []} />
                     </div>
                   </div>
                 );
@@ -1279,39 +1339,60 @@ function ConversationMessagePane({
             onSubmit={handleSubmit}
             className="border-t border-border/60 bg-background/40 px-4 py-3"
           >
+            <ChatPendingAttachmentChips
+              files={pendingFiles}
+              tasks={pendingTasks}
+              projects={pendingProjects}
+              disabled={sendMutation.isPending}
+              onFilesChange={setPendingFiles}
+              onTasksChange={setPendingTasks}
+              onProjectsChange={setPendingProjects}
+            />
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <div className="min-w-0 flex-1">
-                <Textarea
-                  ref={composerRef}
-                  value={draft}
-                  onChange={(event) => {
-                    setDraft(event.target.value);
-                    if (draftError) {
-                      setDraftError(null);
-                    }
-                  }}
-                  onKeyDown={handleComposerKeyDown}
-                  placeholder={t("chat.placeholder")}
+              <div className="flex min-w-0 flex-1 items-end gap-1">
+                <ChatAttachMenu
+                  files={pendingFiles}
+                  tasks={pendingTasks}
+                  projects={pendingProjects}
                   disabled={sendMutation.isPending}
-                  rows={1}
-                  maxLength={CHAT_MESSAGE_MAX_LENGTH + 50}
-                  className="min-h-9 max-h-40 resize-none overflow-x-hidden overflow-y-auto bg-card py-2 leading-5 wrap-break-word"
+                  onFilesChange={setPendingFiles}
+                  onTasksChange={setPendingTasks}
+                  onProjectsChange={setPendingProjects}
+                  onValidationError={setDraftError}
                 />
-                {showComposerMeta ? (
-                  <div className="mt-1 flex items-center justify-between gap-2 px-0.5">
-                    <p className="text-[11px] text-destructive">{draftError ?? ""}</p>
-                    {showCharCounter ? (
-                      <p
-                        className={cn(
-                          "ml-auto text-[11px] tabular-nums text-muted-foreground",
-                          remaining < 0 && "text-destructive",
-                        )}
-                      >
-                        {draft.length}/{CHAT_MESSAGE_MAX_LENGTH}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
+                <div className="min-w-0 flex-1">
+                  <Textarea
+                    ref={composerRef}
+                    value={draft}
+                    onChange={(event) => {
+                      setDraft(event.target.value);
+                      if (draftError) {
+                        setDraftError(null);
+                      }
+                    }}
+                    onKeyDown={handleComposerKeyDown}
+                    placeholder={t("chat.placeholder")}
+                    disabled={sendMutation.isPending}
+                    rows={1}
+                    maxLength={CHAT_MESSAGE_MAX_LENGTH + 50}
+                    className="min-h-9 max-h-40 resize-none overflow-x-hidden overflow-y-auto bg-card py-2 leading-5 wrap-break-word"
+                  />
+                  {showComposerMeta ? (
+                    <div className="mt-1 flex items-center justify-between gap-2 px-0.5">
+                      <p className="text-[11px] text-destructive">{draftError ?? ""}</p>
+                      {showCharCounter ? (
+                        <p
+                          className={cn(
+                            "ml-auto text-[11px] tabular-nums text-muted-foreground",
+                            remaining < 0 && "text-destructive",
+                          )}
+                        >
+                          {draft.length}/{CHAT_MESSAGE_MAX_LENGTH}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
               </div>
               <Button
                 type="submit"
@@ -1321,7 +1402,7 @@ function ConversationMessagePane({
                 {sendMutation.isPending ? (
                   <>
                     <Loader2 className="size-4 animate-spin" />
-                    {t("chat.sending")}
+                    {hasAttachments ? t("chat.uploading") : t("chat.sending")}
                   </>
                 ) : (
                   <>

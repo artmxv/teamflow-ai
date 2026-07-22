@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 
-export type FileStorageCategory = "avatar" | "task" | "project";
+export type FileStorageCategory = "avatar" | "task" | "project" | "chat";
 
 export type StoredFilePayload = {
   objectKey: string;
@@ -43,6 +43,8 @@ export function buildObjectKey(input: {
   workspaceId: string;
   entityId: string;
   storedFilename: string;
+  /** Required for chat: message id segment in the object key. */
+  messageId?: string;
 }): string {
   switch (input.category) {
     case "avatar":
@@ -51,6 +53,12 @@ export function buildObjectKey(input: {
       return `workspaces/${input.workspaceId}/tasks/${input.entityId}/${input.storedFilename}`;
     case "project":
       return `workspaces/${input.workspaceId}/projects/${input.entityId}/${input.storedFilename}`;
+    case "chat": {
+      if (!input.messageId) {
+        throw new Error("messageId is required for chat object keys");
+      }
+      return `workspaces/${input.workspaceId}/chat/${input.entityId}/${input.messageId}/${input.storedFilename}`;
+    }
     default: {
       const exhaustive: never = input.category;
       return exhaustive;
@@ -76,6 +84,9 @@ export function resolveStorageObjectKey(input: {
       return `tasks/${input.entityId}/${input.filename}`;
     case "project":
       return `projects/${input.entityId}/${input.filename}`;
+    case "chat":
+      // Chat attachments always store the full object key.
+      return input.filename;
     default: {
       const exhaustive: never = input.category;
       return exhaustive;

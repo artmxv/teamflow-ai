@@ -2,6 +2,7 @@ import { useMemo, type ReactNode } from "react";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { AppBootScreen } from "@/components/app/AppBootScreen";
+import { AuthenticatedImageLightboxProvider } from "@/components/app/files/AuthenticatedImageLightbox";
 import type { AuthWorkspace } from "@/lib/api/auth";
 import { nameToInitials, useCurrentUser } from "@/lib/auth/use-current-user";
 import { useChatRealtime } from "@/lib/realtime/use-chat-realtime";
@@ -57,6 +58,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           />
         </div>
       ) : (
+      <AuthenticatedImageLightboxProvider>
       <div className="flex min-h-screen w-full bg-muted/30">
         <AppSidebar
           workspace={workspace}
@@ -69,6 +71,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <main className="flex-1 overflow-x-hidden px-4 py-6 sm:px-6 lg:px-8">{children}</main>
         </div>
       </div>
+      </AuthenticatedImageLightboxProvider>
       )}
     </AuthGuard>
   );
