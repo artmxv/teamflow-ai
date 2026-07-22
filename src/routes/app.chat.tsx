@@ -17,6 +17,7 @@ import { isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user"
 import { AppShell } from "@/components/app/AppShell";
 import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { EmptyState } from "@/components/app/EmptyState";
+import { MemberProfileDrawer } from "@/components/app/MemberProfileDrawer";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { NewDirectMessageDialog } from "@/components/app/chat/NewDirectMessageDialog";
 import { ChatMessageAttachments } from "@/components/app/chat/ChatMessageAttachments";
@@ -25,6 +26,13 @@ import {
   ChatMessageReactionPicker,
   ChatMessageReactionProvider,
 } from "@/components/app/chat/ChatMessageReactions";
+import {
+  ChatMessagePinBadge,
+  ChatMessagePinButton,
+  ChatPinnedMessagesHeaderButton,
+  ChatPinnedMessagesPanel,
+  useTemporaryMessageHighlight,
+} from "@/components/app/chat/ChatMessagePins";
 import { ChatOnlineDot } from "@/components/app/chat/ChatOnlineDot";
 import {
   ChatAttachMenu,
@@ -60,6 +68,7 @@ import {
   CHAT_MESSAGES_PAGE_SIZE,
   chatConversationsQueryKey,
   chatMessagesQueryKey,
+  chatPinnedMessagesQueryKey,
   conversationDisplayName,
   deleteChatMessage,
   encodeChatCursor,
@@ -721,6 +730,11 @@ function ConversationMessagePane({
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameDraft, setRenameDraft] = useState("");
   const [renameError, setRenameError] = useState<string | null>(null);
+  const [pinnedPanelOpen, setPinnedPanelOpen] = useState(false);
+  const [jumpingToPinned, setJumpingToPinned] = useState(false);
+  const [profileMemberId, setProfileMemberId] = useState<string | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const { highlightedMessageId, setHighlightedMessageId } = useTemporaryMessageHighlight();
 
   useEffect(() => {
     setDraft("");
@@ -728,9 +742,13 @@ function ConversationMessagePane({
     setPendingFiles([]);
     setPendingTasks([]);
     setPendingProjects([]);
+    setPinnedPanelOpen(false);
+    setProfileMemberId(null);
+    setProfileOpen(false);
+    setHighlightedMessageId(null);
     // Reset only; do not auto-focus on conversation switch / chat open (mobile keyboard).
     composerFocusRequestRef.current = false;
-  }, [conversationId]);
+  }, [conversationId, setHighlightedMessageId]);
 
   const messagesQuery = useQuery({
     queryKey,
@@ -1140,6 +1158,101 @@ function ConversationMessagePane({
     }
   }
 
+  async function ensurePinnedMessageLoaded(messageId: string): Promise<"found" | "missing"> {
+    let current = queryClient.getQueryData<ChatMessagesPage>(queryKey);
+    if (current?.messages.some((message) => message.id === messageId)) {
+      return "found";
+    }
+
+    // Load older pages until the target appears or history is exhausted.
+    // Cap iterations to avoid an infinite loop if cursors stall.
+    for (let pageIndex = 0; pageIndex < 100; pageIndex += 1) {
+      current = queryClient.getQueryData<ChatMessagesPage>(queryKey);
+      if (!current?.pageInfo.hasMoreOlder || !current.pageInfo.oldestCursor) {
+        break;
+      }
+
+      const older = await fetchChatMessages(conversationId, {
+        limit: CHAT_MESSAGES_PAGE_SIZE,
+        before: current.pageInfo.oldestCursor,
+      });
+
+      queryClient.setQueryData<ChatMessagesPage>(queryKey, (old) => {
+        if (!old) {
+          return older;
+        }
+        return {
+          messages: mergeChatMessages(older.messages, old.messages),
+          pageInfo: {
+            hasMoreOlder: older.pageInfo.hasMoreOlder,
+            oldestCursor: older.pageInfo.oldestCursor ?? old.pageInfo.oldestCursor,
+            newestCursor: old.pageInfo.newestCursor,
+          },
+        };
+      });
+
+      const merged = queryClient.getQueryData<ChatMessagesPage>(queryKey);
+      if (merged?.messages.some((message) => message.id === messageId)) {
+        return "found";
+      }
+
+      if (!older.pageInfo.hasMoreOlder || older.messages.length === 0) {
+        break;
+      }
+    }
+
+    return "missing";
+  }
+
+  async function handleJumpToPinnedMessage(messageId: string) {
+    if (jumpingToPinned) {
+      return;
+    }
+
+    setPinnedPanelOpen(false);
+    setJumpingToPinned(true);
+    stickToBottomRef.current = false;
+    layoutAnchorModeRef.current = null;
+
+    try {
+      const result = await ensurePinnedMessageLoaded(messageId);
+      if (result === "missing") {
+        const pinnedKey = chatPinnedMessagesQueryKey(workspaceId, conversationId);
+        queryClient.setQueryData<{ messages: ChatMessage[] }>(pinnedKey, (old) => {
+          if (!old) {
+            return old;
+          }
+          return {
+            messages: old.messages.filter((message) => message.id !== messageId),
+          };
+        });
+        toast.error(t("chat.pinnedMessageMissing"));
+        return;
+      }
+
+      // Wait a frame so newly merged DOM nodes are available.
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+
+      const target = listRef.current?.querySelector(
+        `[data-message-id="${CSS.escape(messageId)}"]`,
+      );
+      if (target instanceof HTMLElement) {
+        ignoreScrollEventsRef.current = true;
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        setHighlightedMessageId(messageId);
+        window.setTimeout(() => {
+          ignoreScrollEventsRef.current = false;
+        }, 400);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("chat.errorTitle"));
+    } finally {
+      setJumpingToPinned(false);
+    }
+  }
+
   const sendMutation = useMutation({
     mutationFn: (input: {
       content: string;
@@ -1225,6 +1338,15 @@ function ConversationMessagePane({
         ...old,
         messages: old.messages.filter((message) => message.id !== id),
       }));
+      const pinnedKey = chatPinnedMessagesQueryKey(workspaceId, conversationId);
+      queryClient.setQueryData<{ messages: ChatMessage[] }>(pinnedKey, (old) => {
+        if (!old) {
+          return old;
+        }
+        return {
+          messages: old.messages.filter((message) => message.id !== id),
+        };
+      });
       setDeleteTarget(null);
       void queryClient.invalidateQueries({ queryKey: conversationsQueryKey });
     },
@@ -1381,6 +1503,8 @@ function ConversationMessagePane({
   const showCharCounter = draft.length >= COMPOSER_COUNTER_SOFT_LIMIT || remaining < 0;
   const showComposerMeta = Boolean(draftError) || showCharCounter;
   const showConversationMeta = page?.pageInfo.hasMoreOlder;
+  const directParticipant =
+    conversation.type === "DIRECT" ? conversation.otherParticipant : null;
 
   useLayoutEffect(() => {
     const el = composerRef.current;
@@ -1406,33 +1530,68 @@ function ConversationMessagePane({
             <ArrowLeft className="size-4" />
           </Button>
         ) : null}
-        {conversation.type === "DIRECT" && conversation.otherParticipant ? (
-          <UserAvatar
-            id={conversation.otherParticipant.id}
-            name={conversation.otherParticipant.name}
-            avatar={conversation.otherParticipant.avatar}
-            avatarUrl={conversation.otherParticipant.avatarUrl}
-            size="sm"
-            className="shrink-0"
-          />
+        {directParticipant ? (
+          <>
+            <span className="relative shrink-0">
+              <UserAvatar
+                id={directParticipant.id}
+                name={directParticipant.name}
+                avatar={directParticipant.avatar}
+                avatarUrl={directParticipant.avatarUrl}
+                size="sm"
+                className="shrink-0"
+              />
+              {showHeaderOnline ? (
+                <ChatOnlineDot
+                  label={t("chat.online")}
+                  className="absolute right-0 bottom-0 ring-2 ring-background"
+                />
+              ) : null}
+            </span>
+            <div className="min-w-0 flex-1">
+              <button
+                type="button"
+                className={cn(
+                  "max-w-full cursor-pointer truncate rounded-sm text-left text-sm font-semibold transition-colors",
+                  "hover:text-foreground/80 hover:underline hover:underline-offset-2",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                )}
+                aria-label={t("chat.openUserProfile").replace("{name}", directParticipant.name)}
+                onClick={() => {
+                  setProfileMemberId(directParticipant.id);
+                  setProfileOpen(true);
+                }}
+              >
+                {title}
+              </button>
+              {conversation.unreadCount > 0 ? (
+                <p className="truncate text-[11px] text-muted-foreground">
+                  {conversation.unreadCount === 1
+                    ? t("chat.unreadOne")
+                    : t("chat.unreadMany").replace("{count}", String(conversation.unreadCount))}
+                </p>
+              ) : null}
+            </div>
+          </>
         ) : (
-          <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary/15 text-primary">
-            <Users className="size-3.5" />
-          </span>
+          <>
+            <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary/15 text-primary">
+              <Users className="size-3.5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <h3 className="truncate text-sm font-semibold">{title}</h3>
+              </div>
+              {conversation.unreadCount > 0 ? (
+                <p className="truncate text-[11px] text-muted-foreground">
+                  {conversation.unreadCount === 1
+                    ? t("chat.unreadOne")
+                    : t("chat.unreadMany").replace("{count}", String(conversation.unreadCount))}
+                </p>
+              ) : null}
+            </div>
+          </>
         )}
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <h3 className="truncate text-sm font-semibold">{title}</h3>
-            {showHeaderOnline ? <ChatOnlineDot label={t("chat.online")} /> : null}
-          </div>
-          {conversation.unreadCount > 0 ? (
-            <p className="truncate text-[11px] text-muted-foreground">
-              {conversation.unreadCount === 1
-                ? t("chat.unreadOne")
-                : t("chat.unreadMany").replace("{count}", String(conversation.unreadCount))}
-            </p>
-          ) : null}
-        </div>
         {conversation.type === "WORKSPACE" && canRenameGeneral ? (
           <Button
             type="button"
@@ -1445,17 +1604,34 @@ function ConversationMessagePane({
             <Pencil className="size-4" />
           </Button>
         ) : null}
+        <ChatPinnedMessagesHeaderButton
+          open={pinnedPanelOpen}
+          onOpenChange={setPinnedPanelOpen}
+        />
         <Button
           type="button"
           variant="ghost"
           size="icon"
           className="size-8 shrink-0"
+          title={conversation.isPinned ? t("chat.unpinChat") : t("chat.pinChat")}
           aria-label={conversation.isPinned ? t("chat.unpinChat") : t("chat.pinChat")}
           onClick={() => onPinnedChange(!conversation.isPinned)}
         >
           {conversation.isPinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
         </Button>
       </div>
+
+      {workspaceId ? (
+        <ChatPinnedMessagesPanel
+          open={pinnedPanelOpen}
+          onOpenChange={setPinnedPanelOpen}
+          conversationId={conversationId}
+          workspaceId={workspaceId}
+          onSelectMessage={(messageId) => {
+            void handleJumpToPinnedMessage(messageId);
+          }}
+        />
+      ) : null}
 
       {messagesQuery.isLoading ? (
         <ChatSkeleton />
@@ -1532,8 +1708,10 @@ function ConversationMessagePane({
                     <div
                       data-message-id={message.id}
                       className={cn(
-                        "group flex gap-2.5",
+                        "group flex gap-2.5 rounded-2xl transition-[box-shadow,background-color] duration-500",
                         isOwn ? "flex-row-reverse" : "flex-row",
+                        highlightedMessageId === message.id &&
+                          "bg-primary/10 ring-2 ring-primary/35 ring-offset-2 ring-offset-background",
                       )}
                     >
                     <UserAvatar
@@ -1559,6 +1737,7 @@ function ConversationMessagePane({
                               : "border-border/80 bg-background/60",
                           )}
                         >
+                          {message.pin ? <ChatMessagePinBadge pin={message.pin} /> : null}
                           <div
                             className={cn(
                               "mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5",
@@ -1570,10 +1749,17 @@ function ConversationMessagePane({
                             </span>
                             <ChatTimestamp iso={message.createdAt} />
                             <ChatMessageReactionPicker />
+                            {workspaceId ? (
+                              <ChatMessagePinButton
+                                conversationId={conversationId}
+                                message={message}
+                                workspaceId={workspaceId}
+                              />
+                            ) : null}
                             {isOwn ? (
                               <button
                                 type="button"
-                                className="inline-flex size-5 items-center justify-center rounded text-muted-foreground/70 transition hover:bg-destructive/10 hover:text-destructive"
+                                className="inline-flex size-5 items-center justify-center rounded text-muted-foreground/70 transition hover:bg-destructive/10 hover:text-destructive opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
                                 aria-label={t("chat.deleteConfirm")}
                                 onClick={() => setDeleteTarget(message)}
                               >
@@ -1602,6 +1788,7 @@ function ConversationMessagePane({
                             : "border-border/80 bg-background/60",
                         )}
                       >
+                        {message.pin ? <ChatMessagePinBadge pin={message.pin} /> : null}
                         <div
                           className={cn(
                             "mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5",
@@ -1813,6 +2000,15 @@ function ConversationMessagePane({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <MemberProfileDrawer
+        memberId={profileMemberId}
+        open={profileOpen}
+        onClose={() => {
+          setProfileOpen(false);
+          setProfileMemberId(null);
+        }}
+      />
     </>
   );
 }

@@ -104,6 +104,7 @@ model User {
   chatMessages                 WorkspaceChatMessage[]
   chatConversationMemberships  ChatConversationMember[]
   chatMessageReactions         ChatMessageReaction[]
+  chatMessagePins              WorkspaceChatMessagePin[]
 }
 
 model Workspace {
@@ -408,9 +409,24 @@ model WorkspaceChatMessage {
   sender       User                    @relation(fields: [senderId], references: [id], onDelete: Cascade)
   attachments  ChatMessageAttachment[]
   reactions    ChatMessageReaction[]
+  pin          WorkspaceChatMessagePin?
 
   @@index([conversationId, createdAt, id])
   @@index([senderId])
+}
+
+model WorkspaceChatMessagePin {
+  id         String   @id @default(cuid())
+  messageId  String   @unique
+  pinnedById String
+  pinnedAt   DateTime @default(now())
+
+  message  WorkspaceChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  pinnedBy User                 @relation(fields: [pinnedById], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@index([pinnedById])
+  @@index([pinnedAt])
 }
 
 model ChatMessageReaction {

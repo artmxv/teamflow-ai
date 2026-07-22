@@ -4,6 +4,7 @@ import {
   buildChatAttachmentPreviewLabel,
   chatConversationsQueryKey,
   chatMessagesQueryKey,
+  chatPinnedMessagesQueryKey,
   chatUnreadCountQueryKey,
   encodeChatCursor,
   mergeChatMessages,
@@ -30,6 +31,13 @@ export type ChatMessageReactionUpdatedEvent = {
   conversationId: string;
   messageId: string;
   reactions: ChatMessage["reactions"];
+};
+
+export type ChatMessagePinUpdatedEvent = {
+  workspaceId: string;
+  conversationId: string;
+  messageId: string;
+  pin: ChatMessage["pin"];
 };
 
 export type ChatConversationUpdatedEvent = {
@@ -208,6 +216,16 @@ export function applyChatMessageDeletedToCache(input: {
     };
   });
 
+  const pinnedKey = chatPinnedMessagesQueryKey(workspaceId, event.conversationId);
+  queryClient.setQueryData<{ messages: ChatMessage[] }>(pinnedKey, (old) => {
+    if (!old) {
+      return old;
+    }
+    return {
+      messages: old.messages.filter((message) => message.id !== event.messageId),
+    };
+  });
+
   void queryClient.invalidateQueries({
     queryKey: chatConversationsQueryKey(workspaceId),
   });
@@ -255,6 +273,92 @@ export function applyChatMessageReactionUpdatedToCache(input: {
       ...old,
       messages,
     };
+  });
+}
+
+/**
+ * Replace pin on a single message and keep the pinned-messages list in sync.
+ * Does not touch unread or conversation order.
+ */
+export function applyChatMessagePinUpdatedToCache(input: {
+  queryClient: QueryClient;
+  workspaceId: string;
+  event: ChatMessagePinUpdatedEvent;
+}) {
+  const { queryClient, workspaceId, event } = input;
+  if (event.workspaceId !== workspaceId) {
+    return;
+  }
+
+  const messagesKey = chatMessagesQueryKey(workspaceId, event.conversationId);
+  let sourceMessage: ChatMessage | undefined;
+
+  queryClient.setQueryData<ChatMessagesPage>(messagesKey, (old) => {
+    if (!old) {
+      return old;
+    }
+
+    let changed = false;
+    const messages = old.messages.map((message) => {
+      if (message.id !== event.messageId) {
+        return message;
+      }
+      changed = true;
+      const next = {
+        ...message,
+        pin: event.pin,
+      };
+      sourceMessage = next;
+      return next;
+    });
+
+    if (!changed) {
+      return old;
+    }
+
+    return {
+      ...old,
+      messages,
+    };
+  });
+
+  const pinnedKey = chatPinnedMessagesQueryKey(workspaceId, event.conversationId);
+  queryClient.setQueryData<{ messages: ChatMessage[] }>(pinnedKey, (old) => {
+    if (!old) {
+      return old;
+    }
+
+    if (event.pin === null) {
+      return {
+        messages: old.messages.filter((message) => message.id !== event.messageId),
+      };
+    }
+
+    const existing = old.messages.find((message) => message.id === event.messageId);
+    const nextMessage = existing
+      ? { ...existing, pin: event.pin }
+      : sourceMessage
+        ? { ...sourceMessage, pin: event.pin }
+        : null;
+
+    if (!nextMessage) {
+      // Message not in history cache yet; refetch pinned list lazily when panel opens.
+      void queryClient.invalidateQueries({ queryKey: pinnedKey });
+      return old;
+    }
+
+    const without = old.messages.filter((message) => message.id !== event.messageId);
+    const merged = [...without, nextMessage].sort((a, b) => {
+      const aAt = a.pin?.pinnedAt ?? "";
+      const bAt = b.pin?.pinnedAt ?? "";
+      const timeDiff = new Date(bAt).getTime() - new Date(aAt).getTime();
+      if (timeDiff !== 0) {
+        return timeDiff;
+      }
+      return a.id.localeCompare(b.id);
+    });
+
+    return { messages: merged };
   });
 }
 

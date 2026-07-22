@@ -9,10 +9,13 @@ import {
   getChatConversationsController,
   getChatUnreadCountController,
   getConversationMessagesController,
+  getPinnedChatMessagesController,
   markConversationReadController,
+  pinChatMessageController,
   pinConversationController,
   removeChatMessageReactionController,
   renameConversationController,
+  unpinChatMessageController,
 } from "../controllers/chat.controller.js";
 import { requireAuth } from "../middleware/require-auth.middleware.js";
 
@@ -36,6 +39,10 @@ chatRouter.post(
   createConversationMessageController,
 );
 chatRouter.get(
+  "/conversations/:conversationId/pinned-messages",
+  getPinnedChatMessagesController,
+);
+chatRouter.get(
   "/conversations/:conversationId/attachments/:attachmentId/file",
   downloadChatAttachmentController,
 );
@@ -50,4 +57,12 @@ chatRouter.put(
 chatRouter.delete(
   "/conversations/:conversationId/messages/:messageId/reactions",
   removeChatMessageReactionController,
+);
+chatRouter.put(
+  "/conversations/:conversationId/messages/:messageId/pin",
+  pinChatMessageController,
+);
+chatRouter.delete(
+  "/conversations/:conversationId/messages/:messageId/pin",
+  unpinChatMessageController,
 );
