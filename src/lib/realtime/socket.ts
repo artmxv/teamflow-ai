@@ -2,6 +2,7 @@ import { io, type Socket } from "socket.io-client";
 
 import { API_BASE_URL } from "@/lib/api/client";
 import { getAuthToken } from "@/lib/auth/token";
+import { clearChatPresence } from "./chat-presence-state";
 import { setChatSocketStatus, type ChatSocketStatus } from "./chat-socket-state";
 
 export type TeamFlowSocket = Socket;
@@ -29,6 +30,7 @@ function bindLifecycle(instance: TeamFlowSocket) {
   });
 
   instance.on("disconnect", () => {
+    clearChatPresence();
     setChatSocketStatus(instance.active ? "reconnecting" : "disconnected");
   });
 
@@ -109,6 +111,8 @@ export function getChatSocket(): TeamFlowSocket | null {
 }
 
 export function disconnectChatSocket() {
+  clearChatPresence();
+
   if (!socket) {
     activeWorkspaceId = null;
     setChatSocketStatus("idle");

@@ -10,10 +10,15 @@ import {
   CHAT_CONVERSATION_UPDATED,
   CHAT_MESSAGE_CREATED,
   CHAT_MESSAGE_DELETED,
+  CHAT_PRESENCE_SNAPSHOT,
+  CHAT_PRESENCE_UPDATED,
   type ChatConversationUpdatedPayload,
   type ChatMessageCreatedPayload,
   type ChatMessageDeletedPayload,
+  type ChatPresenceSnapshotPayload,
+  type ChatPresenceUpdatedPayload,
 } from "./chat-events.js";
+import { chatPresenceRegistry } from "./chat-presence.js";
 import { userRoom, workspaceRoom } from "./rooms.js";
 import {
   authenticateSocketToken,
@@ -38,9 +43,17 @@ function normalizeOrigin(origin: string): string {
 
 const allowedOrigins = new Set(env.CORS_ORIGINS.map(normalizeOrigin));
 
+function emitPresenceUpdated(payload: ChatPresenceUpdatedPayload) {
+  if (!io) {
+    return;
+  }
+  io.to(workspaceRoom(payload.workspaceId)).emit(CHAT_PRESENCE_UPDATED, payload);
+}
+
 /**
  * Single-instance Socket.IO gateway.
- * Horizontal scaling later needs a shared adapter (e.g. Redis).
+ * Horizontal scaling later needs a shared adapter (e.g. Redis) and a shared
+ * presence layer; the in-memory presence registry is not multi-instance safe.
  */
 export function initChatRealtime(httpServer: HttpServer): Server {
   if (io) {
@@ -66,6 +79,14 @@ export function initChatRealtime(httpServer: HttpServer): Server {
     },
     // Same origin allowlist as Express CORS (local + production frontends).
     allowEIO3: false,
+  });
+
+  chatPresenceRegistry.setOfflineHandler(({ workspaceId, userId }) => {
+    emitPresenceUpdated({
+      workspaceId,
+      userId,
+      isOnline: false,
+    });
   });
 
   io.use(async (socket, next) => {
@@ -107,8 +128,31 @@ export function initChatRealtime(httpServer: HttpServer): Server {
     const authSocket = socket as AuthenticatedSocket;
     const { userId, workspaceId } = authSocket.data;
 
+    // Failed / unauthenticated handshakes never reach this handler, so they
+    // cannot enter the presence registry. Inactive members are rejected above.
     void authSocket.join(userRoom(userId));
     void authSocket.join(workspaceRoom(workspaceId));
+
+    const becameOnline = chatPresenceRegistry.addSocket(workspaceId, userId, authSocket.id);
+
+    const snapshot: ChatPresenceSnapshotPayload = {
+      workspaceId,
+      onlineUserIds: chatPresenceRegistry.listOnlineUserIds(workspaceId),
+    };
+    authSocket.emit(CHAT_PRESENCE_SNAPSHOT, snapshot);
+
+    if (becameOnline) {
+      // Other workspace members only; the connecting socket already has the snapshot.
+      authSocket.to(workspaceRoom(workspaceId)).emit(CHAT_PRESENCE_UPDATED, {
+        workspaceId,
+        userId,
+        isOnline: true,
+      } satisfies ChatPresenceUpdatedPayload);
+    }
+
+    authSocket.on("disconnect", () => {
+      chatPresenceRegistry.removeSocket(workspaceId, userId, authSocket.id);
+    });
   });
 
   return io;
@@ -179,6 +223,9 @@ export async function emitChatConversationRenamed(payload: {
 }
 
 export async function closeChatRealtime(): Promise<void> {
+  chatPresenceRegistry.setOfflineHandler(null);
+  chatPresenceRegistry.clear();
+
   if (!io) {
     return;
   }

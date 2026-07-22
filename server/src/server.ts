@@ -7,7 +7,10 @@ import { closeChatRealtime, initChatRealtime } from "./realtime/chat-realtime.js
 
 /**
  * HTTP + Socket.IO on the same port.
- * Realtime is correct for a single backend instance; multi-instance needs a shared adapter (e.g. Redis).
+ * Realtime and online presence are correct for a single backend instance
+ * (WEB_CONCURRENCY=1). Multi-instance needs the Socket.IO Redis adapter and a
+ * shared presence store (e.g. Redis); the in-memory presence registry is not
+ * multi-instance safe.
  */
 const httpServer = createServer(app);
 initChatRealtime(httpServer);
