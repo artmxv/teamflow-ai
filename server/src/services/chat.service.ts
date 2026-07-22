@@ -37,6 +37,13 @@ import {
   validateChatMessageContent,
 } from "../lib/chat-message-utils.js";
 import {
+  groupChatReactions,
+  resolveChatReactionDisplayName,
+  validateChatReactionEmoji,
+  type ChatReactionDto,
+  type ChatReactionUserDto,
+} from "../lib/chat-reaction-utils.js";
+import {
   deleteStoredFile,
   persistUploadedFile,
   resolveStoredFile,
@@ -91,6 +98,20 @@ const messageSelect = {
     orderBy: { createdAt: "asc" as const },
     include: attachmentInclude,
   },
+  reactions: {
+    select: {
+      emoji: true,
+      userId: true,
+      user: {
+        select: {
+          id: true,
+          name: true,
+          displayName: true,
+          avatarUrl: true,
+        },
+      },
+    },
+  },
 } as const;
 
 type SenderRow = {
@@ -126,6 +147,17 @@ type AttachmentRow = {
   } | null;
 };
 
+type ReactionRow = {
+  emoji: string;
+  userId: string;
+  user: {
+    id: string;
+    name: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+  };
+};
+
 type MessageRow = {
   id: string;
   content: string;
@@ -134,6 +166,7 @@ type MessageRow = {
   senderId: string;
   sender: SenderRow;
   attachments: AttachmentRow[];
+  reactions: ReactionRow[];
 };
 
 export type ChatFileAttachmentDto = {
@@ -178,6 +211,7 @@ export type ChatMessageDto = {
   updatedAt: string;
   sender: SenderRow;
   attachments: ChatAttachmentDto[];
+  reactions: ChatReactionDto[];
 };
 
 export type ChatMessagesPage = {
@@ -307,6 +341,40 @@ function mapAttachment(
   };
 }
 
+function mapReactionUser(user: {
+  id: string;
+  name: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+}): ChatReactionUserDto {
+  return {
+    id: user.id,
+    name: resolveChatReactionDisplayName(user),
+    avatarUrl: user.avatarUrl,
+  };
+}
+
+function buildReactionUsersById(
+  reactions: Array<{
+    userId: string;
+    user?: {
+      id: string;
+      name: string;
+      displayName: string | null;
+      avatarUrl: string | null;
+    } | null;
+  }>,
+): Map<string, ChatReactionUserDto> {
+  const usersById = new Map<string, ChatReactionUserDto>();
+  for (const reaction of reactions) {
+    if (!reaction.user || usersById.has(reaction.userId)) {
+      continue;
+    }
+    usersById.set(reaction.userId, mapReactionUser(reaction.user));
+  }
+  return usersById;
+}
+
 function mapMessage(
   message: MessageRow,
   conversationId: string,
@@ -320,6 +388,10 @@ function mapMessage(
     sender: message.sender,
     attachments: message.attachments.map((attachment) =>
       mapAttachment(attachment, conversationId, workspaceId),
+    ),
+    reactions: groupChatReactions(
+      message.reactions ?? [],
+      buildReactionUsersById(message.reactions ?? []),
     ),
   };
 }
@@ -1203,6 +1275,134 @@ export async function deleteConversationMessage(
   });
 
   return { id: messageId };
+}
+
+export type ChatMessageReactionResult =
+  | { reactions: ChatReactionDto[] }
+  | "not_found"
+  | "invalid_emoji";
+
+async function loadMessageReactions(messageId: string): Promise<ChatReactionDto[]> {
+  const rows = await prisma.chatMessageReaction.findMany({
+    where: { messageId },
+    select: {
+      emoji: true,
+      userId: true,
+      user: {
+        select: {
+          id: true,
+          name: true,
+          displayName: true,
+          avatarUrl: true,
+        },
+      },
+    },
+  });
+  return groupChatReactions(rows, buildReactionUsersById(rows));
+}
+
+/**
+ * Idempotent add: creates the reaction if missing, returns current aggregates either way.
+ * Does not trust workspaceId/userId from the client body.
+ */
+export async function addChatMessageReaction(input: {
+  workspaceId: string;
+  conversationId: string;
+  messageId: string;
+  userId: string;
+  rawEmoji: unknown;
+}): Promise<ChatMessageReactionResult> {
+  const emojiValidation = validateChatReactionEmoji(input.rawEmoji);
+  if (!emojiValidation.ok) {
+    return "invalid_emoji";
+  }
+
+  const conversation = await findAccessibleConversation({
+    workspaceId: input.workspaceId,
+    conversationId: input.conversationId,
+    userId: input.userId,
+  });
+  if (!conversation) {
+    return "not_found";
+  }
+
+  const message = await prisma.workspaceChatMessage.findFirst({
+    where: {
+      id: input.messageId,
+      conversationId: input.conversationId,
+    },
+    select: { id: true },
+  });
+  if (!message) {
+    return "not_found";
+  }
+
+  try {
+    await prisma.chatMessageReaction.create({
+      data: {
+        messageId: message.id,
+        userId: input.userId,
+        emoji: emojiValidation.emoji,
+      },
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      // Idempotent: unique (messageId, userId, emoji) already exists.
+    } else {
+      throw error;
+    }
+  }
+
+  return { reactions: await loadMessageReactions(message.id) };
+}
+
+/**
+ * Idempotent remove: deletes only the current user's reaction for the emoji.
+ */
+export async function removeChatMessageReaction(input: {
+  workspaceId: string;
+  conversationId: string;
+  messageId: string;
+  userId: string;
+  rawEmoji: unknown;
+}): Promise<ChatMessageReactionResult> {
+  const emojiValidation = validateChatReactionEmoji(input.rawEmoji);
+  if (!emojiValidation.ok) {
+    return "invalid_emoji";
+  }
+
+  const conversation = await findAccessibleConversation({
+    workspaceId: input.workspaceId,
+    conversationId: input.conversationId,
+    userId: input.userId,
+  });
+  if (!conversation) {
+    return "not_found";
+  }
+
+  const message = await prisma.workspaceChatMessage.findFirst({
+    where: {
+      id: input.messageId,
+      conversationId: input.conversationId,
+    },
+    select: { id: true },
+  });
+  if (!message) {
+    return "not_found";
+  }
+
+  await prisma.chatMessageReaction.deleteMany({
+    where: {
+      messageId: message.id,
+      userId: input.userId,
+      emoji: emojiValidation.emoji,
+    },
+  });
+
+  return { reactions: await loadMessageReactions(message.id) };
 }
 
 export async function getChatAttachmentFile(input: {

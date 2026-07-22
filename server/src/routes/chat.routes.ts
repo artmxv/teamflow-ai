@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import {
+  addChatMessageReactionController,
   createConversationMessageController,
   createDirectConversationController,
   deleteConversationMessageController,
@@ -10,6 +11,7 @@ import {
   getConversationMessagesController,
   markConversationReadController,
   pinConversationController,
+  removeChatMessageReactionController,
   renameConversationController,
 } from "../controllers/chat.controller.js";
 import { requireAuth } from "../middleware/require-auth.middleware.js";
@@ -40,4 +42,12 @@ chatRouter.get(
 chatRouter.delete(
   "/conversations/:conversationId/messages/:messageId",
   deleteConversationMessageController,
+);
+chatRouter.put(
+  "/conversations/:conversationId/messages/:messageId/reactions",
+  addChatMessageReactionController,
+);
+chatRouter.delete(
+  "/conversations/:conversationId/messages/:messageId/reactions",
+  removeChatMessageReactionController,
 );

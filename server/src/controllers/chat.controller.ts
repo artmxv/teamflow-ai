@@ -15,6 +15,7 @@ import { chatAttachmentUpload } from "../lib/chat-upload.js";
 import { sendResolvedStoredFile } from "../lib/file-storage/index.js";
 import { resolveRequestWorkspaceContext } from "../lib/workspace-request.js";
 import {
+  addChatMessageReaction,
   createConversationMessage,
   createConversationMessageWithAttachments,
   deleteConversationMessage,
@@ -24,6 +25,7 @@ import {
   listChatConversations,
   listConversationMessages,
   markConversationRead,
+  removeChatMessageReaction,
   renameChatConversation,
   setConversationPinned,
   SUPABASE_UPLOAD_REQUIRED_MESSAGE,
@@ -34,6 +36,7 @@ import {
   emitChatConversationRenamed,
   emitChatMessageCreated,
   emitChatMessageDeleted,
+  emitChatMessageReactionUpdated,
 } from "../realtime/chat-realtime.js";
 
 const createMessageSchema = z.object({
@@ -59,6 +62,10 @@ const renameConversationSchema = z.object({
       CHAT_CONVERSATION_TITLE_MAX_LENGTH,
       `title must be at most ${CHAT_CONVERSATION_TITLE_MAX_LENGTH} characters`,
     ),
+});
+
+const reactionEmojiSchema = z.object({
+  emoji: z.string({ required_error: "emoji is required" }),
 });
 
 async function resolveWorkspace(req: Request, res: Response) {
@@ -641,6 +648,120 @@ export async function deleteConversationMessageController(
     });
 
     res.json({ data: deleted });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function addChatMessageReactionController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const context = await resolveWorkspace(req, res);
+    if (!context) {
+      return;
+    }
+
+    const conversationId = getConversationIdParam(req);
+    const messageId = req.params.messageId;
+    if (!conversationId || typeof messageId !== "string") {
+      res.status(404).json({ message: "Message not found" });
+      return;
+    }
+
+    const parsed = reactionEmojiSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ message: "emoji is required" });
+      return;
+    }
+
+    const result = await addChatMessageReaction({
+      workspaceId: context.workspaceId,
+      conversationId,
+      messageId,
+      userId: req.userId!,
+      rawEmoji: parsed.data.emoji,
+    });
+
+    if (result === "invalid_emoji") {
+      res.status(400).json({ message: "Unsupported reaction emoji" });
+      return;
+    }
+
+    if (result === "not_found") {
+      res.status(404).json({ message: "Message not found" });
+      return;
+    }
+
+    void emitChatMessageReactionUpdated({
+      workspaceId: context.workspaceId,
+      conversationId,
+      messageId,
+      reactions: result.reactions,
+    }).catch((error) => {
+      console.error("Failed to emit chat:message-reaction-updated:", error);
+    });
+
+    res.json({ data: { reactions: result.reactions } });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function removeChatMessageReactionController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const context = await resolveWorkspace(req, res);
+    if (!context) {
+      return;
+    }
+
+    const conversationId = getConversationIdParam(req);
+    const messageId = req.params.messageId;
+    if (!conversationId || typeof messageId !== "string") {
+      res.status(404).json({ message: "Message not found" });
+      return;
+    }
+
+    const parsed = reactionEmojiSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ message: "emoji is required" });
+      return;
+    }
+
+    const result = await removeChatMessageReaction({
+      workspaceId: context.workspaceId,
+      conversationId,
+      messageId,
+      userId: req.userId!,
+      rawEmoji: parsed.data.emoji,
+    });
+
+    if (result === "invalid_emoji") {
+      res.status(400).json({ message: "Unsupported reaction emoji" });
+      return;
+    }
+
+    if (result === "not_found") {
+      res.status(404).json({ message: "Message not found" });
+      return;
+    }
+
+    void emitChatMessageReactionUpdated({
+      workspaceId: context.workspaceId,
+      conversationId,
+      messageId,
+      reactions: result.reactions,
+    }).catch((error) => {
+      console.error("Failed to emit chat:message-reaction-updated:", error);
+    });
+
+    res.json({ data: { reactions: result.reactions } });
   } catch (error) {
     next(error);
   }

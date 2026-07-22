@@ -10,11 +10,13 @@ import {
   CHAT_CONVERSATION_UPDATED,
   CHAT_MESSAGE_CREATED,
   CHAT_MESSAGE_DELETED,
+  CHAT_MESSAGE_REACTION_UPDATED,
   CHAT_PRESENCE_SNAPSHOT,
   CHAT_PRESENCE_UPDATED,
   type ChatConversationUpdatedPayload,
   type ChatMessageCreatedPayload,
   type ChatMessageDeletedPayload,
+  type ChatMessageReactionUpdatedPayload,
   type ChatPresenceSnapshotPayload,
   type ChatPresenceUpdatedPayload,
 } from "./chat-events.js";
@@ -204,6 +206,17 @@ export async function emitChatMessageCreated(payload: ChatMessageCreatedPayload)
 export async function emitChatMessageDeleted(payload: ChatMessageDeletedPayload) {
   const memberIds = await listConversationMemberUserIds(payload.conversationId);
   emitToUsers(memberIds, CHAT_MESSAGE_DELETED, payload);
+}
+
+/**
+ * Reaction updates go only to conversation member user rooms.
+ * Does not emit conversation-updated (no unread / sort / lastMessage changes).
+ */
+export async function emitChatMessageReactionUpdated(
+  payload: ChatMessageReactionUpdatedPayload,
+) {
+  const memberIds = await listConversationMemberUserIds(payload.conversationId);
+  emitToUsers(memberIds, CHAT_MESSAGE_REACTION_UPDATED, payload);
 }
 
 export async function emitChatConversationRenamed(payload: {

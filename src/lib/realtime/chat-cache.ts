@@ -25,6 +25,13 @@ export type ChatMessageDeletedEvent = {
   messageId: string;
 };
 
+export type ChatMessageReactionUpdatedEvent = {
+  workspaceId: string;
+  conversationId: string;
+  messageId: string;
+  reactions: ChatMessage["reactions"];
+};
+
 export type ChatConversationUpdatedEvent = {
   conversationId: string;
   workspaceId: string;
@@ -206,6 +213,48 @@ export function applyChatMessageDeletedToCache(input: {
   });
   void queryClient.invalidateQueries({
     queryKey: chatUnreadCountQueryKey(workspaceId),
+  });
+}
+
+/**
+ * Replace reactions on a single message. Does not touch unread or conversation order.
+ */
+export function applyChatMessageReactionUpdatedToCache(input: {
+  queryClient: QueryClient;
+  workspaceId: string;
+  event: ChatMessageReactionUpdatedEvent;
+}) {
+  const { queryClient, workspaceId, event } = input;
+  if (event.workspaceId !== workspaceId) {
+    return;
+  }
+
+  const messagesKey = chatMessagesQueryKey(workspaceId, event.conversationId);
+  queryClient.setQueryData<ChatMessagesPage>(messagesKey, (old) => {
+    if (!old) {
+      return old;
+    }
+
+    let changed = false;
+    const messages = old.messages.map((message) => {
+      if (message.id !== event.messageId) {
+        return message;
+      }
+      changed = true;
+      return {
+        ...message,
+        reactions: event.reactions,
+      };
+    });
+
+    if (!changed) {
+      return old;
+    }
+
+    return {
+      ...old,
+      messages,
+    };
   });
 }
 

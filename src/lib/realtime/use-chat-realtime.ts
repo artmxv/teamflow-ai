@@ -10,9 +10,11 @@ import {
   applyChatConversationUpdatedToCache,
   applyChatMessageCreatedToCache,
   applyChatMessageDeletedToCache,
+  applyChatMessageReactionUpdatedToCache,
   type ChatConversationUpdatedEvent,
   type ChatMessageCreatedEvent,
   type ChatMessageDeletedEvent,
+  type ChatMessageReactionUpdatedEvent,
 } from "@/lib/realtime/chat-cache";
 import {
   applyPresenceSnapshot,
@@ -31,6 +33,7 @@ import { connectChatSocket, disconnectChatSocket, getChatSocket } from "@/lib/re
 
 const MESSAGE_CREATED = "chat:message-created";
 const MESSAGE_DELETED = "chat:message-deleted";
+const MESSAGE_REACTION_UPDATED = "chat:message-reaction-updated";
 const CONVERSATION_UPDATED = "chat:conversation-updated";
 const PRESENCE_SNAPSHOT = "chat:presence-snapshot";
 const PRESENCE_UPDATED = "chat:presence-updated";
@@ -92,6 +95,14 @@ export function useChatRealtime({
       });
     }
 
+    function onMessageReactionUpdated(payload: ChatMessageReactionUpdatedEvent) {
+      applyChatMessageReactionUpdatedToCache({
+        queryClient,
+        workspaceId: workspaceId!,
+        event: payload,
+      });
+    }
+
     function onConversationUpdated(payload: ChatConversationUpdatedEvent) {
       applyChatConversationUpdatedToCache({
         queryClient,
@@ -132,6 +143,7 @@ export function useChatRealtime({
 
     instance.on(MESSAGE_CREATED, onMessageCreated);
     instance.on(MESSAGE_DELETED, onMessageDeleted);
+    instance.on(MESSAGE_REACTION_UPDATED, onMessageReactionUpdated);
     instance.on(CONVERSATION_UPDATED, onConversationUpdated);
     instance.on(PRESENCE_SNAPSHOT, onPresenceSnapshot);
     instance.on(PRESENCE_UPDATED, onPresenceUpdated);
@@ -140,6 +152,7 @@ export function useChatRealtime({
     return () => {
       instance.off(MESSAGE_CREATED, onMessageCreated);
       instance.off(MESSAGE_DELETED, onMessageDeleted);
+      instance.off(MESSAGE_REACTION_UPDATED, onMessageReactionUpdated);
       instance.off(CONVERSATION_UPDATED, onConversationUpdated);
       instance.off(PRESENCE_SNAPSHOT, onPresenceSnapshot);
       instance.off(PRESENCE_UPDATED, onPresenceUpdated);
