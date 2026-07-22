@@ -3,13 +3,14 @@ import { SmilePlus } from "lucide-react";
 import {
   createContext,
   useContext,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import {
@@ -45,6 +46,11 @@ function useReactionActions() {
     throw new Error("Chat message reaction components require ChatMessageReactionProvider");
   }
   return value;
+}
+
+/** Public hook for message action menus that sit inside the reaction provider. */
+export function useChatMessageReactionActions() {
+  return useReactionActions();
 }
 
 function sortReactions(reactions: ChatMessageReaction[]): ChatMessageReaction[] {
@@ -221,7 +227,11 @@ export function ChatMessageReactionProvider({
 }
 
 /** Compact emoji picker shown next to message actions. */
-export function ChatMessageReactionPicker() {
+export function ChatMessageReactionPicker({
+  alwaysVisible = false,
+}: {
+  alwaysVisible?: boolean;
+}) {
   const { t } = useI18n();
   const [pickerOpen, setPickerOpen] = useState(false);
   const { reactions, pendingEmoji, toggleReaction, currentUserId, align } =
@@ -235,24 +245,26 @@ export function ChatMessageReactionPicker() {
           variant="ghost"
           size="icon"
           className={cn(
-            "size-5 shrink-0 text-muted-foreground/70 hover:text-foreground",
-            "opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100",
+            "size-7 shrink-0 text-muted-foreground/70 hover:text-foreground",
+            !alwaysVisible &&
+              "opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100",
             pickerOpen && "opacity-100",
           )}
           aria-label={t("chat.addReaction")}
           disabled={Boolean(pendingEmoji)}
         >
-          <SmilePlus className="size-3" />
+          <SmilePlus className="size-3.5" aria-hidden="true" />
         </Button>
       </PopoverTrigger>
       <PopoverContent
         align={align === "end" ? "end" : "start"}
         side="top"
-        className="w-auto p-1.5"
+        collisionPadding={12}
+        className="w-auto max-w-[calc(100vw-1.5rem)] p-1.5"
         aria-label={t("chat.messageReactions")}
       >
         <div
-          className="flex items-center gap-0.5"
+          className="flex flex-wrap items-center gap-0.5"
           role="group"
           aria-label={t("chat.messageReactions")}
         >
@@ -265,7 +277,7 @@ export function ChatMessageReactionPicker() {
                 key={emoji}
                 type="button"
                 className={cn(
-                  "inline-flex size-8 items-center justify-center rounded-md text-base transition hover:bg-muted",
+                  "inline-flex size-9 items-center justify-center rounded-md text-base transition hover:bg-muted",
                   reactedByMe && "bg-primary/15",
                 )}
                 aria-label={reactedByMe ? t("chat.removeReaction") : t("chat.addReaction")}
@@ -312,6 +324,8 @@ export function ChatMessageReactionChips() {
   const { t } = useI18n();
   const { reactions, pendingEmoji, toggleReaction, currentUserId, align } =
     useReactionActions();
+  const [authorsOpenEmoji, setAuthorsOpenEmoji] = useState<string | null>(null);
+  const longPressConsumedRef = useRef(false);
 
   if (reactions.length === 0) {
     return null;
@@ -321,9 +335,10 @@ export function ChatMessageReactionChips() {
     <TooltipProvider delayDuration={250}>
       <div
         className={cn(
-          "mt-1.5 flex flex-wrap items-center gap-1",
+          "mt-1.5 flex max-w-full flex-wrap items-center gap-1",
           align === "end" ? "justify-end" : "justify-start",
         )}
+        data-no-message-long-press=""
       >
         {reactions.map((reaction) => {
           const reactedByMe = reaction.userIds.includes(currentUserId);
@@ -342,33 +357,85 @@ export function ChatMessageReactionChips() {
               : actionLabel;
 
           return (
-            <Tooltip key={reaction.emoji}>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  disabled={Boolean(pendingEmoji)}
-                  aria-label={ariaLabel}
-                  aria-pressed={reactedByMe}
-                  className={cn(
-                    "inline-flex h-6 items-center gap-1 rounded-full border px-1.5 text-[11px] tabular-nums transition",
-                    reactedByMe
-                      ? "border-primary/40 bg-primary/15 text-foreground"
-                      : "border-border/70 bg-background/70 text-muted-foreground hover:bg-muted/60",
-                    isPending && "opacity-60",
-                  )}
-                  onClick={() => toggleReaction(reaction.emoji)}
+            <Popover
+              key={reaction.emoji}
+              open={authorsOpenEmoji === reaction.emoji}
+              onOpenChange={(open) => {
+                setAuthorsOpenEmoji(open ? reaction.emoji : null);
+              }}
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <PopoverAnchor asChild>
+                    <button
+                      type="button"
+                      disabled={Boolean(pendingEmoji)}
+                      aria-label={ariaLabel}
+                      aria-pressed={reactedByMe}
+                      className={cn(
+                        "inline-flex h-7 min-h-7 items-center gap-1 rounded-full border px-2 text-[11px] tabular-nums transition",
+                        reactedByMe
+                          ? "border-primary/40 bg-primary/15 text-foreground"
+                          : "border-border/70 bg-background/70 text-muted-foreground hover:bg-muted/60",
+                        isPending && "opacity-60",
+                      )}
+                      onClick={() => {
+                        if (longPressConsumedRef.current) {
+                          longPressConsumedRef.current = false;
+                          return;
+                        }
+                        toggleReaction(reaction.emoji);
+                      }}
+                      onContextMenu={(event) => {
+                        event.preventDefault();
+                        setAuthorsOpenEmoji(reaction.emoji);
+                      }}
+                      onPointerDown={(event) => {
+                        if (event.pointerType !== "touch") {
+                          return;
+                        }
+                        const target = event.currentTarget;
+                        const timer = window.setTimeout(() => {
+                          longPressConsumedRef.current = true;
+                          setAuthorsOpenEmoji(reaction.emoji);
+                        }, 450);
+                        const clear = () => {
+                          window.clearTimeout(timer);
+                          target.removeEventListener("pointerup", clear);
+                          target.removeEventListener("pointercancel", clear);
+                          target.removeEventListener("pointerleave", clear);
+                        };
+                        target.addEventListener("pointerup", clear);
+                        target.addEventListener("pointercancel", clear);
+                        target.addEventListener("pointerleave", clear);
+                      }}
+                    >
+                      <span aria-hidden="true">{reaction.emoji}</span>
+                      <span>{reaction.count}</span>
+                    </button>
+                  </PopoverAnchor>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top"
+                  collisionPadding={12}
+                  className="max-w-[min(16rem,calc(100vw-1.5rem))] bg-popover px-2.5 py-2 text-popover-foreground shadow-md"
                 >
-                  <span aria-hidden="true">{reaction.emoji}</span>
-                  <span>{reaction.count}</span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent
+                  <ReactionChipTooltipBody emoji={reaction.emoji} lines={authorLines} />
+                </TooltipContent>
+              </Tooltip>
+              <PopoverContent
                 side="top"
-                className="bg-popover px-2.5 py-2 text-popover-foreground shadow-md"
+                align={align === "end" ? "end" : "start"}
+                collisionPadding={12}
+                className="w-auto max-w-[min(16rem,calc(100vw-1.5rem))] p-2.5"
+                onOpenAutoFocus={(event) => event.preventDefault()}
               >
+                <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                  {t("chat.reactionAuthors")}
+                </p>
                 <ReactionChipTooltipBody emoji={reaction.emoji} lines={authorLines} />
-              </TooltipContent>
-            </Tooltip>
+              </PopoverContent>
+            </Popover>
           );
         })}
       </div>

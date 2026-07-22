@@ -33,7 +33,7 @@ export function ChatImageAttachmentPreviewGrid({
         : "grid-cols-2 sm:grid-cols-3";
 
   return (
-    <div className={cn("grid w-full max-w-sm gap-1", gridClassName)}>
+    <div className={cn("grid w-full max-w-full gap-1 sm:max-w-sm", gridClassName)}>
       {attachments.map((attachment) => (
         <ChatImageAttachmentPreview
           key={attachment.id}

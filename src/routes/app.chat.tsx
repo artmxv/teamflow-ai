@@ -20,16 +20,15 @@ import { EmptyState } from "@/components/app/EmptyState";
 import { MemberProfileDrawer } from "@/components/app/MemberProfileDrawer";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { NewDirectMessageDialog } from "@/components/app/chat/NewDirectMessageDialog";
+import { ChatConversationHeader } from "@/components/app/chat/ChatConversationHeader";
+import { ChatMessageActions } from "@/components/app/chat/ChatMessageActions";
 import { ChatMessageAttachments } from "@/components/app/chat/ChatMessageAttachments";
 import {
   ChatMessageReactionChips,
-  ChatMessageReactionPicker,
   ChatMessageReactionProvider,
 } from "@/components/app/chat/ChatMessageReactions";
 import {
   ChatMessagePinBadge,
-  ChatMessagePinButton,
-  ChatPinnedMessagesHeaderButton,
   ChatPinnedMessagesPanel,
   useTemporaryMessageHighlight,
 } from "@/components/app/chat/ChatMessagePins";
@@ -102,6 +101,12 @@ import {
   validateChatConversationTitle,
 } from "@/lib/chat/conversation-title";
 import { shouldShowDirectPresence } from "@/lib/chat/presence";
+import {
+  isMessageLongPressPointer,
+  MESSAGE_LONG_PRESS_MOVE_PX,
+  MESSAGE_LONG_PRESS_MS,
+  shouldIgnoreMessageLongPress,
+} from "@/lib/chat/message-long-press";
 import { resolveInitialScrollTarget } from "@/lib/chat/scroll";
 import { getSelectedWorkspaceId } from "@/lib/api/client";
 import { useI18n, type Lang } from "@/lib/i18n";
@@ -115,16 +120,13 @@ import { useIsUserOnline } from "@/lib/realtime/use-chat-presence";
 import { cn } from "@/lib/utils";
 import {
   ArrowDown,
-  ArrowLeft,
   Loader2,
   MessageSquare,
-  Pencil,
   Pin,
   PinOff,
   Plus,
   Search,
   Send,
-  Trash2,
   Users,
 } from "lucide-react";
 
@@ -221,18 +223,17 @@ function SidebarTime({ iso }: { iso: string | null }) {
   );
 }
 
-function useIsDesktopMd() {
-  const [isDesktop, setIsDesktop] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia("(min-width: 768px)");
-    const update = () => setIsDesktop(media.matches);
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-
-  return isDesktop;
+/** Two-column chat layout from xl (~1280px). Below that: list OR conversation. */
+function useIsDesktopXl() {
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      const media = window.matchMedia("(min-width: 1280px)");
+      media.addEventListener("change", onStoreChange);
+      return () => media.removeEventListener("change", onStoreChange);
+    },
+    () => window.matchMedia("(min-width: 1280px)").matches,
+    () => true,
+  );
 }
 
 function WorkspaceChatPage() {
@@ -243,7 +244,7 @@ function WorkspaceChatPage() {
   const navigate = Route.useNavigate();
   const { conversation: conversationFromUrl } = Route.useSearch();
   const workspaceId = me?.workspace?.id ?? getSelectedWorkspaceId();
-  const isDesktop = useIsDesktopMd();
+  const isDesktop = useIsDesktopXl();
 
   const [directDialogOpen, setDirectDialogOpen] = useState(false);
   const [conversationFilter, setConversationFilter] = useState("");
@@ -285,11 +286,24 @@ function WorkspaceChatPage() {
     if (!conversations.length) {
       return null;
     }
+
+    if (conversationFromUrl) {
+      const match = conversations.some((item) => item.id === conversationFromUrl);
+      if (match) {
+        return conversationFromUrl;
+      }
+    }
+
+    // Mobile list without a conversation in the URL: do not auto-open a chat.
+    if (!isDesktop && !conversationFromUrl) {
+      return null;
+    }
+
     return resolveInitialConversationId({
       requestedId: conversationFromUrl,
       conversations,
     });
-  }, [conversationFromUrl, conversations]);
+  }, [conversationFromUrl, conversations, isDesktop]);
 
   useEffect(() => {
     setOpenChatConversationId(selectedConversationId);
@@ -307,6 +321,12 @@ function WorkspaceChatPage() {
     }
 
     if (!isDesktop && mobileShowList && !conversationFromUrl) {
+      return;
+    }
+
+    // On mobile, only sync the URL when a conversation is already selected in the URL
+    // or the messages pane is open — never force-open from the list.
+    if (!isDesktop && !conversationFromUrl) {
       return;
     }
 
@@ -337,23 +357,23 @@ function WorkspaceChatPage() {
   useEffect(() => {
     if (conversationFromUrl) {
       setMobileShowList(false);
+    } else {
+      setMobileShowList(true);
     }
   }, [conversationFromUrl]);
 
   function selectConversation(conversationId: string) {
+    const fromMobileList = !isDesktop && mobileShowList;
     setMobileShowList(false);
     void navigate({
       search: { conversation: conversationId },
-      replace: true,
+      replace: !fromMobileList,
     });
   }
 
   function handleBackToList() {
+    // Keep conversationId in the URL; only switch the mobile view back to the list.
     setMobileShowList(true);
-    void navigate({
-      search: { conversation: undefined },
-      replace: true,
-    });
   }
 
   const showSidebar = isDesktop || mobileShowList || !selectedConversationId;
@@ -399,15 +419,17 @@ function WorkspaceChatPage() {
 
   return (
     <AppShell>
-      <div className="mb-4 flex items-end justify-between gap-3">
+      <div className="mb-3 flex items-end justify-between gap-3 sm:mb-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("chat.chats")}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t("chat.subtitle")}</p>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+            {t("chat.chats")}
+          </h1>
+          <p className="mt-1 hidden text-sm text-muted-foreground sm:block">{t("chat.subtitle")}</p>
         </div>
         <ChatRealtimeStatus status={socketStatus} />
       </div>
 
-      <div className="relative flex h-[calc(100dvh-10.5rem)] min-h-0 overflow-hidden rounded-2xl border border-border bg-card shadow-soft md:h-[calc(100vh-11rem)] md:min-h-112">
+      <div className="relative flex h-[calc(100dvh-8.5rem)] min-h-0 overflow-hidden rounded-2xl border border-border bg-card shadow-soft sm:h-[calc(100dvh-10.5rem)] md:h-[calc(100vh-11rem)] md:min-h-112">
         {conversationsQuery.isLoading ? (
           <ChatPageSkeleton />
         ) : conversationsQuery.isError ? (
@@ -424,44 +446,57 @@ function WorkspaceChatPage() {
           <>
             <aside
               className={cn(
-                "flex w-full min-w-0 flex-col border-border md:w-[300px] md:shrink-0 md:border-r",
+                "flex w-full min-w-0 flex-col border-border xl:w-[300px] xl:shrink-0 xl:border-r",
                 showSidebar ? "flex" : "hidden",
                 isDesktop && "flex",
               )}
             >
-              <div className="flex items-center justify-end gap-2 border-b border-border/60 px-3 py-3">
+              <div className="flex shrink-0 items-center justify-end gap-2 border-b border-border/60 px-3 py-2.5">
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="h-8 shrink-0 gap-1.5 px-2.5"
+                  className="h-9 shrink-0 gap-1.5 px-2.5 sm:h-8"
+                  aria-label={t("chat.newMessage")}
                   onClick={() => setDirectDialogOpen(true)}
                 >
-                  <Plus className="size-3.5" />
+                  <Plus className="size-3.5" aria-hidden="true" />
                   <span className="hidden sm:inline">{t("chat.newMessage")}</span>
                 </Button>
               </div>
 
-              <div className="border-b border-border/60 px-3 py-2">
+              <div className="shrink-0 border-b border-border/60 px-3 py-2">
                 <div className="relative">
-                  <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Search
+                    className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden="true"
+                  />
                   <Input
                     value={conversationFilter}
                     onChange={(event) => setConversationFilter(event.target.value)}
                     placeholder={t("chat.searchConversations")}
-                    className="h-8 bg-background/60 pl-8 text-sm"
+                    aria-label={t("chat.searchConversations")}
+                    className="h-9 bg-background/60 pl-8 text-sm sm:h-8"
                   />
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
                 {filteredConversations.length === 0 ? (
                   <EmptyState
                     icon={MessageSquare}
-                    title={t("chat.noConversations")}
-                    description={t("chat.noConversationsHint")}
+                    title={
+                      conversationFilter.trim()
+                        ? t("chat.noSearchResults")
+                        : t("chat.noConversations")
+                    }
+                    description={
+                      conversationFilter.trim()
+                        ? t("chat.noSearchResultsHint")
+                        : t("chat.noConversationsHint")
+                    }
                     compact
-                    className="border-0 bg-transparent py-10 shadow-none"
+                    className="border-0 bg-transparent py-8 shadow-none"
                   />
                 ) : (
                   <div className="p-2">
@@ -470,7 +505,7 @@ function WorkspaceChatPage() {
                         <ConversationRow
                           key={item.id}
                           conversation={item}
-                          active={item.id === selectedConversationId && !mobileShowList}
+                          active={item.id === selectedConversationId}
                           currentUserId={user?.id}
                           onSelect={() => selectConversation(item.id)}
                           onTogglePin={() =>
@@ -486,7 +521,7 @@ function WorkspaceChatPage() {
 
             <section
               className={cn(
-                "min-w-0 flex-1 flex-col",
+                "relative min-w-0 flex-1 flex-col overflow-hidden",
                 showMessages ? "flex" : "hidden",
                 isDesktop && "flex",
               )}
@@ -608,13 +643,17 @@ function ConversationRow({
     <li>
       <div
         className={cn(
-          "group flex w-full items-start gap-2 rounded-xl px-2 py-2 transition",
+          "group flex w-full min-w-0 items-center gap-1 rounded-xl px-1.5 py-1 transition",
           active ? "bg-accent text-accent-foreground" : "hover:bg-accent/60",
         )}
       >
-        <button type="button" onClick={onSelect} className="flex min-w-0 flex-1 items-start gap-2.5 text-left">
+        <button
+          type="button"
+          onClick={onSelect}
+          className="flex min-h-12 min-w-0 flex-1 items-center gap-2.5 px-1 py-1.5 text-left"
+        >
           {conversation.type === "DIRECT" && conversation.otherParticipant ? (
-            <span className="relative mt-0.5 shrink-0">
+            <span className="relative shrink-0">
               <UserAvatar
                 id={conversation.otherParticipant.id}
                 name={conversation.otherParticipant.name}
@@ -626,21 +665,24 @@ function ConversationRow({
               {showOnline ? (
                 <ChatOnlineDot
                   label={t("chat.online")}
-                  className="absolute right-0 bottom-0 ring-2 ring-background"
+                  className={cn(
+                    "absolute right-0 bottom-0 ring-2",
+                    active ? "ring-accent" : "ring-card",
+                  )}
                 />
               ) : null}
             </span>
           ) : (
-            <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-primary/15 text-primary">
-              <Users className="size-3.5" />
+            <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/15 text-primary">
+              <Users className="size-3.5" aria-hidden="true" />
             </span>
           )}
-          <span className="min-w-0 flex-1">
-            <span className="flex items-center gap-2">
-              <span className="truncate text-sm font-medium">{name}</span>
+          <span className="min-w-0 flex-1 overflow-hidden">
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">{name}</span>
               <SidebarTime iso={conversation.latestMessageAt} />
             </span>
-            <span className="mt-0.5 flex items-center gap-2">
+            <span className="mt-0.5 flex min-w-0 items-center gap-2">
               <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{preview}</span>
               {conversation.unreadCount > 0 ? (
                 <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
@@ -653,8 +695,8 @@ function ConversationRow({
         <button
           type="button"
           className={cn(
-            "mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition",
-            "opacity-100 md:opacity-0 md:group-hover:opacity-100",
+            "inline-flex size-10 shrink-0 items-center justify-center rounded-md text-muted-foreground transition sm:size-8",
+            "opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100",
             conversation.isPinned && "text-primary md:opacity-100",
             "hover:bg-background/70 hover:text-foreground",
           )}
@@ -664,7 +706,11 @@ function ConversationRow({
             onTogglePin();
           }}
         >
-          {conversation.isPinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
+          {conversation.isPinned ? (
+            <PinOff className="size-3.5" aria-hidden="true" />
+          ) : (
+            <Pin className="size-3.5" aria-hidden="true" />
+          )}
         </button>
       </div>
     </li>
@@ -718,6 +764,10 @@ function ConversationMessagePane({
   const markedReadForNewestRef = useRef<string | null>(null);
   const readyToMarkReadRef = useRef(false);
   const ignoreScrollEventsRef = useRef(false);
+  /** Active bubble long-press timer (cleared on up / cancel / move / unmount). */
+  const messageLongPressTimerRef = useRef<number | null>(null);
+  /** Suppress the click that follows a successful long press. */
+  const messageLongPressOpenedIdRef = useRef<string | null>(null);
 
   const [draft, setDraft] = useState("");
   const [draftError, setDraftError] = useState<string | null>(null);
@@ -734,21 +784,85 @@ function ConversationMessagePane({
   const [jumpingToPinned, setJumpingToPinned] = useState(false);
   const [profileMemberId, setProfileMemberId] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  /** Narrow viewports: which message shows the inline actions trigger. */
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
+  /** Which message has the actions dropdown open (tap on ⋮ or long press). */
+  const [actionsMenuMessageId, setActionsMenuMessageId] = useState<string | null>(null);
   const { highlightedMessageId, setHighlightedMessageId } = useTemporaryMessageHighlight();
+
+  const clearMessageLongPressTimer = () => {
+    if (messageLongPressTimerRef.current != null) {
+      window.clearTimeout(messageLongPressTimerRef.current);
+      messageLongPressTimerRef.current = null;
+    }
+  };
+
+  const clearActiveMessage = () => {
+    setActiveMessageId(null);
+    setActionsMenuMessageId(null);
+  };
+
+  useEffect(() => {
+    return () => {
+      clearMessageLongPressTimer();
+    };
+  }, []);
 
   useEffect(() => {
     setDraft("");
     setDraftError(null);
     setPendingFiles([]);
+    setActiveMessageId(null);
+    setActionsMenuMessageId(null);
     setPendingTasks([]);
     setPendingProjects([]);
     setPinnedPanelOpen(false);
     setProfileMemberId(null);
     setProfileOpen(false);
     setHighlightedMessageId(null);
+    clearMessageLongPressTimer();
     // Reset only; do not auto-focus on conversation switch / chat open (mobile keyboard).
     composerFocusRequestRef.current = false;
   }, [conversationId, setHighlightedMessageId]);
+
+  useEffect(() => {
+    if (!activeMessageId) {
+      setActionsMenuMessageId(null);
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      if (target.closest(`[data-message-id="${activeMessageId}"]`)) {
+        return;
+      }
+      // Radix menus/popovers render in a portal outside the message node.
+      if (
+        target.closest("[data-radix-popper-content-wrapper]") ||
+        target.closest("[data-radix-menu-content]") ||
+        target.closest("[role='menu']")
+      ) {
+        return;
+      }
+      clearActiveMessage();
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        clearActiveMessage();
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [activeMessageId]);
 
   const messagesQuery = useQuery({
     queryKey,
@@ -1503,8 +1617,6 @@ function ConversationMessagePane({
   const showCharCounter = draft.length >= COMPOSER_COUNTER_SOFT_LIMIT || remaining < 0;
   const showComposerMeta = Boolean(draftError) || showCharCounter;
   const showConversationMeta = page?.pageInfo.hasMoreOlder;
-  const directParticipant =
-    conversation.type === "DIRECT" ? conversation.otherParticipant : null;
 
   useLayoutEffect(() => {
     const el = composerRef.current;
@@ -1517,109 +1629,22 @@ function ConversationMessagePane({
 
   return (
     <>
-      <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2.5">
-        {showBackButton ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-8 shrink-0"
-            onClick={onBack}
-            aria-label={t("chat.backToList")}
-          >
-            <ArrowLeft className="size-4" />
-          </Button>
-        ) : null}
-        {directParticipant ? (
-          <>
-            <span className="relative shrink-0">
-              <UserAvatar
-                id={directParticipant.id}
-                name={directParticipant.name}
-                avatar={directParticipant.avatar}
-                avatarUrl={directParticipant.avatarUrl}
-                size="sm"
-                className="shrink-0"
-              />
-              {showHeaderOnline ? (
-                <ChatOnlineDot
-                  label={t("chat.online")}
-                  className="absolute right-0 bottom-0 ring-2 ring-background"
-                />
-              ) : null}
-            </span>
-            <div className="min-w-0 flex-1">
-              <button
-                type="button"
-                className={cn(
-                  "max-w-full cursor-pointer truncate rounded-sm text-left text-sm font-semibold transition-colors",
-                  "hover:text-foreground/80 hover:underline hover:underline-offset-2",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-                )}
-                aria-label={t("chat.openUserProfile").replace("{name}", directParticipant.name)}
-                onClick={() => {
-                  setProfileMemberId(directParticipant.id);
-                  setProfileOpen(true);
-                }}
-              >
-                {title}
-              </button>
-              {conversation.unreadCount > 0 ? (
-                <p className="truncate text-[11px] text-muted-foreground">
-                  {conversation.unreadCount === 1
-                    ? t("chat.unreadOne")
-                    : t("chat.unreadMany").replace("{count}", String(conversation.unreadCount))}
-                </p>
-              ) : null}
-            </div>
-          </>
-        ) : (
-          <>
-            <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary/15 text-primary">
-              <Users className="size-3.5" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex min-w-0 items-center gap-1.5">
-                <h3 className="truncate text-sm font-semibold">{title}</h3>
-              </div>
-              {conversation.unreadCount > 0 ? (
-                <p className="truncate text-[11px] text-muted-foreground">
-                  {conversation.unreadCount === 1
-                    ? t("chat.unreadOne")
-                    : t("chat.unreadMany").replace("{count}", String(conversation.unreadCount))}
-                </p>
-              ) : null}
-            </div>
-          </>
-        )}
-        {conversation.type === "WORKSPACE" && canRenameGeneral ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-8 shrink-0"
-            aria-label={t("chat.renameChat")}
-            onClick={openRenameDialog}
-          >
-            <Pencil className="size-4" />
-          </Button>
-        ) : null}
-        <ChatPinnedMessagesHeaderButton
-          open={pinnedPanelOpen}
-          onOpenChange={setPinnedPanelOpen}
-        />
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-8 shrink-0"
-          title={conversation.isPinned ? t("chat.unpinChat") : t("chat.pinChat")}
-          aria-label={conversation.isPinned ? t("chat.unpinChat") : t("chat.pinChat")}
-          onClick={() => onPinnedChange(!conversation.isPinned)}
-        >
-          {conversation.isPinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
-        </Button>
-      </div>
+      <ChatConversationHeader
+        conversation={conversation}
+        title={title}
+        showBackButton={showBackButton}
+        showOnline={showHeaderOnline}
+        canRenameGeneral={canRenameGeneral}
+        pinnedPanelOpen={pinnedPanelOpen}
+        onBack={onBack}
+        onOpenProfile={(memberId) => {
+          setProfileMemberId(memberId);
+          setProfileOpen(true);
+        }}
+        onPinnedChange={onPinnedChange}
+        onOpenRename={openRenameDialog}
+        onPinnedPanelOpenChange={setPinnedPanelOpen}
+      />
 
       {workspaceId ? (
         <ChatPinnedMessagesPanel
@@ -1648,7 +1673,7 @@ function ConversationMessagePane({
       ) : (
         <>
           {showConversationMeta ? (
-          <div className="flex items-center justify-center border-b border-border/60 px-4 py-2">
+          <div className="flex shrink-0 items-center justify-center border-b border-border/60 px-4 py-2">
             <Button
               type="button"
               variant="ghost"
@@ -1659,7 +1684,7 @@ function ConversationMessagePane({
             >
               {loadingOlder ? (
                 <>
-                  <Loader2 className="size-3.5 animate-spin" />
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
                   {t("common.loading")}
                 </>
               ) : (
@@ -1672,7 +1697,7 @@ function ConversationMessagePane({
           <div
             ref={listRef}
             onScroll={handleScroll}
-            className="relative min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4"
+            className="relative min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-4 sm:px-4"
             role="log"
             aria-live="polite"
           >
@@ -1690,6 +1715,7 @@ function ConversationMessagePane({
               messages.map((message) => {
                 const isOwn = currentUserId === message.sender.id;
                 const showUnreadDivider = message.id === unreadBoundaryId;
+                const align = isOwn ? "end" : "start";
                 return (
                   <div key={message.id} className="space-y-3">
                     {showUnreadDivider ? (
@@ -1708,7 +1734,7 @@ function ConversationMessagePane({
                     <div
                       data-message-id={message.id}
                       className={cn(
-                        "group flex gap-2.5 rounded-2xl transition-[box-shadow,background-color] duration-500",
+                        "group flex min-w-0 gap-2 rounded-2xl transition-[box-shadow,background-color] duration-500 sm:gap-2.5",
                         isOwn ? "flex-row-reverse" : "flex-row",
                         highlightedMessageId === message.id &&
                           "bg-primary/10 ring-2 ring-primary/35 ring-offset-2 ring-offset-background",
@@ -1727,62 +1753,135 @@ function ConversationMessagePane({
                         conversationId={conversationId}
                         message={message}
                         currentUserId={currentUserId}
-                        align={isOwn ? "end" : "start"}
+                        align={align}
                       >
                         <div
                           className={cn(
-                            "max-w-[min(100%,36rem)] min-w-0 rounded-2xl border px-3.5 py-2.5",
-                            isOwn
-                              ? "border-primary/25 bg-primary/10"
-                              : "border-border/80 bg-background/60",
+                            "flex min-w-0 max-w-[min(100%,calc(100%-2.75rem),36rem)] flex-1 gap-1",
+                            isOwn ? "flex-row-reverse" : "flex-row",
                           )}
                         >
-                          {message.pin ? <ChatMessagePinBadge pin={message.pin} /> : null}
                           <div
+                            tabIndex={0}
                             className={cn(
-                              "mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5",
-                              isOwn ? "justify-end" : "justify-start",
+                              "min-w-0 max-w-full overflow-hidden rounded-2xl border px-3 py-2.5 text-left sm:px-3.5",
+                              "outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                              isOwn
+                                ? "border-primary/25 bg-primary/10"
+                                : "border-border/80 bg-background/60",
+                              activeMessageId === message.id && "bg-muted/40 ring-1 ring-border/80",
                             )}
+                            onClick={() => {
+                              if (messageLongPressOpenedIdRef.current === message.id) {
+                                messageLongPressOpenedIdRef.current = null;
+                                return;
+                              }
+                              setActiveMessageId(message.id);
+                            }}
+                            onFocus={() => setActiveMessageId(message.id)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Escape") {
+                                clearActiveMessage();
+                                (event.currentTarget as HTMLElement).blur();
+                              }
+                            }}
+                            onPointerDown={(event) => {
+                              if (!isMessageLongPressPointer(event.pointerType)) {
+                                return;
+                              }
+                              if (shouldIgnoreMessageLongPress(event.target)) {
+                                return;
+                              }
+
+                              const startX = event.clientX;
+                              const startY = event.clientY;
+                              const bubble = event.currentTarget;
+
+                              clearMessageLongPressTimer();
+                              messageLongPressTimerRef.current = window.setTimeout(() => {
+                                messageLongPressTimerRef.current = null;
+                                messageLongPressOpenedIdRef.current = message.id;
+                                setActiveMessageId(message.id);
+                                setActionsMenuMessageId(message.id);
+                              }, MESSAGE_LONG_PRESS_MS);
+
+                              const clear = () => {
+                                clearMessageLongPressTimer();
+                                bubble.removeEventListener("pointermove", onMove);
+                                bubble.removeEventListener("pointerup", clear);
+                                bubble.removeEventListener("pointercancel", clear);
+                              };
+
+                              const onMove = (moveEvent: PointerEvent) => {
+                                const dx = moveEvent.clientX - startX;
+                                const dy = moveEvent.clientY - startY;
+                                if (Math.hypot(dx, dy) > MESSAGE_LONG_PRESS_MOVE_PX) {
+                                  clear();
+                                }
+                              };
+
+                              bubble.addEventListener("pointermove", onMove);
+                              bubble.addEventListener("pointerup", clear);
+                              bubble.addEventListener("pointercancel", clear);
+                            }}
                           >
-                            <span className="text-xs font-medium text-foreground/90">
-                              {isOwn ? t("chat.you") : message.sender.name}
-                            </span>
-                            <ChatTimestamp iso={message.createdAt} />
-                            <ChatMessageReactionPicker />
-                            {workspaceId ? (
-                              <ChatMessagePinButton
+                            {message.pin ? <ChatMessagePinBadge pin={message.pin} /> : null}
+                            <div className="mb-1 flex min-w-0 items-start gap-x-1.5">
+                              <div
+                                className={cn(
+                                  "flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5",
+                                  isOwn ? "justify-end" : "justify-start",
+                                )}
+                              >
+                                <span className="max-w-full truncate text-xs font-medium text-foreground/90">
+                                  {isOwn ? t("chat.you") : message.sender.name}
+                                </span>
+                                <ChatTimestamp iso={message.createdAt} />
+                              </div>
+                              <ChatMessageActions
+                                variant="menu"
                                 conversationId={conversationId}
                                 message={message}
                                 workspaceId={workspaceId}
+                                isOwn={isOwn}
+                                align={align}
+                                isActive={activeMessageId === message.id}
+                                menuOpen={actionsMenuMessageId === message.id}
+                                onMenuOpenChange={(open) => {
+                                  setActionsMenuMessageId(open ? message.id : null);
+                                  if (open) {
+                                    setActiveMessageId(message.id);
+                                  }
+                                }}
+                                onDelete={() => setDeleteTarget(message)}
                               />
+                            </div>
+                            {message.content.trim() ? (
+                              <p className="max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-relaxed text-foreground/95">
+                                {message.content}
+                              </p>
                             ) : null}
-                            {isOwn ? (
-                              <button
-                                type="button"
-                                className="inline-flex size-5 items-center justify-center rounded text-muted-foreground/70 transition hover:bg-destructive/10 hover:text-destructive opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
-                                aria-label={t("chat.deleteConfirm")}
-                                onClick={() => setDeleteTarget(message)}
-                              >
-                                <Trash2 className="size-3" />
-                              </button>
-                            ) : null}
+                            <ChatMessageAttachments
+                              attachments={message.attachments ?? []}
+                              onPreviewLayoutSettle={handlePreviewLayoutSettle}
+                            />
+                            <ChatMessageReactionChips />
                           </div>
-                          {message.content.trim() ? (
-                            <p className="whitespace-pre-wrap wrap-break-word text-sm leading-relaxed text-foreground/95">
-                              {message.content}
-                            </p>
-                          ) : null}
-                          <ChatMessageAttachments
-                            attachments={message.attachments ?? []}
-                            onPreviewLayoutSettle={handlePreviewLayoutSettle}
+                          <ChatMessageActions
+                            variant="toolbar"
+                            conversationId={conversationId}
+                            message={message}
+                            workspaceId={workspaceId}
+                            isOwn={isOwn}
+                            align={align}
+                            onDelete={() => setDeleteTarget(message)}
                           />
-                          <ChatMessageReactionChips />
                         </div>
                       </ChatMessageReactionProvider>
                     ) : (
                       <div
                         className={cn(
-                          "max-w-[min(100%,36rem)] min-w-0 rounded-2xl border px-3.5 py-2.5",
+                          "min-w-0 max-w-[min(100%,calc(100%-2.75rem),36rem)] overflow-hidden rounded-2xl border px-3 py-2.5 sm:px-3.5",
                           isOwn
                             ? "border-primary/25 bg-primary/10"
                             : "border-border/80 bg-background/60",
@@ -1791,17 +1890,17 @@ function ConversationMessagePane({
                         {message.pin ? <ChatMessagePinBadge pin={message.pin} /> : null}
                         <div
                           className={cn(
-                            "mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5",
+                            "mb-1 flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5",
                             isOwn ? "justify-end" : "justify-start",
                           )}
                         >
-                          <span className="text-xs font-medium text-foreground/90">
+                          <span className="max-w-full truncate text-xs font-medium text-foreground/90">
                             {isOwn ? t("chat.you") : message.sender.name}
                           </span>
                           <ChatTimestamp iso={message.createdAt} />
                         </div>
                         {message.content.trim() ? (
-                          <p className="whitespace-pre-wrap wrap-break-word text-sm leading-relaxed text-foreground/95">
+                          <p className="max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-relaxed text-foreground/95">
                             {message.content}
                           </p>
                         ) : null}
@@ -1819,14 +1918,14 @@ function ConversationMessagePane({
           </div>
 
           {showNewMessages ? (
-            <div className="pointer-events-none absolute inset-x-0 bottom-28 z-10 flex justify-center md:left-[300px]">
+            <div className="pointer-events-none absolute inset-x-0 bottom-24 z-10 flex justify-center px-4">
               <Button
                 type="button"
                 size="sm"
                 className="pointer-events-auto h-8 gap-1.5 rounded-full shadow-md"
                 onClick={scrollToBottom}
               >
-                <ArrowDown className="size-3.5" />
+                <ArrowDown className="size-3.5" aria-hidden="true" />
                 {t("chat.newMessages")}
               </Button>
             </div>
@@ -1834,7 +1933,7 @@ function ConversationMessagePane({
 
           <form
             onSubmit={handleSubmit}
-            className="border-t border-border/60 bg-background/40 px-4 py-3"
+            className="shrink-0 border-t border-border/60 bg-background/40 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4"
           >
             <ChatPendingAttachmentChips
               files={pendingFiles}
@@ -1872,7 +1971,7 @@ function ConversationMessagePane({
                     disabled={sendMutation.isPending}
                     rows={1}
                     maxLength={CHAT_MESSAGE_MAX_LENGTH + 50}
-                    className="min-h-9 max-h-40 resize-none overflow-x-hidden overflow-y-auto bg-card py-2 leading-5 wrap-break-word"
+                    className="min-h-9 max-h-40 resize-none overflow-x-hidden overflow-y-auto bg-card py-2 leading-5 break-words [overflow-wrap:anywhere]"
                   />
                   {showComposerMeta ? (
                     <div className="mt-1 flex items-center justify-between gap-2 px-0.5">
@@ -1894,16 +1993,17 @@ function ConversationMessagePane({
               <Button
                 type="submit"
                 disabled={!canSend || sendMutation.isPending}
-                className="h-9 w-full shrink-0 sm:w-auto"
+                className="h-10 w-full shrink-0 sm:h-9 sm:w-auto"
+                aria-label={t("chat.send")}
               >
                 {sendMutation.isPending ? (
                   <>
-                    <Loader2 className="size-4 animate-spin" />
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
                     {hasAttachments ? t("chat.uploading") : t("chat.sending")}
                   </>
                 ) : (
                   <>
-                    <Send className="size-4" />
+                    <Send className="size-4" aria-hidden="true" />
                     {t("chat.send")}
                   </>
                 )}
@@ -2016,7 +2116,7 @@ function ConversationMessagePane({
 function ChatPageSkeleton() {
   return (
     <div className="flex w-full">
-      <div className="hidden w-[300px] shrink-0 flex-col gap-2 border-r border-border p-3 md:flex">
+      <div className="hidden w-[300px] shrink-0 flex-col gap-2 border-r border-border p-3 xl:flex">
         {Array.from({ length: 6 }).map((_, index) => (
           <div key={index} className="flex items-center gap-2">
             <Skeleton className="size-6 rounded-full" />

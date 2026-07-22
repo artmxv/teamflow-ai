@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import {
   Sheet,
   SheetContent,
@@ -88,15 +89,22 @@ export function ChatMessagePinButton({
   conversationId,
   message,
   workspaceId,
+  alwaysVisible = false,
+  asMenuItem = false,
+  onDone,
 }: {
   conversationId: string;
   message: ChatMessage;
   workspaceId: string;
+  alwaysVisible?: boolean;
+  asMenuItem?: boolean;
+  onDone?: () => void;
 }) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const isPinned = Boolean(message.pin);
   const pinnedKey = chatPinnedMessagesQueryKey(workspaceId, conversationId);
+  const label = isPinned ? t("chat.unpinMessage") : t("chat.pinMessage");
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -120,6 +128,7 @@ export function ChatMessagePinButton({
         applyPinToPinnedList(old, message, pin),
       );
       toast.success(pin ? t("chat.messagePinned") : t("chat.messageUnpinned"));
+      onDone?.();
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : t("chat.pinMessageFailed"));
@@ -130,27 +139,50 @@ export function ChatMessagePinButton({
     },
   });
 
+  if (asMenuItem) {
+    return (
+      <DropdownMenuItem
+        className="gap-2"
+        disabled={mutation.isPending}
+        onSelect={(event) => {
+          event.preventDefault();
+          mutation.mutate();
+        }}
+      >
+        {mutation.isPending ? (
+          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+        ) : isPinned ? (
+          <PinOff className="size-4" aria-hidden="true" />
+        ) : (
+          <Pin className="size-4" aria-hidden="true" />
+        )}
+        {label}
+      </DropdownMenuItem>
+    );
+  }
+
   return (
     <Button
       type="button"
       variant="ghost"
       size="icon"
       className={cn(
-        "size-5 shrink-0 text-muted-foreground/70 hover:text-foreground",
-        "opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100",
+        "size-7 shrink-0 text-muted-foreground/70 hover:text-foreground",
+        !alwaysVisible &&
+          "opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100",
         isPinned && "opacity-100 text-foreground/80",
         mutation.isPending && "opacity-100",
       )}
-      aria-label={isPinned ? t("chat.unpinMessage") : t("chat.pinMessage")}
+      aria-label={label}
       disabled={mutation.isPending}
       onClick={() => mutation.mutate()}
     >
       {mutation.isPending ? (
-        <Loader2 className="size-3 animate-spin" />
+        <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
       ) : isPinned ? (
-        <PinOff className="size-3" />
+        <PinOff className="size-3.5" aria-hidden="true" />
       ) : (
-        <Pin className="size-3" />
+        <Pin className="size-3.5" aria-hidden="true" />
       )}
     </Button>
   );
@@ -208,20 +240,23 @@ export function ChatPinnedMessagesPanel({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
-        <SheetHeader className="border-b border-border/70 px-4 py-3 text-left">
-          <SheetTitle className="text-sm">{t("chat.pinnedMessages")}</SheetTitle>
+      <SheetContent
+        side="right"
+        className="flex h-full max-h-[100dvh] w-full max-w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
+      >
+        <SheetHeader className="shrink-0 border-b border-border/70 px-4 py-3 pr-12 text-left">
+          <SheetTitle className="truncate text-sm">{t("chat.pinnedMessages")}</SheetTitle>
           <SheetDescription className="sr-only">{t("chat.pinnedMessages")}</SheetDescription>
         </SheetHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-2" role="list">
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-2" role="list">
           {pinnedQuery.isLoading ? (
-            <div className="flex items-center justify-center gap-2 px-3 py-8 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
+            <div className="flex items-center justify-center gap-2 px-3 py-6 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
               {t("common.loading")}
             </div>
           ) : pinnedQuery.isError ? (
-            <div className="space-y-2 px-3 py-6 text-center">
+            <div className="space-y-2 px-3 py-4 text-center">
               <p className="text-sm text-muted-foreground">{t("chat.errorTitle")}</p>
               <Button
                 type="button"
@@ -233,7 +268,7 @@ export function ChatPinnedMessagesPanel({
               </Button>
             </div>
           ) : messages.length === 0 ? (
-            <p className="px-3 py-8 text-center text-sm text-muted-foreground">
+            <p className="px-3 py-4 text-center text-sm text-muted-foreground">
               {t("chat.noPinnedMessages")}
             </p>
           ) : (
@@ -255,24 +290,18 @@ export function ChatPinnedMessagesPanel({
                   key={message.id}
                   type="button"
                   role="listitem"
-                  className="flex w-full flex-col gap-0.5 rounded-lg px-3 py-2.5 text-left transition hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex min-h-11 w-full flex-col gap-0.5 rounded-lg px-3 py-2.5 text-left transition hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => onSelectMessage(message.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      onSelectMessage(message.id);
-                    }
-                  }}
                 >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="truncate text-xs font-medium text-foreground">
+                  <div className="flex min-w-0 items-baseline justify-between gap-2">
+                    <span className="min-w-0 truncate text-xs font-medium text-foreground">
                       {message.sender.name}
                     </span>
                     <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
                       {messageAt}
                     </span>
                   </div>
-                  <p className="line-clamp-2 text-sm text-foreground/90">
+                  <p className="line-clamp-2 break-words text-sm text-foreground/90">
                     {preview || t("chat.noPreview")}
                   </p>
                   {message.pin ? (
@@ -308,13 +337,17 @@ export function ChatPinnedMessagesHeaderButton({
       type="button"
       variant="ghost"
       size="icon"
-      className="size-8 shrink-0"
+      className="size-10 shrink-0 sm:size-8"
       title={label}
       aria-label={label}
       aria-expanded={open}
       onClick={() => onOpenChange(!open)}
     >
-      {open ? <BookmarkCheck className="size-4" /> : <Bookmark className="size-4" />}
+      {open ? (
+        <BookmarkCheck className="size-4" aria-hidden="true" />
+      ) : (
+        <Bookmark className="size-4" aria-hidden="true" />
+      )}
     </Button>
   );
 }

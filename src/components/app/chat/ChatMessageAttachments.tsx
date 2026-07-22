@@ -56,7 +56,10 @@ export function ChatMessageAttachments({
   const groups = groupChatAttachments(attachments);
 
   return (
-    <div className="mt-2 flex w-full max-w-full flex-col gap-1.5">
+    <div
+      className="mt-2 flex w-full max-w-full flex-col gap-1.5"
+      data-no-message-long-press=""
+    >
       {groups.map((group) => {
         if (Array.isArray(group)) {
           return (
@@ -89,7 +92,7 @@ function TaskAttachmentCard({ attachment }: { attachment: ChatTaskAttachment }) 
       type="button"
       disabled={unavailable}
       className={cn(
-        "flex w-full items-start gap-2 rounded-md border border-border/80 bg-background/60 px-2.5 py-2 text-left text-sm transition-colors",
+        "flex w-full max-w-full min-w-0 items-start gap-2 rounded-md border border-border/80 bg-background/60 px-2.5 py-2 text-left text-sm transition-colors",
         unavailable ? "opacity-70" : "hover:bg-muted/60",
       )}
       onClick={() => {
@@ -103,7 +106,7 @@ function TaskAttachmentCard({ attachment }: { attachment: ChatTaskAttachment }) 
       }}
     >
       <ListTodo className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 overflow-hidden">
         <p className="truncate font-medium">
           {unavailable ? t("chat.attachmentUnavailable") : attachment.title}
         </p>
@@ -130,7 +133,7 @@ function ProjectAttachmentCard({ attachment }: { attachment: ChatProjectAttachme
       type="button"
       disabled={unavailable}
       className={cn(
-        "flex w-full items-start gap-2 rounded-md border border-border/80 bg-background/60 px-2.5 py-2 text-left text-sm transition-colors",
+        "flex w-full max-w-full min-w-0 items-start gap-2 rounded-md border border-border/80 bg-background/60 px-2.5 py-2 text-left text-sm transition-colors",
         unavailable ? "opacity-70" : "hover:bg-muted/60",
       )}
       onClick={() => {
@@ -144,7 +147,7 @@ function ProjectAttachmentCard({ attachment }: { attachment: ChatProjectAttachme
       }}
     >
       <FolderKanban className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 overflow-hidden">
         <p className="truncate font-medium">
           {unavailable ? t("chat.attachmentUnavailable") : attachment.name}
         </p>
