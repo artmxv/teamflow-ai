@@ -74,6 +74,17 @@ export type ChatMessageReaction = {
   reactedBy: ChatMessageReactionUser[];
 };
 
+export type ChatMessagePinUser = {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+};
+
+export type ChatMessagePin = {
+  pinnedAt: string;
+  pinnedBy: ChatMessagePinUser;
+};
+
 export type ChatMessage = {
   id: string;
   content: string;
@@ -82,6 +93,7 @@ export type ChatMessage = {
   sender: ChatSender;
   attachments: ChatAttachment[];
   reactions: ChatMessageReaction[];
+  pin: ChatMessagePin | null;
 };
 
 export type ChatPageInfo = {
@@ -152,12 +164,23 @@ export function chatUnreadCountQueryKey(workspaceId: string | null | undefined) 
   return ["chat-unread-count", workspaceId ?? "none"] as const;
 }
 
+export function chatPinnedMessagesQueryKey(
+  workspaceId: string | null | undefined,
+  conversationId: string | null | undefined,
+) {
+  return ["chat-pinned-messages", workspaceId ?? "none", conversationId ?? "none"] as const;
+}
+
 export function getChatConversationsQueryKey() {
   return chatConversationsQueryKey(getSelectedWorkspaceId());
 }
 
 export function getChatMessagesQueryKey(conversationId: string | null | undefined) {
   return chatMessagesQueryKey(getSelectedWorkspaceId(), conversationId);
+}
+
+export function getChatPinnedMessagesQueryKey(conversationId: string | null | undefined) {
+  return chatPinnedMessagesQueryKey(getSelectedWorkspaceId(), conversationId);
 }
 
 export function normalizeChatMessage(message: ChatMessage): ChatMessage {
@@ -171,6 +194,16 @@ export function normalizeChatMessage(message: ChatMessage): ChatMessage {
           reactedBy: Array.isArray(reaction.reactedBy) ? reaction.reactedBy : [],
         }))
       : [],
+    pin: message.pin
+      ? {
+          pinnedAt: message.pin.pinnedAt,
+          pinnedBy: {
+            id: message.pin.pinnedBy.id,
+            name: message.pin.pinnedBy.name,
+            avatarUrl: message.pin.pinnedBy.avatarUrl ?? null,
+          },
+        }
+      : null,
   };
 }
 
@@ -399,6 +432,35 @@ export async function removeChatMessageReaction(
     },
   );
   return response.data.reactions;
+}
+
+export async function pinChatMessage(conversationId: string, messageId: string) {
+  const response = await apiRequest<{ data: { pin: ChatMessagePin } }>(
+    `/api/chat/conversations/${conversationId}/messages/${messageId}/pin`,
+    {
+      method: "PUT",
+    },
+  );
+  return response.data.pin;
+}
+
+export async function unpinChatMessage(conversationId: string, messageId: string) {
+  const response = await apiRequest<{ data: { pin: null } }>(
+    `/api/chat/conversations/${conversationId}/messages/${messageId}/pin`,
+    {
+      method: "DELETE",
+    },
+  );
+  return response.data.pin;
+}
+
+export async function getPinnedChatMessages(conversationId: string) {
+  const response = await apiRequest<{ data: { messages: ChatMessage[] } }>(
+    `/api/chat/conversations/${conversationId}/pinned-messages`,
+  );
+  return {
+    messages: response.data.messages.map(normalizeChatMessage),
+  };
 }
 
 export function isChatImagePreviewAttachment(

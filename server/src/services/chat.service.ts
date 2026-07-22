@@ -37,6 +37,12 @@ import {
   validateChatMessageContent,
 } from "../lib/chat-message-utils.js";
 import {
+  CHAT_PINNED_MESSAGES_LIMIT,
+  mapChatPinDto,
+  wouldExceedPinnedMessagesLimit,
+  type ChatMessagePinDto,
+} from "../lib/chat-pin-utils.js";
+import {
   groupChatReactions,
   resolveChatReactionDisplayName,
   validateChatReactionEmoji,
@@ -112,6 +118,19 @@ const messageSelect = {
       },
     },
   },
+  pin: {
+    select: {
+      pinnedAt: true,
+      pinnedBy: {
+        select: {
+          id: true,
+          name: true,
+          displayName: true,
+          avatarUrl: true,
+        },
+      },
+    },
+  },
 } as const;
 
 type SenderRow = {
@@ -158,6 +177,16 @@ type ReactionRow = {
   };
 };
 
+type PinRow = {
+  pinnedAt: Date;
+  pinnedBy: {
+    id: string;
+    name: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+  };
+};
+
 type MessageRow = {
   id: string;
   content: string;
@@ -167,6 +196,7 @@ type MessageRow = {
   sender: SenderRow;
   attachments: AttachmentRow[];
   reactions: ReactionRow[];
+  pin: PinRow | null;
 };
 
 export type ChatFileAttachmentDto = {
@@ -212,6 +242,7 @@ export type ChatMessageDto = {
   sender: SenderRow;
   attachments: ChatAttachmentDto[];
   reactions: ChatReactionDto[];
+  pin: ChatMessagePinDto | null;
 };
 
 export type ChatMessagesPage = {
@@ -375,6 +406,13 @@ function buildReactionUsersById(
   return usersById;
 }
 
+function mapMessagePin(pin: PinRow | null | undefined): ChatMessagePinDto | null {
+  if (!pin) {
+    return null;
+  }
+  return mapChatPinDto(pin);
+}
+
 function mapMessage(
   message: MessageRow,
   conversationId: string,
@@ -393,6 +431,7 @@ function mapMessage(
       message.reactions ?? [],
       buildReactionUsersById(message.reactions ?? []),
     ),
+    pin: mapMessagePin(message.pin),
   };
 }
 
@@ -1403,6 +1442,190 @@ export async function removeChatMessageReaction(input: {
   });
 
   return { reactions: await loadMessageReactions(message.id) };
+}
+
+export type ChatMessagePinResult =
+  | { pin: ChatMessagePinDto }
+  | "not_found"
+  | "pin_limit_reached";
+
+export type ChatMessageUnpinResult = { pin: null } | "not_found";
+
+async function loadMessagePin(messageId: string): Promise<ChatMessagePinDto | null> {
+  const row = await prisma.workspaceChatMessagePin.findUnique({
+    where: { messageId },
+    select: {
+      pinnedAt: true,
+      pinnedBy: {
+        select: {
+          id: true,
+          name: true,
+          displayName: true,
+          avatarUrl: true,
+        },
+      },
+    },
+  });
+  return mapMessagePin(row);
+}
+
+/**
+ * Idempotent pin: creates the pin if missing, returns current pin either way.
+ * Does not trust workspaceId/userId from the client body.
+ */
+export async function pinChatMessage(input: {
+  workspaceId: string;
+  conversationId: string;
+  messageId: string;
+  userId: string;
+}): Promise<ChatMessagePinResult> {
+  const conversation = await findAccessibleConversation({
+    workspaceId: input.workspaceId,
+    conversationId: input.conversationId,
+    userId: input.userId,
+  });
+  if (!conversation) {
+    return "not_found";
+  }
+
+  const message = await prisma.workspaceChatMessage.findFirst({
+    where: {
+      id: input.messageId,
+      conversationId: input.conversationId,
+    },
+    select: {
+      id: true,
+      pin: { select: { id: true } },
+    },
+  });
+  if (!message) {
+    return "not_found";
+  }
+
+  if (message.pin) {
+    const pin = await loadMessagePin(message.id);
+    if (!pin) {
+      return "not_found";
+    }
+    return { pin };
+  }
+
+  const pinnedInConversation = await prisma.workspaceChatMessagePin.count({
+    where: {
+      message: {
+        conversationId: input.conversationId,
+      },
+    },
+  });
+
+  if (
+    wouldExceedPinnedMessagesLimit({
+      currentPinnedCount: pinnedInConversation,
+      alreadyPinned: false,
+      limit: CHAT_PINNED_MESSAGES_LIMIT,
+    })
+  ) {
+    return "pin_limit_reached";
+  }
+
+  try {
+    await prisma.workspaceChatMessagePin.create({
+      data: {
+        messageId: message.id,
+        pinnedById: input.userId,
+      },
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      // Idempotent: unique messageId already exists (race with another pin).
+    } else {
+      throw error;
+    }
+  }
+
+  const pin = await loadMessagePin(message.id);
+  if (!pin) {
+    return "not_found";
+  }
+  return { pin };
+}
+
+/**
+ * Idempotent unpin: any active conversation member may remove the pin.
+ */
+export async function unpinChatMessage(input: {
+  workspaceId: string;
+  conversationId: string;
+  messageId: string;
+  userId: string;
+}): Promise<ChatMessageUnpinResult> {
+  const conversation = await findAccessibleConversation({
+    workspaceId: input.workspaceId,
+    conversationId: input.conversationId,
+    userId: input.userId,
+  });
+  if (!conversation) {
+    return "not_found";
+  }
+
+  const message = await prisma.workspaceChatMessage.findFirst({
+    where: {
+      id: input.messageId,
+      conversationId: input.conversationId,
+    },
+    select: { id: true },
+  });
+  if (!message) {
+    return "not_found";
+  }
+
+  await prisma.workspaceChatMessagePin.deleteMany({
+    where: { messageId: message.id },
+  });
+
+  return { pin: null };
+}
+
+/**
+ * List pinned messages for a conversation, newest pins first.
+ */
+export async function listPinnedChatMessages(input: {
+  workspaceId: string;
+  conversationId: string;
+  userId: string;
+}): Promise<{ messages: ChatMessageDto[] } | "not_found"> {
+  const conversation = await findAccessibleConversation({
+    workspaceId: input.workspaceId,
+    conversationId: input.conversationId,
+    userId: input.userId,
+  });
+  if (!conversation) {
+    return "not_found";
+  }
+
+  const pins = await prisma.workspaceChatMessagePin.findMany({
+    where: {
+      message: {
+        conversationId: input.conversationId,
+      },
+    },
+    orderBy: [{ pinnedAt: "desc" }, { messageId: "asc" }],
+    take: CHAT_PINNED_MESSAGES_LIMIT,
+    select: {
+      message: {
+        select: messageSelect,
+      },
+    },
+  });
+
+  return {
+    messages: pins.map((row) =>
+      mapMessage(row.message as MessageRow, input.conversationId, input.workspaceId),
+    ),
+  };
 }
 
 export async function getChatAttachmentFile(input: {

@@ -24,11 +24,14 @@ import {
   getTotalUnreadChatCount,
   listChatConversations,
   listConversationMessages,
+  listPinnedChatMessages,
   markConversationRead,
+  pinChatMessage,
   removeChatMessageReaction,
   renameChatConversation,
   setConversationPinned,
   SUPABASE_UPLOAD_REQUIRED_MESSAGE,
+  unpinChatMessage,
   validateConversationAccess,
 } from "../services/chat.service.js";
 import { CHAT_CONVERSATION_TITLE_MAX_LENGTH } from "../lib/chat-conversation-utils.js";
@@ -36,6 +39,7 @@ import {
   emitChatConversationRenamed,
   emitChatMessageCreated,
   emitChatMessageDeleted,
+  emitChatMessagePinUpdated,
   emitChatMessageReactionUpdated,
 } from "../realtime/chat-realtime.js";
 
@@ -762,6 +766,137 @@ export async function removeChatMessageReactionController(
     });
 
     res.json({ data: { reactions: result.reactions } });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function pinChatMessageController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const context = await resolveWorkspace(req, res);
+    if (!context) {
+      return;
+    }
+
+    const conversationId = getConversationIdParam(req);
+    const messageId = req.params.messageId;
+    if (!conversationId || typeof messageId !== "string") {
+      res.status(404).json({ message: "Message not found" });
+      return;
+    }
+
+    const result = await pinChatMessage({
+      workspaceId: context.workspaceId,
+      conversationId,
+      messageId,
+      userId: req.userId!,
+    });
+
+    if (result === "pin_limit_reached") {
+      res.status(400).json({
+        message: "Pinned message limit reached (50 per conversation)",
+      });
+      return;
+    }
+
+    if (result === "not_found") {
+      res.status(404).json({ message: "Message not found" });
+      return;
+    }
+
+    void emitChatMessagePinUpdated({
+      workspaceId: context.workspaceId,
+      conversationId,
+      messageId,
+      pin: result.pin,
+    }).catch((error) => {
+      console.error("Failed to emit chat:message-pin-updated:", error);
+    });
+
+    res.json({ data: { pin: result.pin } });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function unpinChatMessageController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const context = await resolveWorkspace(req, res);
+    if (!context) {
+      return;
+    }
+
+    const conversationId = getConversationIdParam(req);
+    const messageId = req.params.messageId;
+    if (!conversationId || typeof messageId !== "string") {
+      res.status(404).json({ message: "Message not found" });
+      return;
+    }
+
+    const result = await unpinChatMessage({
+      workspaceId: context.workspaceId,
+      conversationId,
+      messageId,
+      userId: req.userId!,
+    });
+
+    if (result === "not_found") {
+      res.status(404).json({ message: "Message not found" });
+      return;
+    }
+
+    void emitChatMessagePinUpdated({
+      workspaceId: context.workspaceId,
+      conversationId,
+      messageId,
+      pin: null,
+    }).catch((error) => {
+      console.error("Failed to emit chat:message-pin-updated:", error);
+    });
+
+    res.json({ data: { pin: null } });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getPinnedChatMessagesController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const context = await resolveWorkspace(req, res);
+    if (!context) {
+      return;
+    }
+
+    const conversationId = getConversationIdParam(req);
+    if (!conversationId) {
+      res.status(404).json({ message: "Conversation not found" });
+      return;
+    }
+
+    const result = await listPinnedChatMessages({
+      workspaceId: context.workspaceId,
+      conversationId,
+      userId: req.userId!,
+    });
+
+    if (result === "not_found") {
+      res.status(404).json({ message: "Conversation not found" });
+      return;
+    }
+
+    res.json({ data: { messages: result.messages } });
   } catch (error) {
     next(error);
   }

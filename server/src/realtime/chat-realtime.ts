@@ -10,12 +10,14 @@ import {
   CHAT_CONVERSATION_UPDATED,
   CHAT_MESSAGE_CREATED,
   CHAT_MESSAGE_DELETED,
+  CHAT_MESSAGE_PIN_UPDATED,
   CHAT_MESSAGE_REACTION_UPDATED,
   CHAT_PRESENCE_SNAPSHOT,
   CHAT_PRESENCE_UPDATED,
   type ChatConversationUpdatedPayload,
   type ChatMessageCreatedPayload,
   type ChatMessageDeletedPayload,
+  type ChatMessagePinUpdatedPayload,
   type ChatMessageReactionUpdatedPayload,
   type ChatPresenceSnapshotPayload,
   type ChatPresenceUpdatedPayload,
@@ -217,6 +219,17 @@ export async function emitChatMessageReactionUpdated(
 ) {
   const memberIds = await listConversationMemberUserIds(payload.conversationId);
   emitToUsers(memberIds, CHAT_MESSAGE_REACTION_UPDATED, payload);
+}
+
+/**
+ * Pin updates go only to conversation member user rooms.
+ * Does not emit conversation-updated (no unread / sort / lastMessage changes).
+ */
+export async function emitChatMessagePinUpdated(
+  payload: ChatMessagePinUpdatedPayload,
+) {
+  const memberIds = await listConversationMemberUserIds(payload.conversationId);
+  emitToUsers(memberIds, CHAT_MESSAGE_PIN_UPDATED, payload);
 }
 
 export async function emitChatConversationRenamed(payload: {
