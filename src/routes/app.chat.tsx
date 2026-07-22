@@ -37,6 +37,7 @@ import {
   ChatAttachMenu,
   ChatPendingAttachmentChips,
 } from "@/components/app/chat/ChatComposerAttachments";
+import { ChatComposerEmojiPicker } from "@/components/app/chat/ChatComposerEmojiPicker";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1955,6 +1956,17 @@ function ConversationMessagePane({
                   onTasksChange={setPendingTasks}
                   onProjectsChange={setPendingProjects}
                   onValidationError={setDraftError}
+                />
+                <ChatComposerEmojiPicker
+                  textareaRef={composerRef}
+                  value={draft}
+                  disabled={sendMutation.isPending}
+                  onChange={(next) => {
+                    setDraft(next);
+                    if (draftError) {
+                      setDraftError(null);
+                    }
+                  }}
                 />
                 <div className="min-w-0 flex-1">
                   <Textarea
