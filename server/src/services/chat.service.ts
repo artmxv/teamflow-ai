@@ -22,7 +22,11 @@ import {
   assertDistinctDirectParticipants,
   buildDirectIdentityKey,
   compareConversationsForSidebar,
+  resolveChatConversationRenameAccess,
+  validateChatConversationTitle,
 } from "../lib/chat-conversation-utils.js";
+import { isWorkspaceManager } from "./project-access.service.js";
+import type { WorkspaceRole } from "./workspace-context.service.js";
 import {
   canDeleteChatMessage,
   CHAT_MESSAGE_MAX_LENGTH,
@@ -201,6 +205,8 @@ export type ChatConversationListItem = {
   } | null;
   latestMessageAt: string | null;
   unreadCount: number;
+  /** Member read cursor before the client marks the open conversation as read. */
+  lastReadAt: string | null;
   isPinned: boolean;
   updatedAt: string;
 };
@@ -532,6 +538,7 @@ export async function listChatConversations(
         : null,
       latestMessageAt: latest ? latest.createdAt.toISOString() : null,
       unreadCount,
+      lastReadAt: membership.lastReadAt ? membership.lastReadAt.toISOString() : null,
       isPinned: membership.isPinned,
       updatedAt: conversation.updatedAt.toISOString(),
     });
@@ -702,6 +709,86 @@ export async function setConversationPinned(input: {
   return {
     id: updated.conversationId,
     isPinned: updated.isPinned,
+  };
+}
+
+export type RenameChatConversationResult =
+  | {
+      id: string;
+      title: string;
+      displayName: string;
+      type: "WORKSPACE";
+      updatedAt: string;
+    }
+  | "not_found"
+  | "forbidden"
+  | "invalid_type"
+  | "empty"
+  | "too_long";
+
+export async function renameChatConversation(input: {
+  workspaceId: string;
+  conversationId: string;
+  userId: string;
+  role: WorkspaceRole;
+  title: unknown;
+}): Promise<RenameChatConversationResult> {
+  const titleValidation = validateChatConversationTitle(input.title);
+  if (!titleValidation.ok) {
+    return titleValidation.reason;
+  }
+
+  const conversation = await prisma.chatConversation.findFirst({
+    where: {
+      id: input.conversationId,
+      workspaceId: input.workspaceId,
+    },
+    select: {
+      id: true,
+      type: true,
+      title: true,
+      members: {
+        where: { userId: input.userId },
+        select: { userId: true },
+        take: 1,
+      },
+    },
+  });
+
+  const access = resolveChatConversationRenameAccess({
+    role: input.role,
+    conversationType: conversation?.type,
+    conversationExistsInWorkspace: Boolean(conversation && conversation.members.length > 0),
+  });
+  if (access !== "ok") {
+    return access;
+  }
+
+  // Defense in depth: managers only (same helper as project management).
+  if (!isWorkspaceManager(input.role)) {
+    return "forbidden";
+  }
+
+  const updated = await prisma.chatConversation.update({
+    where: { id: input.conversationId },
+    data: {
+      title: titleValidation.title,
+      updatedAt: new Date(),
+    },
+    select: {
+      id: true,
+      title: true,
+      type: true,
+      updatedAt: true,
+    },
+  });
+
+  return {
+    id: updated.id,
+    title: updated.title!,
+    displayName: updated.title!.trim() || "General chat",
+    type: "WORKSPACE",
+    updatedAt: updated.updatedAt.toISOString(),
   };
 }
 

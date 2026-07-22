@@ -120,3 +120,130 @@ export function resolveInitialConversationId(input: {
 
   return conversations[0]!.id;
 }
+
+export type UnreadScrollMessageLike = UnreadMessageLike & {
+  id: string;
+};
+
+/**
+ * Oldest message that counts as unread for the member.
+ * Own messages are never treated as unread.
+ * Messages must already be in chronological (oldest → newest) order.
+ */
+export function findOldestUnreadMessageId(
+  messages: UnreadScrollMessageLike[],
+  currentUserId: string,
+  lastReadAt: Date | string | null | undefined,
+): string | null {
+  for (const message of messages) {
+    if (
+      isMessageUnreadForMember({
+        senderId: message.senderId,
+        createdAt: message.createdAt,
+        currentUserId,
+        lastReadAt,
+      })
+    ) {
+      return message.id;
+    }
+  }
+  return null;
+}
+
+export type InitialScrollTarget =
+  | { type: "bottom" }
+  | { type: "message"; messageId: string };
+
+/**
+ * Where to place the viewport after the first history render.
+ * Uses the unread boundary captured before mark-as-read.
+ */
+export function resolveInitialScrollTarget(input: {
+  messages: UnreadScrollMessageLike[];
+  currentUserId: string;
+  lastReadAt: Date | string | null | undefined;
+}): InitialScrollTarget {
+  if (input.messages.length === 0) {
+    return { type: "bottom" };
+  }
+
+  const oldestUnreadId = findOldestUnreadMessageId(
+    input.messages,
+    input.currentUserId,
+    input.lastReadAt,
+  );
+
+  if (oldestUnreadId) {
+    return { type: "message", messageId: oldestUnreadId };
+  }
+
+  return { type: "bottom" };
+}
+
+/** Single unified sidebar: pinned first, then activity (server sort order). */
+export function partitionUnifiedConversationList<T extends { isPinned: boolean }>(
+  conversations: T[],
+): { pinned: T[]; rest: T[]; ordered: T[] } {
+  const pinned = conversations.filter((item) => item.isPinned);
+  const rest = conversations.filter((item) => !item.isPinned);
+  return {
+    pinned,
+    rest,
+    ordered: [...pinned, ...rest],
+  };
+}
+
+export const CHAT_CONVERSATION_TITLE_MAX_LENGTH = 80;
+
+export type ChatConversationTitleValidation =
+  | { ok: true; title: string }
+  | { ok: false; reason: "empty" | "too_long" };
+
+export function validateChatConversationTitle(
+  raw: unknown,
+): ChatConversationTitleValidation {
+  if (typeof raw !== "string") {
+    return { ok: false, reason: "empty" };
+  }
+  const title = raw.trim();
+  if (!title) {
+    return { ok: false, reason: "empty" };
+  }
+  if (title.length > CHAT_CONVERSATION_TITLE_MAX_LENGTH) {
+    return { ok: false, reason: "too_long" };
+  }
+  return { ok: true, title };
+}
+
+export type WorkspaceRoleValue = "OWNER" | "ADMIN" | "MEMBER";
+
+export function canRenameWorkspaceConversation(
+  role: WorkspaceRoleValue,
+  conversationType: ChatConversationTypeValue,
+): boolean {
+  if (conversationType !== "WORKSPACE") {
+    return false;
+  }
+  return role === "OWNER" || role === "ADMIN";
+}
+
+/**
+ * Authorization gate for renaming a conversation (no DB).
+ * Cross-workspace / missing rows surface as not_found.
+ */
+export function resolveChatConversationRenameAccess(input: {
+  role: WorkspaceRoleValue;
+  conversationType: ChatConversationTypeValue | null | undefined;
+  conversationExistsInWorkspace: boolean;
+}): "ok" | "not_found" | "forbidden" | "invalid_type" {
+  if (!input.conversationExistsInWorkspace || !input.conversationType) {
+    return "not_found";
+  }
+  if (input.conversationType === "DIRECT") {
+    return "invalid_type";
+  }
+  if (!canRenameWorkspaceConversation(input.role, input.conversationType)) {
+    return "forbidden";
+  }
+  return "ok";
+}

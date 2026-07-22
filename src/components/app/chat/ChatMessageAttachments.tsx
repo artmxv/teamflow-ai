@@ -16,6 +16,7 @@ import { ChatImageAttachmentPreviewGrid } from "./ChatImageAttachmentPreview";
 
 type ChatMessageAttachmentsProps = {
   attachments: ChatAttachment[];
+  onPreviewLayoutSettle?: () => void;
 };
 
 type AttachmentGroup = ChatAttachment | ChatFileAttachment[];
@@ -44,7 +45,10 @@ function groupChatAttachments(attachments: ChatAttachment[]): AttachmentGroup[] 
   return groups;
 }
 
-export function ChatMessageAttachments({ attachments }: ChatMessageAttachmentsProps) {
+export function ChatMessageAttachments({
+  attachments,
+  onPreviewLayoutSettle,
+}: ChatMessageAttachmentsProps) {
   if (!attachments.length) {
     return null;
   }
@@ -55,7 +59,13 @@ export function ChatMessageAttachments({ attachments }: ChatMessageAttachmentsPr
     <div className="mt-2 flex w-full max-w-full flex-col gap-1.5">
       {groups.map((group) => {
         if (Array.isArray(group)) {
-          return <ChatImageAttachmentPreviewGrid key={group.map((item) => item.id).join("-")} attachments={group} />;
+          return (
+            <ChatImageAttachmentPreviewGrid
+              key={group.map((item) => item.id).join("-")}
+              attachments={group}
+              onPreviewLayoutSettle={onPreviewLayoutSettle}
+            />
+          );
         }
         if (group.type === "FILE") {
           return <ChatFileAttachmentCard key={group.id} attachment={group} />;

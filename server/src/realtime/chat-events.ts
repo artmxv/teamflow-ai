@@ -20,11 +20,14 @@ export type ChatMessageDeletedPayload = {
 export type ChatConversationUpdatedPayload = {
   conversationId: string;
   workspaceId: string;
-  latestMessage: {
+  latestMessage?: {
     id: string;
     content: string;
     createdAt: string;
     senderId: string;
   } | null;
-  latestMessageAt: string | null;
+  latestMessageAt?: string | null;
+  /** Present when the workspace general conversation was renamed. */
+  title?: string | null;
+  displayName?: string;
 };
