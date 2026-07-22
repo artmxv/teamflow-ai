@@ -222,6 +222,7 @@ Notes:
 - `npm run start` runs `node dist/server.js`.
 - After you know the Vercel frontend URL, set `APP_URL` and `CORS_ORIGIN`, then redeploy the backend if env changed.
 - **Realtime chat (Socket.IO)** shares the same HTTP port as the REST API. It is correct for a **single** backend instance. Do not scale the API to multiple instances until a shared Socket.IO adapter (for example Redis) is added. Keep `CORS_ORIGIN` aligned with the frontend so browser `wss` handshakes succeed.
+- **Online presence** is stored **in memory** on the API process. It works with the current Render setup: one backend instance and `WEB_CONCURRENCY=1`. Presence is intentionally cleared on server restart and rebuilt when clients reconnect. Horizontal scaling (multiple instances) would need a shared presence store (for example Redis) plus the Socket.IO Redis adapter. Redis is **not** required or implemented at this stage.
 
 ---
 

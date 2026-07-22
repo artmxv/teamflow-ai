@@ -15,6 +15,13 @@ import {
   type ChatMessageDeletedEvent,
 } from "@/lib/realtime/chat-cache";
 import {
+  applyPresenceSnapshot,
+  applyPresenceUpdate,
+  clearChatPresence,
+  type ChatPresenceSnapshotEvent,
+  type ChatPresenceUpdatedEvent,
+} from "@/lib/realtime/chat-presence-state";
+import {
   getChatSocketStatus,
   getOpenChatConversationId,
   subscribeChatSocketStatus,
@@ -25,6 +32,8 @@ import { connectChatSocket, disconnectChatSocket, getChatSocket } from "@/lib/re
 const MESSAGE_CREATED = "chat:message-created";
 const MESSAGE_DELETED = "chat:message-deleted";
 const CONVERSATION_UPDATED = "chat:conversation-updated";
+const PRESENCE_SNAPSHOT = "chat:presence-snapshot";
+const PRESENCE_UPDATED = "chat:presence-updated";
 
 type UseChatRealtimeOptions = {
   workspaceId: string | null | undefined;
@@ -55,6 +64,7 @@ export function useChatRealtime({
 
   useEffect(() => {
     if (!enabled || !workspaceId || !currentUserId || typeof window === "undefined") {
+      clearChatPresence();
       disconnectChatSocket();
       return;
     }
@@ -90,6 +100,20 @@ export function useChatRealtime({
       });
     }
 
+    function onPresenceSnapshot(payload: ChatPresenceSnapshotEvent) {
+      if (payload.workspaceId !== workspaceId) {
+        return;
+      }
+      applyPresenceSnapshot(payload);
+    }
+
+    function onPresenceUpdated(payload: ChatPresenceUpdatedEvent) {
+      if (payload.workspaceId !== workspaceId) {
+        return;
+      }
+      applyPresenceUpdate(payload);
+    }
+
     function refetchAfterReconnect() {
       void queryClient.invalidateQueries({
         queryKey: chatConversationsQueryKey(workspaceId),
@@ -109,12 +133,16 @@ export function useChatRealtime({
     instance.on(MESSAGE_CREATED, onMessageCreated);
     instance.on(MESSAGE_DELETED, onMessageDeleted);
     instance.on(CONVERSATION_UPDATED, onConversationUpdated);
+    instance.on(PRESENCE_SNAPSHOT, onPresenceSnapshot);
+    instance.on(PRESENCE_UPDATED, onPresenceUpdated);
     instance.on("connect", refetchAfterReconnect);
 
     return () => {
       instance.off(MESSAGE_CREATED, onMessageCreated);
       instance.off(MESSAGE_DELETED, onMessageDeleted);
       instance.off(CONVERSATION_UPDATED, onConversationUpdated);
+      instance.off(PRESENCE_SNAPSHOT, onPresenceSnapshot);
+      instance.off(PRESENCE_UPDATED, onPresenceUpdated);
       instance.off("connect", refetchAfterReconnect);
     };
   }, [enabled, workspaceId, currentUserId, queryClient]);

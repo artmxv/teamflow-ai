@@ -9,7 +9,6 @@ import {
   useSyncExternalStore,
   type FormEvent,
   type KeyboardEvent,
-  type ReactNode,
   type UIEvent,
 } from "react";
 import { toast } from "sonner";
@@ -21,6 +20,7 @@ import { EmptyState } from "@/components/app/EmptyState";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { NewDirectMessageDialog } from "@/components/app/chat/NewDirectMessageDialog";
 import { ChatMessageAttachments } from "@/components/app/chat/ChatMessageAttachments";
+import { ChatOnlineDot } from "@/components/app/chat/ChatOnlineDot";
 import {
   ChatAttachMenu,
   ChatPendingAttachmentChips,
@@ -87,6 +87,7 @@ import {
   CHAT_CONVERSATION_TITLE_MAX_LENGTH,
   validateChatConversationTitle,
 } from "@/lib/chat/conversation-title";
+import { shouldShowDirectPresence } from "@/lib/chat/presence";
 import { resolveInitialScrollTarget } from "@/lib/chat/scroll";
 import { getSelectedWorkspaceId } from "@/lib/api/client";
 import { useI18n, type Lang } from "@/lib/i18n";
@@ -96,6 +97,7 @@ import {
   setOpenChatConversationId,
   subscribeChatSocketStatus,
 } from "@/lib/realtime/chat-socket-state";
+import { useIsUserOnline } from "@/lib/realtime/use-chat-presence";
 import { cn } from "@/lib/utils";
 import {
   ArrowDown,
@@ -413,8 +415,7 @@ function WorkspaceChatPage() {
                 isDesktop && "flex",
               )}
             >
-              <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-3">
-                <h2 className="truncate text-sm font-semibold">{t("chat.chats")}</h2>
+              <div className="flex items-center justify-end gap-2 border-b border-border/60 px-3 py-3">
                 <Button
                   type="button"
                   size="sm"
@@ -449,20 +450,21 @@ function WorkspaceChatPage() {
                     className="border-0 bg-transparent py-10 shadow-none"
                   />
                 ) : (
-                  <div className="space-y-3 p-2">
-                    <ConversationSection title={t("chat.chats")}>
+                  <div className="p-2">
+                    <ul className="space-y-0.5">
                       {[...pinned, ...unpinned].map((item) => (
                         <ConversationRow
                           key={item.id}
                           conversation={item}
                           active={item.id === selectedConversationId && !mobileShowList}
+                          currentUserId={user?.id}
                           onSelect={() => selectConversation(item.id)}
                           onTogglePin={() =>
                             pinMutation.mutate({ id: item.id, isPinned: !item.isPinned })
                           }
                         />
                       ))}
-                    </ConversationSection>
+                    </ul>
                   </div>
                 )}
               </div>
@@ -552,35 +554,24 @@ function ChatRealtimeStatus({
   );
 }
 
-function ConversationSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section>
-      <div className="px-2 pb-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-        {title}
-      </div>
-      <ul className="space-y-0.5">{children}</ul>
-    </section>
-  );
-}
-
 function ConversationRow({
   conversation,
   active,
+  currentUserId,
   onSelect,
   onTogglePin,
 }: {
   conversation: ChatConversation;
   active: boolean;
+  currentUserId?: string;
   onSelect: () => void;
   onTogglePin: () => void;
 }) {
   const { t } = useI18n();
+  const otherParticipantId =
+    conversation.type === "DIRECT" ? conversation.otherParticipant?.id : null;
+  const participantOnline = useIsUserOnline(otherParticipantId);
+  const showOnline = shouldShowDirectPresence(conversation, currentUserId, participantOnline);
   const name = conversationDisplayName(conversation, t("chat.generalChat"));
   const previewLabels = {
     file: t("chat.previewFile"),
@@ -605,14 +596,22 @@ function ConversationRow({
       >
         <button type="button" onClick={onSelect} className="flex min-w-0 flex-1 items-start gap-2.5 text-left">
           {conversation.type === "DIRECT" && conversation.otherParticipant ? (
-            <UserAvatar
-              id={conversation.otherParticipant.id}
-              name={conversation.otherParticipant.name}
-              avatar={conversation.otherParticipant.avatar}
-              avatarUrl={conversation.otherParticipant.avatarUrl}
-              size="sm"
-              className="mt-0.5 shrink-0"
-            />
+            <span className="relative mt-0.5 shrink-0">
+              <UserAvatar
+                id={conversation.otherParticipant.id}
+                name={conversation.otherParticipant.name}
+                avatar={conversation.otherParticipant.avatar}
+                avatarUrl={conversation.otherParticipant.avatarUrl}
+                size="sm"
+                className="shrink-0"
+              />
+              {showOnline ? (
+                <ChatOnlineDot
+                  label={t("chat.online")}
+                  className="absolute right-0 bottom-0 ring-2 ring-background"
+                />
+              ) : null}
+            </span>
           ) : (
             <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-primary/15 text-primary">
               <Users className="size-3.5" />
@@ -735,6 +734,14 @@ function ConversationMessagePane({
   const page = messagesQuery.data;
   const messages = page?.messages ?? [];
   const title = conversationDisplayName(conversation, t("chat.generalChat"));
+  const headerPresenceUserId =
+    conversation.type === "DIRECT" ? conversation.otherParticipant?.id : null;
+  const headerParticipantOnline = useIsUserOnline(headerPresenceUserId);
+  const showHeaderOnline = shouldShowDirectPresence(
+    conversation,
+    currentUserId,
+    headerParticipantOnline,
+  );
 
   // Capture the unread boundary once before any mark-as-read call.
   if (capturedLastReadAtRef.current === undefined) {
@@ -1405,7 +1412,10 @@ function ConversationMessagePane({
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-semibold">{title}</h3>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <h3 className="truncate text-sm font-semibold">{title}</h3>
+            {showHeaderOnline ? <ChatOnlineDot label={t("chat.online")} /> : null}
+          </div>
           {conversation.unreadCount > 0 ? (
             <p className="truncate text-[11px] text-muted-foreground">
               {conversation.unreadCount === 1
