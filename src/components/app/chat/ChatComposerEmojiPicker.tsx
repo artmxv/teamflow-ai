@@ -200,6 +200,17 @@ export function ChatComposerEmojiPicker({
                 loadingLabel={t("chat.emojiLoading")}
                 emptyLabel={t("chat.emojiEmpty")}
                 searchPlaceholder={t("chat.searchEmoji")}
+                categoriesAriaLabel={t("chat.emojiCategories")}
+                categoryLabels={{
+                  recent: t("chat.emojiCategoryRecent"),
+                  smileys: t("chat.emojiCategorySmileys"),
+                  animals: t("chat.emojiCategoryAnimals"),
+                  food: t("chat.emojiCategoryFood"),
+                  activity: t("chat.emojiCategoryActivity"),
+                  travel: t("chat.emojiCategoryTravel"),
+                  objects: t("chat.emojiCategoryObjects"),
+                  symbols: t("chat.emojiCategorySymbols"),
+                }}
                 onEmojiSelect={handleEmojiSelect}
               />
             </Suspense>
