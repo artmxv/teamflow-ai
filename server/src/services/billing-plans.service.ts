@@ -1,7 +1,9 @@
-import type { BillingPlan } from "@prisma/client";
+import type { BillingPlan, Prisma } from "@prisma/client";
 
 import { prisma } from "../lib/prisma.js";
 import { AuthError } from "./auth.service.js";
+
+type DbClient = Prisma.TransactionClient | typeof prisma;
 
 export const MEMBER_LIMIT_REACHED_CODE = "MEMBER_LIMIT_REACHED";
 
@@ -110,6 +112,34 @@ export async function assertCanInviteMember(input: {
   const seatsUsed = usage.members + usage.pendingInvitations;
 
   if (seatsUsed >= limits.maxMembers) {
+    throw new AuthError(
+      "Member limit reached for the current plan",
+      409,
+      MEMBER_LIMIT_REACHED_CODE,
+    );
+  }
+}
+
+/** Seat check for accepting an invite: only ACTIVE members count (pending is converting). */
+export async function assertCanAcceptMember(input: {
+  workspaceId: string;
+  plan: BillingPlan;
+  db?: DbClient;
+}): Promise<void> {
+  const { limits } = getBillingPlanConfig(input.plan);
+  if (limits.maxMembers === null) {
+    return;
+  }
+
+  const db = input.db ?? prisma;
+  const members = await db.workspaceMember.count({
+    where: {
+      workspaceId: input.workspaceId,
+      status: "ACTIVE",
+    },
+  });
+
+  if (members >= limits.maxMembers) {
     throw new AuthError(
       "Member limit reached for the current plan",
       409,

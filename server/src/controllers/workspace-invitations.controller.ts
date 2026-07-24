@@ -111,6 +111,7 @@ export async function createWorkspaceInvitationController(
         invitation: created.invitation,
         deliveryMode: created.deliveryMode,
         emailSent: created.emailSent,
+        reused: created.reused,
         ...(created.emailWarning ? { emailWarning: created.emailWarning } : {}),
         acceptUrl: created.invitation.acceptUrl,
       },

@@ -7,7 +7,7 @@ import { ensureUserInWorkspaceGeneralConversation } from "../lib/chat-conversati
 import { prisma } from "../lib/prisma.js";
 import type { PublicUser } from "./auth.service.js";
 import { AuthError } from "./auth.service.js";
-import { assertCanInviteMember } from "./billing-plans.service.js";
+import { assertCanAcceptMember, assertCanInviteMember } from "./billing-plans.service.js";
 import { sendWorkspaceInviteEmail } from "./email.service.js";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -196,7 +196,7 @@ export async function createWorkspaceInvitation(input: {
     return {
       invitation: toInvitationDto(existing),
       deliveryMode: "existing",
-      emailSent: true,
+      emailSent: false,
       reused: true,
     };
   }
@@ -374,7 +374,7 @@ export async function acceptWorkspaceInvitation(
   const invite = await prisma.workspaceInvitation.findUnique({
     where: { token },
     include: {
-      workspace: { select: { id: true, name: true } },
+      workspace: { select: { id: true, name: true, plan: true } },
     },
   });
 
@@ -427,6 +427,12 @@ export async function acceptWorkspaceInvitation(
   }
 
   await prisma.$transaction(async (tx) => {
+    await assertCanAcceptMember({
+      workspaceId: resolved.workspaceId,
+      plan: invite.workspace.plan,
+      db: tx,
+    });
+
     await tx.workspaceMember.create({
       data: {
         workspaceId: resolved.workspaceId,

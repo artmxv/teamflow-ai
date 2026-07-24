@@ -206,6 +206,13 @@ export async function removeWorkspaceMember(input: RemoveWorkspaceMemberInput) {
       });
     }
 
+    await tx.chatConversationMember.deleteMany({
+      where: {
+        userId: memberId,
+        conversation: { workspaceId },
+      },
+    });
+
     await tx.workspaceMember.delete({
       where: {
         workspaceId_userId: {
