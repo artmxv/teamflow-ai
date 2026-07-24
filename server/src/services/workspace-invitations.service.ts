@@ -8,9 +8,22 @@ import { prisma } from "../lib/prisma.js";
 import type { PublicUser } from "./auth.service.js";
 import { AuthError } from "./auth.service.js";
 import { assertCanAcceptMember, assertCanInviteMember } from "./billing-plans.service.js";
-import { sendWorkspaceInviteEmail } from "./email.service.js";
+import {
+  sendWorkspaceInviteEmail,
+  type SendWorkspaceInviteEmailInput,
+  type SendWorkspaceInviteEmailResult,
+} from "./email.service.js";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const RESEND_COOLDOWN_MS = 60 * 1000;
+export const INVITATION_RESEND_TOO_SOON_CODE = "INVITATION_RESEND_TOO_SOON";
+
+/** Test seam so parallel-resend tests can count email deliveries. */
+export const invitationEmailDelivery = {
+  send: sendWorkspaceInviteEmail as (
+    input: SendWorkspaceInviteEmailInput,
+  ) => Promise<SendWorkspaceInviteEmailResult>,
+};
 
 const invitationSelect = {
   id: true,
@@ -275,6 +288,123 @@ export async function revokeWorkspaceInvitation(
   });
 
   return toInvitationDto(revoked);
+}
+
+export async function resendWorkspaceInvitation(input: {
+  workspaceId: string;
+  workspaceName: string;
+  invitationId: string;
+  actorUserId: string;
+  actorRole: WorkspaceRole;
+}): Promise<{
+  invitation: WorkspaceInvitationDto;
+  deliveryMode: string;
+  emailSent: boolean;
+  emailWarning?: string;
+  acceptUrl: string;
+}> {
+  assertOwner(input.actorRole);
+
+  const invite = await prisma.workspaceInvitation.findFirst({
+    where: { id: input.invitationId, workspaceId: input.workspaceId },
+    select: {
+      ...invitationSelect,
+      updatedAt: true,
+    },
+  });
+
+  if (!invite) {
+    throw new AuthError("Invitation not found", 404);
+  }
+
+  const resolved = await markExpiredIfNeeded(invite);
+
+  if (resolved.status !== "PENDING" || isInviteExpired(resolved)) {
+    throw new AuthError("Only pending invitations can be resent", 400);
+  }
+
+  const expectedUpdatedAt = resolved.updatedAt;
+  const msSinceUpdate = Date.now() - expectedUpdatedAt.getTime();
+  if (msSinceUpdate < RESEND_COOLDOWN_MS) {
+    throw new AuthError(
+      "Please wait before resending this invitation",
+      429,
+      INVITATION_RESEND_TOO_SOON_CODE,
+    );
+  }
+
+  const token = generateInviteToken();
+  const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
+
+  // Optimistic concurrency: only one concurrent resend can win this update.
+  const updateResult = await prisma.workspaceInvitation.updateMany({
+    where: {
+      id: resolved.id,
+      workspaceId: input.workspaceId,
+      status: "PENDING",
+      expiresAt: { gt: new Date() },
+      updatedAt: expectedUpdatedAt,
+    },
+    data: {
+      token,
+      expiresAt,
+    },
+  });
+
+  if (updateResult.count === 0) {
+    const current = await prisma.workspaceInvitation.findFirst({
+      where: { id: input.invitationId, workspaceId: input.workspaceId },
+      select: {
+        ...invitationSelect,
+        updatedAt: true,
+      },
+    });
+
+    if (!current) {
+      throw new AuthError("Invitation not found", 404);
+    }
+
+    const currentResolved = await markExpiredIfNeeded(current);
+    if (currentResolved.status !== "PENDING" || isInviteExpired(currentResolved)) {
+      throw new AuthError("Only pending invitations can be resent", 400);
+    }
+
+    throw new AuthError(
+      "Please wait before resending this invitation",
+      429,
+      INVITATION_RESEND_TOO_SOON_CODE,
+    );
+  }
+
+  const updated = await prisma.workspaceInvitation.findFirstOrThrow({
+    where: { id: resolved.id, workspaceId: input.workspaceId },
+    select: invitationSelect,
+  });
+
+  const acceptUrl = buildWorkspaceInviteAcceptUrl(updated.token);
+
+  const inviter = await prisma.user.findUnique({
+    where: { id: input.actorUserId },
+    select: { name: true, displayName: true, email: true },
+  });
+
+  const emailResult = await invitationEmailDelivery.send({
+    to: updated.email,
+    workspaceName: input.workspaceName,
+    role: updated.role,
+    acceptUrl,
+    expiresAt: updated.expiresAt,
+    inviterName: inviter?.displayName ?? inviter?.name ?? null,
+    inviterEmail: inviter?.email ?? null,
+  });
+
+  return {
+    invitation: toInvitationDto(updated),
+    deliveryMode: emailResult.mode,
+    emailSent: emailResult.sent,
+    emailWarning: emailResult.warning,
+    acceptUrl,
+  };
 }
 
 export async function listPendingInvitationsForUser(

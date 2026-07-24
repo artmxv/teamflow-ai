@@ -3,6 +3,7 @@ import { Router } from "express";
 import {
   createWorkspaceInvitationController,
   listWorkspaceInvitationsController,
+  resendWorkspaceInvitationController,
   revokeWorkspaceInvitationController,
 } from "../controllers/workspace-invitations.controller.js";
 import {
@@ -24,6 +25,7 @@ workspaceRouter.patch("/members/:memberId", updateWorkspaceMemberRoleController)
 workspaceRouter.delete("/members/:memberId", removeWorkspaceMemberController);
 workspaceRouter.get("/invitations", listWorkspaceInvitationsController);
 workspaceRouter.post("/invitations", createWorkspaceInvitationController);
+workspaceRouter.post("/invitations/:id/resend", resendWorkspaceInvitationController);
 workspaceRouter.delete("/invitations/:id", revokeWorkspaceInvitationController);
 workspaceRouter.get("/settings", getWorkspaceSettingsController);
 workspaceRouter.patch("/settings", updateWorkspaceController);

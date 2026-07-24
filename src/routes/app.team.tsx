@@ -61,6 +61,7 @@ import { ApiError } from "@/lib/api/client";
 import {
   createWorkspaceInvitation,
   fetchWorkspaceInvitations,
+  resendWorkspaceInvitation,
   revokeWorkspaceInvitation,
 } from "@/lib/api/workspace-invitations";
 import {
@@ -122,6 +123,9 @@ function isMemberLimitInviteError(error: unknown): boolean {
 }
 
 function formatInviteError(error: unknown, t: (k: TKey) => string): string {
+  if (error instanceof ApiError && error.code === "INVITATION_RESEND_TOO_SOON") {
+    return t("team.error.resendTooSoon");
+  }
   if (isMemberLimitInviteError(error)) {
     return t("billing.memberLimitReached");
   }
@@ -227,6 +231,26 @@ function TeamPage() {
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : t("team.toast.inviteFailed"));
+    },
+  });
+
+  const resendInviteMutation = useMutation({
+    mutationFn: resendWorkspaceInvitation,
+    onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: ["workspace", "invitations"] });
+      const emailFailed = data.emailSent === false || Boolean(data.emailWarning);
+      if (emailFailed) {
+        toast.warning(t("team.invitationResendEmailFailed"), {
+          description: data.acceptUrl,
+        });
+      } else {
+        toast.success(t("team.invitationResent"), {
+          description: data.acceptUrl,
+        });
+      }
+    },
+    onError: (error) => {
+      toast.error(formatInviteError(error, t));
     },
   });
 
@@ -398,7 +422,9 @@ function TeamPage() {
                     className="bg-gradient-brand text-white"
                     disabled={createInviteMutation.isPending}
                   >
-                    {createInviteMutation.isPending ? t("team.sendingInvite") : t("team.sendInvite")}
+                    {createInviteMutation.isPending
+                      ? t("team.sendingInvite")
+                      : t("team.sendInvite")}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -457,9 +483,27 @@ function TeamPage() {
                     </Button>
                     <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={
+                        resendInviteMutation.isPending &&
+                        resendInviteMutation.variables === invite.id
+                      }
+                      onClick={() => resendInviteMutation.mutate(invite.id)}
+                    >
+                      {resendInviteMutation.isPending &&
+                      resendInviteMutation.variables === invite.id
+                        ? t("team.resendingInvite")
+                        : t("team.resendInvite")}
+                    </Button>
+                    <Button
+                      type="button"
                       variant="destructive"
                       size="sm"
-                      disabled={revokeInviteMutation.isPending}
+                      disabled={
+                        revokeInviteMutation.isPending &&
+                        revokeInviteMutation.variables === invite.id
+                      }
                       onClick={() => revokeInviteMutation.mutate(invite.id)}
                     >
                       {t("team.revokeInvite")}

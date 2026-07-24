@@ -22,6 +22,8 @@ export interface CreateWorkspaceInvitationResult {
   emailWarning?: string;
 }
 
+export type ResendWorkspaceInvitationResult = CreateWorkspaceInvitationResult;
+
 export interface InvitationPreview {
   id: string;
   workspaceName: string;
@@ -56,6 +58,14 @@ export async function revokeWorkspaceInvitation(id: string) {
   const response = await apiRequest<{ data: WorkspaceInvitationItem }>(
     `/api/workspace/invitations/${id}`,
     { method: "DELETE" },
+  );
+  return response.data;
+}
+
+export async function resendWorkspaceInvitation(id: string) {
+  const response = await apiRequest<{ data: ResendWorkspaceInvitationResult }>(
+    `/api/workspace/invitations/${id}/resend`,
+    { method: "POST" },
   );
   return response.data;
 }
