@@ -20,6 +20,7 @@ export interface CreateWorkspaceInvitationResult {
   acceptUrl: string;
   emailSent?: boolean;
   emailWarning?: string;
+  reused?: boolean;
 }
 
 export type ResendWorkspaceInvitationResult = CreateWorkspaceInvitationResult;

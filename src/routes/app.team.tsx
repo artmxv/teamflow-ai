@@ -63,6 +63,7 @@ import {
   fetchWorkspaceInvitations,
   resendWorkspaceInvitation,
   revokeWorkspaceInvitation,
+  type WorkspaceInvitationItem,
 } from "@/lib/api/workspace-invitations";
 import {
   fetchWorkspaceMembers,
@@ -189,7 +190,7 @@ function TeamPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<InviteRole>("MEMBER");
-  const [lastAcceptUrl, setLastAcceptUrl] = useState<string | null>(null);
+  const [revokeInvite, setRevokeInvite] = useState<WorkspaceInvitationItem | null>(null);
 
   const invitationsQuery = useQuery({
     queryKey: ["workspace", "invitations"],
@@ -204,20 +205,23 @@ function TeamPage() {
         role: inviteRole,
       }),
     onSuccess: (data) => {
-      setLastAcceptUrl(data.acceptUrl);
       void queryClient.invalidateQueries({ queryKey: ["workspace", "invitations"] });
-      const emailFailed = data.emailSent === false || Boolean(data.emailWarning);
-      if (emailFailed) {
-        toast.warning(t("team.invitationEmailFailed"), {
-          description: data.acceptUrl,
-        });
-      } else {
-        toast.success(t("team.invitationSent"), {
-          description: data.acceptUrl,
-        });
-      }
+      setInviteOpen(false);
       setInviteEmail("");
       setInviteRole("MEMBER");
+
+      if (data.reused) {
+        toast.warning(t("team.invitationReused"));
+        return;
+      }
+
+      const emailFailed = data.emailSent === false || Boolean(data.emailWarning);
+      if (emailFailed) {
+        toast.warning(t("team.invitationEmailFailed"));
+        return;
+      }
+
+      toast.success(t("team.invitationSent"));
     },
     onError: (error) => {
       toast.error(formatInviteError(error, t));
@@ -228,9 +232,11 @@ function TeamPage() {
     mutationFn: revokeWorkspaceInvitation,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["workspace", "invitations"] });
+      setRevokeInvite(null);
+      toast.success(t("team.toast.inviteRevoked"));
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : t("team.toast.inviteFailed"));
+      toast.error(formatTeamError(error, "team.error.revokeFailed", t));
     },
   });
 
@@ -319,7 +325,14 @@ function TeamPage() {
     removeMemberMutation.mutate(removeMember.id);
   };
 
+  const handleConfirmRevoke = () => {
+    if (!revokeInvite) return;
+    revokeInviteMutation.mutate(revokeInvite.id);
+  };
+
   const pendingInvitations = invitationsQuery.data ?? [];
+  const isRevokingInvite = (inviteId: string) =>
+    revokeInviteMutation.isPending && revokeInviteMutation.variables === inviteId;
 
   function updateUrlSearch(patch: Partial<TeamSearch>) {
     void navigate({
@@ -341,6 +354,38 @@ function TeamPage() {
     }
   }
 
+  const memberActions = (member: WorkspaceMemberItem) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={t("team.memberActionsAria").replace("{name}", member.name)}
+          className="rounded-md p-1 text-muted-foreground transition outline-none hover:bg-secondary hover:text-foreground focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground/30"
+        >
+          <MoreHorizontal className="size-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onCloseAutoFocus={(event) => event.preventDefault()}>
+        <DropdownMenuItem onClick={() => openMemberDrawer(member.id)}>
+          {t("team.viewProfile")}
+        </DropdownMenuItem>
+        {canManageMember(member) && (
+          <DropdownMenuItem onClick={() => openRoleDialog(member)}>
+            {t("team.changeRole")}
+          </DropdownMenuItem>
+        )}
+        {canManageMember(member) && (
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onClick={() => setRemoveMember(member)}
+          >
+            {t("team.removeMember")}
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <AppShell>
       <PageHeader
@@ -354,8 +399,9 @@ function TeamPage() {
               open={inviteOpen}
               onOpenChange={(open) => {
                 setInviteOpen(open);
-                if (!open) {
-                  setLastAcceptUrl(null);
+                if (!open && !createInviteMutation.isPending) {
+                  setInviteEmail("");
+                  setInviteRole("MEMBER");
                 }
               }}
             >
@@ -375,7 +421,7 @@ function TeamPage() {
                     <Input
                       id="invite-email"
                       type="email"
-                      placeholder="teammate@company.com"
+                      placeholder={t("team.inviteEmailPlaceholder")}
                       value={inviteEmail}
                       onChange={(event) => setInviteEmail(event.target.value)}
                     />
@@ -395,23 +441,6 @@ function TeamPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  {lastAcceptUrl && (
-                    <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-3">
-                      <div className="text-xs font-medium text-muted-foreground">
-                        {t("team.invitationLink")}
-                      </div>
-                      <p className="break-all text-xs">{lastAcceptUrl}</p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => void handleCopyInviteLink(lastAcceptUrl)}
-                      >
-                        <Copy className="size-4" /> {t("team.copyInviteLink")}
-                      </Button>
-                    </div>
-                  )}
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setInviteOpen(false)}>
@@ -443,172 +472,228 @@ function TeamPage() {
 
       {canManageTeam && (
         <section className="mb-6 overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
-          <div className="border-b border-border bg-muted/50 px-5 py-3">
+          <div className="border-b border-border bg-muted/50 px-4 py-3 sm:px-5">
             <h2 className="text-sm font-semibold">{t("team.pendingInvitations")}</h2>
           </div>
-          {pendingInvitations.length === 0 ? (
-            <EmptyState
-              compact
-              className="border-0 bg-transparent shadow-none"
-              icon={Mail}
-              title={t("team.noPendingInvitationsTitle")}
-              description={t("team.noPendingInvitationsHint")}
-            />
-          ) : (
-            <ul className="divide-y divide-border">
-              {pendingInvitations.map((invite) => (
-                <li
-                  key={invite.id}
-                  className="flex flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0">
-                    <div className="font-medium">{invite.email}</div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <Badge variant="secondary" className="border-0">
-                        {workspaceRoleLabel(invite.role, t)}
-                      </Badge>
-                      <span>
-                        {t("team.inviteExpires")}: {new Date(invite.expiresAt).toLocaleString()}
-                      </span>
+          {invitationsQuery.isLoading && <PendingInvitationsSkeleton />}
+          {invitationsQuery.isError && (
+            <div className="px-4 py-4 sm:px-5">
+              <ApiErrorState
+                compact
+                className="border-0 bg-transparent shadow-none"
+                title={t("team.pendingLoadErrorTitle")}
+                error={invitationsQuery.error}
+                onRetry={() => void invitationsQuery.refetch()}
+                isRetrying={invitationsQuery.isFetching}
+              />
+            </div>
+          )}
+          {!invitationsQuery.isLoading &&
+            !invitationsQuery.isError &&
+            pendingInvitations.length === 0 && (
+              <EmptyState
+                compact
+                className="border-0 bg-transparent shadow-none"
+                icon={Mail}
+                title={t("team.noPendingInvitationsTitle")}
+                description={t("team.noPendingInvitationsHint")}
+              />
+            )}
+          {!invitationsQuery.isLoading &&
+            !invitationsQuery.isError &&
+            pendingInvitations.length > 0 && (
+              <ul className="divide-y divide-border">
+                {pendingInvitations.map((invite) => (
+                  <li
+                    key={invite.id}
+                    className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+                  >
+                    <div className="min-w-0">
+                      <div className="break-all font-medium sm:truncate sm:break-normal">
+                        {invite.email}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="secondary" className="border-0">
+                          {workspaceRoleLabel(invite.role, t)}
+                        </Badge>
+                        <span>
+                          {t("team.inviteExpires")}: {new Date(invite.expiresAt).toLocaleString()}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex shrink-0 flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void handleCopyInviteLink(invite.acceptUrl)}
-                    >
-                      <Copy className="size-4" /> {t("team.copyInviteLink")}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={
-                        resendInviteMutation.isPending &&
+                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:shrink-0 sm:flex-row sm:flex-wrap">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-center sm:w-auto"
+                        onClick={() => void handleCopyInviteLink(invite.acceptUrl)}
+                      >
+                        <Copy className="size-4" /> {t("team.copyInviteLink")}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-center sm:w-auto"
+                        disabled={
+                          resendInviteMutation.isPending &&
+                          resendInviteMutation.variables === invite.id
+                        }
+                        onClick={() => resendInviteMutation.mutate(invite.id)}
+                      >
+                        {resendInviteMutation.isPending &&
                         resendInviteMutation.variables === invite.id
-                      }
-                      onClick={() => resendInviteMutation.mutate(invite.id)}
+                          ? t("team.resendingInvite")
+                          : t("team.resendInvite")}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="w-full justify-center sm:w-auto"
+                        disabled={isRevokingInvite(invite.id)}
+                        onClick={() => setRevokeInvite(invite)}
+                      >
+                        {t("team.revokeInvite")}
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+        </section>
+      )}
+
+      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
+        {/* Desktop / tablet table */}
+        <div className="hidden md:block">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">
+              <tr>
+                <th className="px-5 py-3 text-left">{t("team.members")}</th>
+                <th className="px-5 py-3 text-left">{t("team.role")}</th>
+                <th className="px-5 py-3 text-left">{t("team.joined")}</th>
+                <th className="px-5 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {membersQuery.isLoading && <MembersTableSkeleton />}
+              {membersQuery.isError && (
+                <tr>
+                  <td colSpan={4} className="px-5 py-6">
+                    <ApiErrorState
+                      compact
+                      className="border-0 bg-transparent shadow-none"
+                      title={t("team.loadErrorTitle")}
+                      error={membersQuery.error}
+                      onRetry={() => void membersQuery.refetch()}
+                    />
+                  </td>
+                </tr>
+              )}
+              {!membersQuery.isLoading &&
+                !membersQuery.isError &&
+                members.map((member) => (
+                  <tr
+                    key={member.id}
+                    className="cursor-pointer transition hover:bg-muted/40"
+                    onClick={() => openMemberDrawer(member.id)}
+                  >
+                    <td className="px-5 py-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <UserAvatar
+                          id={member.id}
+                          name={member.name}
+                          avatar={member.avatar}
+                          avatarUrl={member.avatarUrl}
+                        />
+                        <div className="min-w-0">
+                          <div className="truncate font-medium">{member.name}</div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            {member.email}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3">
+                      <Badge variant="secondary" className={roleStyles[member.role] + " border-0"}>
+                        {workspaceRoleLabel(member.role, t)}
+                      </Badge>
+                    </td>
+                    <td className="px-5 py-3 text-muted-foreground">
+                      {formatJoinedDate(member.joinedAt, lang as Lang) ?? "—"}
+                    </td>
+                    <td
+                      className="px-5 py-3 text-right"
+                      onClick={(event) => event.stopPropagation()}
                     >
-                      {resendInviteMutation.isPending &&
-                      resendInviteMutation.variables === invite.id
-                        ? t("team.resendingInvite")
-                        : t("team.resendInvite")}
-                    </Button>
-                    <Button
+                      {memberActions(member)}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden">
+          {membersQuery.isLoading && <MembersCardsSkeleton />}
+          {membersQuery.isError && (
+            <div className="px-4 py-6">
+              <ApiErrorState
+                compact
+                className="border-0 bg-transparent shadow-none"
+                title={t("team.loadErrorTitle")}
+                error={membersQuery.error}
+                onRetry={() => void membersQuery.refetch()}
+              />
+            </div>
+          )}
+          {!membersQuery.isLoading && !membersQuery.isError && (
+            <ul className="divide-y divide-border">
+              {members.map((member) => (
+                <li key={member.id} className="px-4 py-3">
+                  <div className="flex items-start gap-2">
+                    <button
                       type="button"
-                      variant="destructive"
-                      size="sm"
-                      disabled={
-                        revokeInviteMutation.isPending &&
-                        revokeInviteMutation.variables === invite.id
-                      }
-                      onClick={() => revokeInviteMutation.mutate(invite.id)}
+                      className="min-w-0 flex-1 rounded-md text-left transition hover:bg-muted/40 focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground/30"
+                      onClick={() => openMemberDrawer(member.id)}
                     >
-                      {t("team.revokeInvite")}
-                    </Button>
+                      <div className="flex items-start gap-3">
+                        <UserAvatar
+                          id={member.id}
+                          name={member.name}
+                          avatar={member.avatar}
+                          avatarUrl={member.avatarUrl}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-medium">{member.name}</div>
+                          <div className="break-all text-xs text-muted-foreground">
+                            {member.email}
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <Badge
+                              variant="secondary"
+                              className={roleStyles[member.role] + " border-0"}
+                            >
+                              {workspaceRoleLabel(member.role, t)}
+                            </Badge>
+                            <span>
+                              {t("team.joined")}:{" "}
+                              {formatJoinedDate(member.joinedAt, lang as Lang) ?? "—"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                    <div className="shrink-0 pt-0.5">{memberActions(member)}</div>
                   </div>
                 </li>
               ))}
             </ul>
           )}
-        </section>
-      )}
-
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">
-            <tr>
-              <th className="px-5 py-3 text-left">{t("team.members")}</th>
-              <th className="px-5 py-3 text-left">{t("team.role")}</th>
-              <th className="px-5 py-3 text-left">{t("team.joined")}</th>
-              <th className="px-5 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {membersQuery.isLoading && <MembersTableSkeleton />}
-            {membersQuery.isError && (
-              <tr>
-                <td colSpan={4} className="px-5 py-6">
-                  <ApiErrorState
-                    compact
-                    className="border-0 bg-transparent shadow-none"
-                    title={t("team.loadErrorTitle")}
-                    error={membersQuery.error}
-                    onRetry={() => void membersQuery.refetch()}
-                  />
-                </td>
-              </tr>
-            )}
-            {!membersQuery.isLoading &&
-              !membersQuery.isError &&
-              members.map((member) => (
-                <tr
-                  key={member.id}
-                  className="cursor-pointer transition hover:bg-muted/40"
-                  onClick={() => openMemberDrawer(member.id)}
-                >
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-3">
-                      <UserAvatar
-                        id={member.id}
-                        name={member.name}
-                        avatar={member.avatar}
-                        avatarUrl={member.avatarUrl}
-                      />
-                      <div>
-                        <div className="font-medium">{member.name}</div>
-                        <div className="text-xs text-muted-foreground">{member.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3">
-                    <Badge variant="secondary" className={roleStyles[member.role] + " border-0"}>
-                      {workspaceRoleLabel(member.role, t)}
-                    </Badge>
-                  </td>
-                  <td className="px-5 py-3 text-muted-foreground">
-                    {formatJoinedDate(member.joinedAt, lang as Lang) ?? "—"}
-                  </td>
-                  <td className="px-5 py-3 text-right" onClick={(event) => event.stopPropagation()}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          aria-label={`Actions for ${member.name}`}
-                          className="rounded-md p-1 text-muted-foreground transition outline-none hover:bg-secondary hover:text-foreground focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground/30"
-                        >
-                          <MoreHorizontal className="size-4" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="end"
-                        onCloseAutoFocus={(event) => event.preventDefault()}
-                      >
-                        <DropdownMenuItem onClick={() => openMemberDrawer(member.id)}>
-                          {t("team.viewProfile")}
-                        </DropdownMenuItem>
-                        {canManageMember(member) && (
-                          <DropdownMenuItem onClick={() => openRoleDialog(member)}>
-                            {t("team.changeRole")}
-                          </DropdownMenuItem>
-                        )}
-                        {canManageMember(member) && (
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => setRemoveMember(member)}
-                          >
-                            {t("team.removeMember")}
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
+        </div>
       </div>
 
       <MemberProfileDrawer
@@ -679,7 +764,67 @@ function TeamPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog
+        open={revokeInvite != null}
+        onOpenChange={(next) => {
+          if (!next && !revokeInviteMutation.isPending) {
+            setRevokeInvite(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("team.revokeTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("team.revokeDesc").replace("{email}", revokeInvite?.email ?? "")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={revokeInviteMutation.isPending}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={revokeInviteMutation.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                handleConfirmRevoke();
+              }}
+            >
+              {revokeInviteMutation.isPending ? t("team.revokingInvite") : t("team.revokeConfirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
+  );
+}
+
+function PendingInvitationsSkeleton() {
+  return (
+    <ul className="divide-y divide-border" aria-hidden>
+      {Array.from({ length: 3 }).map((_, index) => (
+        <li
+          key={index}
+          className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+        >
+          <div className="min-w-0 space-y-2">
+            <Skeleton className="h-4 w-48 max-w-full" />
+            <div className="flex flex-wrap gap-2">
+              <Skeleton className="h-5 w-16 rounded-full" />
+              <Skeleton className="h-5 w-24 rounded-full" />
+              <Skeleton className="h-4 w-36" />
+            </div>
+          </div>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <Skeleton className="h-8 w-full sm:w-28" />
+            <Skeleton className="h-8 w-full sm:w-24" />
+            <Skeleton className="h-8 w-full sm:w-20" />
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -709,5 +854,28 @@ function MembersTableSkeleton() {
         </tr>
       ))}
     </>
+  );
+}
+
+function MembersCardsSkeleton() {
+  return (
+    <ul className="divide-y divide-border" aria-hidden>
+      {Array.from({ length: 4 }).map((_, index) => (
+        <li key={index} className="px-4 py-3">
+          <div className="flex items-start gap-3">
+            <Skeleton className="size-9 shrink-0 rounded-full" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-3 w-40 max-w-full" />
+              <div className="flex gap-2">
+                <Skeleton className="h-5 w-16 rounded-full" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            </div>
+            <Skeleton className="size-8 rounded-md" />
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
