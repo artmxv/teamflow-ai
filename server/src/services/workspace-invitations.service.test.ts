@@ -9,6 +9,9 @@ import {
   acceptWorkspaceInvitation,
   createWorkspaceInvitation,
   getInvitationByToken,
+  INVITATION_RESEND_TOO_SOON_CODE,
+  invitationEmailDelivery,
+  resendWorkspaceInvitation,
   revokeWorkspaceInvitation,
 } from "./workspace-invitations.service.js";
 
@@ -40,6 +43,14 @@ function publicUser(user: {
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
+}
+
+/** Backdate updatedAt so the 60s resend cooldown does not block the test. */
+async function clearResendCooldown(invitationId: string) {
+  await prisma.workspaceInvitation.update({
+    where: { id: invitationId },
+    data: { updatedAt: new Date(Date.now() - 61_000) },
+  });
 }
 
 describe("workspace-invitations.service", () => {
@@ -433,4 +444,400 @@ describe("workspace-invitations.service", () => {
 
     await prisma.workspace.delete({ where: { id: seatWorkspace.id } });
   });
+
+  it("OWNER can resend a pending invitation with a new token and extended expiry", async () => {
+    const created = await createWorkspaceInvitation({
+      workspaceId,
+      workspaceName,
+      workspacePlan: "ENTERPRISE",
+      inviterUserId: ownerId,
+      inviterRole: "OWNER",
+      email: email("resend-ok"),
+      role: "MEMBER",
+    });
+
+    const oldToken = created.invitation.acceptUrl.split("/invite/")[1]!;
+    const nearExpiry = new Date(Date.now() + 60_000);
+
+    await prisma.workspaceInvitation.update({
+      where: { id: created.invitation.id },
+      data: {
+        expiresAt: nearExpiry,
+        updatedAt: new Date(Date.now() - 61_000),
+      },
+    });
+
+    const resent = await resendWorkspaceInvitation({
+      workspaceId,
+      workspaceName,
+      invitationId: created.invitation.id,
+      actorUserId: ownerId,
+      actorRole: "OWNER",
+    });
+
+    const newToken = resent.invitation.acceptUrl.split("/invite/")[1]!;
+    assert.notEqual(newToken, oldToken);
+    assert.equal(resent.acceptUrl, resent.invitation.acceptUrl);
+    assert.match(resent.acceptUrl, /\/invite\//);
+    assert.ok(resultExpiresFarEnough(resent.invitation.expiresAt));
+    assert.equal(resent.emailSent, false);
+    assert.ok(resent.deliveryMode === "dev" || resent.deliveryMode === "console");
+
+    const stored = await prisma.workspaceInvitation.findUniqueOrThrow({
+      where: { id: created.invitation.id },
+      select: { token: true, expiresAt: true, status: true },
+    });
+    assert.equal(stored.token, newToken);
+    assert.equal(stored.status, "PENDING");
+    assert.ok(stored.expiresAt.getTime() > nearExpiry.getTime());
+  });
+
+  it("MEMBER cannot resend invitations", async () => {
+    const created = await createWorkspaceInvitation({
+      workspaceId,
+      workspaceName,
+      workspacePlan: "ENTERPRISE",
+      inviterUserId: ownerId,
+      inviterRole: "OWNER",
+      email: email("resend-member-blocked"),
+      role: "MEMBER",
+    });
+
+    await clearResendCooldown(created.invitation.id);
+
+    await assert.rejects(
+      () =>
+        resendWorkspaceInvitation({
+          workspaceId,
+          workspaceName,
+          invitationId: created.invitation.id,
+          actorUserId: ownerId,
+          actorRole: "MEMBER",
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.statusCode, 403);
+        return true;
+      },
+    );
+  });
+
+  it("rejects resend for invitations from another workspace", async () => {
+    const created = await createWorkspaceInvitation({
+      workspaceId,
+      workspaceName,
+      workspacePlan: "ENTERPRISE",
+      inviterUserId: ownerId,
+      inviterRole: "OWNER",
+      email: email("resend-other-ws"),
+      role: "MEMBER",
+    });
+
+    await clearResendCooldown(created.invitation.id);
+
+    const otherWorkspace = await prisma.workspace.create({
+      data: {
+        name: `Other Invite WS ${suffix}`,
+        slug: `other-invite-ws-${suffix}`,
+        plan: "ENTERPRISE",
+      },
+    });
+
+    try {
+      await assert.rejects(
+        () =>
+          resendWorkspaceInvitation({
+            workspaceId: otherWorkspace.id,
+            workspaceName: otherWorkspace.name,
+            invitationId: created.invitation.id,
+            actorUserId: ownerId,
+            actorRole: "OWNER",
+          }),
+        (error: unknown) => {
+          assert.ok(error instanceof AuthError);
+          assert.equal(error.statusCode, 404);
+          return true;
+        },
+      );
+    } finally {
+      await prisma.workspace.delete({ where: { id: otherWorkspace.id } });
+    }
+  });
+
+  it("invalidates the old token and accepts the new token after resend", async () => {
+    const inviteEmail = email("resend-token-swap");
+    const created = await createWorkspaceInvitation({
+      workspaceId,
+      workspaceName,
+      workspacePlan: "ENTERPRISE",
+      inviterUserId: ownerId,
+      inviterRole: "OWNER",
+      email: inviteEmail,
+      role: "MEMBER",
+    });
+
+    const oldToken = created.invitation.acceptUrl.split("/invite/")[1]!;
+    await clearResendCooldown(created.invitation.id);
+
+    const resent = await resendWorkspaceInvitation({
+      workspaceId,
+      workspaceName,
+      invitationId: created.invitation.id,
+      actorUserId: ownerId,
+      actorRole: "OWNER",
+    });
+
+    const newToken = resent.acceptUrl.split("/invite/")[1]!;
+
+    await assert.rejects(
+      () => getInvitationByToken(oldToken),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.statusCode, 404);
+        assert.equal(error.code, "INVITATION_NO_LONGER_AVAILABLE");
+        return true;
+      },
+    );
+
+    const preview = await getInvitationByToken(newToken);
+    assert.equal(preview.canAccept, true);
+    assert.equal(preview.email, inviteEmail);
+
+    const invitee = await prisma.user.create({
+      data: {
+        name: "Resend Token Invitee",
+        email: inviteEmail,
+        passwordHash: "test-hash",
+      },
+    });
+    userIds.push(invitee.id);
+
+    const accepted = await acceptWorkspaceInvitation(newToken, publicUser(invitee));
+    assert.equal(accepted.workspaceId, workspaceId);
+  });
+
+  it("rejects resend for revoked, accepted, and expired invitations", async () => {
+    const revoked = await createWorkspaceInvitation({
+      workspaceId,
+      workspaceName,
+      workspacePlan: "ENTERPRISE",
+      inviterUserId: ownerId,
+      inviterRole: "OWNER",
+      email: email("resend-revoked"),
+      role: "MEMBER",
+    });
+    await revokeWorkspaceInvitation(workspaceId, revoked.invitation.id, "OWNER");
+    await clearResendCooldown(revoked.invitation.id);
+
+    await assert.rejects(
+      () =>
+        resendWorkspaceInvitation({
+          workspaceId,
+          workspaceName,
+          invitationId: revoked.invitation.id,
+          actorUserId: ownerId,
+          actorRole: "OWNER",
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.statusCode, 400);
+        return true;
+      },
+    );
+
+    const acceptedInviteEmail = email("resend-accepted");
+    const acceptedCreated = await createWorkspaceInvitation({
+      workspaceId,
+      workspaceName,
+      workspacePlan: "ENTERPRISE",
+      inviterUserId: ownerId,
+      inviterRole: "OWNER",
+      email: acceptedInviteEmail,
+      role: "MEMBER",
+    });
+    const acceptedInvitee = await prisma.user.create({
+      data: {
+        name: "Resend Accepted Invitee",
+        email: acceptedInviteEmail,
+        passwordHash: "test-hash",
+      },
+    });
+    userIds.push(acceptedInvitee.id);
+    const acceptToken = acceptedCreated.invitation.acceptUrl.split("/invite/")[1]!;
+    await acceptWorkspaceInvitation(acceptToken, publicUser(acceptedInvitee));
+    await clearResendCooldown(acceptedCreated.invitation.id);
+
+    await assert.rejects(
+      () =>
+        resendWorkspaceInvitation({
+          workspaceId,
+          workspaceName,
+          invitationId: acceptedCreated.invitation.id,
+          actorUserId: ownerId,
+          actorRole: "OWNER",
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.statusCode, 400);
+        return true;
+      },
+    );
+
+    const expired = await prisma.workspaceInvitation.create({
+      data: {
+        workspaceId,
+        email: email("resend-expired"),
+        role: "MEMBER",
+        token: randomBytes(24).toString("base64url"),
+        invitedById: ownerId,
+        status: "PENDING",
+        expiresAt: new Date(Date.now() - 60_000),
+        updatedAt: new Date(Date.now() - 61_000),
+      },
+    });
+
+    await assert.rejects(
+      () =>
+        resendWorkspaceInvitation({
+          workspaceId,
+          workspaceName,
+          invitationId: expired.id,
+          actorUserId: ownerId,
+          actorRole: "OWNER",
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.statusCode, 400);
+        return true;
+      },
+    );
+  });
+
+  it("rejects resend earlier than 60 seconds and allows it after cooldown", async () => {
+    const created = await createWorkspaceInvitation({
+      workspaceId,
+      workspaceName,
+      workspacePlan: "ENTERPRISE",
+      inviterUserId: ownerId,
+      inviterRole: "OWNER",
+      email: email("resend-cooldown"),
+      role: "MEMBER",
+    });
+
+    await assert.rejects(
+      () =>
+        resendWorkspaceInvitation({
+          workspaceId,
+          workspaceName,
+          invitationId: created.invitation.id,
+          actorUserId: ownerId,
+          actorRole: "OWNER",
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.statusCode, 429);
+        assert.equal(error.code, INVITATION_RESEND_TOO_SOON_CODE);
+        return true;
+      },
+    );
+
+    await clearResendCooldown(created.invitation.id);
+
+    const resent = await resendWorkspaceInvitation({
+      workspaceId,
+      workspaceName,
+      invitationId: created.invitation.id,
+      actorUserId: ownerId,
+      actorRole: "OWNER",
+    });
+
+    assert.equal(resent.invitation.id, created.invitation.id);
+    assert.ok(resent.deliveryMode === "dev" || resent.deliveryMode === "console");
+    assert.equal(typeof resent.emailSent, "boolean");
+
+    await assert.rejects(
+      () =>
+        resendWorkspaceInvitation({
+          workspaceId,
+          workspaceName,
+          invitationId: created.invitation.id,
+          actorUserId: ownerId,
+          actorRole: "OWNER",
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.code, INVITATION_RESEND_TOO_SOON_CODE);
+        return true;
+      },
+    );
+  });
+
+  it("allows only one concurrent resend to succeed", async () => {
+    const created = await createWorkspaceInvitation({
+      workspaceId,
+      workspaceName,
+      workspacePlan: "ENTERPRISE",
+      inviterUserId: ownerId,
+      inviterRole: "OWNER",
+      email: email("resend-race"),
+      role: "MEMBER",
+    });
+
+    await clearResendCooldown(created.invitation.id);
+
+    let emailCalls = 0;
+    const originalSend = invitationEmailDelivery.send;
+    invitationEmailDelivery.send = async (input) => {
+      emailCalls += 1;
+      // Widen the window so the losing request still races on updateMany.
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      return originalSend(input);
+    };
+
+    try {
+      const payload = {
+        workspaceId,
+        workspaceName,
+        invitationId: created.invitation.id,
+        actorUserId: ownerId,
+        actorRole: "OWNER" as const,
+      };
+
+      const results = await Promise.allSettled([
+        resendWorkspaceInvitation(payload),
+        resendWorkspaceInvitation(payload),
+      ]);
+
+      const fulfilled = results.filter((result) => result.status === "fulfilled");
+      const rejected = results.filter((result) => result.status === "rejected");
+
+      assert.equal(fulfilled.length, 1);
+      assert.equal(rejected.length, 1);
+
+      const winner = fulfilled[0];
+      const loser = rejected[0];
+      assert.ok(winner && winner.status === "fulfilled");
+      assert.ok(loser && loser.status === "rejected");
+      assert.ok(loser.reason instanceof AuthError);
+      assert.equal(loser.reason.statusCode, 429);
+      assert.equal(loser.reason.code, INVITATION_RESEND_TOO_SOON_CODE);
+      assert.equal(emailCalls, 1);
+
+      const winnerToken = winner.value.acceptUrl.split("/invite/")[1]!;
+      const stored = await prisma.workspaceInvitation.findUniqueOrThrow({
+        where: { id: created.invitation.id },
+        select: { token: true, status: true },
+      });
+      assert.equal(stored.status, "PENDING");
+      assert.equal(stored.token, winnerToken);
+    } finally {
+      invitationEmailDelivery.send = originalSend;
+    }
+  });
 });
+
+function resultExpiresFarEnough(expiresAtIso: string): boolean {
+  const expiresAt = new Date(expiresAtIso).getTime();
+  const sixDaysMs = 6 * 24 * 60 * 60 * 1000;
+  return expiresAt > Date.now() + sixDaysMs;
+}

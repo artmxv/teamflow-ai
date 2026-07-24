@@ -43,7 +43,8 @@ const dict = {
     "chat.unreadBoundary": "New messages",
     "chat.renameChat": "Rename chat",
     "chat.renameTitle": "Rename general chat",
-    "chat.renameDescription": "This updates the name for everyone in the workspace. Message history stays the same.",
+    "chat.renameDescription":
+      "This updates the name for everyone in the workspace. Message history stays the same.",
     "chat.renameSave": "Save name",
     "chat.renameFailed": "Could not rename the chat",
     "chat.renameValidationEmpty": "Name cannot be empty",
@@ -770,6 +771,12 @@ const dict = {
     "team.invitationSent": "Invitation sent",
     "team.invitationEmailFailed":
       "Invitation created, but the email was not sent. Copy the link manually.",
+    "team.invitationResent": "Invitation resent",
+    "team.invitationResendEmailFailed":
+      "Invite link updated, but the email was not sent. Copy the new link manually.",
+    "team.resendInvite": "Resend",
+    "team.resendingInvite": "Resending",
+    "team.error.resendTooSoon": "Please wait a minute before resending this invitation.",
     "team.invitationLink": "Invitation link",
     "team.copyInviteLink": "Copy invite link",
     "team.invitationLinkCopied": "Invitation link copied",
@@ -927,7 +934,8 @@ const dict = {
     "chat.unreadBoundary": "Новые сообщения",
     "chat.renameChat": "Переименовать чат",
     "chat.renameTitle": "Переименовать общий чат",
-    "chat.renameDescription": "Новое имя увидят все участники пространства. История сообщений сохранится.",
+    "chat.renameDescription":
+      "Новое имя увидят все участники пространства. История сообщений сохранится.",
     "chat.renameSave": "Сохранить имя",
     "chat.renameFailed": "Не удалось переименовать чат",
     "chat.renameValidationEmpty": "Имя не может быть пустым",
@@ -1663,6 +1671,12 @@ const dict = {
     "team.invitationSent": "Приглашение отправлено",
     "team.invitationEmailFailed":
       "Приглашение создано, но письмо не отправилось. Скопируйте ссылку вручную.",
+    "team.invitationResent": "Приглашение отправлено повторно",
+    "team.invitationResendEmailFailed":
+      "Ссылка обновлена, но письмо не отправилось. Скопируйте новую ссылку вручную.",
+    "team.resendInvite": "Отправить повторно",
+    "team.resendingInvite": "Отправляем",
+    "team.error.resendTooSoon": "Подождите минуту перед повторной отправкой этого приглашения.",
     "team.invitationLink": "Ссылка приглашения",
     "team.copyInviteLink": "Скопировать ссылку",
     "team.invitationLinkCopied": "Ссылка приглашения скопирована",

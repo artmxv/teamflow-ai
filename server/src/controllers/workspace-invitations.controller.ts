@@ -9,6 +9,7 @@ import {
   createWorkspaceInvitation,
   getInvitationByToken,
   listWorkspaceInvitations,
+  resendWorkspaceInvitation,
   revokeWorkspaceInvitation,
 } from "../services/workspace-invitations.service.js";
 
@@ -144,6 +145,55 @@ export async function revokeWorkspaceInvitationController(
       context.role,
     );
     res.json({ data: invitation });
+  } catch (error) {
+    handleInvitationError(error, res, next);
+  }
+}
+
+export async function resendWorkspaceInvitationController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    if (!req.userId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const context = await resolveRequestWorkspaceContext(req.userId, req);
+    if (!context) {
+      res.status(403).json({ message: "Workspace not found" });
+      return;
+    }
+
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: context.workspaceId },
+      select: { name: true },
+    });
+
+    if (!workspace) {
+      res.status(403).json({ message: "Workspace not found" });
+      return;
+    }
+
+    const resent = await resendWorkspaceInvitation({
+      workspaceId: context.workspaceId,
+      workspaceName: workspace.name,
+      invitationId: routeParam(req.params.id),
+      actorUserId: req.userId,
+      actorRole: context.role,
+    });
+
+    res.json({
+      data: {
+        invitation: resent.invitation,
+        deliveryMode: resent.deliveryMode,
+        emailSent: resent.emailSent,
+        ...(resent.emailWarning ? { emailWarning: resent.emailWarning } : {}),
+        acceptUrl: resent.acceptUrl,
+      },
+    });
   } catch (error) {
     handleInvitationError(error, res, next);
   }
