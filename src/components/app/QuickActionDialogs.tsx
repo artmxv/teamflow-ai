@@ -38,6 +38,7 @@ import { nameToInitials, useCurrentWorkspace } from "@/lib/auth/use-current-user
 import { resolveEditAssigneeOptions } from "@/lib/assignee-options";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { dueDateTimeToIso } from "@/lib/due-datetime";
+import { invalidateWorkspaceContentQueries } from "@/lib/workspace-queries";
 import { type Priority, type ProjectStatus, type TaskStatus } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
@@ -168,8 +169,7 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
       return { project, failedCount, memberCount: selectedMemberIds.length };
     },
     onSuccess: async ({ project, failedCount, memberCount }) => {
-      await queryClient.invalidateQueries({ queryKey: ["projects"] });
-      await queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      await invalidateWorkspaceContentQueries(queryClient, resolvedWorkspaceId);
 
       if (memberCount > 0 && failedCount > 0) {
         toast.warning(t("projects.new.membersPartialWarning"));

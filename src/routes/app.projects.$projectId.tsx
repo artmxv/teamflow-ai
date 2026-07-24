@@ -92,6 +92,7 @@ import {
   type ProjectMemberApiItem,
 } from "@/lib/api/project-members";
 import { invalidateNotifications } from "@/lib/api/notifications";
+import { invalidateWorkspaceContentQueries } from "@/lib/workspace-queries";
 import { friendlyUploadErrorMessage } from "@/lib/upload-errors";
 import { isUploadFileTooLarge } from "@/lib/upload-limits";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -181,6 +182,7 @@ const taskPriorityTone: Record<TaskApiPriority, string> = {
 function ProjectDetailPage() {
   const { t, lang } = useI18n();
   const { data: me } = useCurrentUser();
+  const workspaceId = me?.workspace?.id ?? null;
   const canManageProjects = isWorkspaceManager(me?.workspace?.role);
   const { projectId } = Route.useParams();
   const router = useRouter();
@@ -222,7 +224,7 @@ function ProjectDetailPage() {
         dueDate: input.dueDate,
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       toast.success("Project updated");
     },
     onError: (mutationError) => {
@@ -235,7 +237,7 @@ function ProjectDetailPage() {
   const deleteProjectMutation = useMutation({
     mutationFn: (id: string) => deleteProject(id),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       toast.success("Project deleted");
       await router.navigate({ to: "/app/projects" });
     },
@@ -249,8 +251,7 @@ function ProjectDetailPage() {
   const createTaskMutation = useMutation({
     mutationFn: createTask,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       invalidateNotifications(queryClient);
       toast.success("Task created");
     },
@@ -264,8 +265,7 @@ function ProjectDetailPage() {
   const deleteTaskMutation = useMutation({
     mutationFn: deleteTask,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       setSelectedTask(null);
       toast.success("Task deleted");
     },
@@ -291,8 +291,7 @@ function ProjectDetailPage() {
       };
     }) => updateTask(id, input),
     onSuccess: async (updated) => {
-      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      await queryClient.invalidateQueries({ queryKey: ["projects"] });
+      await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       invalidateNotifications(queryClient);
       setSelectedTask((prev) => {
         if (!prev || prev.id !== updated.id) return prev;
