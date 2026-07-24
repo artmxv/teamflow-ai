@@ -31,31 +31,53 @@ export function buildOverviewCopy(locale: AiLocale, metrics: Metrics): string {
     if (metrics.totalProjects === 0) {
       return "В пространстве пока нет проектов. Создайте проект и добавьте задачи, чтобы отслеживать работу.";
     }
-    const projectPart =
-      metrics.activeProjects === metrics.totalProjects
-        ? formatCount(locale, metrics.totalProjects, "проект", "проектов")
-        : `${metrics.activeProjects} активных из ${metrics.totalProjects} проектов`;
     if (metrics.totalTasks === 0) {
-      return `В пространстве ${projectPart}, но задач пока нет. Добавьте задачи для отслеживания прогресса.`;
+      const projectPart =
+        metrics.activeProjects === metrics.totalProjects
+          ? formatCount(locale, metrics.totalProjects, "проект", "проектов")
+          : `${metrics.activeProjects} активных из ${metrics.totalProjects} проектов`;
+      return `Доступно ${projectPart}, но задач пока нет. Добавьте задачи, чтобы следить за прогрессом.`;
+    }
+    if (metrics.overdueTasks > 0) {
+      return `Сфокусируйтесь на просроченной работе: ${formatCount(locale, metrics.overdueTasks, "просроченная задача", "просроченных задач")} из ${metrics.openTasks} открытых.`;
+    }
+    if (metrics.urgentTasks > 0) {
+      return `Сейчас важнее всего срочные пункты: ${formatCount(locale, metrics.urgentTasks, "срочная открытая задача", "срочных открытых задач")} при ${metrics.openTasks} открытых.`;
     }
     const openLabel = metrics.openTasks === 1 ? "открытая задача" : "открытых задач";
-    const doneLabel = metrics.completedTasks === 1 ? "выполненная задача" : "выполненных задач";
-    return `В пространстве ${projectPart}, ${metrics.openTasks} ${openLabel} и ${metrics.completedTasks} ${doneLabel}.`;
+    const activeProjectsPart = formatCount(
+      locale,
+      metrics.activeProjects,
+      "активный проект",
+      "активных проектов",
+    );
+    return `В доступе ${activeProjectsPart} и ${metrics.openTasks} ${openLabel}; ${metrics.completedTasks} уже закрыто.`;
   }
 
   if (metrics.totalProjects === 0) {
     return "The workspace has no projects yet. Create a project and add tasks to start tracking delivery.";
   }
-  const projectPart =
-    metrics.activeProjects === metrics.totalProjects
-      ? formatCount(locale, metrics.totalProjects, "project", "projects")
-      : `${metrics.activeProjects} active of ${metrics.totalProjects} projects`;
   if (metrics.totalTasks === 0) {
-    return `The workspace has ${projectPart} but no tasks yet. Add tasks to monitor progress and priorities.`;
+    const projectPart =
+      metrics.activeProjects === metrics.totalProjects
+        ? formatCount(locale, metrics.totalProjects, "project", "projects")
+        : `${metrics.activeProjects} active of ${metrics.totalProjects} projects`;
+    return `You can access ${projectPart}, but there are no tasks yet. Add tasks to monitor progress.`;
+  }
+  if (metrics.overdueTasks > 0) {
+    return `Focus on overdue work first: ${formatCount(locale, metrics.overdueTasks, "overdue task", "overdue tasks")} out of ${metrics.openTasks} open.`;
+  }
+  if (metrics.urgentTasks > 0) {
+    return `Urgent items need attention: ${formatCount(locale, metrics.urgentTasks, "urgent open task", "urgent open tasks")} among ${metrics.openTasks} open.`;
   }
   const openLabel = metrics.openTasks === 1 ? "open task" : "open tasks";
-  const doneLabel = metrics.completedTasks === 1 ? "completed task" : "completed tasks";
-  return `The workspace has ${projectPart}, ${metrics.openTasks} ${openLabel}, and ${metrics.completedTasks} ${doneLabel}.`;
+  const activeProjectsPart = formatCount(
+    locale,
+    metrics.activeProjects,
+    "active project",
+    "active projects",
+  );
+  return `You have access to ${activeProjectsPart} and ${metrics.openTasks} ${openLabel}; ${metrics.completedTasks} already done.`;
 }
 
 export function emptyWorkspaceHighlight(locale: AiLocale): string {
@@ -67,12 +89,12 @@ export function emptyWorkspaceHighlight(locale: AiLocale): string {
 export function completedHighlight(locale: AiLocale, count: number): string {
   if (locale === "ru") {
     return count === 1
-      ? "1 задача выполнена в пространстве."
-      : `${count} задач выполнено в пространстве.`;
+      ? "1 задача выполнена в доступных проектах."
+      : `${count} задач выполнено в доступных проектах.`;
   }
   return count === 1
-    ? "1 task has been completed across the workspace."
-    : `${count} tasks have been completed across the workspace.`;
+    ? "1 task has been completed in accessible projects."
+    : `${count} tasks have been completed in accessible projects.`;
 }
 
 export function inProgressHighlight(locale: AiLocale, count: number): string {
@@ -112,13 +134,37 @@ export function overdueRisk(locale: AiLocale, count: number, sample: string): st
   return `${count} overdue task${count === 1 ? "" : "s"} need attention: ${sample}.`;
 }
 
-export function urgentRisk(locale: AiLocale, count: number): string {
+export function urgentRisk(locale: AiLocale, count: number, sample: string): string {
   if (locale === "ru") {
-    return count === 1
-      ? "1 срочная открытая задача может заблокировать поставку."
-      : `${count} срочных открытых задач могут заблокировать поставку.`;
+    const suffix = count === 1 ? "срочная открытая задача" : "срочных открытых задач";
+    return `${count} ${suffix}: ${sample}.`;
   }
-  return `${count} urgent open task${count === 1 ? "" : "s"} may block delivery if not addressed soon.`;
+  return `${count} urgent open task${count === 1 ? "" : "s"}: ${sample}.`;
+}
+
+export function staleInProgressRisk(locale: AiLocale, count: number, sample: string): string {
+  if (locale === "ru") {
+    const suffix = count === 1 ? "задача в работе" : "задач в работе";
+    return `${count} ${suffix} без обновлений 7 дней и более: ${sample}.`;
+  }
+  return `${count} in-progress task${count === 1 ? "" : "s"} with no updates for 7 days or more: ${sample}.`;
+}
+
+export function unassignedRisk(locale: AiLocale, count: number, sample: string): string {
+  if (locale === "ru") {
+    const suffix =
+      count === 1 ? "открытая задача без исполнителя" : "открытых задач без исполнителя";
+    return `${count} ${suffix}: ${sample}.`;
+  }
+  return `${count} unassigned open task${count === 1 ? "" : "s"}: ${sample}.`;
+}
+
+export function missingDueDateRisk(locale: AiLocale, count: number, sample: string): string {
+  if (locale === "ru") {
+    const suffix = count === 1 ? "задача HIGH/URGENT без срока" : "задач HIGH/URGENT без срока";
+    return `${count} ${suffix}: ${sample}.`;
+  }
+  return `${count} HIGH/URGENT task${count === 1 ? "" : "s"} without a due date: ${sample}.`;
 }
 
 export function highPriorityRisk(locale: AiLocale, count: number): string {
@@ -128,6 +174,76 @@ export function highPriorityRisk(locale: AiLocale, count: number): string {
       : `${count} задач с высоким приоритетом нужно запланировать в текущем спринте.`;
   }
   return `${count} high-priority open task${count === 1 ? "" : "s"} should be scheduled in the current sprint.`;
+}
+
+export function overdueAction(locale: AiLocale, taskRef: string): string {
+  return locale === "ru"
+    ? `Закройте просроченную работу: ${taskRef}.`
+    : `Resolve overdue work: ${taskRef}.`;
+}
+
+export function urgentAction(
+  locale: AiLocale,
+  taskKey: string,
+  title: string,
+  projectName: string,
+): string {
+  return locale === "ru"
+    ? `Приоритизируйте срочную задачу ${taskKey} (${title}) в ${projectName}.`
+    : `Prioritize urgent task ${taskKey} (${title}) in ${projectName}.`;
+}
+
+export function staleInProgressAction(locale: AiLocale, count: number, sample: string): string {
+  if (locale === "ru") {
+    return count === 1
+      ? `Обновите статус или проверьте застрявшую задачу: ${sample}.`
+      : `Обновите статусы застрявших задач (${count}): ${sample}.`;
+  }
+  return count === 1
+    ? `Update status or check the stalled task: ${sample}.`
+    : `Update statuses on stalled tasks (${count}): ${sample}.`;
+}
+
+export function unassignedAction(locale: AiLocale, count: number, sample: string): string {
+  if (locale === "ru") {
+    return count === 1
+      ? `Назначьте исполнителя: ${sample}.`
+      : `Назначьте исполнителей (${count} задач): ${sample}.`;
+  }
+  return count === 1 ? `Assign an owner: ${sample}.` : `Assign owners (${count} tasks): ${sample}.`;
+}
+
+export function missingDueDateAction(locale: AiLocale, count: number, sample: string): string {
+  if (locale === "ru") {
+    return count === 1
+      ? `Назначьте срок для приоритетной задачи: ${sample}.`
+      : `Назначьте сроки для ${count} приоритетных задач: ${sample}.`;
+  }
+  return count === 1
+    ? `Set a due date for the priority task: ${sample}.`
+    : `Set due dates for ${count} priority tasks: ${sample}.`;
+}
+
+export function reviewAction(locale: AiLocale, taskKey: string): string {
+  return locale === "ru"
+    ? `Завершите ревью ${taskKey} и переведите в done или обратно в in progress.`
+    : `Complete review for ${taskKey} and move it to done or back to in progress.`;
+}
+
+export function supportInProgressAction(
+  locale: AiLocale,
+  taskKey: string,
+  projectName: string,
+): string {
+  return locale === "ru"
+    ? `Поддержите задачу в работе ${taskKey} в ${projectName}.`
+    : `Support in-progress delivery on ${taskKey} in ${projectName}.`;
+}
+
+export function startReadyWorkAction(locale: AiLocale, taskKey: string, title: string): string {
+  return locale === "ru"
+    ? `Начните или назначьте готовую работу: ${taskKey} (${title}).`
+    : `Start or assign ready work: ${taskKey} (${title}).`;
 }
 
 export function starterActions(locale: AiLocale, kind: "projects" | "tasks"): string[] {
