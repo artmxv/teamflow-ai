@@ -1,4 +1,4 @@
-import type { Project, Task, TaskStatus, User } from "@prisma/client";
+import type { Project, Task, TaskPriority, TaskStatus, User } from "@prisma/client";
 
 import { prisma } from "../lib/prisma.js";
 import { displayProjectName, displayTaskTitle } from "../lib/starter-content.js";
@@ -11,24 +11,47 @@ import {
   emptyWorkspaceHighlight,
   highPriorityRisk,
   inProgressHighlight,
+  missingDueDateAction,
+  missingDueDateRisk,
   noRisks,
+  overdueAction,
   overdueRisk,
   parseAiLocale,
   rebalanceAction,
+  reviewAction,
   reviewBoardAction,
+  staleInProgressAction,
+  staleInProgressRisk,
+  startReadyWorkAction,
   starterActions,
+  supportInProgressAction,
+  unassignedAction,
+  unassignedRisk,
   updateStatusesAction,
+  urgentAction,
   urgentRisk,
   type AiLocale,
 } from "./ai-copy.js";
+import { getAccessibleProjectWhere, getAccessibleTaskWhere } from "./project-access.service.js";
+import type { WorkspaceRole } from "./workspace-context.service.js";
 
-type AssigneeUser = Pick<User, "id" | "name" | "email">;
+export const STALE_IN_PROGRESS_DAYS = 7;
+export const MAX_TASK_EXAMPLES = 3;
+export const MAX_RECOMMENDED_ACTIONS = 5;
+export const MAX_RISKS = 6;
 
-type TaskWithRelations = Pick<Task, "id" | "key" | "title" | "status" | "priority" | "dueDate"> & {
+type AssigneeUser = Pick<User, "id" | "name">;
+
+export type TaskWithRelations = Pick<
+  Task,
+  "id" | "key" | "title" | "status" | "priority" | "dueDate" | "updatedAt" | "assigneeId"
+> & {
   project: Pick<Project, "id" | "name" | "status">;
   assignee: AssigneeUser | null;
   taskAssignees: { user: AssigneeUser }[];
 };
+
+type ProjectSummary = Pick<Project, "id" | "name" | "status">;
 
 type WorkspaceAiMetrics = {
   totalProjects: number;
@@ -52,6 +75,7 @@ export type WorkspaceAiSummary = {
 };
 
 const OPEN_TASK_STATUSES: TaskStatus[] = ["BACKLOG", "TODO", "IN_PROGRESS", "REVIEW"];
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function sanitizeText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -82,8 +106,50 @@ function formatInProgressTask(task: TaskWithRelations, locale: AiLocale): string
   return `(${key}: ${title})`;
 }
 
+function isOpenTask(task: Pick<Task, "status">): boolean {
+  return task.status !== "DONE";
+}
+
 function isOverdueTask(task: Pick<Task, "dueDate" | "status">, now: Date): boolean {
-  return task.status !== "DONE" && task.dueDate !== null && task.dueDate < now;
+  return isOpenTask(task) && task.dueDate !== null && task.dueDate < now;
+}
+
+function isUnassignedOpenTask(task: TaskWithRelations): boolean {
+  return isOpenTask(task) && !task.assigneeId && !task.assignee && task.taskAssignees.length === 0;
+}
+
+function isHighOrUrgent(priority: TaskPriority): boolean {
+  return priority === "HIGH" || priority === "URGENT";
+}
+
+function isMissingDueDatePriorityTask(task: TaskWithRelations): boolean {
+  return isOpenTask(task) && isHighOrUrgent(task.priority) && task.dueDate === null;
+}
+
+function getStaleInProgressThreshold(now: Date): Date {
+  return new Date(now.getTime() - STALE_IN_PROGRESS_DAYS * DAY_MS);
+}
+
+export function isStaleInProgressTask(
+  task: Pick<Task, "status" | "updatedAt">,
+  now: Date,
+): boolean {
+  if (task.status !== "IN_PROGRESS") {
+    return false;
+  }
+  return task.updatedAt.getTime() <= getStaleInProgressThreshold(now).getTime();
+}
+
+function formatTaskExample(task: TaskWithRelations, locale: AiLocale): string {
+  const title = displayTaskTitle(task.title, locale);
+  return `${task.key}: ${title}`;
+}
+
+function joinTaskExamples(tasks: TaskWithRelations[], locale: AiLocale): string {
+  return tasks
+    .slice(0, MAX_TASK_EXAMPLES)
+    .map((task) => formatTaskExample(task, locale))
+    .join("; ");
 }
 
 function resolveTaskAssigneeNames(task: TaskWithRelations): string[] {
@@ -120,13 +186,32 @@ function formatTaskRef(task: TaskWithRelations, locale: AiLocale): string {
   return `${task.key}: ${title} ${inWord} ${projectName}${assigneeSuffix}`;
 }
 
+function computeMetrics(
+  projects: ProjectSummary[],
+  tasks: TaskWithRelations[],
+  now: Date,
+): WorkspaceAiMetrics {
+  const openTasks = tasks.filter((task) => isOpenTask(task));
+  return {
+    totalProjects: projects.length,
+    activeProjects: projects.filter((project) => project.status === "ACTIVE").length,
+    totalTasks: tasks.length,
+    openTasks: openTasks.length,
+    completedTasks: tasks.filter((task) => task.status === "DONE").length,
+    urgentTasks: openTasks.filter((task) => task.priority === "URGENT").length,
+    highPriorityTasks: openTasks.filter((task) => task.priority === "HIGH").length,
+    reviewTasks: tasks.filter((task) => task.status === "REVIEW").length,
+    overdueTasks: tasks.filter((task) => isOverdueTask(task, now)).length,
+  };
+}
+
 function buildOverview(metrics: WorkspaceAiMetrics, locale: AiLocale): string {
   return buildOverviewCopy(locale, metrics);
 }
 
 function buildHighlights(
   metrics: WorkspaceAiMetrics,
-  projects: Pick<Project, "name" | "status">[],
+  projects: ProjectSummary[],
   tasks: TaskWithRelations[],
   locale: AiLocale,
 ): string[] {
@@ -167,22 +252,43 @@ function buildRisks(
   locale: AiLocale,
 ): string[] {
   const risks: string[] = [];
+  const openTasks = tasks.filter((task) => isOpenTask(task));
 
-  const overdue = tasks.filter((task) => isOverdueTask(task, now));
+  const overdue = openTasks.filter((task) => isOverdueTask(task, now));
   if (overdue.length > 0) {
-    const sample = overdue.slice(0, 3).map((task) => formatTaskRef(task, locale));
-    risks.push(overdueRisk(locale, overdue.length, sample.join("; ")));
+    risks.push(overdueRisk(locale, overdue.length, joinTaskExamples(overdue, locale)));
   }
 
-  const urgentOpen = tasks.filter((task) => task.priority === "URGENT" && task.status !== "DONE");
+  const urgentOpen = openTasks.filter((task) => task.priority === "URGENT");
   if (urgentOpen.length > 0) {
-    risks.push(urgentRisk(locale, urgentOpen.length));
+    risks.push(urgentRisk(locale, urgentOpen.length, joinTaskExamples(urgentOpen, locale)));
   }
 
-  const highPriorityOpen = tasks.filter(
-    (task) => task.priority === "HIGH" && task.status !== "DONE",
-  );
-  if (highPriorityOpen.length > 0 && metrics.urgentTasks === 0) {
+  const staleInProgress = openTasks.filter((task) => isStaleInProgressTask(task, now));
+  if (staleInProgress.length > 0) {
+    risks.push(
+      staleInProgressRisk(
+        locale,
+        staleInProgress.length,
+        joinTaskExamples(staleInProgress, locale),
+      ),
+    );
+  }
+
+  const unassigned = openTasks.filter((task) => isUnassignedOpenTask(task));
+  if (unassigned.length > 0) {
+    risks.push(unassignedRisk(locale, unassigned.length, joinTaskExamples(unassigned, locale)));
+  }
+
+  const missingDueDate = openTasks.filter((task) => isMissingDueDatePriorityTask(task));
+  if (missingDueDate.length > 0) {
+    risks.push(
+      missingDueDateRisk(locale, missingDueDate.length, joinTaskExamples(missingDueDate, locale)),
+    );
+  }
+
+  const highPriorityOpen = openTasks.filter((task) => task.priority === "HIGH");
+  if (risks.length === 0 && highPriorityOpen.length > 0 && metrics.urgentTasks === 0) {
     risks.push(highPriorityRisk(locale, highPriorityOpen.length));
   }
 
@@ -190,7 +296,7 @@ function buildRisks(
     risks.push(noRisks(locale));
   }
 
-  return risks;
+  return risks.slice(0, MAX_RISKS);
 }
 
 function buildRecommendedNextActions(
@@ -209,58 +315,74 @@ function buildRecommendedNextActions(
 
   const actions: string[] = [];
   const seen = new Set<string>();
+  const openTasks = tasks.filter((task) => isOpenTask(task));
 
   const addAction = (action: string) => {
-    if (!seen.has(action) && actions.length < 5) {
+    if (!seen.has(action) && actions.length < MAX_RECOMMENDED_ACTIONS) {
       seen.add(action);
       actions.push(action);
     }
   };
 
-  for (const task of tasks.filter((item) => isOverdueTask(item, now)).slice(0, 2)) {
+  for (const task of openTasks.filter((item) => isOverdueTask(item, now)).slice(0, 2)) {
+    addAction(overdueAction(locale, formatTaskRef(task, locale)));
+  }
+
+  for (const task of openTasks.filter((item) => item.priority === "URGENT").slice(0, 2)) {
     addAction(
-      locale === "ru"
-        ? `Закройте просроченную работу: ${formatTaskRef(task, locale)}.`
-        : `Resolve overdue work: ${formatTaskRef(task, locale)}.`,
+      urgentAction(
+        locale,
+        task.key,
+        displayTaskTitle(task.title, locale),
+        displayProjectName(task.project.name, locale),
+      ),
     );
   }
 
-  for (const task of tasks
-    .filter((item) => item.priority === "URGENT" && item.status !== "DONE")
-    .slice(0, 2)) {
+  const staleInProgress = openTasks.filter((task) => isStaleInProgressTask(task, now));
+  if (staleInProgress.length > 0) {
     addAction(
-      locale === "ru"
-        ? `Приоритизируйте срочную задачу ${task.key} (${displayTaskTitle(task.title, locale)}) в ${displayProjectName(task.project.name, locale)}.`
-        : `Prioritize urgent task ${task.key} (${displayTaskTitle(task.title, locale)}) in ${displayProjectName(task.project.name, locale)}.`,
+      staleInProgressAction(
+        locale,
+        staleInProgress.length,
+        joinTaskExamples(staleInProgress, locale),
+      ),
     );
   }
 
-  for (const task of tasks.filter((item) => item.status === "REVIEW").slice(0, 2)) {
+  const unassigned = openTasks.filter((task) => isUnassignedOpenTask(task));
+  if (unassigned.length > 0) {
+    addAction(unassignedAction(locale, unassigned.length, joinTaskExamples(unassigned, locale)));
+  }
+
+  const missingDueDate = openTasks.filter((task) => isMissingDueDatePriorityTask(task));
+  if (missingDueDate.length > 0) {
     addAction(
-      locale === "ru"
-        ? `Завершите ревью ${task.key} и переведите в done или обратно в in progress.`
-        : `Complete review for ${task.key} and move it to done or back to in progress.`,
+      missingDueDateAction(locale, missingDueDate.length, joinTaskExamples(missingDueDate, locale)),
     );
   }
 
-  for (const task of tasks
-    .filter((item) => item.status === "IN_PROGRESS" && item.priority === "HIGH")
+  for (const task of openTasks.filter((item) => item.status === "REVIEW").slice(0, 1)) {
+    addAction(reviewAction(locale, task.key));
+  }
+
+  for (const task of openTasks
+    .filter(
+      (item) =>
+        item.status === "IN_PROGRESS" &&
+        item.priority === "HIGH" &&
+        !isStaleInProgressTask(item, now),
+    )
     .slice(0, 1)) {
     addAction(
-      locale === "ru"
-        ? `Поддержите задачу в работе ${task.key} в ${displayProjectName(task.project.name, locale)}.`
-        : `Support in-progress delivery on ${task.key} in ${displayProjectName(task.project.name, locale)}.`,
+      supportInProgressAction(locale, task.key, displayProjectName(task.project.name, locale)),
     );
   }
 
-  for (const task of tasks
+  for (const task of openTasks
     .filter((item) => OPEN_TASK_STATUSES.includes(item.status) && item.status === "TODO")
     .slice(0, 1)) {
-    addAction(
-      locale === "ru"
-        ? `Начните или назначьте готовую работу: ${task.key} (${displayTaskTitle(task.title, locale)}).`
-        : `Start or assign ready work: ${task.key} (${displayTaskTitle(task.title, locale)}).`,
-    );
+    addAction(startReadyWorkAction(locale, task.key, displayTaskTitle(task.title, locale)));
   }
 
   if (metrics.openTasks > metrics.completedTasks) {
@@ -274,12 +396,12 @@ function buildRecommendedNextActions(
     break;
   }
 
-  return actions.slice(0, 5);
+  return actions.slice(0, MAX_RECOMMENDED_ACTIONS);
 }
 
 function buildStandupSummary(
   metrics: WorkspaceAiMetrics,
-  projects: Pick<Project, "name" | "status">[],
+  projects: ProjectSummary[],
   tasks: TaskWithRelations[],
   locale: AiLocale,
 ): string {
@@ -359,103 +481,15 @@ function buildStandupSummary(
   return `${sentences.join(". ")}.`;
 }
 
-export async function getWorkspaceAiSummary(
-  workspaceId: string,
+/** Pure builder used by the service and unit tests. */
+export function buildWorkspaceAiSummaryFromData(
+  projects: ProjectSummary[],
+  tasks: TaskWithRelations[],
   localeInput?: unknown,
-): Promise<WorkspaceAiSummary> {
+  now: Date = new Date(),
+): WorkspaceAiSummary {
   const locale = parseAiLocale(localeInput);
-  const now = new Date();
-  const projectWhere = { workspaceId };
-  const taskWhere = { project: { workspaceId } };
-  const openTaskWhere = { ...taskWhere, status: { not: "DONE" as const } };
-
-  const [
-    totalProjects,
-    activeProjects,
-    totalTasks,
-    openTasks,
-    completedTasks,
-    urgentTasks,
-    highPriorityTasks,
-    reviewTasks,
-    overdueTasks,
-    projects,
-    tasks,
-  ] = await Promise.all([
-    prisma.project.count({ where: projectWhere }),
-    prisma.project.count({ where: { ...projectWhere, status: "ACTIVE" } }),
-    prisma.task.count({ where: taskWhere }),
-    prisma.task.count({ where: openTaskWhere }),
-    prisma.task.count({ where: { ...taskWhere, status: "DONE" } }),
-    prisma.task.count({
-      where: { ...openTaskWhere, priority: "URGENT" },
-    }),
-    prisma.task.count({
-      where: { ...openTaskWhere, priority: "HIGH" },
-    }),
-    prisma.task.count({ where: { ...taskWhere, status: "REVIEW" } }),
-    prisma.task.count({
-      where: {
-        ...openTaskWhere,
-        dueDate: { lt: now },
-      },
-    }),
-    prisma.project.findMany({
-      where: projectWhere,
-      select: { id: true, name: true, status: true, description: true },
-      orderBy: { updatedAt: "desc" },
-    }),
-    prisma.task.findMany({
-      where: taskWhere,
-      select: {
-        id: true,
-        key: true,
-        title: true,
-        status: true,
-        priority: true,
-        dueDate: true,
-        project: {
-          select: {
-            id: true,
-            name: true,
-            status: true,
-          },
-        },
-        assignee: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        taskAssignees: {
-          orderBy: { createdAt: "asc" },
-          select: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
-    }),
-  ]);
-
-  const metrics: WorkspaceAiMetrics = {
-    totalProjects,
-    activeProjects,
-    totalTasks,
-    openTasks,
-    completedTasks,
-    urgentTasks,
-    highPriorityTasks,
-    reviewTasks,
-    overdueTasks,
-  };
+  const metrics = computeMetrics(projects, tasks, now);
 
   return {
     overview: normalizeSummaryText(buildOverview(metrics, locale)),
@@ -467,4 +501,63 @@ export async function getWorkspaceAiSummary(
     standupSummary: normalizeSummaryText(buildStandupSummary(metrics, projects, tasks, locale)),
     metrics,
   };
+}
+
+export async function getWorkspaceAiSummary(
+  workspaceId: string,
+  userId: string,
+  role: WorkspaceRole,
+  localeInput?: unknown,
+  now: Date = new Date(),
+): Promise<WorkspaceAiSummary> {
+  const projectWhere = getAccessibleProjectWhere(userId, workspaceId, role);
+  const taskWhere = getAccessibleTaskWhere(userId, workspaceId, role);
+
+  const [projects, tasks] = await Promise.all([
+    prisma.project.findMany({
+      where: projectWhere,
+      select: { id: true, name: true, status: true },
+      orderBy: { updatedAt: "desc" },
+    }),
+    prisma.task.findMany({
+      where: taskWhere,
+      select: {
+        id: true,
+        key: true,
+        title: true,
+        status: true,
+        priority: true,
+        dueDate: true,
+        updatedAt: true,
+        assigneeId: true,
+        project: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+          },
+        },
+        assignee: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        taskAssignees: {
+          orderBy: { createdAt: "asc" },
+          select: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
+    }),
+  ]);
+
+  return buildWorkspaceAiSummaryFromData(projects, tasks, localeInput, now);
 }
