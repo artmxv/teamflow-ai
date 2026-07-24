@@ -740,8 +740,20 @@ const dict = {
     "tasks.deleteAttachmentAria": "Delete attachment",
     "team.inviteMember": "Invite member",
     "team.loadErrorTitle": "Could not load team members",
+    "team.pendingLoadErrorTitle": "Could not load pending invitations",
     "team.noPendingInvitationsTitle": "No pending invitations",
     "team.noPendingInvitationsHint": "Invitations will appear here after you send them.",
+    "team.inviteEmailPlaceholder": "teammate@company.com",
+    "team.memberActionsAria": "Actions for {name}",
+    "team.invitationReused":
+      "An active invitation for this email already exists. A new email was not sent.",
+    "team.revokeTitle": "Revoke invitation?",
+    "team.revokeDesc":
+      "Revoke the invitation for {email}? The current invite link will stop working.",
+    "team.revokeConfirm": "Revoke invitation",
+    "team.revokingInvite": "Revoking…",
+    "team.toast.inviteRevoked": "Invitation revoked",
+    "team.error.revokeFailed": "Could not revoke invitation",
     "comments.emptyTitle": "No comments yet",
     "comments.emptyHint": "Be the first to leave a note.",
     "comments.loading": "Loading comments…",
@@ -770,7 +782,7 @@ const dict = {
     "team.sendingInvite": "Sending invite",
     "team.invitationSent": "Invitation sent",
     "team.invitationEmailFailed":
-      "Invitation created, but the email was not sent. Copy the link manually.",
+      "Invitation created, but the email was not sent. The link is available in pending invitations.",
     "team.invitationResent": "Invitation resent",
     "team.invitationResendEmailFailed":
       "Invite link updated, but the email was not sent. Copy the new link manually.",
@@ -1639,8 +1651,19 @@ const dict = {
     "tasks.deleteAttachmentAria": "Удалить вложение",
     "team.inviteMember": "Пригласить участника",
     "team.loadErrorTitle": "Не удалось загрузить участников",
+    "team.pendingLoadErrorTitle": "Не удалось загрузить ожидающие приглашения",
     "team.noPendingInvitationsTitle": "Ожидающих приглашений нет",
     "team.noPendingInvitationsHint": "Приглашения появятся здесь после отправки.",
+    "team.inviteEmailPlaceholder": "teammate@company.com",
+    "team.memberActionsAria": "Действия для {name}",
+    "team.invitationReused":
+      "Активное приглашение на этот email уже есть. Новое письмо не отправлялось.",
+    "team.revokeTitle": "Отозвать приглашение?",
+    "team.revokeDesc": "Отозвать приглашение для {email}? Текущая ссылка перестанет работать.",
+    "team.revokeConfirm": "Отозвать приглашение",
+    "team.revokingInvite": "Отзываем…",
+    "team.toast.inviteRevoked": "Приглашение отозвано",
+    "team.error.revokeFailed": "Не удалось отозвать приглашение",
     "comments.emptyTitle": "Комментариев пока нет",
     "comments.emptyHint": "Оставьте первый комментарий к задаче.",
     "comments.loading": "Загрузка комментариев…",
@@ -1670,7 +1693,7 @@ const dict = {
     "team.sendingInvite": "Отправляем приглашение",
     "team.invitationSent": "Приглашение отправлено",
     "team.invitationEmailFailed":
-      "Приглашение создано, но письмо не отправилось. Скопируйте ссылку вручную.",
+      "Приглашение создано, но письмо не отправилось. Ссылка доступна в списке ожидающих приглашений.",
     "team.invitationResent": "Приглашение отправлено повторно",
     "team.invitationResendEmailFailed":
       "Ссылка обновлена, но письмо не отправилось. Скопируйте новую ссылку вручную.",
