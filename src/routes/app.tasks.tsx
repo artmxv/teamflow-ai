@@ -4,6 +4,8 @@ import { requireAuth } from "@/lib/auth/route-guards";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { invalidateNotifications } from "@/lib/api/notifications";
+import { useCurrentWorkspace } from "@/lib/auth/use-current-user";
+import { invalidateWorkspaceContentQueries } from "@/lib/workspace-queries";
 import { AppShell } from "@/components/app/AppShell";
 import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { type Task, type TaskStatus, type Priority } from "@/lib/mock-data";
@@ -234,6 +236,8 @@ function TasksPage() {
   const hasUrlAnalyticsFilters = Boolean(dueFromUrl || priorityFromUrl);
   const navigate = Route.useNavigate();
   const queryClient = useQueryClient();
+  const { data: currentWorkspace } = useCurrentWorkspace();
+  const workspaceId = currentWorkspace?.id ?? null;
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<TaskListStatusFilter>(() =>
     taskListStatusFromUrl(statusFromUrl),
@@ -270,7 +274,7 @@ function TasksPage() {
   const createTaskMutation = useMutation({
     mutationFn: createTask,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       invalidateNotifications(queryClient);
       toast.success("Task created");
     },
@@ -295,7 +299,7 @@ function TasksPage() {
       };
     }) => updateTask(id, input),
     onSuccess: async (updated) => {
-      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       invalidateNotifications(queryClient);
       setSelected((prev) => {
         if (!prev || prev.id !== updated.id) return prev;
@@ -358,7 +362,7 @@ function TasksPage() {
   const deleteTaskMutation = useMutation({
     mutationFn: deleteTask,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       setSelected(null);
       if (taskIdFromUrl) {
         updateUrlSearch({ taskId: undefined });

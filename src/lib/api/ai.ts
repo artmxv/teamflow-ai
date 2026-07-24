@@ -25,6 +25,11 @@ export interface WorkspaceAiSummaryApiResponse {
   data: WorkspaceAiSummary;
 }
 
+/** Cache key scoped by workspace and UI language (separate RU/EN entries). */
+export function workspaceAiSummaryQueryKey(workspaceId: string, lang: string) {
+  return ["workspace-ai-summary", workspaceId, lang] as const;
+}
+
 export async function fetchWorkspaceAiSummary(locale?: string) {
   const response = await apiRequest<WorkspaceAiSummaryApiResponse>("/api/ai/workspace-summary", {
     method: "POST",

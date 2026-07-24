@@ -1,7 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { requireAuth } from "@/lib/auth/route-guards";
+import { useCurrentWorkspace } from "@/lib/auth/use-current-user";
 import { AppShell } from "@/components/app/AppShell";
 import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { EmptyState } from "@/components/app/EmptyState";
@@ -17,9 +18,14 @@ import {
   ListChecks,
   Megaphone,
   Copy,
+  FolderKanban,
 } from "lucide-react";
-import { useI18n } from "@/lib/i18n";
-import { fetchWorkspaceAiSummary, type WorkspaceAiMetrics } from "@/lib/api/ai";
+import { useI18n, type TKey } from "@/lib/i18n";
+import {
+  fetchWorkspaceAiSummary,
+  workspaceAiSummaryQueryKey,
+  type WorkspaceAiMetrics,
+} from "@/lib/api/ai";
 
 export const Route = createFileRoute("/app/ai")({
   beforeLoad: requireAuth,
@@ -33,14 +39,27 @@ const SECTIONS = [
   { id: "risks", labelKey: "ai.risks" as const },
   { id: "actions", labelKey: "ai.actions" as const },
   { id: "standup", labelKey: "ai.standupSummary" as const },
+  { id: "metrics", labelKey: "ai.sectionMetrics" as const },
 ] as const;
 
 function AssistantPage() {
   const { t, lang } = useI18n();
+  const { data: currentWorkspace } = useCurrentWorkspace();
+  const workspaceId = currentWorkspace?.id ?? null;
+
   const { data, error, isError, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["workspace-ai-summary", lang],
+    // When workspaceId is null the query stays disabled; null in the key never matches a real id.
+    queryKey: workspaceId
+      ? workspaceAiSummaryQueryKey(workspaceId, lang)
+      : (["workspace-ai-summary", null, lang] as const),
     queryFn: () => fetchWorkspaceAiSummary(lang),
+    enabled: Boolean(workspaceId),
   });
+
+  const isEmptyWorkspace =
+    !!data && data.metrics.totalProjects === 0 && data.metrics.totalTasks === 0;
+  const showSectionContent = !!data && !isEmptyWorkspace;
+  const navEnabled = !!data;
 
   function scrollToSection(id: string) {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -64,13 +83,33 @@ function AssistantPage() {
     <AppShell>
       <PageHeader title={t("ai.assistant")} subtitle={t("ai.groundedContext")} className="mb-4" />
 
-      <div className="grid h-[calc(100vh-11rem)] gap-4 lg:grid-cols-[260px_1fr]">
+      <nav
+        className="mb-3 -mx-1 overflow-x-auto px-1 lg:hidden"
+        aria-label={t("ai.sectionsNavLabel")}
+      >
+        <ul className="flex w-max max-w-none gap-1.5 pb-1">
+          {SECTIONS.map((section) => (
+            <li key={section.id}>
+              <button
+                type="button"
+                onClick={() => scrollToSection(section.id)}
+                disabled={!navEnabled || (section.id !== "metrics" && isEmptyWorkspace)}
+                className="whitespace-nowrap rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-soft transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
+              >
+                {t(section.labelKey)}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      <div className="grid gap-4 lg:h-[calc(100vh-11rem)] lg:grid-cols-[260px_1fr]">
         <aside className="hidden flex-col rounded-2xl border border-border bg-card p-3 shadow-soft lg:flex">
           <div className="border-b border-border/60 pb-3">
             <div className="mb-2 flex items-center gap-1.5 px-2 pt-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/80">
               <BarChart3 className="size-3" /> {t("ai.metricsTitle")}
             </div>
-            {isLoading ? (
+            {isLoading || !workspaceId ? (
               <MetricsSkeleton />
             ) : data ? (
               <MetricsPanel metrics={data.metrics} />
@@ -83,12 +122,12 @@ function AssistantPage() {
               {t("ai.sectionsTitle")}
             </div>
             <ul className="flex-1 space-y-0.5 overflow-y-auto">
-              {SECTIONS.map((section) => (
+              {SECTIONS.filter((section) => section.id !== "metrics").map((section) => (
                 <li key={section.id}>
                   <button
                     type="button"
                     onClick={() => scrollToSection(section.id)}
-                    disabled={!data}
+                    disabled={!showSectionContent}
                     className="flex w-full rounded-lg px-2 py-2 text-left text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
                   >
                     {t(section.labelKey)}
@@ -101,7 +140,7 @@ function AssistantPage() {
             variant="brand"
             size="sm"
             className="mt-4 w-full"
-            disabled={isLoading || isFetching}
+            disabled={!workspaceId || isLoading || isFetching}
             onClick={() => void handleRegenerate()}
           >
             <RefreshCw className={"mr-1.5 size-3.5 " + (isFetching ? "animate-spin" : "")} />
@@ -109,7 +148,7 @@ function AssistantPage() {
           </Button>
         </aside>
 
-        <section className="flex min-h-0 flex-col rounded-2xl border border-border bg-card shadow-soft">
+        <section className="flex flex-col rounded-2xl border border-border bg-card shadow-soft lg:min-h-0">
           <div className="flex items-center gap-3 border-b border-border px-5 py-3">
             <div className="grid size-9 place-items-center rounded-xl bg-gradient-brand shadow-glow">
               <Sparkles className="size-4 text-white" />
@@ -121,8 +160,8 @@ function AssistantPage() {
             <Button
               variant="outline"
               size="sm"
-              className="ml-auto"
-              disabled={isLoading || isFetching}
+              className="ml-auto shrink-0"
+              disabled={!workspaceId || isLoading || isFetching}
               onClick={() => void handleRegenerate()}
             >
               <RefreshCw className={"mr-1.5 size-3.5 " + (isFetching ? "animate-spin" : "")} />
@@ -130,8 +169,8 @@ function AssistantPage() {
             </Button>
           </div>
 
-          <div className="flex-1 space-y-6 overflow-y-auto px-5 py-6">
-            {isLoading ? (
+          <div className="space-y-6 px-5 py-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+            {!workspaceId || isLoading ? (
               <SummarySkeleton />
             ) : isError ? (
               <ApiErrorState
@@ -142,19 +181,35 @@ function AssistantPage() {
                 isRetrying={isFetching}
               />
             ) : data ? (
-              data.metrics.totalProjects === 0 && data.metrics.totalTasks === 0 ? (
-                <EmptyState
-                  icon={Sparkles}
-                  title={t("ai.emptyWorkspaceTitle")}
-                  description={t("ai.emptyWorkspaceHint")}
-                />
+              isEmptyWorkspace ? (
+                <>
+                  <EmptyState
+                    icon={Sparkles}
+                    title={t("ai.emptyWorkspaceTitle")}
+                    description={t("ai.emptyWorkspaceHint")}
+                    primaryAction={
+                      <Button variant="brand" asChild>
+                        <Link to="/app/projects">
+                          <FolderKanban className="size-4" />
+                          {t("ai.goToProjects")}
+                        </Link>
+                      </Button>
+                    }
+                  />
+                  <div id="metrics" className="scroll-mt-20 lg:hidden">
+                    <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {t("ai.metricsTitle")}
+                    </div>
+                    <MetricsPanel metrics={data.metrics} />
+                  </div>
+                </>
               ) : (
                 <>
-                  <div id="overview">
+                  <div id="overview" className="scroll-mt-20">
                     <AssistantBubble content={data.overview} />
                   </div>
 
-                  <div id="highlights">
+                  <div id="highlights" className="scroll-mt-20">
                     <SectionBlock
                       icon={CheckCircle2}
                       title={t("ai.highlights")}
@@ -163,7 +218,7 @@ function AssistantPage() {
                     />
                   </div>
 
-                  <div id="risks">
+                  <div id="risks" className="scroll-mt-20">
                     <SectionBlock
                       icon={AlertTriangle}
                       title={t("ai.risks")}
@@ -172,7 +227,7 @@ function AssistantPage() {
                     />
                   </div>
 
-                  <div id="actions">
+                  <div id="actions" className="scroll-mt-20">
                     <SectionBlock
                       icon={ListChecks}
                       title={t("ai.nextActions")}
@@ -182,7 +237,7 @@ function AssistantPage() {
                     />
                   </div>
 
-                  <div id="standup">
+                  <div id="standup" className="scroll-mt-20">
                     <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                       <Megaphone className="size-3.5" /> {t("ai.standupSummary")}
                       {data.standupSummary.trim() ? (
@@ -204,7 +259,7 @@ function AssistantPage() {
                     />
                   </div>
 
-                  <div className="lg:hidden">
+                  <div id="metrics" className="scroll-mt-20 lg:hidden">
                     <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                       {t("ai.metricsTitle")}
                     </div>
@@ -220,7 +275,7 @@ function AssistantPage() {
   );
 }
 
-async function copyStandupSummary(text: string, t: (key: import("@/lib/i18n").TKey) => string) {
+async function copyStandupSummary(text: string, t: (key: TKey) => string) {
   try {
     await navigator.clipboard.writeText(text);
     toast.success(t("ai.copied"));

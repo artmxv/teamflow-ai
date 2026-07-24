@@ -15,6 +15,7 @@ import { requireAuth } from "@/lib/auth/route-guards";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { invalidateNotifications } from "@/lib/api/notifications";
+import { invalidateWorkspaceContentQueries } from "@/lib/workspace-queries";
 import { AppShell } from "@/components/app/AppShell";
 import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { statusColumns, type Priority, type Task, type TaskStatus } from "@/lib/mock-data";
@@ -85,6 +86,7 @@ const apiPriorityMap: Record<TaskApiPriority, Priority> = {
 function Board() {
   const { t } = useI18n();
   const { data: me } = useCurrentUser();
+  const workspaceId = me?.workspace?.id ?? null;
   const canManageProjects = isWorkspaceManager(me?.workspace?.role);
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<Task | null>(null);
@@ -116,7 +118,7 @@ function Board() {
   const createTaskMutation = useMutation({
     mutationFn: createTask,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       invalidateNotifications(queryClient);
       toast.success("Task created");
     },
@@ -142,7 +144,6 @@ function Board() {
       return { previous };
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
       toast.success("Task status updated");
     },
     onError: (mutationError, _variables, context) => {
@@ -154,13 +155,13 @@ function Board() {
       );
     },
     onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      await invalidateWorkspaceContentQueries(queryClient, workspaceId);
     },
   });
   const deleteTaskMutation = useMutation({
     mutationFn: deleteTask,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       setSelected(null);
       toast.success("Task deleted");
     },
@@ -185,7 +186,7 @@ function Board() {
       };
     }) => updateTask(id, input),
     onSuccess: async (updated) => {
-      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       invalidateNotifications(queryClient);
       setSelected((prev) => (prev?.id === updated.id ? mapApiTaskToTask(updated) : prev));
       setSelected(null);
