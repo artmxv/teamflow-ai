@@ -5,7 +5,7 @@ import { AuthError } from "../services/auth.service.js";
 import { getBillingSummary, updateWorkspaceBillingPlan } from "../services/billing.service.js";
 import { resolveRequestWorkspaceContext } from "../lib/workspace-request.js";
 
-const updatePlanSchema = z.object({
+export const updatePlanSchema = z.object({
   plan: z.enum(["FREE", "TEAM", "BUSINESS", "ENTERPRISE"]),
 });
 

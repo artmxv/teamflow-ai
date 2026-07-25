@@ -819,9 +819,11 @@ function SettingsPage() {
               ) : (
                 <div className="mt-1 text-sm text-muted-foreground">{t("board.errorTitle")}</div>
               )}
-              <p className="mt-4 text-xs text-muted-foreground">{t("billing.paymentsLaterNote")}</p>
+              <p className="mt-4 text-xs text-muted-foreground">
+                {t("billing.onlineBillingUnavailable")}
+              </p>
               <Button variant="brand" className="mt-4" asChild>
-                <Link to="/app/billing">{t("billing.manageBilling")}</Link>
+                <Link to="/app/billing">{t("billing.viewPlans")}</Link>
               </Button>
             </div>
           </Card>
