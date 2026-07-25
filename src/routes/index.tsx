@@ -8,11 +8,10 @@ import {
   ShieldCheck,
   Zap,
   Check,
-  Star,
   PlayCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { LanguageSwitcher } from "@/lib/i18n";
+import { LanguageSwitcher, useI18n } from "@/lib/i18n";
 import { ThemeToggle } from "@/lib/theme";
 import { Github, Twitter, Linkedin } from "lucide-react";
 
@@ -23,13 +22,13 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "TeamFlow AI is the modern project management platform for small product teams. Plan, ship, and stay aligned with built-in AI assistance.",
+          "TeamFlow AI is a project management workspace for small product teams with projects, tasks, team chat, and grounded workspace briefings.",
       },
       { property: "og:title", content: "TeamFlow AI — Project management for product teams" },
       {
         property: "og:description",
         content:
-          "Plan, ship, and stay aligned with the AI-native project workspace built for product teams.",
+          "Plan projects, manage tasks, collaborate in team chat, and review briefings grounded in your workspace data.",
       },
     ],
   }),
@@ -90,7 +89,7 @@ function SiteHeader() {
             className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
           >
             <Link to="/app/dashboard">
-              Start free <ArrowRight className="size-3.5" />
+              Get started free <ArrowRight className="size-3.5" />
             </Link>
           </Button>
         </div>
@@ -108,15 +107,15 @@ function Hero() {
       <div className="mx-auto max-w-7xl px-6 pt-20 pb-16 text-center sm:pt-28">
         <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground shadow-soft">
           <span className="inline-block size-1.5 rounded-full bg-primary" />
-          New · AI standups & smart task summaries
+          New · Workspace briefings and standup summaries
         </div>
         <h1 className="mx-auto mt-6 max-w-3xl text-4xl font-semibold tracking-tight sm:text-6xl">
-          The AI-native workspace for{" "}
+          The focused workspace for{" "}
           <span className="text-gradient-brand">modern product teams</span>
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground sm:text-lg">
-          TeamFlow AI brings projects, tasks, and team context into one calm, fast workspace — with
-          an AI partner that summarizes work, drafts checklists, and keeps every sprint on track.
+          TeamFlow AI brings projects, tasks, deadlines, and team chat into one calm, fast workspace
+          — with briefings based on the workspace data you can access.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Button
@@ -206,11 +205,11 @@ function HeroPreview() {
               <div className="rounded-xl border border-border bg-gradient-to-br from-primary/8 to-transparent p-3">
                 <div className="flex items-center gap-2 text-xs font-medium">
                   <Sparkles className="size-3.5 text-primary" />
-                  AI insight
+                  Workspace briefing
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  Mobile App v3 is trending 2 days behind schedule. 3 high-priority tasks are
-                  unassigned.
+                  Overview from accessible projects: 3 high-priority tasks are unassigned. Next:
+                  assign owners and review open risks.
                 </div>
               </div>
             </div>
@@ -245,13 +244,13 @@ function Features() {
   const items = [
     {
       icon: KanbanSquare,
-      title: "A board that thinks ahead",
-      body: "Drag-and-drop kanban with smart priority signals and predicted bottlenecks.",
+      title: "A board that keeps work visible",
+      body: "Drag-and-drop kanban with statuses, priorities, assignees, and deadlines.",
     },
     {
       icon: Bot,
-      title: "Built-in AI partner",
-      body: "Summaries, draft checklists, daily standups — all grounded in your project context.",
+      title: "Grounded workspace briefings",
+      body: "Review an overview, risks, recommended next actions, and a standup summary based on accessible projects and tasks.",
     },
     {
       icon: Users,
@@ -266,7 +265,7 @@ function Features() {
     {
       icon: ShieldCheck,
       title: "Secure & private",
-      body: "SOC 2 ready, SSO, granular permissions and audit logs included on every plan.",
+      body: "Workspace roles and permissions so the right people can manage projects and invites.",
     },
     {
       icon: Sparkles,
@@ -325,7 +324,7 @@ function DashboardPreview() {
             <ul className="mt-6 space-y-3 text-sm">
               {[
                 "Realtime collaboration with presence and cursors",
-                "AI-generated stand-up notes & weekly digests",
+                "Workspace briefings with overview, risks, and standup summaries",
                 "Custom workflows, fields, and saved views",
                 "Native iOS, Android, and desktop apps",
               ].map((f) => (
@@ -388,94 +387,107 @@ function DashboardPreview() {
   );
 }
 
+/** Marketing plan limits — mirrors backend PLAN_CONFIG (members / workspaces only). */
+const MARKETING_PLANS = [
+  {
+    id: "FREE" as const,
+    nameKey: "billing.plan.free" as const,
+    descKey: "billing.planDesc.free" as const,
+    maxMembers: 5,
+    maxWorkspaces: 1,
+    paid: false,
+  },
+  {
+    id: "TEAM" as const,
+    nameKey: "billing.plan.team" as const,
+    descKey: "billing.planDesc.team" as const,
+    maxMembers: 10,
+    maxWorkspaces: 2,
+    paid: true,
+  },
+  {
+    id: "BUSINESS" as const,
+    nameKey: "billing.plan.business" as const,
+    descKey: "billing.planDesc.business" as const,
+    maxMembers: 20,
+    maxWorkspaces: 5,
+    paid: true,
+  },
+  {
+    id: "ENTERPRISE" as const,
+    nameKey: "billing.plan.enterprise" as const,
+    descKey: "billing.planDesc.enterprise" as const,
+    maxMembers: null,
+    maxWorkspaces: null,
+    paid: true,
+  },
+];
+
 function Pricing() {
-  const tiers = [
-    {
-      name: "Free",
-      price: "$0",
-      blurb: "For tiny teams trying things out.",
-      features: ["Up to 5 members", "3 active projects", "Basic AI (50 prompts/mo)"],
-      cta: "Start free",
-      to: "/app/dashboard" as const,
-      featured: false,
-    },
-    {
-      name: "Team",
-      price: "$12",
-      blurb: "Per user / month. Most popular for product teams.",
-      features: [
-        "Unlimited projects",
-        "Advanced AI assistant",
-        "Custom workflows",
-        "SSO with Google",
-      ],
-      cta: "Start 14-day trial",
-      to: "/app/dashboard" as const,
-      featured: true,
-    },
-    {
-      name: "Business",
-      price: "$24",
-      blurb: "For growing companies with compliance needs.",
-      features: ["SAML SSO + SCIM", "Audit logs", "Priority support", "Unlimited AI seats"],
-      cta: "Contact sales",
-      to: "/app/dashboard" as const,
-      featured: false,
-    },
-  ];
+  const { t } = useI18n();
+
+  const featureLines = (plan: (typeof MARKETING_PLANS)[number]) => {
+    const members =
+      plan.maxMembers === null
+        ? t("pricing.unlimitedMembers")
+        : t("pricing.upToMembers").replace("{count}", String(plan.maxMembers));
+    const workspaces =
+      plan.maxWorkspaces === null
+        ? t("pricing.unlimitedWorkspaces")
+        : plan.maxWorkspaces === 1
+          ? t("pricing.oneWorkspace")
+          : t("pricing.upToWorkspaces").replace("{count}", String(plan.maxWorkspaces));
+    return [members, workspaces];
+  };
+
   return (
     <section id="pricing" className="mx-auto max-w-7xl px-6 py-24">
       <div className="mx-auto max-w-2xl text-center">
-        <div className="text-xs font-semibold uppercase tracking-wider text-primary">Pricing</div>
+        <div className="text-xs font-semibold uppercase tracking-wider text-primary">
+          {t("nav.pricing")}
+        </div>
         <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-          Simple pricing, scales with your team
+          {t("pricing.title")}
         </h2>
-        <p className="mt-4 text-muted-foreground">
-          Start free. Upgrade when you need more AI or seats.
+        <p className="mt-4 text-muted-foreground">{t("pricing.subtitle")}</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {t("billing.onlineBillingUnavailable")}
         </p>
       </div>
 
-      <div className="mt-12 grid gap-5 md:grid-cols-3">
-        {tiers.map((t) => (
+      <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        {MARKETING_PLANS.map((plan) => (
           <div
-            key={t.name}
-            className={
-              "rounded-2xl border p-6 shadow-soft transition " +
-              (t.featured
-                ? "border-primary/30 bg-gradient-to-br from-primary/8 via-card to-card shadow-card"
-                : "border-border bg-card")
-            }
+            key={plan.id}
+            className="flex h-full flex-col rounded-2xl border border-border bg-card p-6 shadow-soft transition"
           >
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold">{t.name}</div>
-              {t.featured && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                  <Star className="size-3" /> Popular
-                </span>
-              )}
+            <div className="text-sm font-semibold">{t(plan.nameKey)}</div>
+            <div className="mt-3">
+              <span className="text-3xl font-semibold tracking-tight sm:text-4xl">
+                {plan.paid ? t("billing.comingSoon") : t("pricing.priceFree")}
+              </span>
             </div>
-            <div className="mt-3 flex items-baseline gap-1">
-              <span className="text-4xl font-semibold tracking-tight">{t.price}</span>
-              <span className="text-sm text-muted-foreground">/ user / mo</span>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">{t.blurb}</p>
-            <ul className="mt-5 space-y-2 text-sm">
-              {t.features.map((f) => (
-                <li key={f} className="flex items-start gap-2">
-                  <Check className="mt-0.5 size-4 text-primary" /> {f}
+            <p className="mt-1 text-sm text-muted-foreground">{t(plan.descKey)}</p>
+            <ul className="mt-5 flex-1 space-y-2 text-sm">
+              {featureLines(plan).map((line) => (
+                <li key={line} className="flex items-start gap-2">
+                  <Check className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <span className="min-w-0 break-words">{line}</span>
                 </li>
               ))}
             </ul>
-            <Button
-              asChild
-              className={
-                "mt-6 w-full " +
-                (t.featured ? "bg-gradient-brand text-white shadow-glow hover:opacity-95" : "")
-              }
-              variant={t.featured ? "default" : "outline"}
-            >
-              <Link to={t.to}>{t.cta}</Link>
-            </Button>
+            {plan.paid ? (
+              <Button className="mt-6 w-full" variant="outline" disabled>
+                {t("billing.comingSoon")}
+              </Button>
+            ) : (
+              <Button
+                asChild
+                className="mt-6 w-full bg-gradient-brand text-white shadow-glow hover:opacity-95"
+              >
+                <Link to="/app/dashboard">{t("pricing.getStarted")}</Link>
+              </Button>
+            )}
           </div>
         ))}
       </div>
@@ -499,7 +511,7 @@ function CTA() {
           </div>
           <div className="flex gap-3">
             <Button asChild size="lg" className="bg-white text-primary hover:bg-white/90">
-              <Link to="/app/dashboard">Start free</Link>
+              <Link to="/app/dashboard">Get started free</Link>
             </Button>
             <Button
               asChild
@@ -529,7 +541,7 @@ function SiteFooter() {
               <span className="text-base font-semibold tracking-tight">TeamFlow AI</span>
             </Link>
             <p className="mt-3 max-w-xs text-sm text-muted-foreground">
-              The AI-native project workspace for modern product teams.
+              Project management and grounded workspace briefings for modern product teams.
             </p>
             <div className="mt-5 flex items-center gap-2">
               {[Github, Twitter, Linkedin].map((Icon, i) => (
