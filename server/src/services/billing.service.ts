@@ -10,6 +10,10 @@ import {
 } from "./billing-plans.service.js";
 import type { WorkspaceRole } from "./workspace-context.service.js";
 
+export const BILLING_NOT_AVAILABLE_CODE = "BILLING_NOT_AVAILABLE";
+export const BILLING_NOT_AVAILABLE_MESSAGE =
+  "Online billing and plan changes are not available yet.";
+
 export type BillingSummaryDto = {
   currentPlan: BillingPlan;
   planLabel: string;
@@ -79,10 +83,7 @@ export async function updateWorkspaceBillingPlan(input: {
     throw new AuthError("Only workspace owners can change the billing plan", 403);
   }
 
-  await prisma.workspace.update({
-    where: { id: input.workspaceId },
-    data: { plan: input.plan },
-  });
-
-  return getBillingSummary(input.userId, input.workspaceId);
+  // Keep endpoint for API compatibility; do not accept paid plan switches yet.
+  void input.plan;
+  throw new AuthError(BILLING_NOT_AVAILABLE_MESSAGE, 503, BILLING_NOT_AVAILABLE_CODE);
 }

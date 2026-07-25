@@ -27,11 +27,3 @@ export async function fetchBillingSummary(): Promise<BillingSummary> {
   const response = await apiRequest<{ data: BillingSummary }>("/api/billing/summary");
   return response.data;
 }
-
-export async function updateBillingPlan(plan: BillingPlanId): Promise<BillingSummary> {
-  const response = await apiRequest<{ data: BillingSummary }>("/api/billing/plan", {
-    method: "PATCH",
-    body: { plan },
-  });
-  return response.data;
-}
