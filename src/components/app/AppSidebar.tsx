@@ -370,13 +370,17 @@ export function AppSidebar({
                         active
                           ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-border"
                           : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
-                        !collapsed && active && "border-l-2 border-l-primary pl-[calc(0.75rem-2px)]",
+                        !collapsed &&
+                          active &&
+                          "border-l-2 border-l-primary pl-[calc(0.75rem-2px)]",
                       )}
                     >
                       <Icon
                         className={cn(
                           "size-4 shrink-0",
-                          active ? "text-primary" : "text-muted-foreground group-hover:text-sidebar-foreground",
+                          active
+                            ? "text-primary"
+                            : "text-muted-foreground group-hover:text-sidebar-foreground",
                         )}
                       />
                       {!collapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}
@@ -434,7 +438,9 @@ export function AppSidebar({
                         projectActive
                           ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-border"
                           : "text-sidebar-foreground/80",
-                        !collapsed && projectActive && "border-l-2 border-l-primary pl-[calc(0.75rem-2px)]",
+                        !collapsed &&
+                          projectActive &&
+                          "border-l-2 border-l-primary pl-[calc(0.75rem-2px)]",
                       )}
                     >
                       {collapsed ? (
@@ -481,19 +487,16 @@ export function AppSidebar({
 
         {!collapsed && (
           <div className="m-3 rounded-xl border border-sidebar-border bg-card p-3 shadow-soft">
-            <div className="flex items-center gap-2 text-xs font-medium">
-              <Sparkles className="size-3.5 text-primary" />
-              {t("billing.aiCredits")}
-            </div>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-              <div className="h-full w-2/3 rounded-full bg-gradient-brand" />
-            </div>
-            <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
-              <span>1,340 / 2,000</span>
-              <Link className="text-primary hover:underline" to="/app/billing">
-                {t("billing.changePlan")}
-              </Link>
-            </div>
+            <div className="text-xs font-medium">{t("billing.plans")}</div>
+            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+              {t("billing.viewAvailableLimits")}
+            </p>
+            <Link
+              to="/app/billing"
+              className="mt-2 inline-flex text-[11px] font-medium text-primary hover:underline"
+            >
+              {t("billing.viewPlans")}
+            </Link>
           </div>
         )}
       </aside>
