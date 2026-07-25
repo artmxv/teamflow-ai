@@ -85,9 +85,7 @@ import {
   Flag,
   User as UserIcon,
   CircleDot,
-  Sparkles,
   Paperclip,
-  Plus,
   Check,
   Trash2,
   Pencil,
@@ -140,7 +138,6 @@ export function TaskDrawer({
   const queryClient = useQueryClient();
   const { data: me } = useCurrentUser();
   const currentUserId = me?.user.id;
-  const [aiOpen, setAiOpen] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftAssigneeIds, setDraftAssigneeIds] = useState<string[]>([]);
   const [draftDueDate, setDraftDueDate] = useState("");
@@ -426,51 +423,6 @@ export function TaskDrawer({
                 <p className="text-sm leading-relaxed text-foreground/90">
                   {displayTaskDescription(task.description, lang)}
                 </p>
-              </section>
-
-              <section className="rounded-2xl border border-border bg-gradient-to-br from-primary/5 to-transparent p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <Sparkles className="size-4 text-primary" />
-                    {t("tasks.aiAssist")}
-                  </div>
-                  <Button size="sm" variant="brand" onClick={() => setAiOpen(true)}>
-                    {t("tasks.taskSummary")}
-                  </Button>
-                </div>
-                {aiOpen && (
-                  <div className="mt-3 space-y-3 text-sm">
-                    <div className="rounded-lg bg-card p-3 shadow-soft">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-primary">
-                        {t("tasks.aiSummaryLabel")}
-                      </div>
-                      <p className="mt-1 text-foreground/90">{t("tasks.aiSummaryText")}</p>
-                    </div>
-                    <div className="rounded-lg bg-card p-3 shadow-soft">
-                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary">
-                        {t("tasks.aiChecklistLabel")}
-                      </div>
-                      <ul className="space-y-1.5">
-                        {(
-                          [
-                            "tasks.aiChecklistItem1",
-                            "tasks.aiChecklistItem2",
-                            "tasks.aiChecklistItem3",
-                            "tasks.aiChecklistItem4",
-                            "tasks.aiChecklistItem5",
-                          ] as const
-                        ).map((key) => (
-                          <li key={key} className="flex items-start gap-2 text-sm">
-                            <span className="mt-0.5 grid size-4 place-items-center rounded border border-input">
-                              <Plus className="size-3 text-muted-foreground" />
-                            </span>
-                            {t(key)}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                )}
               </section>
 
               <section>
