@@ -837,6 +837,60 @@ const dict = {
     "footer.resources": "Resources",
     "footer.legal": "Legal",
     "footer.rights": "All rights reserved",
+    "landing.cta.createAccount": "Create free account",
+    "landing.cta.createAccountShort": "Sign up",
+    "landing.cta.title": "Start planning with your team",
+    "landing.cta.subtitle":
+      "Create a free workspace for projects, tasks, team chat, and grounded briefings.",
+    "landing.hero.badge": "Workspace briefings and standup summaries",
+    "landing.hero.titleBefore": "The focused workspace for",
+    "landing.hero.titleAccent": "modern product teams",
+    "landing.hero.subtitle":
+      "TeamFlow AI brings projects, tasks, deadlines, and team chat into one calm workspace — with briefings based on the workspace data you can access.",
+    "landing.hero.planNote": "Free plan: up to 5 members and 1 workspace.",
+    "landing.preview.windowTitle": "TeamFlow AI workspace",
+    "landing.preview.activeProjects": "Active projects",
+    "landing.preview.openTasks": "Open tasks",
+    "landing.preview.doneThisWeek": "Done this week",
+    "landing.preview.teamMembers": "Team members",
+    "landing.preview.percentComplete": "{percent}% complete",
+    "landing.preview.briefingTitle": "Workspace briefing",
+    "landing.preview.briefingBody":
+      "Overview from accessible projects: 3 high-priority tasks are unassigned. Next: assign owners and review open risks.",
+    "landing.preview.kanbanTitle": "Sprint board · Kanban",
+    "landing.preview.kanbanTasks": "{count} tasks",
+    "landing.preview.sampleTask": "Polish onboarding copy",
+    "landing.preview.sampleTag": "design",
+    "landing.features.eyebrow": "Why TeamFlow",
+    "landing.features.title": "What TeamFlow AI includes today",
+    "landing.features.subtitle":
+      "Honest capabilities for small product teams — no unverified promises.",
+    "landing.features.projectsTitle": "Projects and tasks",
+    "landing.features.projectsBody":
+      "Plan work with statuses, priorities, assignees, deadlines, and attachments.",
+    "landing.features.kanbanTitle": "Visual kanban board",
+    "landing.features.kanbanBody": "Move tasks between workflow stages with drag and drop.",
+    "landing.features.chatTitle": "Team chat",
+    "landing.features.chatBody":
+      "Use workspace chat, direct messages, reactions, pinned messages, and attachments.",
+    "landing.features.briefingsTitle": "Grounded workspace briefings",
+    "landing.features.briefingsBody":
+      "Review an overview, risks, next actions, and a standup summary based on accessible workspace data.",
+    "landing.features.rolesTitle": "Roles and invitations",
+    "landing.features.rolesBody":
+      "Invite teammates and control access to workspace and project management.",
+    "landing.features.notificationsTitle": "Useful notifications",
+    "landing.features.notificationsBody":
+      "Stay informed about task activity, comments, uploads, invitations, and deadlines.",
+    "landing.product.title": "A workspace built around real team work",
+    "landing.product.subtitle":
+      "From daily task planning to workspace briefings, TeamFlow AI helps product teams stay aligned.",
+    "landing.product.pointChat": "Realtime team chat with online presence",
+    "landing.product.pointBriefings": "Workspace briefings with risks and recommended next actions",
+    "landing.product.pointAttachments": "Task and project attachments in private storage",
+    "landing.product.pointRoles": "Roles, invitations, notifications, and deadline reminders",
+    "landing.footer.navLabel": "Footer links",
+    "landing.footer.githubAria": "TeamFlow AI on GitHub (opens in a new tab)",
   },
   ru: {
     "ai.assistant": "AI-ассистент пространства",
@@ -1677,6 +1731,61 @@ const dict = {
     "footer.resources": "Ресурсы",
     "footer.legal": "Правовая информация",
     "footer.rights": "Все права защищены",
+    "landing.cta.createAccount": "Создать аккаунт",
+    "landing.cta.createAccountShort": "Регистрация",
+    "landing.cta.title": "Начните планировать работу с командой",
+    "landing.cta.subtitle":
+      "Создайте бесплатное пространство для проектов, задач, командного чата и сводок.",
+    "landing.hero.badge": "Сводки пространства и стендап-резюме",
+    "landing.hero.titleBefore": "Сфокусированное пространство для",
+    "landing.hero.titleAccent": "современных продуктовых команд",
+    "landing.hero.subtitle":
+      "TeamFlow AI объединяет проекты, задачи, сроки и командный чат в одном спокойном пространстве — со сводками на основе доступных вам данных.",
+    "landing.hero.planNote": "Бесплатный тариф: до 5 участников и 1 рабочее пространство.",
+    "landing.preview.windowTitle": "Рабочее пространство TeamFlow AI",
+    "landing.preview.activeProjects": "Активные проекты",
+    "landing.preview.openTasks": "Открытые задачи",
+    "landing.preview.doneThisWeek": "Сделано за неделю",
+    "landing.preview.teamMembers": "Участники команды",
+    "landing.preview.percentComplete": "{percent}% выполнено",
+    "landing.preview.briefingTitle": "Сводка пространства",
+    "landing.preview.briefingBody":
+      "Обзор по доступным проектам: 3 задачи с высоким приоритетом без исполнителя. Далее: назначить ответственных и проверить открытые риски.",
+    "landing.preview.kanbanTitle": "Спринт · Канбан",
+    "landing.preview.kanbanTasks": "Задач: {count}",
+    "landing.preview.sampleTask": "Улучшить текст онбординга",
+    "landing.preview.sampleTag": "дизайн",
+    "landing.features.eyebrow": "Почему TeamFlow",
+    "landing.features.title": "Что уже есть в TeamFlow AI",
+    "landing.features.subtitle":
+      "Честные возможности для небольших продуктовых команд — без неподтверждённых обещаний.",
+    "landing.features.projectsTitle": "Проекты и задачи",
+    "landing.features.projectsBody":
+      "Планируйте работу со статусами, приоритетами, исполнителями, сроками и файлами.",
+    "landing.features.kanbanTitle": "Наглядная канбан-доска",
+    "landing.features.kanbanBody":
+      "Перемещайте задачи между этапами работы с помощью drag-and-drop.",
+    "landing.features.chatTitle": "Командный чат",
+    "landing.features.chatBody":
+      "Общайтесь в общем чате и личных сообщениях, используйте реакции, закрепления и файлы.",
+    "landing.features.briefingsTitle": "Сводки рабочего пространства",
+    "landing.features.briefingsBody":
+      "Просматривайте обзор, риски, следующие действия и сводку для стендапа на основе доступных данных.",
+    "landing.features.rolesTitle": "Роли и приглашения",
+    "landing.features.rolesBody":
+      "Приглашайте участников и управляйте доступом к рабочему пространству и проектам.",
+    "landing.features.notificationsTitle": "Полезные уведомления",
+    "landing.features.notificationsBody":
+      "Получайте уведомления об изменениях задач, комментариях, файлах, приглашениях и сроках.",
+    "landing.product.title": "Пространство вокруг реальной командной работы",
+    "landing.product.subtitle":
+      "От ежедневного планирования задач до сводок пространства TeamFlow AI помогает продуктовым командам оставаться в синхроне.",
+    "landing.product.pointChat": "Командный чат в реальном времени со статусом присутствия",
+    "landing.product.pointBriefings": "Сводки пространства с рисками и рекомендуемыми действиями",
+    "landing.product.pointAttachments": "Файлы проектов и задач в приватном хранилище",
+    "landing.product.pointRoles": "Роли, приглашения, уведомления и напоминания о сроках",
+    "landing.footer.navLabel": "Ссылки в подвале",
+    "landing.footer.githubAria": "TeamFlow AI на GitHub (откроется в новой вкладке)",
   },
 } as const;
 
