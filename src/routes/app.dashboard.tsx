@@ -16,6 +16,8 @@ import {
   CalendarClock,
   Flame,
   UserX,
+  ListChecks,
+  RefreshCw,
 } from "lucide-react";
 import { members, projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
 import {
@@ -25,6 +27,7 @@ import {
   type DashboardTaskPriority,
   type DashboardTaskStatus,
 } from "@/lib/api/dashboard";
+import { fetchWorkspaceAiSummary, workspaceAiSummaryQueryKey } from "@/lib/api/ai";
 import { fetchTasks } from "@/lib/api/tasks";
 import {
   buildTaskActivitySeries,
@@ -44,6 +47,7 @@ import {
   canManageWorkspaceTeam,
   isWorkspaceManager,
   useCurrentUser,
+  useCurrentWorkspace,
 } from "@/lib/auth/use-current-user";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -172,11 +176,6 @@ function Dashboard() {
 
   const dashboardProjects = useMemo(
     () => apiProjects.slice(0, 4).map(mapApiProjectToDashboardCard),
-    [apiProjects],
-  );
-
-  const orionProjectId = useMemo(
-    () => apiProjects.find((p) => p.name === "Orion Web App")?.id,
     [apiProjects],
   );
 
@@ -417,44 +416,7 @@ function Dashboard() {
       </div>
 
       <div className="mt-6 grid gap-4 xl:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/8 via-card to-card p-5 shadow-soft xl:col-span-1">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Sparkles className="size-4 text-primary" /> {t("dashboard.aiInsights")}
-          </div>
-          {isLoading ? (
-            <AiInsightsSkeleton />
-          ) : (
-            <>
-              <div className="mt-4 space-y-3 text-sm">
-                <Insight
-                  tone="warn"
-                  title={t("dashboard.insightMobileSlipping")}
-                  body={t("dashboard.insightMobileSlippingBody")}
-                  target={{ to: "/app/tasks", search: { status: "open" } }}
-                />
-                <Insight
-                  tone="ok"
-                  title={t("dashboard.insightOrionOnTrack")}
-                  body={t("dashboard.insightOrionOnTrackBody")}
-                  target={
-                    orionProjectId
-                      ? { to: "/app/projects/$projectId", params: { projectId: orionProjectId } }
-                      : undefined
-                  }
-                />
-                <Insight
-                  tone="info"
-                  title={t("dashboard.insightWeeklyDigest")}
-                  body={t("dashboard.insightWeeklyDigestBody")}
-                  target={{ to: "/app/team" }}
-                />
-              </div>
-              <Button variant="outline" className="mt-4 w-full" asChild>
-                <Link to="/app/ai">{t("dashboard.openAiAssistant")}</Link>
-              </Button>
-            </>
-          )}
-        </div>
+        <DashboardAiInsightsCard />
 
         <div className="rounded-2xl border border-border bg-card p-5 shadow-soft xl:col-span-2">
           <div className="mb-4 flex items-center justify-between">
@@ -658,17 +620,135 @@ function DashboardProjectCard({
   );
 }
 
+function DashboardAiInsightsCard() {
+  const { t, lang } = useI18n();
+  const { data: currentWorkspace } = useCurrentWorkspace();
+  const workspaceId = currentWorkspace?.id ?? null;
+
+  const { data, isError, isLoading, isFetching, refetch } = useQuery({
+    // Same key as /app/ai so Dashboard and AI page share the React Query cache.
+    queryKey: workspaceId
+      ? workspaceAiSummaryQueryKey(workspaceId, lang)
+      : (["workspace-ai-summary", null, lang] as const),
+    queryFn: () => fetchWorkspaceAiSummary(lang),
+    enabled: Boolean(workspaceId),
+  });
+
+  const isEmptyWorkspace =
+    !!data && data.metrics.totalProjects === 0 && data.metrics.totalTasks === 0;
+  const previewRisks = data?.risks.slice(0, 2) ?? [];
+  const previewActions = data?.recommendedNextActions.slice(0, 2) ?? [];
+  const showSuccess = !!data && !isEmptyWorkspace;
+
+  return (
+    <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/8 via-card to-card p-5 shadow-soft xl:col-span-1">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <Sparkles className="size-4 shrink-0 text-primary" />
+            <span className="truncate">{t("dashboard.aiInsights")}</span>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {t("dashboard.aiInsightsDescription")}
+          </p>
+        </div>
+        {showSuccess && isFetching ? (
+          <RefreshCw
+            className="mt-0.5 size-3.5 shrink-0 animate-spin text-muted-foreground"
+            aria-hidden
+          />
+        ) : null}
+      </div>
+
+      {!workspaceId || isLoading ? (
+        <AiInsightsSkeleton />
+      ) : isError && !data ? (
+        <div className="mt-4 space-y-3">
+          <p className="text-sm text-muted-foreground">{t("dashboard.aiInsightsError")}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full sm:w-auto"
+            disabled={isFetching}
+            onClick={() => void refetch()}
+          >
+            <RefreshCw className={cn("mr-1.5 size-3.5", isFetching && "animate-spin")} />
+            {t("common.retry")}
+          </Button>
+        </div>
+      ) : isEmptyWorkspace ? (
+        <div className="mt-4 space-y-3">
+          <div>
+            <p className="text-sm font-medium">{t("ai.emptyWorkspaceTitle")}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t("ai.emptyWorkspaceHint")}</p>
+          </div>
+          <Button variant="outline" className="w-full" asChild>
+            <Link to="/app/projects">
+              <FolderKanban className="size-4" />
+              {t("ai.goToProjects")}
+            </Link>
+          </Button>
+        </div>
+      ) : showSuccess ? (
+        <>
+          <p className="mt-4 line-clamp-4 break-words text-sm leading-relaxed text-foreground/90">
+            {data.overview}
+          </p>
+
+          {previewRisks.length > 0 ? (
+            <div className="mt-4 min-w-0">
+              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-warning-foreground">
+                <AlertTriangle className="size-3.5 shrink-0" />
+                {t("ai.risks")}
+              </div>
+              <ul className="space-y-1.5">
+                {previewRisks.map((risk, index) => (
+                  <li
+                    key={`risk-${index}`}
+                    className="line-clamp-2 break-words rounded-lg border border-border/60 bg-card/70 px-2.5 py-1.5 text-xs text-muted-foreground"
+                  >
+                    {risk}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {previewActions.length > 0 ? (
+            <div className="mt-4 min-w-0">
+              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-info">
+                <ListChecks className="size-3.5 shrink-0" />
+                {t("ai.actions")}
+              </div>
+              <ol className="list-decimal space-y-1.5 pl-4">
+                {previewActions.map((action, index) => (
+                  <li
+                    key={`action-${index}`}
+                    className="line-clamp-2 break-words text-xs text-muted-foreground"
+                  >
+                    {action}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
+
+          <Button variant="outline" className="mt-4 w-full" asChild>
+            <Link to="/app/ai">{t("dashboard.openFullBriefing")}</Link>
+          </Button>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function AiInsightsSkeleton() {
   return (
     <div className="mt-4 space-y-3">
-      {Array.from({ length: 3 }).map((_, index) => (
-        <div key={index} className="rounded-xl border border-border/60 bg-card/50 p-3">
-          <Skeleton className="h-4 w-40" />
-          <Skeleton className="mt-2 h-3 w-full" />
-          <Skeleton className="mt-1 h-3 w-4/5" />
-        </div>
-      ))}
-      <Skeleton className="mt-4 h-9 w-full rounded-md" />
+      <Skeleton className="h-16 w-full rounded-lg" />
+      <Skeleton className="h-10 w-full rounded-lg" />
+      <Skeleton className="h-10 w-4/5 rounded-lg" />
+      <Skeleton className="h-9 w-full rounded-md" />
     </div>
   );
 }
@@ -952,78 +1032,6 @@ function StatCard({
 
   return (
     <Link to={to} aria-label={ariaLabel} className={className}>
-      {content}
-    </Link>
-  );
-}
-
-type InsightTarget =
-  | { to: "/app/tasks"; search?: TasksSearch }
-  | { to: "/app/team" }
-  | { to: "/app/projects/$projectId"; params: { projectId: string } };
-
-function Insight({
-  tone,
-  title,
-  body,
-  target,
-}: {
-  tone: "warn" | "ok" | "info";
-  title: string;
-  body: string;
-  target?: InsightTarget;
-}) {
-  const { t } = useI18n();
-  const toneClass = {
-    warn: "bg-warning/15 text-warning-foreground",
-    ok: "bg-success/15 text-success",
-    info: "bg-info/15 text-info",
-  }[tone];
-  const content = (
-    <>
-      <div className="flex items-center gap-2">
-        <span
-          className={
-            "inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold " + toneClass
-          }
-        >
-          {tone === "warn"
-            ? t("dashboard.insightAtRisk")
-            : tone === "ok"
-              ? t("dashboard.insightOnTrack")
-              : t("dashboard.insightFyi")}
-        </span>
-        <span className="text-sm font-medium">{title}</span>
-      </div>
-      <p className="mt-1 text-xs text-muted-foreground">{body}</p>
-    </>
-  );
-
-  const linkClass =
-    "block rounded-xl border border-border bg-card p-3 transition hover:border-primary/30 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
-
-  if (!target) {
-    return <div className="rounded-xl border border-border bg-card p-3">{content}</div>;
-  }
-
-  if (target.to === "/app/tasks") {
-    return (
-      <Link to="/app/tasks" search={target.search} className={linkClass}>
-        {content}
-      </Link>
-    );
-  }
-
-  if (target.to === "/app/team") {
-    return (
-      <Link to="/app/team" className={linkClass}>
-        {content}
-      </Link>
-    );
-  }
-
-  return (
-    <Link to="/app/projects/$projectId" params={target.params} className={linkClass}>
       {content}
     </Link>
   );
