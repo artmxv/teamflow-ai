@@ -110,6 +110,7 @@ import {
 } from "@/lib/chat/message-long-press";
 import { resolveInitialScrollTarget } from "@/lib/chat/scroll";
 import { getSelectedWorkspaceId } from "@/lib/api/client";
+import { friendlyChatErrorMessage } from "@/lib/chat-errors";
 import { useI18n, type Lang } from "@/lib/i18n";
 import {
   getChatSocketStatus,
@@ -411,7 +412,7 @@ function WorkspaceChatPage() {
       if (context?.previous) {
         queryClient.setQueryData(conversationsQueryKey, context.previous);
       }
-      toast.error(error instanceof Error ? error.message : t("chat.pinFailed"));
+      toast.error(friendlyChatErrorMessage(error, t, "chat.pinFailed"));
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: conversationsQueryKey });
@@ -1267,7 +1268,7 @@ function ConversationMessagePane({
       });
     } catch (error) {
       pendingScrollRestoreRef.current = null;
-      toast.error(error instanceof Error ? error.message : t("chat.errorTitle"));
+      toast.error(friendlyChatErrorMessage(error, t, "chat.errorTitle"));
     } finally {
       setLoadingOlder(false);
     }
@@ -1362,7 +1363,7 @@ function ConversationMessagePane({
         }, 400);
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("chat.errorTitle"));
+      toast.error(friendlyChatErrorMessage(error, t, "chat.errorTitle"));
     } finally {
       setJumpingToPinned(false);
     }
@@ -1440,7 +1441,7 @@ function ConversationMessagePane({
       void queryClient.invalidateQueries({ queryKey: conversationsQueryKey });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : t("chat.sendFailed"));
+      toast.error(friendlyChatErrorMessage(error, t, "chat.sendFailed"));
       // Keep draft + attachments; restore focus so the user can retry.
       composerFocusRequestRef.current = true;
     },
@@ -1466,7 +1467,7 @@ function ConversationMessagePane({
       void queryClient.invalidateQueries({ queryKey: conversationsQueryKey });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : t("chat.deleteFailed"));
+      toast.error(friendlyChatErrorMessage(error, t, "chat.deleteFailed"));
     },
   });
 
@@ -1504,7 +1505,7 @@ function ConversationMessagePane({
       if (context?.previous) {
         queryClient.setQueryData(conversationsQueryKey, context.previous);
       }
-      toast.error(error instanceof Error ? error.message : t("chat.renameFailed"));
+      toast.error(friendlyChatErrorMessage(error, t, "chat.renameFailed"));
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: conversationsQueryKey });
@@ -1543,6 +1544,13 @@ function ConversationMessagePane({
           ? t("chat.validationTooLong").replace("{max}", String(CHAT_MESSAGE_MAX_LENGTH))
           : t("chat.validationEmpty"),
       );
+      return;
+    }
+
+    // Fast path: DevTools Offline (and real offline) often leave fetch pending forever.
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      toast.error(t("common.offline"));
+      composerFocusRequestRef.current = true;
       return;
     }
 

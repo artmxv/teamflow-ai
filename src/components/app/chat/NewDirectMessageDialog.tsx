@@ -23,6 +23,7 @@ import {
 } from "@/lib/api/chat";
 import { fetchWorkspaceMembers, type WorkspaceMemberItem } from "@/lib/api/workspace-members";
 import { useI18n } from "@/lib/i18n";
+import { friendlyChatErrorMessage } from "@/lib/chat-errors";
 import { cn } from "@/lib/utils";
 
 type NewDirectMessageDialogProps = {
@@ -64,7 +65,7 @@ export function NewDirectMessageDialog({
       setQuery("");
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : t("chat.directCreateFailed"));
+      toast.error(friendlyChatErrorMessage(error, t, "chat.directCreateFailed"));
     },
   });
 

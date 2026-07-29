@@ -8,11 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { register } from "@/lib/api/auth";
 import { primeAuthMeAfterAuth, resetWorkspaceValidationSession } from "@/lib/auth/auth-cache";
+import { authSignUpErrorKey } from "@/lib/auth/auth-errors";
 import { googleAuthErrorKey, startGoogleAuth } from "@/lib/auth/google-auth";
 import { getSafeRedirectPath } from "@/lib/auth/safe-redirect";
 import { getAuthToken, setAuthToken } from "@/lib/auth/token";
 import { useI18n } from "@/lib/i18n";
-import { PASSWORD_HELPER_TEXT, validatePassword } from "@/lib/validation/password";
+import {
+  passwordErrorKey,
+  validatePassword,
+  type PasswordErrorCode,
+} from "@/lib/validation/password";
 
 export type SignUpSearch = {
   redirect?: string;
@@ -49,8 +54,8 @@ function SignUp() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<PasswordErrorCode | null>(null);
+  const [confirmPasswordError, setConfirmPasswordError] = useState(false);
 
   useEffect(() => {
     if (!googleError) {
@@ -65,29 +70,27 @@ function SignUp() {
       resetWorkspaceValidationSession();
       setAuthToken(token);
       await primeAuthMeAfterAuth(queryClient, user);
-      toast.success("Account created successfully");
+      toast.success(t("auth.accountCreated"));
       void router.navigate({ href: getSafeRedirectPath(redirectPath) });
     },
     onError: (error) => {
-      toast.error(
-        error instanceof Error ? error.message : "Could not create account. Please try again.",
-      );
+      toast.error(t(authSignUpErrorKey(error)));
     },
   });
 
   return (
     <AuthShell
-      title="Create your workspace"
-      subtitle="Free for up to 5 teammates. No credit card required."
+      title={t("auth.signUpTitle")}
+      subtitle={t("auth.signUpSubtitle")}
       footer={
         <>
-          Already have an account?{" "}
+          {t("auth.alreadyHaveAccount")}{" "}
           <Link
             to="/signin"
             search={redirectPath ? { redirect: redirectPath } : undefined}
             className="font-medium text-primary hover:underline"
           >
-            Sign in
+            {t("auth.signIn")}
           </Link>
         </>
       }
@@ -98,21 +101,21 @@ function SignUp() {
           e.preventDefault();
           const name = `${firstName.trim()} ${lastName.trim()}`.trim();
           if (name.length < 2) {
-            toast.error("Please enter your first and last name.");
+            toast.error(t("auth.nameRequired"));
             return;
           }
 
           const passwordValidationError = validatePassword(password);
           const passwordsMatch = password === confirmPassword;
           setPasswordError(passwordValidationError);
-          setConfirmPasswordError(passwordsMatch ? null : "Passwords do not match.");
+          setConfirmPasswordError(!passwordsMatch);
 
           if (passwordValidationError) {
-            toast.error(passwordValidationError);
+            toast.error(t(passwordErrorKey(passwordValidationError)));
             return;
           }
           if (!passwordsMatch) {
-            toast.error("Passwords do not match.");
+            toast.error(t("auth.password.mismatch"));
             return;
           }
 
@@ -132,15 +135,15 @@ function SignUp() {
           <GoogleIcon /> {t("auth.continueWithGoogle")}
         </Button>
         <div className="relative my-2 text-center text-xs text-muted-foreground">
-          <span className="relative z-10 bg-background px-2">or with email</span>
+          <span className="relative z-10 bg-background px-2">{t("auth.orWithEmail")}</span>
           <span className="absolute inset-x-0 top-1/2 -z-0 h-px bg-border" />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label htmlFor="first">First name</Label>
+            <Label htmlFor="first">{t("auth.firstName")}</Label>
             <Input
               id="first"
-              placeholder="Alex"
+              placeholder={t("auth.firstNamePlaceholder")}
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               required
@@ -148,10 +151,10 @@ function SignUp() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="last">Last name</Label>
+            <Label htmlFor="last">{t("auth.lastName")}</Label>
             <Input
               id="last"
-              placeholder="Morgan"
+              placeholder={t("auth.lastNamePlaceholder")}
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
               required
@@ -160,15 +163,15 @@ function SignUp() {
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="ws">Workspace name</Label>
-          <Input id="ws" placeholder="Acme Studio" />
+          <Label htmlFor="ws">{t("auth.workspaceName")}</Label>
+          <Input id="ws" placeholder={t("auth.workspaceNamePlaceholder")} />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="email">Work email</Label>
+          <Label htmlFor="email">{t("auth.email")}</Label>
           <Input
             id="email"
             type="email"
-            placeholder="you@company.com"
+            placeholder={t("auth.emailPlaceholder")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -176,11 +179,11 @@ function SignUp() {
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">{t("auth.password")}</Label>
           <Input
             id="password"
             type="password"
-            placeholder="At least 8 characters"
+            placeholder={t("auth.passwordPlaceholder")}
             value={password}
             onChange={(e) => {
               setPassword(e.target.value);
@@ -194,26 +197,26 @@ function SignUp() {
             autoComplete="new-password"
             aria-invalid={passwordError ? true : undefined}
           />
-          <p className="text-xs text-muted-foreground">{PASSWORD_HELPER_TEXT}</p>
-          {passwordError && <p className="text-xs text-destructive">{passwordError}</p>}
+          <p className="text-xs text-muted-foreground">{t("auth.password.helper")}</p>
+          {passwordError && (
+            <p className="text-xs text-destructive">{t(passwordErrorKey(passwordError))}</p>
+          )}
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="confirm-password">Confirm password</Label>
+          <Label htmlFor="confirm-password">{t("auth.confirmPassword")}</Label>
           <Input
             id="confirm-password"
             type="password"
-            placeholder="Re-enter your password"
+            placeholder={t("auth.confirmPasswordPlaceholder")}
             value={confirmPassword}
             onChange={(e) => {
               setConfirmPassword(e.target.value);
               if (confirmPasswordError && e.target.value === password) {
-                setConfirmPasswordError(null);
+                setConfirmPasswordError(false);
               }
             }}
             onBlur={() => {
-              setConfirmPasswordError(
-                confirmPassword === password ? null : "Passwords do not match.",
-              );
+              setConfirmPasswordError(confirmPassword !== password);
             }}
             required
             minLength={8}
@@ -221,7 +224,7 @@ function SignUp() {
             aria-invalid={confirmPasswordError ? true : undefined}
           />
           {confirmPasswordError && (
-            <p className="text-xs text-destructive">{confirmPasswordError}</p>
+            <p className="text-xs text-destructive">{t("auth.password.mismatch")}</p>
           )}
         </div>
         <Button
@@ -229,11 +232,9 @@ function SignUp() {
           className="w-full bg-gradient-brand text-white shadow-glow hover:opacity-95"
           disabled={registerMutation.isPending}
         >
-          {registerMutation.isPending ? "Creating workspace…" : "Create workspace"}
+          {registerMutation.isPending ? t("auth.creatingWorkspace") : t("auth.createWorkspace")}
         </Button>
-        <p className="text-center text-xs text-muted-foreground">
-          By signing up you agree to our Terms and Privacy Policy.
-        </p>
+        <p className="text-center text-xs text-muted-foreground">{t("auth.termsAgree")}</p>
       </form>
     </AuthShell>
   );

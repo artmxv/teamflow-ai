@@ -276,12 +276,10 @@ function TasksPage() {
     onSuccess: async () => {
       await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       invalidateNotifications(queryClient);
-      toast.success("Task created");
+      toast.success(t("tasks.created"));
     },
-    onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Task could not be created",
-      );
+    onError: () => {
+      toast.error(t("tasks.createFailed"));
     },
   });
   const updateAssigneeMutation = useMutation({
@@ -306,12 +304,10 @@ function TasksPage() {
         return mapApiTaskToRow(updated);
       });
       setSelected(null);
-      toast.success("Task updated");
+      toast.success(t("tasks.updated"));
     },
-    onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Task could not be updated",
-      );
+    onError: () => {
+      toast.error(t("tasks.updateFailed"));
     },
   });
   const assigneeOptions = useMemo(
@@ -367,12 +363,10 @@ function TasksPage() {
       if (taskIdFromUrl) {
         updateUrlSearch({ taskId: undefined });
       }
-      toast.success("Task deleted");
+      toast.success(t("tasks.deleted"));
     },
-    onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Task could not be deleted",
-      );
+    onError: () => {
+      toast.error(t("tasks.deleteFailed"));
     },
   });
 

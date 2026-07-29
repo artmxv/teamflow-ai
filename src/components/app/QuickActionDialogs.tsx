@@ -5,8 +5,8 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { Avatar } from "@/components/app/Avatar";
 import { AssigneeMultiPicker } from "@/components/app/AssigneeMultiPicker";
+import { UserAvatar } from "@/components/app/UserAvatar";
 import { DeadlineDatePicker } from "@/components/app/DeadlineDatePicker";
 import { DeadlineTimePicker } from "@/components/app/DeadlineTimePicker";
 import { deadlineStatusDateTimeRowClassName } from "@/components/app/deadline-field-styles";
@@ -34,9 +34,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { addProjectMember, fetchProjectMembers } from "@/lib/api/project-members";
 import { createProject, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
 import { fetchWorkspaceMembers } from "@/lib/api/workspace-members";
-import { nameToInitials, useCurrentWorkspace } from "@/lib/auth/use-current-user";
+import { useCurrentWorkspace } from "@/lib/auth/use-current-user";
 import { resolveEditAssigneeOptions } from "@/lib/assignee-options";
 import { useI18n, type TKey } from "@/lib/i18n";
+import { friendlyApiErrorMessage } from "@/lib/api-error";
 import { dueDateTimeToIso } from "@/lib/due-datetime";
 import { invalidateWorkspaceContentQueries } from "@/lib/workspace-queries";
 import { type Priority, type ProjectStatus, type TaskStatus } from "@/lib/mock-data";
@@ -187,7 +188,7 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
         toast.error(t("access.createProjectDenied"));
         return;
       }
-      toast.error(message || t("projects.new.createFailed"));
+      toast.error(friendlyApiErrorMessage(error, t, "projects.new.createFailed"));
     },
   });
 
@@ -345,9 +346,11 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
                             disabled={isSubmitting}
                             onCheckedChange={(value) => toggleMember(member.id, value === true)}
                           />
-                          <Avatar
+                          <UserAvatar
                             id={member.id}
-                            initials={member.avatar ?? nameToInitials(member.name)}
+                            name={member.name}
+                            avatar={member.avatar}
+                            avatarUrl={member.avatarUrl}
                             size="sm"
                           />
                           <span className="min-w-0 flex-1">

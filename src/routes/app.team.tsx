@@ -58,6 +58,7 @@ import { displayWorkspaceName } from "@/lib/workspace-display";
 import { formatJoinedDate } from "@/lib/profile-contact";
 import type { WorkspaceRole } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
+import { friendlyApiErrorMessage } from "@/lib/api-error";
 import {
   createWorkspaceInvitation,
   fetchWorkspaceInvitations,
@@ -139,9 +140,8 @@ function formatTeamError(error: unknown, fallback: TKey, t: (k: TKey) => string)
     if (key) {
       return t(key);
     }
-    return error.message;
   }
-  return t(fallback);
+  return friendlyApiErrorMessage(error, t, fallback);
 }
 
 function TeamPage() {

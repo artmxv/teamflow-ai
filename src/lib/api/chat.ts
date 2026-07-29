@@ -333,6 +333,43 @@ export type SendChatMessageInput = {
   projectIds?: string[];
 };
 
+/** Caps hung chat-send fetches (e.g. browser offline) without changing global API timeouts. */
+export const CHAT_SEND_TIMEOUT_MS = 15_000;
+
+/** Stable markers mapped by friendlyChatErrorMessage → common.offline. */
+export const CHAT_SEND_OFFLINE_ERROR = "OFFLINE";
+export const CHAT_SEND_TIMEOUT_ERROR = "CHAT_SEND_TIMEOUT";
+
+function assertOnlineForChatSend(): void {
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    throw new Error(CHAT_SEND_OFFLINE_ERROR);
+  }
+}
+
+function isAbortError(error: unknown): boolean {
+  return (error instanceof DOMException || error instanceof Error) && error.name === "AbortError";
+}
+
+async function runWithChatSendTimeout<T>(execute: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  assertOnlineForChatSend();
+
+  const controller = new AbortController();
+  const timeoutId = globalThis.setTimeout(() => {
+    controller.abort();
+  }, CHAT_SEND_TIMEOUT_MS);
+
+  try {
+    return await execute(controller.signal);
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw new Error(CHAT_SEND_TIMEOUT_ERROR);
+    }
+    throw error;
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+  }
+}
+
 export async function sendChatMessage(
   conversationId: string,
   input: string | SendChatMessageInput,
@@ -345,53 +382,57 @@ export async function sendChatMessage(
   const projectIds = payload.projectIds ?? [];
   const hasAttachments = files.length > 0 || taskIds.length > 0 || projectIds.length > 0;
 
-  if (!hasAttachments) {
-    const response = await apiRequest<{ data: ChatMessage }>(
-      `/api/chat/conversations/${conversationId}/messages`,
+  return runWithChatSendTimeout(async (signal) => {
+    if (!hasAttachments) {
+      const response = await apiRequest<{ data: ChatMessage }>(
+        `/api/chat/conversations/${conversationId}/messages`,
+        {
+          method: "POST",
+          body: { content: payload.content },
+          signal,
+        },
+      );
+      return normalizeChatMessage(response.data);
+    }
+
+    const formData = new FormData();
+    formData.append("content", payload.content);
+    for (const taskId of taskIds) {
+      formData.append("taskIds", taskId);
+    }
+    for (const projectId of projectIds) {
+      formData.append("projectIds", projectId);
+    }
+    for (const file of files) {
+      formData.append("files", file, file.name);
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/chat/conversations/${conversationId}/messages`,
       {
         method: "POST",
-        body: { content: payload.content },
+        headers: buildAuthHeaders(),
+        credentials: "include",
+        body: formData,
+        signal,
       },
     );
-    return normalizeChatMessage(response.data);
-  }
 
-  const formData = new FormData();
-  formData.append("content", payload.content);
-  for (const taskId of taskIds) {
-    formData.append("taskIds", taskId);
-  }
-  for (const projectId of projectIds) {
-    formData.append("projectIds", projectId);
-  }
-  for (const file of files) {
-    formData.append("files", file, file.name);
-  }
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        message?: string;
+        code?: string;
+      } | null;
+      throw new ApiError(
+        body?.message ?? `Upload failed with status ${response.status}`,
+        response.status,
+        body?.code,
+      );
+    }
 
-  const response = await fetch(
-    `${API_BASE_URL}/api/chat/conversations/${conversationId}/messages`,
-    {
-      method: "POST",
-      headers: buildAuthHeaders(),
-      credentials: "include",
-      body: formData,
-    },
-  );
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as {
-      message?: string;
-      code?: string;
-    } | null;
-    throw new ApiError(
-      body?.message ?? `Upload failed with status ${response.status}`,
-      response.status,
-      body?.code,
-    );
-  }
-
-  const json = (await response.json()) as { data: ChatMessage };
-  return normalizeChatMessage(json.data);
+    const json = (await response.json()) as { data: ChatMessage };
+    return normalizeChatMessage(json.data);
+  });
 }
 
 export async function deleteChatMessage(conversationId: string, messageId: string) {

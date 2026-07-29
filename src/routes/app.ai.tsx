@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { useCurrentWorkspace } from "@/lib/auth/use-current-user";
@@ -21,6 +21,7 @@ import {
   FolderKanban,
 } from "lucide-react";
 import { useI18n, type TKey } from "@/lib/i18n";
+import { friendlyApiErrorMessage, isBrowserOffline } from "@/lib/api-error";
 import {
   fetchWorkspaceAiSummary,
   workspaceAiSummaryQueryKey,
@@ -44,14 +45,16 @@ const SECTIONS = [
 
 function AssistantPage() {
   const { t, lang } = useI18n();
+  const queryClient = useQueryClient();
   const { data: currentWorkspace } = useCurrentWorkspace();
   const workspaceId = currentWorkspace?.id ?? null;
+  const summaryQueryKey = workspaceId
+    ? workspaceAiSummaryQueryKey(workspaceId, lang)
+    : (["workspace-ai-summary", null, lang] as const);
 
   const { data, error, isError, isLoading, isFetching, refetch } = useQuery({
     // When workspaceId is null the query stays disabled; null in the key never matches a real id.
-    queryKey: workspaceId
-      ? workspaceAiSummaryQueryKey(workspaceId, lang)
-      : (["workspace-ai-summary", null, lang] as const),
+    queryKey: summaryQueryKey,
     queryFn: () => fetchWorkspaceAiSummary(lang),
     enabled: Boolean(workspaceId),
   });
@@ -66,16 +69,35 @@ function AssistantPage() {
   }
 
   async function handleRegenerate() {
+    if (!workspaceId) {
+      return;
+    }
+    // DevTools Offline / real offline: do not treat paused or cached refetch as success.
+    if (isBrowserOffline()) {
+      toast.error(t("common.offline"));
+      return;
+    }
+
+    const dataUpdatedAtBefore = queryClient.getQueryState(summaryQueryKey)?.dataUpdatedAt ?? 0;
+
     try {
       const result = await refetch();
+      if (isBrowserOffline() || result.isPaused) {
+        toast.error(t("common.offline"));
+        return;
+      }
       if (result.error) {
         throw result.error;
       }
+      const dataUpdatedAtAfter = queryClient.getQueryState(summaryQueryKey)?.dataUpdatedAt ?? 0;
+      // Cached/paused resolve without a real network success must not show success toast.
+      if (dataUpdatedAtAfter <= dataUpdatedAtBefore) {
+        toast.error(t("common.offline"));
+        return;
+      }
       toast.success(t("ai.summaryRefreshed"));
     } catch (regenerateError) {
-      toast.error(
-        regenerateError instanceof Error ? regenerateError.message : t("ai.refreshError"),
-      );
+      toast.error(friendlyApiErrorMessage(regenerateError, t, "ai.refreshError"));
     }
   }
 

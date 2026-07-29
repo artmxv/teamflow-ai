@@ -30,6 +30,7 @@ import {
 } from "@/lib/api/chat";
 import { buildPinnedMessagePreview } from "@/lib/chat/pins";
 import { useI18n, type Lang } from "@/lib/i18n";
+import { friendlyChatErrorMessage } from "@/lib/chat-errors";
 import { cn } from "@/lib/utils";
 
 function formatPinnedTimestamp(iso: string, lang: Lang) {
@@ -131,7 +132,7 @@ export function ChatMessagePinButton({
       onDone?.();
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : t("chat.pinMessageFailed"));
+      toast.error(friendlyChatErrorMessage(error, t, "chat.pinMessageFailed"));
       void queryClient.invalidateQueries({
         queryKey: ["chat-messages", workspaceId, conversationId],
       });

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { downloadChatAttachmentFile, type ChatFileAttachment } from "@/lib/api/chat";
 import { formatAttachmentSize } from "@/lib/api/task-attachments";
+import { friendlyChatErrorMessage } from "@/lib/chat-errors";
 import { useI18n } from "@/lib/i18n";
 
 export function ChatFileAttachmentCard({ attachment }: { attachment: ChatFileAttachment }) {
@@ -35,9 +36,7 @@ export function ChatFileAttachmentCard({ attachment }: { attachment: ChatFileAtt
           setDownloading(true);
           void downloadChatAttachmentFile(attachment.downloadUrl, attachment.originalName)
             .catch((error) => {
-              toast.error(
-                error instanceof Error ? error.message : t("chat.downloadFailed"),
-              );
+              toast.error(friendlyChatErrorMessage(error, t, "chat.downloadFailed"));
             })
             .finally(() => setDownloading(false));
         }}
