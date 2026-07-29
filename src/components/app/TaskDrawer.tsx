@@ -202,12 +202,10 @@ export function TaskDrawer({
       await queryClient.invalidateQueries({ queryKey: ["task-comments", task!.id] });
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
       invalidateNotifications(queryClient);
-      toast.success("Comment added");
+      toast.success(t("comments.added"));
     },
-    onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Comment could not be saved",
-      );
+    onError: () => {
+      toast.error(t("comments.saveFailed"));
     },
   });
 
@@ -216,12 +214,10 @@ export function TaskDrawer({
       updateTaskComment(task!.id, commentId, body),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["task-comments", task!.id] });
-      toast.success("Comment updated");
+      toast.success(t("comments.updated"));
     },
-    onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Comment could not be updated",
-      );
+    onError: () => {
+      toast.error(t("comments.updateFailed"));
     },
   });
 
@@ -230,12 +226,10 @@ export function TaskDrawer({
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["task-comments", task!.id] });
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      toast.success("Comment deleted");
+      toast.success(t("comments.deleted"));
     },
-    onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Comment could not be deleted",
-      );
+    onError: () => {
+      toast.error(t("comments.deleteFailed"));
     },
   });
 
@@ -248,7 +242,7 @@ export function TaskDrawer({
   const uploadAttachmentMutation = useMutation({
     mutationFn: (file: File) => {
       if (!task?.id) {
-        throw new Error("Task is not ready yet");
+        throw new Error(t("tasks.notReady"));
       }
       return uploadTaskAttachment(task.id, file);
     },
@@ -256,7 +250,7 @@ export function TaskDrawer({
       await queryClient.invalidateQueries({ queryKey: ["task-attachments", task!.id] });
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
       invalidateNotifications(queryClient);
-      toast.success("Attachment uploaded");
+      toast.success(t("tasks.attachmentUploaded"));
     },
     onError: (mutationError) => {
       toast.error(friendlyUploadErrorMessage(mutationError, t));
@@ -268,12 +262,10 @@ export function TaskDrawer({
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["task-attachments", task!.id] });
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      toast.success("Attachment deleted");
+      toast.success(t("tasks.attachmentDeleted"));
     },
-    onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Attachment could not be deleted",
-      );
+    onError: () => {
+      toast.error(t("tasks.attachmentDeleteFailed"));
     },
   });
 
@@ -465,7 +457,7 @@ export function TaskDrawer({
                 onFileSelected={(file) => {
                   if (uploadAttachmentMutation.isPending) return;
                   if (!task?.id) {
-                    toast.error("Task is not ready yet");
+                    toast.error(t("tasks.notReady"));
                     return;
                   }
                   if (!(file instanceof File) || !file.size) {

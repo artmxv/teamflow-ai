@@ -138,6 +138,8 @@ export class ApiError extends Error {
 export type ApiRequestOptions = {
   method?: string;
   body?: unknown;
+  /** Optional abort signal (e.g. chat-send timeout). Omit for default unbounded fetch. */
+  signal?: AbortSignal;
   /** Do not send Authorization header (e.g. login/register). */
   skipAuth?: boolean;
   /** Do not send X-Workspace-Id (token-based routes like workspace invitations). */
@@ -219,6 +221,7 @@ export async function apiRequest<T>(path: string, options?: ApiRequestOptions): 
     headers,
     credentials: "include",
     body: options?.body !== undefined ? JSON.stringify(options.body) : undefined,
+    signal: options?.signal,
   });
 
   if (!response.ok) {

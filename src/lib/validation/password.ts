@@ -1,21 +1,35 @@
-export const PASSWORD_HELPER_TEXT =
-  "Use 8+ characters with uppercase, lowercase, number and special character.";
+import type { TKey } from "@/lib/i18n";
 
-export function validatePassword(password: string): string | null {
+export type PasswordErrorCode = "minLength" | "uppercase" | "lowercase" | "number" | "special";
+
+const PASSWORD_ERROR_KEYS: Record<PasswordErrorCode, TKey> = {
+  minLength: "auth.password.minLength",
+  uppercase: "auth.password.uppercase",
+  lowercase: "auth.password.lowercase",
+  number: "auth.password.number",
+  special: "auth.password.special",
+};
+
+/** Returns a stable error code, or null when the password meets all rules. */
+export function validatePassword(password: string): PasswordErrorCode | null {
   if (password.length < 8) {
-    return "Password must be at least 8 characters.";
+    return "minLength";
   }
   if (!/[A-Z]/.test(password)) {
-    return "Password must contain at least one uppercase letter.";
+    return "uppercase";
   }
   if (!/[a-z]/.test(password)) {
-    return "Password must contain at least one lowercase letter.";
+    return "lowercase";
   }
   if (!/[0-9]/.test(password)) {
-    return "Password must contain at least one number.";
+    return "number";
   }
   if (!/[^A-Za-z0-9]/.test(password)) {
-    return "Password must contain at least one special character.";
+    return "special";
   }
   return null;
+}
+
+export function passwordErrorKey(code: PasswordErrorCode): TKey {
+  return PASSWORD_ERROR_KEYS[code];
 }

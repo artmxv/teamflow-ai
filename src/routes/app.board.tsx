@@ -50,7 +50,7 @@ import {
   type TaskApiStatus,
 } from "@/lib/api/tasks";
 import { fetchProjects } from "@/lib/api/projects";
-import { taskStatusLabel, useI18n } from "@/lib/i18n";
+import { taskStatusLabel, useI18n, type TKey } from "@/lib/i18n";
 import { Filter, FolderKanban, ListTodo, Plus } from "lucide-react";
 import { fetchWorkspaceMembers } from "@/lib/api/workspace-members";
 import {
@@ -120,12 +120,10 @@ function Board() {
     onSuccess: async () => {
       await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       invalidateNotifications(queryClient);
-      toast.success("Task created");
+      toast.success(t("tasks.created"));
     },
-    onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Task could not be created",
-      );
+    onError: () => {
+      toast.error(t("tasks.createFailed"));
     },
   });
   const updateTaskMutation = useMutation({
@@ -144,15 +142,13 @@ function Board() {
       return { previous };
     },
     onSuccess: async () => {
-      toast.success("Task status updated");
+      toast.success(t("tasks.statusUpdated"));
     },
-    onError: (mutationError, _variables, context) => {
+    onError: (_mutationError, _variables, context) => {
       if (context?.previous) {
         queryClient.setQueryData(["tasks"], context.previous);
       }
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Task status could not be updated",
-      );
+      toast.error(t("tasks.statusUpdateFailed"));
     },
     onSettled: async () => {
       await invalidateWorkspaceContentQueries(queryClient, workspaceId);
@@ -163,12 +159,10 @@ function Board() {
     onSuccess: async () => {
       await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       setSelected(null);
-      toast.success("Task deleted");
+      toast.success(t("tasks.deleted"));
     },
-    onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Task could not be deleted",
-      );
+    onError: () => {
+      toast.error(t("tasks.deleteFailed"));
     },
   });
   const updateAssigneeMutation = useMutation({
@@ -188,14 +182,12 @@ function Board() {
     onSuccess: async (updated) => {
       await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       invalidateNotifications(queryClient);
-      setSelected((prev) => (prev?.id === updated.id ? mapApiTaskToTask(updated) : prev));
+      setSelected((prev) => (prev?.id === updated.id ? mapApiTaskToTask(updated, t) : prev));
       setSelected(null);
-      toast.success("Task updated");
+      toast.success(t("tasks.updated"));
     },
-    onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Task could not be updated",
-      );
+    onError: () => {
+      toast.error(t("tasks.updateFailed"));
     },
   });
   const assigneeOptions = useMemo(
@@ -216,7 +208,7 @@ function Board() {
       : null;
   const [activeDragTask, setActiveDragTask] = useState<Task | null>(null);
   const suppressCardClickRef = useRef(false);
-  const taskList = apiTasks.map(mapApiTaskToTask);
+  const taskList = apiTasks.map((task) => mapApiTaskToTask(task, t));
 
   const dragSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -521,7 +513,7 @@ function Board() {
   );
 }
 
-function mapApiTaskToTask(task: TaskApiItem): Task {
+function mapApiTaskToTask(task: TaskApiItem, t: (k: TKey) => string): Task {
   return {
     id: task.id,
     key: task.key,
@@ -539,7 +531,7 @@ function mapApiTaskToTask(task: TaskApiItem): Task {
     attachmentsCount: task.attachmentsCount,
     checklist: Array.from({ length: task.checklistTotal }, (_, index) => ({
       id: `${task.id}-checklist-${index}`,
-      label: `Checklist item ${index + 1}`,
+      label: t("tasks.checklistItem").replace("{n}", String(index + 1)),
       done: index < task.checklistDone,
     })),
     activity: [],

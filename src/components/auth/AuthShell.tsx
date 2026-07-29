@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Sparkles } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 export function AuthShell({
   title,
@@ -13,6 +14,8 @@ export function AuthShell({
   children: ReactNode;
   footer: ReactNode;
 }) {
+  const { t } = useI18n();
+
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       {/* Left brand panel */}
@@ -29,21 +32,18 @@ export function AuthShell({
           </Link>
           <div className="space-y-6">
             <div className="rounded-2xl border border-white/15 bg-white/10 p-5 backdrop-blur">
-              <p className="text-sm leading-relaxed text-white/90">
-                "TeamFlow's AI assistant gave us back two hours every standup. It's the project tool
-                I always wanted."
-              </p>
+              <p className="text-sm leading-relaxed text-white/90">"{t("auth.shell.quote")}"</p>
               <div className="mt-4 flex items-center gap-3">
                 <div className="grid size-9 place-items-center rounded-full bg-white/20 text-xs font-semibold">
                   RB
                 </div>
                 <div className="text-sm">
-                  <div className="font-medium">Rita Bauer</div>
-                  <div className="text-white/70 text-xs">Head of Product, Northwind</div>
+                  <div className="font-medium">{t("auth.shell.quoteAuthor")}</div>
+                  <div className="text-white/70 text-xs">{t("auth.shell.quoteRole")}</div>
                 </div>
               </div>
             </div>
-            <div className="text-xs text-white/60">© 2026 TeamFlow Labs, Inc.</div>
+            <div className="text-xs text-white/60">{t("auth.shell.copyright")}</div>
           </div>
         </div>
       </div>

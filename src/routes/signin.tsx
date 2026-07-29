@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { login } from "@/lib/api/auth";
 import { primeAuthMeAfterAuth, resetWorkspaceValidationSession } from "@/lib/auth/auth-cache";
+import { authSignInErrorKey } from "@/lib/auth/auth-errors";
 import { googleAuthErrorKey, startGoogleAuth } from "@/lib/auth/google-auth";
 import { getSafeRedirectPath } from "@/lib/auth/safe-redirect";
 import { getAuthToken, setAuthToken } from "@/lib/auth/token";
@@ -59,27 +60,27 @@ function SignIn() {
       resetWorkspaceValidationSession();
       setAuthToken(token);
       await primeAuthMeAfterAuth(queryClient, user);
-      toast.success("Signed in successfully");
+      toast.success(t("auth.signedIn"));
       void router.navigate({ href: getSafeRedirectPath(redirectPath) });
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Could not sign in. Please try again.");
+      toast.error(t(authSignInErrorKey(error)));
     },
   });
 
   return (
     <AuthShell
-      title="Welcome back"
-      subtitle="Sign in to continue to your workspace."
+      title={t("auth.signInTitle")}
+      subtitle={t("auth.signInSubtitle")}
       footer={
         <>
-          New to TeamFlow?{" "}
+          {t("auth.newToTeamFlow")}{" "}
           <Link
             to="/signup"
             search={redirectPath ? { redirect: redirectPath } : undefined}
             className="font-medium text-primary hover:underline"
           >
-            Create an account
+            {t("auth.createAccount")}
           </Link>
         </>
       }
@@ -100,15 +101,15 @@ function SignIn() {
           <GoogleIcon /> {t("auth.continueWithGoogle")}
         </Button>
         <div className="relative my-2 text-center text-xs text-muted-foreground">
-          <span className="relative z-10 bg-background px-2">or with email</span>
+          <span className="relative z-10 bg-background px-2">{t("auth.orWithEmail")}</span>
           <span className="absolute inset-x-0 top-1/2 -z-0 h-px bg-border" />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="email">Work email</Label>
+          <Label htmlFor="email">{t("auth.email")}</Label>
           <Input
             id="email"
             type="email"
-            placeholder="you@company.com"
+            placeholder={t("auth.emailPlaceholder")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -117,9 +118,9 @@ function SignIn() {
         </div>
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t("auth.password")}</Label>
             <Link to="/forgot-password" className="text-xs text-primary hover:underline">
-              Forgot?
+              {t("auth.forgotPassword")}
             </Link>
           </div>
           <Input
@@ -137,7 +138,7 @@ function SignIn() {
           className="w-full bg-gradient-brand text-white shadow-glow hover:opacity-95"
           disabled={loginMutation.isPending}
         >
-          {loginMutation.isPending ? "Signing in…" : "Sign in"}
+          {loginMutation.isPending ? t("auth.signingIn") : t("auth.signIn")}
         </Button>
       </form>
     </AuthShell>

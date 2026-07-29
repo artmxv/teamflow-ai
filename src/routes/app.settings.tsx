@@ -34,6 +34,7 @@ import {
   workspaceSettingsDisplayName,
 } from "@/lib/workspace-display";
 import { removeAvatar, updateProfile, uploadAvatar } from "@/lib/api/auth";
+import { assertBrowserOnline, friendlyApiErrorMessage, isBrowserOffline } from "@/lib/api-error";
 import { AUTH_ME_QUERY_KEY, patchAuthMeUser } from "@/lib/auth/auth-cache";
 import { invalidateWorkspaceScopedQueries } from "@/lib/workspace-queries";
 import {
@@ -187,9 +188,8 @@ function formatWorkspaceError(error: unknown, fallback: TKey, t: (k: TKey) => st
     if (key) {
       return t(key);
     }
-    return error.message;
   }
-  return t(fallback);
+  return friendlyApiErrorMessage(error, t, fallback);
 }
 
 function workspaceUrlFromSlug(slug: string): string {
@@ -312,7 +312,12 @@ function SettingsPage() {
   }, [workspace, lang]);
 
   const profileMutation = useMutation({
-    mutationFn: updateProfile,
+    // Avoid RQ "paused" limbo offline; fail fast via assertBrowserOnline instead.
+    networkMode: "always",
+    mutationFn: async (input: Parameters<typeof updateProfile>[0]) => {
+      assertBrowserOnline();
+      return updateProfile(input);
+    },
     onSuccess: async (updatedUser) => {
       const saved = profileFormFromUser(updatedUser);
       setProfileForm(saved);
@@ -322,19 +327,23 @@ function SettingsPage() {
       toast.success(t("settings.profileUpdated"));
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : t("settings.profileSaveError"));
+      toast.error(friendlyApiErrorMessage(error, t, "settings.profileSaveError"));
     },
   });
 
   const avatarUploadMutation = useMutation({
-    mutationFn: uploadAvatar,
+    networkMode: "always",
+    mutationFn: async (file: File) => {
+      assertBrowserOnline();
+      return uploadAvatar(file);
+    },
     onSuccess: async (updatedUser) => {
       patchAuthMeUser(queryClient, updatedUser);
       await invalidateWorkspaceScopedQueries(queryClient);
       toast.success(t("settings.avatarUpdated"));
     },
     onError: (error) => {
-      const message = error instanceof Error ? error.message : t("settings.avatarUploadError");
+      const message = error instanceof Error ? error.message : "";
       if (message.includes("JPG") || message.includes("PNG") || message.includes("WEBP")) {
         toast.error(t("settings.imageTypeError"));
         return;
@@ -343,7 +352,7 @@ function SettingsPage() {
         toast.error(t("settings.imageTooLarge"));
         return;
       }
-      toast.error(message);
+      toast.error(friendlyApiErrorMessage(error, t, "settings.avatarUploadError"));
     },
     onSettled: () => {
       if (avatarInputRef.current) {
@@ -353,21 +362,29 @@ function SettingsPage() {
   });
 
   const avatarRemoveMutation = useMutation({
-    mutationFn: removeAvatar,
+    networkMode: "always",
+    mutationFn: async () => {
+      assertBrowserOnline();
+      return removeAvatar();
+    },
     onSuccess: async (updatedUser) => {
       patchAuthMeUser(queryClient, updatedUser);
       await invalidateWorkspaceScopedQueries(queryClient);
       toast.success(t("settings.avatarRemoved"));
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : t("settings.avatarRemoveError"));
+      toast.error(friendlyApiErrorMessage(error, t, "settings.avatarRemoveError"));
     },
   });
 
   const avatarBusy = avatarUploadMutation.isPending || avatarRemoveMutation.isPending;
 
   const workspaceMutation = useMutation({
-    mutationFn: updateWorkspace,
+    networkMode: "always",
+    mutationFn: async (input: Parameters<typeof updateWorkspace>[0]) => {
+      assertBrowserOnline();
+      return updateWorkspace(input);
+    },
     onSuccess: async (updated) => {
       await queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY });
       setWorkspaceForm(workspaceFormFromWorkspace(updated, lang));
@@ -381,6 +398,10 @@ function SettingsPage() {
 
   const handleProfileSave = () => {
     if (!profileForm || !user) {
+      return;
+    }
+    if (isBrowserOffline()) {
+      toast.error(t("common.offline"));
       return;
     }
     profileMutation.mutate({
@@ -421,10 +442,20 @@ function SettingsPage() {
       return;
     }
 
+    if (isBrowserOffline()) {
+      toast.error(t("common.offline"));
+      event.target.value = "";
+      return;
+    }
+
     avatarUploadMutation.mutate(file);
   };
 
   const handleRemoveAvatar = () => {
+    if (isBrowserOffline()) {
+      toast.error(t("common.offline"));
+      return;
+    }
     avatarRemoveMutation.mutate();
   };
 
@@ -439,6 +470,10 @@ function SettingsPage() {
     const slug = workspaceForm.slug.trim();
     if (!WORKSPACE_SLUG_PATTERN.test(slug)) {
       toast.error(t("settings.error.slugInvalid"));
+      return;
+    }
+    if (isBrowserOffline()) {
+      toast.error(t("common.offline"));
       return;
     }
     workspaceMutation.mutate({

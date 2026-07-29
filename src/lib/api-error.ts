@@ -7,6 +7,20 @@ const API_ERROR_KEYS: Record<string, TKey> = {
   "Load failed": "common.errorNetwork",
 };
 
+/** Stable marker for intentional offline guards (mapped → common.offline). */
+export const OFFLINE_ERROR_MARKER = "OFFLINE";
+
+export function isBrowserOffline(): boolean {
+  return typeof navigator !== "undefined" && !navigator.onLine;
+}
+
+/** Throws OFFLINE_ERROR_MARKER when the browser reports no network. */
+export function assertBrowserOnline(): void {
+  if (isBrowserOffline()) {
+    throw new Error(OFFLINE_ERROR_MARKER);
+  }
+}
+
 function isNetworkError(error: unknown): boolean {
   if (error instanceof TypeError) {
     return true;
@@ -39,6 +53,14 @@ export function friendlyApiErrorMessage(
   t: (key: TKey) => string,
   fallbackKey: TKey = "common.errorServerHint",
 ): string {
+  if (isBrowserOffline()) {
+    return t("common.offline");
+  }
+
+  if (error instanceof Error && error.message === OFFLINE_ERROR_MARKER) {
+    return t("common.offline");
+  }
+
   if (isNetworkError(error)) {
     return t("common.errorNetwork");
   }
@@ -49,9 +71,7 @@ export function friendlyApiErrorMessage(
 
   if (error instanceof ApiError) {
     if (error.status === 401 || error.status === 403) {
-      return error.status === 401
-        ? t("common.errorAccessDenied")
-        : t("common.errorForbiddenHint");
+      return error.status === 401 ? t("common.errorAccessDenied") : t("common.errorForbiddenHint");
     }
     if (error.status === 404) {
       return t("common.errorNotFoundHint");

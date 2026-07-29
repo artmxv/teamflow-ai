@@ -225,12 +225,10 @@ function ProjectDetailPage() {
       }),
     onSuccess: async () => {
       await invalidateWorkspaceContentQueries(queryClient, workspaceId);
-      toast.success("Project updated");
+      toast.success(t("projects.toast.updated"));
     },
-    onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Project could not be updated",
-      );
+    onError: () => {
+      toast.error(t("projects.toast.updateFailed"));
     },
   });
 
@@ -238,13 +236,11 @@ function ProjectDetailPage() {
     mutationFn: (id: string) => deleteProject(id),
     onSuccess: async () => {
       await invalidateWorkspaceContentQueries(queryClient, workspaceId);
-      toast.success("Project deleted");
+      toast.success(t("projects.toast.deleted"));
       await router.navigate({ to: "/app/projects" });
     },
-    onError: (mutationError) => {
-      const message =
-        mutationError instanceof Error ? mutationError.message : "Project could not be deleted";
-      toast.error(message);
+    onError: () => {
+      toast.error(t("projects.toast.deleteFailed"));
     },
   });
 
@@ -253,12 +249,10 @@ function ProjectDetailPage() {
     onSuccess: async () => {
       await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       invalidateNotifications(queryClient);
-      toast.success("Task created");
+      toast.success(t("tasks.created"));
     },
-    onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Task could not be created",
-      );
+    onError: () => {
+      toast.error(t("tasks.createFailed"));
     },
   });
 
@@ -267,12 +261,10 @@ function ProjectDetailPage() {
     onSuccess: async () => {
       await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       setSelectedTask(null);
-      toast.success("Task deleted");
+      toast.success(t("tasks.deleted"));
     },
-    onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Task could not be deleted",
-      );
+    onError: () => {
+      toast.error(t("tasks.deleteFailed"));
     },
   });
 
@@ -295,14 +287,12 @@ function ProjectDetailPage() {
       invalidateNotifications(queryClient);
       setSelectedTask((prev) => {
         if (!prev || prev.id !== updated.id) return prev;
-        return mapApiTaskToTask(updated);
+        return mapApiTaskToTask(updated, t);
       });
-      toast.success("Task updated");
+      toast.success(t("tasks.updated"));
     },
-    onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Task could not be updated",
-      );
+    onError: () => {
+      toast.error(t("tasks.updateFailed"));
     },
   });
 
@@ -388,7 +378,7 @@ function ProjectDetailPage() {
           projectTasks={projectTasks}
           isCreatingTask={createTaskMutation.isPending}
           onCreateTask={handleCreateTask}
-          onOpenTask={(task) => setSelectedTask(mapApiTaskToTask(task))}
+          onOpenTask={(task) => setSelectedTask(mapApiTaskToTask(task, t))}
           canManageMembers={canManageProjects}
         />
       )}
@@ -886,13 +876,11 @@ function ProjectMembersCard({
         queryKey: ["project-available-members", projectId],
       });
       invalidateNotifications(queryClient);
-      toast.success("Member added");
+      toast.success(t("projects.detail.memberAdded"));
       setAddDialogOpen(false);
     },
-    onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Member could not be added",
-      );
+    onError: () => {
+      toast.error(t("projects.detail.memberAddFailed"));
     },
   });
 
@@ -903,12 +891,10 @@ function ProjectMembersCard({
       await queryClient.invalidateQueries({
         queryKey: ["project-available-members", projectId],
       });
-      toast.success("Member removed");
+      toast.success(t("projects.detail.memberRemoved"));
     },
-    onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Member could not be removed",
-      );
+    onError: () => {
+      toast.error(t("projects.detail.memberRemoveFailed"));
     },
   });
 
@@ -1176,7 +1162,7 @@ function ProjectDocumentsCard({ projectId }: { projectId: string }) {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["project-documents", projectId] });
       invalidateNotifications(queryClient);
-      toast.success("Document uploaded");
+      toast.success(t("projects.detail.documentUploaded"));
     },
     onError: (mutationError) => {
       toast.error(friendlyUploadErrorMessage(mutationError, t));
@@ -1187,12 +1173,10 @@ function ProjectDocumentsCard({ projectId }: { projectId: string }) {
     mutationFn: (documentId: string) => deleteProjectDocument(projectId, documentId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["project-documents", projectId] });
-      toast.success("Document deleted");
+      toast.success(t("projects.detail.documentDeleted"));
     },
-    onError: (mutationError) => {
-      toast.error(
-        mutationError instanceof Error ? mutationError.message : "Document could not be deleted",
-      );
+    onError: () => {
+      toast.error(t("projects.detail.documentDeleteFailed"));
     },
   });
 
@@ -1209,7 +1193,7 @@ function ProjectDocumentsCard({ projectId }: { projectId: string }) {
         onFileSelected={(file) => {
           if (uploadMutation.isPending) return;
           if (!projectId.trim()) {
-            toast.error("Project is not ready yet");
+            toast.error(t("projects.notReady"));
             return;
           }
           if (!(file instanceof File) || !file.size) {
@@ -1649,7 +1633,7 @@ function calculateTaskProgress(tasks: TaskApiItem[]) {
   return { percent, done, total };
 }
 
-function mapApiTaskToTask(task: TaskApiItem): Task {
+function mapApiTaskToTask(task: TaskApiItem, t: (k: TKey) => string): Task {
   return {
     id: task.id,
     key: task.key,
@@ -1667,7 +1651,7 @@ function mapApiTaskToTask(task: TaskApiItem): Task {
     attachmentsCount: task.attachmentsCount,
     checklist: Array.from({ length: task.checklistTotal }, (_, index) => ({
       id: `${task.id}-checklist-${index}`,
-      label: `Checklist item ${index + 1}`,
+      label: t("tasks.checklistItem").replace("{n}", String(index + 1)),
       done: index < task.checklistDone,
     })),
     activity: [],
