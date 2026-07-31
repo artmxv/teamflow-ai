@@ -747,16 +747,18 @@ function ProjectDetails({
                       )}
               </p>
             </div>
-            <NewTaskDialog
-              isSubmitting={isCreatingTask}
-              fixedProjectId={project.id}
-              onSubmit={onCreateTask}
-            >
-              <Button size="sm" variant="brand" className="h-8 shrink-0 gap-1">
-                <Plus className="size-3.5" />
-                {t("common.newTask")}
-              </Button>
-            </NewTaskDialog>
+            {sortedTasks.length > 0 ? (
+              <NewTaskDialog
+                isSubmitting={isCreatingTask}
+                fixedProjectId={project.id}
+                onSubmit={onCreateTask}
+              >
+                <Button size="sm" variant="brand" className="h-8 shrink-0 gap-1">
+                  <Plus className="size-3.5" />
+                  {t("common.newTask")}
+                </Button>
+              </NewTaskDialog>
+            ) : null}
           </div>
           <div className="mt-4 min-h-0 flex-1 overflow-hidden rounded-xl border border-border">
             {sortedTasks.length === 0 ? (

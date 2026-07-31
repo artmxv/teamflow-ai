@@ -1038,21 +1038,23 @@ function TaskAttachmentsSection({
         <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <Paperclip className="size-3.5" /> {t("tasks.sectionAttachments")}
         </h3>
-        <Button
-          type="button"
-          size="sm"
-          variant="brand"
-          className="h-7 gap-1.5 px-2 text-xs"
-          disabled={isUploading}
-          onClick={onPickFile}
-        >
-          {isUploading ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : (
-            <Upload className="size-3.5" />
-          )}
-          {isUploading ? t("tasks.uploading") : t("tasks.upload")}
-        </Button>
+        {!isLoading && !isError && attachments.length > 0 ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="brand"
+            className="h-7 gap-1.5 px-2 text-xs"
+            disabled={isUploading}
+            onClick={onPickFile}
+          >
+            {isUploading ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Upload className="size-3.5" />
+            )}
+            {isUploading ? t("tasks.uploading") : t("tasks.upload")}
+          </Button>
+        ) : null}
         <input
           ref={fileInputRef}
           type="file"
