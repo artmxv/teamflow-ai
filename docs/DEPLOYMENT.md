@@ -1,42 +1,47 @@
 # Deployment guide
 
-Step-by-step reference for the **current** TeamFlow AI production setup and for the planned frontend move to Vercel.
+Step-by-step reference for the **current** TeamFlow AI production setup after the frontend cutover to Vercel.
 
 **Current production**
 
 | Surface | URL / host |
 | ------- | ---------- |
-| Frontend | https://teamflow-ai-web.onrender.com (Render) |
+| Frontend | https://teamflow-ai-murex.vercel.app (Vercel, TanStack Start SSR) |
 | API + Socket.IO | https://teamflow-ai-api.onrender.com (Render) |
 | Database | Neon PostgreSQL |
 | Files | Private Supabase Storage |
 | Reminders | GitHub Actions → API |
 
-**Planned (stage 104):** migrate **only** the frontend to Vercel. Express + Socket.IO stay on Render. Do not treat Vercel as the current production frontend.
+**Temporary fallback (transitional only):** the previous Render frontend at https://teamflow-ai-web.onrender.com is kept as a fallback during the cutover period. It is not the primary production frontend.
+
+**Architecture notes:**
+
+- Frontend runs on Vercel as TanStack Start SSR.
+- Backend Express API and Socket.IO continue on Render.
+- The frontend deployment does not contain Prisma, backend env, or backend secrets.
+- Google OAuth callback stays on the Render API URL.
 
 For a broader manual QA pass, see [QA_CHECKLIST.md](./QA_CHECKLIST.md).
 
 ## Critical warnings
 
-**`APP_URL` must be your production frontend URL** (currently `https://teamflow-ai-web.onrender.com`), not `http://localhost:8080`.
+**`APP_URL` must be your primary production frontend URL** (currently `https://teamflow-ai-murex.vercel.app`), not `http://localhost:8080`.
 
 If `APP_URL` points to localhost, workspace invitation links and Google OAuth redirects will send users to localhost and auth will fail in production.
 
-**`CORS_ORIGIN`** must match the deployed frontend origin **exactly** (scheme + host + port if non-default). **No trailing slash.**
+**`CORS_ORIGIN`** must match allowed frontend origin(s) **exactly** (scheme + host + port if non-default). **No trailing slash.**
 
-Example (current production):
-
-```text
-CORS_ORIGIN=https://teamflow-ai-web.onrender.com
-```
-
-After a future Vercel cutover, update `APP_URL` and `CORS_ORIGIN` to the Vercel origin. Multiple origins (production + preview) are comma-separated:
+Current production (primary Vercel origin + temporary Render fallback):
 
 ```text
-CORS_ORIGIN=https://your-app.vercel.app,https://teamflow-ai-git-main-yourorg.vercel.app
+CORS_ORIGIN=https://teamflow-ai-web.onrender.com,https://teamflow-ai-murex.vercel.app
 ```
 
-**Google OAuth:** If the client secret was ever exposed during local development, **rotate or recreate** it before production. Never reuse a leaked secret.
+Both origins are temporarily allowed while the old Render frontend is kept as a fallback. After the fallback is fully retired, remove `https://teamflow-ai-web.onrender.com` from `CORS_ORIGIN`.
+
+Do not use wildcard CORS. Random Vercel Preview URLs are not covered by the exact allowlist; see [Preview deployments](#preview-deployments).
+
+**Google OAuth:** If the client secret was ever exposed during local development, **rotate or recreate** it before production. Never reuse a leaked secret. Keep the OAuth callback on the Render API; do not move it to Vercel.
 
 **Realtime:** keep a **single** backend instance and `WEB_CONCURRENCY=1` while presence is in-memory.
 
@@ -50,8 +55,8 @@ Never commit `server/.env` or a filled root `.env` with secrets.
 | ---- | -------- |
 | Database | `DATABASE_URL` (Neon) |
 | Auth | `JWT_SECRET` (long random; not the dev default) |
-| Frontend links | `APP_URL` (production frontend URL) |
-| CORS | `CORS_ORIGIN` (production frontend URL) |
+| Frontend links | `APP_URL` (primary production frontend URL) |
+| CORS | `CORS_ORIGIN` (allowed frontend origin(s)) |
 | Runtime | `NODE_ENV=production` |
 | Frontend build | `VITE_API_URL` (production API URL) |
 | Files | `FILE_STORAGE_DRIVER=supabase` + Supabase vars |
@@ -89,6 +94,12 @@ VITE_API_URL=https://teamflow-ai-api.onrender.com
 
 Default for local dev: `http://localhost:4000` (see `src/lib/api/client.ts`). Local frontend listens on **http://localhost:8080**.
 
+On Vercel, set the same build-time variable for Production and Preview:
+
+```bash
+VITE_API_URL=https://teamflow-ai-api.onrender.com
+```
+
 ---
 
 ## 3. Backend env (Render)
@@ -123,6 +134,23 @@ On Render, set the same variables in the service dashboard.
 | `TASK_REMINDER_CRON_SECRET` | For reminders | Bearer token for the internal reminders endpoint |
 | `WEB_CONCURRENCY` | Yes for presence | Keep `1` while presence is in-memory |
 
+**Current production values for frontend-facing URLs** (non-secret):
+
+```text
+APP_URL=https://teamflow-ai-murex.vercel.app
+CORS_ORIGIN=https://teamflow-ai-web.onrender.com,https://teamflow-ai-murex.vercel.app
+GOOGLE_REDIRECT_URI=https://teamflow-ai-api.onrender.com/api/auth/google/callback
+```
+
+Why these values:
+
+- `APP_URL` uses the Vercel URL so invitation links and post-OAuth redirects land on the primary frontend.
+- `CORS_ORIGIN` temporarily allows both the Vercel production origin and the old Render frontend fallback.
+- After the Render frontend is fully retired, remove its origin from `CORS_ORIGIN`.
+- Origins must not include a trailing slash.
+
+Do not document real values for `JWT_SECRET`, `DATABASE_URL`, Supabase service role, Resend, or cron secrets.
+
 Startup validation lives in `server/src/config/env.ts`. Misconfigured production or Resend settings fail fast at boot.
 
 ---
@@ -131,37 +159,33 @@ Startup validation lives in `server/src/config/env.ts`. Misconfigured production
 
 1. Create an OAuth 2.0 **Web application** client in [Google Cloud Console](https://console.cloud.google.com/apis/credentials).
 2. **Rotate or recreate the client secret** if it was ever committed, logged, or shared during development.
-3. Set **Authorized JavaScript origins** to the frontend origin, for example:
+3. Set **Authorized JavaScript origins** to the primary frontend origin:
    ```text
-   https://teamflow-ai-web.onrender.com
+   https://teamflow-ai-murex.vercel.app
    ```
-4. Set **Authorized redirect URI** to the **backend** callback:
+   During the transitional period you may also keep the temporary Render fallback origin if that UI is still used for OAuth testing.
+4. Set **Authorized redirect URI** to the **backend** callback (unchanged; do not move to Vercel):
    ```text
    https://teamflow-ai-api.onrender.com/api/auth/google/callback
    ```
-5. Set all three env vars on the API service:
+5. Set all three env vars on the API service (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and):
    ```bash
-   GOOGLE_CLIENT_ID=...
-   GOOGLE_CLIENT_SECRET=...
    GOOGLE_REDIRECT_URI=https://teamflow-ai-api.onrender.com/api/auth/google/callback
    ```
-6. Ensure `APP_URL` is the production frontend URL (used after OAuth completes).
+6. Ensure `APP_URL` is the primary production frontend URL (`https://teamflow-ai-murex.vercel.app`).
 
 Flow: browser → frontend “Continue with Google” → backend `/api/auth/google` → Google → backend `/api/auth/google/callback` → redirect to frontend (`APP_URL`) with session token handling.
 
 If Google env vars are all empty, the API starts normally and the sign-in page shows Google as unavailable when clicked.
-
-After a Vercel frontend migration, update Google **JavaScript origins** and Render `APP_URL` / `CORS_ORIGIN`. Keep the callback on the Render API URL.
 
 ---
 
 ## 5. Resend setup
 
 1. Create a [Resend](https://resend.com) account and **verify your sending domain**.
-2. Create an API key and set on Render:
+2. Create an API key and set on Render: `EMAIL_PROVIDER=resend`, `EMAIL_FROM` for a verified sender, and `RESEND_API_KEY` (set the real key only in the Render dashboard).
    ```bash
    EMAIL_PROVIDER=resend
-   RESEND_API_KEY=<your-resend-api-key>
    EMAIL_FROM="TeamFlow AI <noreply@yourdomain.com>"
    ```
 3. **`EMAIL_FROM` must use a verified sender or domain in Resend.** Do not use `noreply@example.com` in production.
@@ -194,9 +218,10 @@ Uploads (avatars, task attachments, project documents, chat files) are handled i
 ```bash
 FILE_STORAGE_DRIVER=supabase
 SUPABASE_URL=https://your-project-ref.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<supabase-service-role-key>
 SUPABASE_STORAGE_BUCKET=teamflow-uploads
 ```
+
+Also set `SUPABASE_SERVICE_ROLE_KEY` in the Render dashboard only (never in git or frontend env).
 
 **Never commit** `SUPABASE_SERVICE_ROLE_KEY` or expose it to the frontend. The Vite app does not talk to Supabase directly for uploads or downloads.
 
@@ -216,7 +241,7 @@ Legacy keys (`projects/{projectId}/{filename}`, `tasks/{taskId}/{filename}`) are
 1. Create a project at [Neon](https://neon.tech).
 2. Copy the **pooled** connection string if available (recommended for PaaS workloads).
 3. Set `DATABASE_URL` on the Render API service.
-4. Apply migrations as part of the API build (see section 9) or manually with `npm run prisma:migrate:deploy`.
+4. Apply migrations as part of the API build (see section 10) or manually with `npm run prisma:migrate:deploy`.
 
 Do not run `prisma migrate dev` against production. Use `npm run prisma:migrate:deploy` only.
 
@@ -238,28 +263,24 @@ npm run db:seed
 | Start command | `npm run start` |
 | Instances / concurrency | One instance; `WEB_CONCURRENCY=1` |
 
-**Environment variables** (placeholders only — set real values in Render, not in git):
+**Non-secret environment variables** (set secret values only in the Render dashboard, never in git):
 
 ```bash
 NODE_ENV=production
 PORT=4000
 WEB_CONCURRENCY=1
-DATABASE_URL=<neon-connection-string>
-JWT_SECRET=<long-random-secret>
-CORS_ORIGIN=https://teamflow-ai-web.onrender.com
-APP_URL=https://teamflow-ai-web.onrender.com
+CORS_ORIGIN=https://teamflow-ai-web.onrender.com,https://teamflow-ai-murex.vercel.app
+APP_URL=https://teamflow-ai-murex.vercel.app
 EMAIL_PROVIDER=resend
 EMAIL_FROM="TeamFlow AI <noreply@yourdomain.com>"
-RESEND_API_KEY=<resend-api-key>
 GOOGLE_CLIENT_ID=<google-client-id>
-GOOGLE_CLIENT_SECRET=<google-client-secret>
 GOOGLE_REDIRECT_URI=https://teamflow-ai-api.onrender.com/api/auth/google/callback
 FILE_STORAGE_DRIVER=supabase
 SUPABASE_URL=https://your-project-ref.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<supabase-service-role-key>
 SUPABASE_STORAGE_BUCKET=teamflow-uploads
-TASK_REMINDER_CRON_SECRET=<cron-shared-secret>
 ```
+
+Also configure in Render only (do not paste real values into docs or git): `DATABASE_URL`, `JWT_SECRET`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `TASK_REMINDER_CRON_SECRET`.
 
 Notes:
 
@@ -273,9 +294,67 @@ Notes:
 
 ---
 
-## 9. Render frontend (current) and Vercel (planned)
+## 9. Vercel frontend (current) and Render frontend (temporary fallback)
 
-### Current: Render Web Service (frontend)
+### Current: Vercel (primary production frontend)
+
+| Setting | Value |
+| ------- | ----- |
+| Root Directory | `.` |
+| Framework Preset | `Other` |
+| Node.js Version | `22.x` |
+| Install Command | `npm install --include=dev` |
+| Build Command | `NITRO_PRESET=vercel npm run build` |
+| Output Directory | leave blank |
+| Production Branch | `main` |
+
+**Environment variable** (Production and Preview):
+
+```bash
+VITE_API_URL=https://teamflow-ai-api.onrender.com
+```
+
+Leave **Output Directory** blank. Do not set it to `dist`. With `NITRO_PRESET=vercel`, Nitro writes the Vercel Build Output API under `.vercel/output`, and Vercel consumes that layout automatically.
+
+Do **not** configure a Vercel start command. The serverless runtime is started by Vercel.
+
+Vercel hosts only the frontend SSR app. Do not deploy Express, Socket.IO, Prisma, or backend secrets to Vercel.
+
+### Dual-target frontend build
+
+The same repository supports two Nitro presets:
+
+**Render / local compatibility** (default preset `node-server`):
+
+```bash
+npm run build
+```
+
+| Detail | Value |
+| ------ | ----- |
+| Nitro preset | `node-server` |
+| Output | `dist/` |
+| Server entry | `dist/server/index.mjs` |
+
+**Vercel:**
+
+```bash
+NITRO_PRESET=vercel npm run build
+```
+
+| Detail | Value |
+| ------ | ----- |
+| Nitro preset | `vercel` |
+| Output | `.vercel/output` (Vercel Build Output API) |
+
+Notes:
+
+- The default preset remains `node-server` so local and Render builds stay compatible.
+- The Vercel preset is enabled only via `NITRO_PRESET=vercel`.
+- `.vercel/` is generated output / CLI metadata and is ignored by Git.
+- This dual-target approach keeps the Render frontend available as a temporary fallback without a separate configuration branch.
+
+### Temporary fallback: Render Web Service (frontend)
 
 | Setting | Value |
 | ------- | ----- |
@@ -289,22 +368,14 @@ Notes:
 VITE_API_URL=https://teamflow-ai-api.onrender.com
 ```
 
-TanStack Start builds a Nitro `node-server` bundle; production start is `node dist/server/index.mjs` (not a static-only export).
+TanStack Start builds a Nitro `node-server` bundle; production start is `node dist/server/index.mjs` (not a static-only export). Use this Render service only as a transitional fallback while the Vercel cutover settles.
 
-### Planned: Vercel frontend only
+### Preview deployments
 
-| Setting | Value |
-| ------- | ----- |
-| Build command | `npm run build` |
-| Adapter / output | To be verified during stage 104; the current Nitro preset is node-server |
-| Env | `VITE_API_URL=https://teamflow-ai-api.onrender.com` |
-
-After cutover:
-
-1. Point Render `APP_URL` and `CORS_ORIGIN` at the Vercel URL.
-2. Update Google Authorized JavaScript origins.
-3. Redeploy the backend if env vars changed.
-4. Keep Socket.IO and Express on Render — do **not** move the API to Vercel.
+- Random Vercel Preview URLs are **not** allowed by the current exact CORS allowlist.
+- For a full API smoke test against a specific preview deployment, temporarily add that exact preview origin to `CORS_ORIGIN` on the Render API.
+- Do not use wildcard CORS.
+- The production Vercel domain (`https://teamflow-ai-murex.vercel.app`) is already allowed.
 
 ---
 
@@ -337,7 +408,7 @@ npm run build
 NODE_ENV=production npm run start
 ```
 
-### Frontend
+### Frontend (Render / local compatibility)
 
 ```bash
 # from repository root
@@ -345,6 +416,14 @@ echo 'VITE_API_URL=https://teamflow-ai-api.onrender.com' > .env
 npm install --include=dev
 npm run build
 node dist/server/index.mjs
+```
+
+### Frontend (Vercel-oriented build)
+
+```bash
+# from repository root
+VITE_API_URL=https://teamflow-ai-api.onrender.com NITRO_PRESET=vercel npm run build
+# Nitro writes .vercel/output for the Vercel Build Output API
 ```
 
 ---
@@ -363,24 +442,47 @@ Set the same secret in Render env and in the GitHub repository secrets. Do not c
 
 ## 13. Production smoke tests
 
-After deploy, verify:
+Confirmed on the primary Vercel frontend (`https://teamflow-ai-murex.vercel.app`) after cutover:
+
+- Root and SSR routes return successfully
+- Email/password login and Google OAuth
+- Dashboard and workspace data
+- Projects, tasks, and Kanban status persistence after reload
+- Chat and Socket.IO
+- Private task/project attachments (upload and delete)
+- Invitation links using the Vercel origin (`APP_URL`)
+
+Also keep checking:
 
 1. **Health:** `GET https://teamflow-ai-api.onrender.com/api/health` returns OK.
-2. **Frontend loads:** open https://teamflow-ai-web.onrender.com (auth required for `/app/*`).
-3. **API URL:** browser network tab shows requests to `teamflow-ai-api.onrender.com`, not `localhost:4000`.
-4. **Email login:** register or sign in with email/password.
-5. **Google login:** sign in with Google completes and lands in the app (if OAuth configured).
-6. **Workspace loading:** dashboard / workspace switcher loads without errors.
-7. **Project / task CRUD:** create, edit, complete, and delete a task; confirm Kanban updates.
-8. **Files:** upload avatar, task attachment, and project document; with Supabase, files survive an API redeploy.
-9. **Chat / realtime:** send workspace and DM messages; confirm realtime delivery, unread counts, and presence on a second session.
-10. **Notifications:** trigger assignment / comment / invite and confirm the notification list updates; confirm deadline reminder path if testing the cron secret locally.
-11. **AI summary:** open AI Assistant / regenerate; summary reflects accessible projects and tasks (no external LLM).
-12. **Billing preview:** open `/app/billing`. Confirm current plan, usage, and real limits render. Paid plans show **Coming soon**. Plan-change controls are disabled. The UI must not show checkout or a working payment flow. The blocked plan mutation is covered by backend tests and is not part of the production smoke test.
-13. **Invite link:** invitation email/link host matches `APP_URL`.
-14. **RU/EN switch:** language toggle updates UI strings.
+2. **API URL:** browser network tab shows requests to `teamflow-ai-api.onrender.com`, not `localhost:4000`.
+3. **AI summary:** open AI Assistant / regenerate; summary reflects accessible projects and tasks (no external LLM).
+4. **Billing preview:** open `/app/billing`. Confirm current plan, usage, and real limits render. Paid plans show **Coming soon**. Plan-change controls are disabled. The UI must not show checkout or a working payment flow.
+5. **RU/EN switch:** language toggle updates UI strings.
 
 Full manual QA: [QA_CHECKLIST.md](./QA_CHECKLIST.md).
+
+### Post-migration follow-up (not fixed by the cutover)
+
+These UI issues remain known follow-ups and are **not** claimed as resolved:
+
+- Attachment readiness / loading UX after page reload
+- Duplicate empty-state CTA buttons
+- Sidebar billing-card positioning
+- Invite page localization / responsive polish
+- Favicon and broader visual redesign
+
+---
+
+## Current production limitations
+
+These remain honest product limits after the Vercel frontend cutover:
+
+- Backend on Render may cold-start after idle time
+- Online presence is in-memory and single-instance (`WEB_CONCURRENCY=1`)
+- Billing is a read-only preview; no payment provider
+- Workspace briefings do not call an external LLM
+- Auth JWT is stored in `localStorage` (not httpOnly cookies / refresh-token flow)
 
 ---
 
@@ -391,10 +493,10 @@ From `server/`:
 ```bash
 npm run typecheck
 npm run build
-NODE_ENV=production JWT_SECRET=dev-jwt-secret-change-in-production APP_URL=http://localhost:8080 CORS_ORIGIN=http://localhost:8080 npm run start
+# Rejected start: production NODE_ENV with the known-dev JWT placeholder and localhost APP_URL / CORS_ORIGIN
 # Expected: startup error (JWT / localhost guards)
 
-NODE_ENV=production JWT_SECRET=$(openssl rand -hex 32) APP_URL=https://app.example.com CORS_ORIGIN=https://app.example.com DATABASE_URL="postgresql://..." npm run start
+# Accepted start: production NODE_ENV with a strong random JWT, real APP_URL / CORS_ORIGIN, and a valid Neon DATABASE_URL
 # Expected: starts when DATABASE_URL and other required vars are valid
 ```
 
@@ -405,4 +507,7 @@ npm run build
 # Production build without VITE_API_URL: check browser console for VITE_API_URL warning
 VITE_API_URL=https://api.example.com npm run build
 # Expected: build succeeds; bundle uses configured API URL
+
+NITRO_PRESET=vercel npm run build
+# Expected: Nitro writes Vercel Build Output API under .vercel/output
 ```

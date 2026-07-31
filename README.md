@@ -10,14 +10,14 @@ Workspace briefings are built from projects, tasks, deadlines, and priorities th
 
 | Surface | URL |
 | ------- | --- |
-| Frontend | https://teamflow-ai-web.onrender.com |
+| Frontend | https://teamflow-ai-murex.vercel.app |
 | API | https://teamflow-ai-api.onrender.com |
 
 The app requires authentication. These URLs are the current production deployment, not a public unauthenticated demo. The API root may not serve a browser UI; use `/api/health` to check the API.
 
-**Current infrastructure:** frontend and backend on Render, PostgreSQL on Neon, private Supabase Storage.
+**Current infrastructure:** frontend SSR on Vercel, Express API and Socket.IO on Render, PostgreSQL on Neon, private Supabase Storage, reminder scheduler via GitHub Actions.
 
-**Planned:** migrate only the frontend to Vercel. The Express + Socket.IO backend remains on Render. That migration is not done yet (stage 104).
+During the transitional period, the previous Render frontend remains available as a temporary fallback only: https://teamflow-ai-web.onrender.com. It is not the primary production URL.
 
 ## Screenshots
 
@@ -120,7 +120,7 @@ Online plan changes and a payment provider are **not** available. Billing is an 
 
 ```text
 Browser
-  → TanStack Start frontend on Render
+  → TanStack Start frontend on Vercel (SSR)
   → Express REST API + Socket.IO on Render
       → Neon PostgreSQL
       → private Supabase Storage (backend proxy / signed URLs)
@@ -128,7 +128,7 @@ Browser
       → GitHub Actions hourly cron → POST /api/internal/task-reminders/run
 ```
 
-Planned: migrate only the frontend to Vercel. The Express and Socket.IO backend remains on Render.
+Vercel hosts only the frontend SSR app. Express and Socket.IO stay on Render. The frontend deployment does not include Prisma, backend env, or backend secrets.
 
 ### Frontend (`src/`)
 
@@ -297,29 +297,44 @@ Full guide: **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
 
 ### Current
 
-- Frontend: Render Web Service (TanStack Start / Nitro `node-server`)
+- Frontend: Vercel (TanStack Start SSR)
 - Backend: Render Web Service (Express + Socket.IO)
 - Database: Neon PostgreSQL
 - Files: private Supabase Storage
 - Reminders: GitHub Actions → production API
 
-### Planned
+Temporary fallback during the transitional period: Render frontend at https://teamflow-ai-web.onrender.com (not the primary production URL).
 
-- Move **only** the frontend to Vercel
-- Keep Express + Socket.IO on Render
-- Re-verify `APP_URL`, `CORS_ORIGIN`, and Google OAuth origins after the cutover
+### Dual-target frontend build
 
-### Render commands (current production)
+The frontend supports two Nitro presets so the same repo can deploy to Vercel and keep the Render frontend as a temporary fallback without a separate config branch.
 
-Frontend:
+**Render / local compatibility** (default):
 
 ```bash
-# Build
-npm install --include=dev && npm run build
-
-# Start
-node dist/server/index.mjs
+npm run build
 ```
+
+| Detail | Value |
+| ------ | ----- |
+| Nitro preset | `node-server` |
+| Output | `dist/` |
+| Server entry | `dist/server/index.mjs` |
+
+**Vercel:**
+
+```bash
+NITRO_PRESET=vercel npm run build
+```
+
+| Detail | Value |
+| ------ | ----- |
+| Nitro preset | `vercel` |
+| Output | Vercel Build Output API under `.vercel/output` |
+
+Vercel is used only for the frontend SSR app. Express API and Socket.IO are not deployed on Vercel.
+
+### Render backend commands
 
 Backend (Root Directory = `server`):
 
@@ -379,10 +394,12 @@ Manual post-deploy checks: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/QA
 | Script | Description |
 | ------ | ----------- |
 | `npm run dev` | Vite / TanStack Start dev server (port 8080) |
-| `npm run build` | Production build |
+| `npm run build` | Production build (default Nitro `node-server`) |
 | `npm run preview` | Preview production build |
 | `npm run lint` | ESLint |
 | `npm run format` | Prettier |
+
+For a Vercel-oriented build locally: `NITRO_PRESET=vercel npm run build`.
 
 ### `server/` (backend)
 
@@ -405,7 +422,6 @@ Manual post-deploy checks: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/QA
 - Workspace briefings do not use an external LLM
 - Online presence is in-memory and single-instance (`WEB_CONCURRENCY=1`)
 - Backend on Render may cold-start after idle time
-- Frontend is still on Render (Vercel migration planned)
 - No native mobile or desktop apps
 - No SSO/SAML or audit-log product features
 - Auth JWT is stored in `localStorage` (not httpOnly cookies / refresh-token flow)
@@ -415,8 +431,10 @@ Manual post-deploy checks: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/QA
 
 Near-term (no fixed dates):
 
-- Frontend migration to Vercel
-- Production verification after domain / origin changes
+- Production monitoring and post-migration cleanup
+- UI/UX and visual polish
+- Attachment loading experience
+- Responsive and localization polish
 - Optional external LLM provider behind the same briefing API shape
 - Real billing provider later
 - Multi-instance-safe presence (shared store + Socket.IO adapter) later
@@ -434,4 +452,4 @@ This repository shows fullstack TypeScript product work:
 
 ---
 
-Production: [frontend](https://teamflow-ai-web.onrender.com) · [API](https://teamflow-ai-api.onrender.com)
+Production: [frontend](https://teamflow-ai-murex.vercel.app) · [API](https://teamflow-ai-api.onrender.com)
