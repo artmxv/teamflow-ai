@@ -6,9 +6,25 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
+// Lovable resolves preset as: userNitroOpts.preset ?? process.env.NITRO_PRESET ?? "cloudflare-module".
+// Keep an explicit default so local/Render builds stay on node-server (not cloudflare-module).
+const nitroPreset = process.env.NITRO_PRESET ?? "node-server";
+
+// Lovable always injects output { dir/serverDir/publicDir: dist* }. For the vercel preset that
+// would break Build Output API, so restore Nitro's own vercel output templates only in that case.
+const nitroVercelOutput =
+  nitroPreset === "vercel"
+    ? {
+        dir: ".vercel/output",
+        serverDir: "{{ output.dir }}/functions/__server.func",
+        publicDir: "{{ output.dir }}/static/{{ baseURL }}",
+      }
+    : undefined;
+
 export default defineConfig({
   nitro: {
-    preset: "node-server",
+    preset: nitroPreset,
+    ...(nitroVercelOutput ? { output: nitroVercelOutput } : {}),
   },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
