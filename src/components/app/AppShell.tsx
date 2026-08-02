@@ -7,6 +7,7 @@ import type { AuthWorkspace } from "@/lib/api/auth";
 import { nameToInitials, useCurrentUser } from "@/lib/auth/use-current-user";
 import { useChatRealtime } from "@/lib/realtime/use-chat-realtime";
 import { useSidebarCollapsed } from "@/lib/sidebar-preference";
+import { AppPage } from "./AppPage";
 import { AppSidebar } from "./AppSidebar";
 import { AppTopbar } from "./AppTopbar";
 
@@ -49,7 +50,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {isBootstrapping ? (
         <AppBootScreen />
       ) : isError && !me ? (
-        <div className="flex min-h-screen items-center justify-center bg-muted/30 p-6">
+        <div className="flex min-h-screen items-center justify-center bg-background p-6">
           <ApiErrorState
             titleKey="loading.workspaceLoadErrorTitle"
             error={error}
@@ -58,20 +59,22 @@ export function AppShell({ children }: { children: ReactNode }) {
           />
         </div>
       ) : (
-      <AuthenticatedImageLightboxProvider>
-      <div className="flex min-h-screen w-full bg-muted/30">
-        <AppSidebar
-          workspace={workspace}
-          workspaceLoading={workspaceLoading}
-          collapsed={sidebarCollapsed}
-          onToggleCollapsed={toggleSidebarCollapsed}
-        />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <AppTopbar workspaceRole={me?.workspace?.role ?? null} />
-          <main className="flex-1 overflow-x-hidden px-4 py-6 sm:px-6 lg:px-8">{children}</main>
-        </div>
-      </div>
-      </AuthenticatedImageLightboxProvider>
+        <AuthenticatedImageLightboxProvider>
+          <div className="flex min-h-screen w-full bg-background">
+            <AppSidebar
+              workspace={workspace}
+              workspaceLoading={workspaceLoading}
+              collapsed={sidebarCollapsed}
+              onToggleCollapsed={toggleSidebarCollapsed}
+            />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <AppTopbar workspaceRole={me?.workspace?.role ?? null} />
+              <main className="min-h-0 flex-1 overflow-x-hidden">
+                <AppPage>{children}</AppPage>
+              </main>
+            </div>
+          </div>
+        </AuthenticatedImageLightboxProvider>
       )}
     </AuthGuard>
   );

@@ -168,11 +168,11 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
   });
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border bg-background/80 px-3 backdrop-blur sm:gap-3 sm:px-6">
+    <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border/80 bg-background/95 px-3 backdrop-blur-sm sm:h-16 sm:gap-3 sm:px-6">
       <MobileNav pathname={pathname} />
       <GlobalSearch />
 
-      <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1.5">
         <LanguageSwitcher />
         <ThemeToggle />
         <button
@@ -180,7 +180,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
           onClick={() => setHelpOpen(true)}
           title={t("top.help")}
           aria-label={t("top.help")}
-          className="hidden sm:grid size-9 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+          className="hidden size-9 place-items-center rounded-lg text-muted-foreground outline-none transition hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35 sm:grid"
         >
           <HelpCircle className="size-4" aria-hidden />
         </button>
@@ -198,7 +198,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
             <button
               type="button"
               aria-label={bellLabel}
-              className="relative grid size-9 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground outline-none focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground/30"
+              className="relative grid size-9 shrink-0 place-items-center rounded-lg text-muted-foreground outline-none transition hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35"
             >
               <Bell className="size-4" />
               <span
@@ -226,7 +226,9 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
                   <Loader2 className="size-3 animate-spin" aria-hidden />
                 ) : null}
                 {unreadCount > 0 ? (
-                  <span>{t("top.notificationsUnread").replace("{count}", String(unreadCount))}</span>
+                  <span>
+                    {t("top.notificationsUnread").replace("{count}", String(unreadCount))}
+                  </span>
                 ) : null}
               </span>
             </DropdownMenuLabel>
@@ -296,7 +298,9 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
                         <Clock
                           className={
                             "mt-1.5 size-3.5 shrink-0 " +
-                            (item.isRead ? "text-muted-foreground/50" : "text-amber-600 dark:text-amber-400")
+                            (item.isRead
+                              ? "text-muted-foreground/50"
+                              : "text-amber-600 dark:text-amber-400")
                           }
                           aria-hidden
                         />
@@ -372,7 +376,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="flex shrink-0 items-center gap-2 rounded-lg p-1 pr-2 transition hover:bg-secondary outline-none focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground/30"
+                className="flex shrink-0 items-center gap-2 rounded-lg p-1 pr-2 outline-none transition hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring/35"
               >
                 <UserAvatar
                   id={currentUser.id}

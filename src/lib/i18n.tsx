@@ -2107,16 +2107,17 @@ export function LanguageSwitcher({ className = "" }: { className?: string }) {
   return (
     <div
       className={
-        "inline-flex items-center rounded-lg border border-border bg-card p-0.5 text-[11px] font-semibold " +
+        "inline-flex items-center rounded-lg border border-border/80 bg-card p-0.5 text-[11px] font-semibold shadow-soft " +
         className
       }
     >
       {(["en", "ru"] as Lang[]).map((l) => (
         <button
           key={l}
+          type="button"
           onClick={() => setLang(l)}
           className={
-            "rounded-md px-2 py-1 uppercase transition " +
+            "rounded-md px-2 py-1 uppercase outline-none transition focus-visible:ring-2 focus-visible:ring-ring/35 " +
             (lang === l
               ? "bg-secondary text-foreground"
               : "text-muted-foreground hover:text-foreground")

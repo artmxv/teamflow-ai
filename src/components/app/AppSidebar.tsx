@@ -174,7 +174,7 @@ function WorkspaceSwitcher({
       type="button"
       title={displayName}
       className={cn(
-        "flex w-full min-w-0 items-center rounded-xl border border-sidebar-border bg-card text-left transition hover:border-border hover:bg-card/90 hover:shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-0 data-[state=open]:border-border data-[state=open]:shadow-sm",
+        "flex w-full min-w-0 items-center rounded-xl border border-sidebar-border/80 bg-card text-left shadow-soft transition hover:border-border hover:bg-card outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/40 focus-visible:ring-offset-0 data-[state=open]:border-border data-[state=open]:shadow-soft",
         collapsed ? "justify-center p-2" : "gap-2.5 px-3 py-2.5",
       )}
     >
@@ -316,16 +316,18 @@ export function AppSidebar({
       >
         <div
           className={cn(
-            "flex shrink-0 items-center gap-2 py-5",
-            collapsed ? "flex-col justify-center px-2" : "px-5",
+            "flex shrink-0 items-center gap-2.5 border-b border-sidebar-border/70 py-4",
+            collapsed ? "flex-col justify-center gap-2 px-2" : "px-4",
           )}
         >
-          <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-gradient-brand shadow-glow">
-            <Sparkles className="size-4 text-white" />
+          <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-gradient-brand shadow-soft">
+            <Sparkles className="size-3.5 text-white" />
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1 leading-tight">
-              <div className="text-sm font-semibold text-sidebar-foreground">TeamFlow</div>
+              <div className="text-sm font-semibold tracking-tight text-sidebar-foreground">
+                TeamFlow
+              </div>
               <div className="text-[11px] text-muted-foreground">{t("side.tagline")}</div>
             </div>
           )}
@@ -335,7 +337,7 @@ export function AppSidebar({
             title={toggleLabel}
             aria-label={toggleLabel}
             className={cn(
-              "grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-sidebar-accent hover:text-sidebar-foreground",
+              "grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground outline-none transition hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring/40",
               collapsed ? "" : "ml-auto",
             )}
           >
@@ -347,7 +349,7 @@ export function AppSidebar({
           </button>
         </div>
 
-        <div className={cn("shrink-0", collapsed ? "px-2" : "px-3")}>
+        <div className={cn("shrink-0 pt-3", collapsed ? "px-2" : "px-3")}>
           <WorkspaceSwitcher
             workspace={workspace}
             loading={workspaceLoading}
@@ -355,10 +357,10 @@ export function AppSidebar({
           />
         </div>
 
-        <nav className={cn("mt-6 flex min-h-0 flex-1 flex-col", collapsed ? "px-2" : "px-3")}>
+        <nav className={cn("mt-5 flex min-h-0 flex-1 flex-col", collapsed ? "px-2" : "px-3")}>
           <div className="shrink-0">
             {!collapsed && (
-              <div className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="px-2.5 pb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80">
                 {t("side.workspace")}
               </div>
             )}
@@ -388,11 +390,11 @@ export function AppSidebar({
                             : undefined
                         }
                         className={cn(
-                          "group relative flex items-center rounded-lg text-sm transition",
+                          "group relative flex items-center rounded-lg text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-sidebar-ring/40",
                           collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2",
                           active
-                            ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-border"
-                            : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                            ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                            : "text-sidebar-foreground/75 hover:bg-sidebar-accent/55 hover:text-sidebar-foreground",
                           !collapsed &&
                             active &&
                             "border-l-2 border-l-primary pl-[calc(0.75rem-2px)]",
@@ -432,9 +434,9 @@ export function AppSidebar({
             </ul>
           </div>
 
-          <div className="mt-8 flex min-h-0 flex-1 flex-col pb-3">
+          <div className="mt-7 flex min-h-0 flex-1 flex-col border-t border-sidebar-border/60 pb-3 pt-5">
             {!collapsed && (
-              <div className="shrink-0 px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="shrink-0 px-2.5 pb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80">
                 {t("side.projects")}
               </div>
             )}
@@ -463,11 +465,11 @@ export function AppSidebar({
                         title={collapsed ? projectLabel : undefined}
                         aria-current={projectActive ? "page" : undefined}
                         className={cn(
-                          "flex w-full items-center rounded-lg text-left text-sm transition hover:bg-sidebar-accent/60",
+                          "flex w-full items-center rounded-lg text-left text-sm outline-none transition-colors hover:bg-sidebar-accent/55 focus-visible:ring-2 focus-visible:ring-sidebar-ring/40",
                           collapsed ? "justify-center px-2 py-2" : "gap-2 px-3 py-1.5",
                           projectActive
-                            ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-border"
-                            : "text-sidebar-foreground/80",
+                            ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                            : "text-sidebar-foreground/75",
                           !collapsed &&
                             projectActive &&
                             "border-l-2 border-l-primary pl-[calc(0.75rem-2px)]",
@@ -502,7 +504,7 @@ export function AppSidebar({
                       type="button"
                       title={collapsed ? t("common.newProject") : undefined}
                       className={cn(
-                        "flex w-full items-center rounded-lg text-sm text-muted-foreground hover:text-foreground",
+                        "flex w-full items-center rounded-lg text-sm text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent/55 hover:text-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring/40",
                         collapsed ? "justify-center px-2 py-2" : "gap-2 px-3 py-1.5",
                       )}
                     >

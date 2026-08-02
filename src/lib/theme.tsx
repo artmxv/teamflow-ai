@@ -70,7 +70,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
       onClick={toggle}
       aria-label="Toggle theme"
       className={
-        "grid size-9 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground " +
+        "grid size-9 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/35 " +
         className
       }
     >
