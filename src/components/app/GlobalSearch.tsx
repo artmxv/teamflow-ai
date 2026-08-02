@@ -239,7 +239,7 @@ export function GlobalSearch() {
         aria-autocomplete="list"
         value={query}
         placeholder={t("top.search")}
-        className="h-9 w-full rounded-lg border border-input bg-secondary/60 pl-9 pr-12 text-sm outline-none transition placeholder:text-muted-foreground focus:bg-card focus:ring-2 focus:ring-ring/40"
+        className="h-9 w-full rounded-lg border border-input/80 bg-card pl-9 pr-12 text-sm shadow-soft outline-none transition placeholder:text-muted-foreground focus:border-ring focus:bg-card focus:ring-2 focus:ring-ring/30"
         onChange={(event) => {
           setQuery(event.target.value);
           if (!open) {

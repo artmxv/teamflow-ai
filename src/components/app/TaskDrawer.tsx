@@ -32,8 +32,15 @@ import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
 import { AssigneeMultiPicker } from "@/components/app/AssigneeMultiPicker";
 import { AuthenticatedImagePreview } from "@/components/app/files/AuthenticatedImagePreview";
 import { useAuthenticatedImageLightbox } from "@/components/app/files/AuthenticatedImageLightbox";
+import { FilePreparationStatus } from "@/components/app/files/FilePreparationStatus";
 import { DeadlineDatePicker } from "@/components/app/DeadlineDatePicker";
 import { DeadlineTimePicker } from "@/components/app/DeadlineTimePicker";
+import {
+  acquireAuthenticatedBlobUrl,
+  getAuthenticatedBlobObjectUrl,
+  releaseAuthenticatedBlobUrl,
+} from "@/hooks/use-authenticated-blob-url";
+import { useOnDemandFilePreparation } from "@/hooks/use-on-demand-file-preparation";
 import { fetchProjectMembers } from "@/lib/api/project-members";
 import { fetchWorkspaceMembers } from "@/lib/api/workspace-members";
 import {
@@ -56,11 +63,13 @@ import {
   fetchTaskAttachments,
   formatAttachmentSize,
   getAttachmentFileTypeBadge,
+  invalidateTaskAttachmentBlobCache,
   isImageAttachment,
   openTaskAttachment,
   uploadTaskAttachment,
   type TaskAttachmentApiItem,
 } from "@/lib/api/task-attachments";
+import { friendlyApiErrorMessage } from "@/lib/api-error";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { priorityLabel, taskStatusLabel, useI18n } from "@/lib/i18n";
 import {
@@ -470,21 +479,23 @@ export function TaskDrawer({
                   }
                   uploadAttachmentMutation.mutate(file);
                 }}
-                onOpen={(attachment) => {
-                  openTaskAttachment(attachment).catch(() => {
-                    toast.error(t("uploads.fileOpenLegacy"));
-                  });
-                }}
+                onOpen={(attachment) => openTaskAttachment(attachment)}
                 onDownload={(attachment) => {
-                  downloadTaskAttachmentFile(attachment).catch(() => {
-                    toast.error(t("uploads.fileDownloadLegacy"));
+                  downloadTaskAttachmentFile(attachment).catch((error) => {
+                    toast.error(friendlyApiErrorMessage(error, t, "uploads.fileDownloadLegacy"));
                   });
                 }}
                 onDelete={(attachmentId) => {
                   if (deleteAttachmentMutation.isPending) {
                     return Promise.reject(new Error("Delete already in progress"));
                   }
-                  return deleteAttachmentMutation.mutateAsync(attachmentId);
+                  const target = attachmentsQuery.data?.find((item) => item.id === attachmentId);
+                  return deleteAttachmentMutation.mutateAsync(attachmentId).then((result) => {
+                    if (target) {
+                      invalidateTaskAttachmentBlobCache(target);
+                    }
+                    return result;
+                  });
                 }}
               />
 
@@ -862,6 +873,7 @@ function TaskCommentRow({
   onUpdate: (commentId: string, body: string) => Promise<unknown>;
   onRequestDelete: (commentId: string) => void;
 }) {
+  const { t } = useI18n();
   const [isEditing, setIsEditing] = useState(false);
   const [editBody, setEditBody] = useState(comment.body);
 
@@ -928,7 +940,7 @@ function TaskCommentRow({
                 size="icon"
                 className="size-7 text-muted-foreground hover:text-foreground"
                 disabled={isUpdating || isDeleting}
-                aria-label="Edit comment"
+                aria-label={t("comments.editComment")}
                 onClick={startEditing}
               >
                 <Pencil className="size-3.5" />
@@ -939,7 +951,7 @@ function TaskCommentRow({
                 size="icon"
                 className="size-7 text-muted-foreground hover:text-destructive"
                 disabled={isUpdating || isDeleting}
-                aria-label="Delete comment"
+                aria-label={t("comments.deleteComment")}
                 onClick={handleDelete}
               >
                 <Trash2 className="size-3.5" />
@@ -1014,7 +1026,7 @@ function TaskAttachmentsSection({
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   onPickFile: () => void;
   onFileSelected: (file: File) => void;
-  onOpen: (attachment: TaskAttachmentApiItem) => void;
+  onOpen: (attachment: TaskAttachmentApiItem) => void | Promise<void>;
   onDownload: (attachment: TaskAttachmentApiItem) => void;
   onDelete: (attachmentId: string) => Promise<unknown>;
 }) {
@@ -1038,21 +1050,23 @@ function TaskAttachmentsSection({
         <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <Paperclip className="size-3.5" /> {t("tasks.sectionAttachments")}
         </h3>
-        <Button
-          type="button"
-          size="sm"
-          variant="brand"
-          className="h-7 gap-1.5 px-2 text-xs"
-          disabled={isUploading}
-          onClick={onPickFile}
-        >
-          {isUploading ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : (
-            <Upload className="size-3.5" />
-          )}
-          {isUploading ? t("tasks.uploading") : t("tasks.upload")}
-        </Button>
+        {!isLoading && !isError && attachments.length > 0 ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="brand"
+            className="h-7 gap-1.5 px-2 text-xs"
+            disabled={isUploading}
+            onClick={onPickFile}
+          >
+            {isUploading ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Upload className="size-3.5" />
+            )}
+            {isUploading ? t("tasks.uploading") : t("tasks.upload")}
+          </Button>
+        ) : null}
         <input
           ref={fileInputRef}
           type="file"
@@ -1201,32 +1215,58 @@ function TaskAttachmentRow({
 }: {
   attachment: TaskAttachmentApiItem;
   isDeleting: boolean;
-  onOpen: () => void;
+  onOpen: () => void | Promise<void>;
   onDownload: () => void;
   onRequestDelete: () => void;
 }) {
   const { t } = useI18n();
   const { openLightbox } = useAuthenticatedImageLightbox();
   const isImage = isImageAttachment(attachment);
+  const downloadUrl = attachment.downloadUrl || attachment.url;
+  const { isPreparing, isError, isOffline, isBusy, clearStatus, prepare } =
+    useOnDemandFilePreparation();
+  const openDisabled = isDeleting || isBusy;
 
-  function handleOpen() {
+  function openImageLightbox(objectUrl?: string | null) {
+    openLightbox({
+      downloadUrl,
+      filename: attachment.originalName,
+      objectUrl: objectUrl ?? undefined,
+      onDownload: () => onDownload(),
+    });
+  }
+
+  async function runOpen() {
+    if (openDisabled) {
+      return;
+    }
+
     if (isImage) {
-      openLightbox({
-        downloadUrl: attachment.downloadUrl || attachment.url,
-        filename: attachment.originalName,
-        onDownload: () => onDownload(),
+      const cachedUrl = getAuthenticatedBlobObjectUrl(downloadUrl);
+      if (cachedUrl) {
+        clearStatus();
+        openImageLightbox(cachedUrl);
+        return;
+      }
+
+      await prepare(async () => {
+        const objectUrl = await acquireAuthenticatedBlobUrl(downloadUrl, () =>
+          fetchTaskAttachmentBlob(attachment),
+        );
+        releaseAuthenticatedBlobUrl(downloadUrl);
+        openImageLightbox(objectUrl);
       });
       return;
     }
-    onOpen();
+
+    await prepare(async () => {
+      await onOpen();
+    });
   }
 
   return (
     <div className="flex items-start gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2">
-      <TaskAttachmentPreview
-        attachment={attachment}
-        onDownload={() => onDownload()}
-      />
+      <TaskAttachmentPreview attachment={attachment} onDownload={() => onDownload()} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{attachment.originalName}</div>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
@@ -1236,6 +1276,14 @@ function TaskAttachmentRow({
           <span>·</span>
           <span>{attachment.uploader.name}</span>
         </div>
+        <FilePreparationStatus
+          isPreparing={isPreparing}
+          isError={isError}
+          isOffline={isOffline}
+          onRetry={() => {
+            void runOpen();
+          }}
+        />
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
         <Button
@@ -1243,9 +1291,15 @@ function TaskAttachmentRow({
           variant="ghost"
           size="icon"
           className="size-7 text-muted-foreground hover:text-foreground"
-          disabled={isDeleting}
-          aria-label={isImage ? t("files.viewImage").replace("{name}", attachment.originalName) : t("files.openAttachment")}
-          onClick={handleOpen}
+          disabled={openDisabled}
+          aria-label={
+            isImage
+              ? t("files.viewImage").replace("{name}", attachment.originalName)
+              : t("files.openAttachment")
+          }
+          onClick={() => {
+            void runOpen();
+          }}
         >
           <ExternalLink className="size-3.5" />
         </Button>

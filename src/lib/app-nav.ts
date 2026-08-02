@@ -26,7 +26,7 @@ export const APP_NAV_ITEMS: AppNavItem[] = [
   { to: "/app/chat", key: "side.chat", icon: MessageSquare },
   { to: "/app/ai", key: "side.assistant", icon: Sparkles },
   { to: "/app/settings", key: "side.settings", icon: Settings },
-  { to: "/app/billing", key: "side.billing", icon: CreditCard },
+  { to: "/app/billing", key: "side.plans", icon: CreditCard },
 ];
 
 /** Whether a sidebar nav item should appear active for the current pathname. */

@@ -405,6 +405,7 @@ const dict = {
     "projects.notReady": "Project is not ready yet",
     "projects.new.dialogDesc": "Set up a project and optionally add teammates from your workspace.",
     "projects.new.projectName": "Project name",
+    "projects.new.namePlaceholder": "Orion launch",
     "projects.new.description": "Description",
     "projects.new.status": "Status",
     "projects.new.dueDate": "Due date",
@@ -530,7 +531,8 @@ const dict = {
     "settings.email": "Email",
     "settings.timeZone": "Time zone",
     "settings.bio": "Bio",
-    "settings.notificationDesc": "Choose what you want to be notified about.",
+    "settings.notificationDesc":
+      "Preview of upcoming notification preferences. Saving is not available yet.",
     "settings.notifyComments": "New comments on my tasks",
     "settings.notifyEmailInApp": "Email + in-app",
     "settings.notifyMentions": "Mentions",
@@ -624,6 +626,7 @@ const dict = {
     "side.noProjectsYet": "No projects yet",
     "side.settings": "Settings",
     "side.billing": "Billing",
+    "side.plans": "Plans",
     "side.collapseSidebar": "Collapse sidebar",
     "side.expandSidebar": "Expand sidebar",
     "side.tagline": "AI workspace",
@@ -720,6 +723,8 @@ const dict = {
     "files.downloadAttachment": "Download attachment",
     "files.openDocument": "Open document",
     "files.downloadDocument": "Download document",
+    "files.preparingFile": "Preparing file…",
+    "files.preparationFailed": "File preparation failed",
     "tasks.sheetDescription": "Task details, checklist, comments, and activity for {key}",
     "tasks.deleteTask": "Delete task",
     "tasks.deleting": "Deleting…",
@@ -1392,6 +1397,7 @@ const dict = {
     "projects.new.dialogDesc":
       "Настройте проект и при необходимости добавьте участников из пространства.",
     "projects.new.projectName": "Название проекта",
+    "projects.new.namePlaceholder": "Запуск Orion",
     "projects.new.description": "Описание",
     "projects.new.status": "Статус",
     "projects.new.dueDate": "Дата срока",
@@ -1523,7 +1529,8 @@ const dict = {
     "settings.email": "Email",
     "settings.timeZone": "Часовой пояс",
     "settings.bio": "О себе",
-    "settings.notificationDesc": "Выберите, о чём получать уведомления.",
+    "settings.notificationDesc":
+      "Предпросмотр будущих настроек уведомлений. Сохранение пока недоступно.",
     "settings.notifyComments": "Новые комментарии к моим задачам",
     "settings.notifyEmailInApp": "Email + в приложении",
     "settings.notifyMentions": "Упоминания",
@@ -1616,6 +1623,7 @@ const dict = {
     "side.noProjectsYet": "Пока нет проектов",
     "side.settings": "Настройки",
     "side.billing": "Оплата",
+    "side.plans": "Тарифы",
     "side.collapseSidebar": "Свернуть боковую панель",
     "side.expandSidebar": "Развернуть боковую панель",
     "side.tagline": "AI-пространство",
@@ -1713,6 +1721,8 @@ const dict = {
     "files.downloadAttachment": "Скачать вложение",
     "files.openDocument": "Открыть документ",
     "files.downloadDocument": "Скачать документ",
+    "files.preparingFile": "Подготовка файла…",
+    "files.preparationFailed": "Не удалось подготовить файл",
     "tasks.sheetDescription": "Детали задачи, чеклист, комментарии и активность для {key}",
     "tasks.deleteTask": "Удалить задачу",
     "tasks.deleting": "Удаление…",
@@ -2097,16 +2107,17 @@ export function LanguageSwitcher({ className = "" }: { className?: string }) {
   return (
     <div
       className={
-        "inline-flex items-center rounded-lg border border-border bg-card p-0.5 text-[11px] font-semibold " +
+        "inline-flex items-center rounded-lg border border-border/80 bg-card p-0.5 text-[11px] font-semibold shadow-soft " +
         className
       }
     >
       {(["en", "ru"] as Lang[]).map((l) => (
         <button
           key={l}
+          type="button"
           onClick={() => setLang(l)}
           className={
-            "rounded-md px-2 py-1 uppercase transition " +
+            "rounded-md px-2 py-1 uppercase outline-none transition focus-visible:ring-2 focus-visible:ring-ring/35 " +
             (lang === l
               ? "bg-secondary text-foreground"
               : "text-muted-foreground hover:text-foreground")

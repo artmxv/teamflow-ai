@@ -146,7 +146,7 @@ function getAssigneeFilterTriggerLabel(
   options: AssigneeOption[],
   t: (k: TKey) => string,
 ): string {
-  if (filter === "all") return t("tasks.assignee");
+  if (filter === "all") return t("tasks.allAssignees");
   if (filter === "unassigned") return t("tasks.noAssignees");
   return options.find((option) => option.id === filter)?.name ?? t("tasks.assignee");
 }
@@ -531,7 +531,7 @@ function TasksPage() {
               </span>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{t("tasks.filterAssignees")}</SelectItem>
+              <SelectItem value="all">{t("tasks.allAssignees")}</SelectItem>
               <SelectItem value="unassigned">{t("tasks.noAssignees")}</SelectItem>
               {assigneeOptions.map((option) => (
                 <SelectItem key={option.id} value={option.id}>

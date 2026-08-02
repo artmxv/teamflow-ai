@@ -100,7 +100,7 @@ export function TaskCard({
               {priorityLabel(task.priority, t)}
             </Badge>
             {dueDateLabel ? (
-              <span className="inline-flex items-center gap-1" title="Due date">
+              <span className="inline-flex items-center gap-1" title={t("tasks.dueDate")}>
                 <Calendar className="size-3 shrink-0" />
                 <span className="truncate">{dueDateLabel}</span>
               </span>

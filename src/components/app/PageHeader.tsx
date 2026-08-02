@@ -37,12 +37,22 @@ export function PageHeader({
   const hasMetaRow = backTo || (breadcrumbs && breadcrumbs.length > 0);
 
   return (
-    <header className={cn("mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between", className)}>
+    <header
+      className={cn(
+        "mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between sm:gap-4",
+        className,
+      )}
+    >
       <div className="min-w-0 space-y-2">
         {hasMetaRow ? (
           <div className="flex flex-wrap items-center gap-2">
             {backTo ? (
-              <Button variant="ghost" size="sm" className="-ml-2 h-8 gap-1 px-2 text-muted-foreground" asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-ml-2 h-8 gap-1 px-2 text-muted-foreground"
+                asChild
+              >
                 <Link to={backTo.to}>
                   <ChevronLeft className="size-4" />
                   {backTo.label}
@@ -80,8 +90,14 @@ export function PageHeader({
         ) : null}
 
         <div className="min-w-0">
-          <h1 className="truncate text-2xl font-semibold tracking-tight">{title}</h1>
-          {subtitle ? <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p> : null}
+          <h1 className="truncate text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+            {title}
+          </h1>
+          {subtitle ? (
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              {subtitle}
+            </p>
+          ) : null}
         </div>
       </div>
 

@@ -1,3 +1,5 @@
+import { clearAuthenticatedBlobCache } from "@/lib/api/authenticated-blob-cache";
+
 const AUTH_TOKEN_KEY = "teamflow_auth_token";
 
 export function getAuthToken(): string | null {
@@ -8,9 +10,11 @@ export function getAuthToken(): string | null {
 }
 
 export function setAuthToken(token: string): void {
+  clearAuthenticatedBlobCache();
   localStorage.setItem(AUTH_TOKEN_KEY, token);
 }
 
 export function clearAuthToken(): void {
+  clearAuthenticatedBlobCache();
   localStorage.removeItem(AUTH_TOKEN_KEY);
 }

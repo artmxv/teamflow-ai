@@ -44,9 +44,16 @@ import { resolveTaskAssignees } from "@/lib/assignee-options";
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
 import { AuthenticatedImagePreview } from "@/components/app/files/AuthenticatedImagePreview";
 import { useAuthenticatedImageLightbox } from "@/components/app/files/AuthenticatedImageLightbox";
+import { FilePreparationStatus } from "@/components/app/files/FilePreparationStatus";
 import { DeadlineDatePicker } from "@/components/app/DeadlineDatePicker";
 import { DeadlineTimePicker } from "@/components/app/DeadlineTimePicker";
 import { deadlineStatusDateTimeRowClassName } from "@/components/app/deadline-field-styles";
+import {
+  acquireAuthenticatedBlobUrl,
+  getAuthenticatedBlobObjectUrl,
+  releaseAuthenticatedBlobUrl,
+} from "@/hooks/use-authenticated-blob-url";
+import { useOnDemandFilePreparation } from "@/hooks/use-on-demand-file-preparation";
 import { resolveProjectGradient } from "@/lib/project-color";
 import {
   displayProjectDescription,
@@ -78,6 +85,7 @@ import {
   fetchProjectDocuments,
   formatDocumentSize,
   getProjectDocumentFileTypeBadge,
+  invalidateProjectDocumentBlobCache,
   isImageProjectDocument,
   openProjectDocument,
   uploadProjectDocument,
@@ -93,6 +101,7 @@ import {
 } from "@/lib/api/project-members";
 import { invalidateNotifications } from "@/lib/api/notifications";
 import { invalidateWorkspaceContentQueries } from "@/lib/workspace-queries";
+import { friendlyApiErrorMessage } from "@/lib/api-error";
 import { friendlyUploadErrorMessage } from "@/lib/upload-errors";
 import { isUploadFileTooLarge } from "@/lib/upload-limits";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -747,16 +756,18 @@ function ProjectDetails({
                       )}
               </p>
             </div>
-            <NewTaskDialog
-              isSubmitting={isCreatingTask}
-              fixedProjectId={project.id}
-              onSubmit={onCreateTask}
-            >
-              <Button size="sm" variant="brand" className="h-8 shrink-0 gap-1">
-                <Plus className="size-3.5" />
-                {t("common.newTask")}
-              </Button>
-            </NewTaskDialog>
+            {sortedTasks.length > 0 ? (
+              <NewTaskDialog
+                isSubmitting={isCreatingTask}
+                fixedProjectId={project.id}
+                onSubmit={onCreateTask}
+              >
+                <Button size="sm" variant="brand" className="h-8 shrink-0 gap-1">
+                  <Plus className="size-3.5" />
+                  {t("common.newTask")}
+                </Button>
+              </NewTaskDialog>
+            ) : null}
           </div>
           <div className="mt-4 min-h-0 flex-1 overflow-hidden rounded-xl border border-border">
             {sortedTasks.length === 0 ? (
@@ -854,6 +865,7 @@ function ProjectMembersCard({
   projectId: string;
   canManageMembers: boolean;
 }) {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
@@ -1206,21 +1218,23 @@ function ProjectDocumentsCard({ projectId }: { projectId: string }) {
           }
           uploadMutation.mutate(file);
         }}
-        onOpen={(document) => {
-          openProjectDocument(document).catch(() => {
-            toast.error(t("uploads.fileOpenLegacy"));
-          });
-        }}
+        onOpen={(document) => openProjectDocument(document)}
         onDownload={(document) => {
-          downloadProjectDocumentFile(document).catch(() => {
-            toast.error(t("uploads.fileDownloadLegacy"));
+          downloadProjectDocumentFile(document).catch((error) => {
+            toast.error(friendlyApiErrorMessage(error, t, "uploads.fileDownloadLegacy"));
           });
         }}
         onDelete={(documentId) => {
           if (deleteMutation.isPending) {
             return Promise.reject(new Error("Delete already in progress"));
           }
-          return deleteMutation.mutateAsync(documentId);
+          const target = documentsQuery.data?.find((item) => item.id === documentId);
+          return deleteMutation.mutateAsync(documentId).then((result) => {
+            if (target) {
+              invalidateProjectDocumentBlobCache(target);
+            }
+            return result;
+          });
         }}
       />
     </div>
@@ -1248,7 +1262,7 @@ function ProjectDocumentsSection({
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   onPickFile: () => void;
   onFileSelected: (file: File) => void;
-  onOpen: (document: ProjectDocumentApiItem) => void;
+  onOpen: (document: ProjectDocumentApiItem) => void | Promise<void>;
   onDownload: (document: ProjectDocumentApiItem) => void;
   onDelete: (documentId: string) => Promise<unknown>;
 }) {
@@ -1445,24 +1459,53 @@ function ProjectDocumentRow({
 }: {
   document: ProjectDocumentApiItem;
   isDeleting: boolean;
-  onOpen: () => void;
+  onOpen: () => void | Promise<void>;
   onDownload: () => void;
   onRequestDelete: () => void;
 }) {
   const { t } = useI18n();
   const { openLightbox } = useAuthenticatedImageLightbox();
   const isImage = isImageProjectDocument(document);
+  const downloadUrl = document.downloadUrl || document.url;
+  const { isPreparing, isError, isOffline, isBusy, clearStatus, prepare } =
+    useOnDemandFilePreparation();
+  const openDisabled = isDeleting || isBusy;
 
-  function handleOpen() {
+  function openImageLightbox(objectUrl?: string | null) {
+    openLightbox({
+      downloadUrl,
+      filename: document.originalName,
+      objectUrl: objectUrl ?? undefined,
+      onDownload: () => onDownload(),
+    });
+  }
+
+  async function runOpen() {
+    if (openDisabled) {
+      return;
+    }
+
     if (isImage) {
-      openLightbox({
-        downloadUrl: document.downloadUrl || document.url,
-        filename: document.originalName,
-        onDownload: () => onDownload(),
+      const cachedUrl = getAuthenticatedBlobObjectUrl(downloadUrl);
+      if (cachedUrl) {
+        clearStatus();
+        openImageLightbox(cachedUrl);
+        return;
+      }
+
+      await prepare(async () => {
+        const objectUrl = await acquireAuthenticatedBlobUrl(downloadUrl, () =>
+          fetchProjectDocumentBlob(document),
+        );
+        releaseAuthenticatedBlobUrl(downloadUrl);
+        openImageLightbox(objectUrl);
       });
       return;
     }
-    onOpen();
+
+    await prepare(async () => {
+      await onOpen();
+    });
   }
 
   return (
@@ -1477,6 +1520,14 @@ function ProjectDocumentRow({
           <span>·</span>
           <span>{document.uploader.name}</span>
         </div>
+        <FilePreparationStatus
+          isPreparing={isPreparing}
+          isError={isError}
+          isOffline={isOffline}
+          onRetry={() => {
+            void runOpen();
+          }}
+        />
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
         <Button
@@ -1484,9 +1535,15 @@ function ProjectDocumentRow({
           variant="ghost"
           size="icon"
           className="size-7 text-muted-foreground hover:text-foreground"
-          disabled={isDeleting}
-          aria-label={isImage ? t("files.viewImage").replace("{name}", document.originalName) : t("files.openDocument")}
-          onClick={handleOpen}
+          disabled={openDisabled}
+          aria-label={
+            isImage
+              ? t("files.viewImage").replace("{name}", document.originalName)
+              : t("files.openDocument")
+          }
+          onClick={() => {
+            void runOpen();
+          }}
         >
           <ExternalLink className="size-3.5" />
         </Button>
