@@ -447,8 +447,8 @@ function TeamPage() {
                     {t("common.cancel")}
                   </Button>
                   <Button
+                    variant="brand"
                     onClick={handleSendInvite}
-                    className="bg-gradient-brand text-white"
                     disabled={createInviteMutation.isPending}
                   >
                     {createInviteMutation.isPending
