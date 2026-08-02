@@ -376,8 +376,8 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
             </Button>
             <Button
               type="submit"
+              variant="brand"
               disabled={!isValid || isSubmitting || !resolvedWorkspaceId}
-              className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
             >
               {isSubmitting ? t("projects.new.creating") : t("common.createProject")}
             </Button>
@@ -677,8 +677,8 @@ export function NewTaskDialog({
             </Button>
             <Button
               type="submit"
+              variant="brand"
               disabled={!isValid || isSubmitting || (showProjectSelect && !selectedProjectId)}
-              className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
             >
               {isSubmitting ? t("tasks.new.creating") : t("common.createTask")}
             </Button>
