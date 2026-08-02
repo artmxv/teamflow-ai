@@ -571,11 +571,7 @@ function EditProjectDialog({
             >
               {t("common.cancel")}
             </Button>
-            <Button
-              type="submit"
-              disabled={!isValid || isSubmitting}
-              className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
-            >
+            <Button type="submit" variant="brand" disabled={!isValid || isSubmitting}>
               {isSubmitting ? t("settings.saving") : t("common.saveChanges")}
             </Button>
           </DialogFooter>
