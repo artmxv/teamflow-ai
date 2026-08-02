@@ -292,13 +292,13 @@ export function AppSidebar({
     <TooltipProvider delayDuration={0}>
       <aside
         className={cn(
-          "hidden md:flex shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-linear",
+          "sticky top-0 hidden h-svh shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-linear md:flex",
           collapsed ? "w-16" : "w-64",
         )}
       >
         <div
           className={cn(
-            "flex items-center gap-2 py-5",
+            "flex shrink-0 items-center gap-2 py-5",
             collapsed ? "flex-col justify-center px-2" : "px-5",
           )}
         >
@@ -329,7 +329,7 @@ export function AppSidebar({
           </button>
         </div>
 
-        <div className={cn(collapsed ? "px-2" : "px-3")}>
+        <div className={cn("shrink-0", collapsed ? "px-2" : "px-3")}>
           <WorkspaceSwitcher
             workspace={workspace}
             loading={workspaceLoading}
@@ -337,168 +337,166 @@ export function AppSidebar({
           />
         </div>
 
-        <nav className={cn("mt-6 flex-1", collapsed ? "px-2" : "px-3")}>
-          {!collapsed && (
-            <div className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {t("side.workspace")}
-            </div>
-          )}
-          <ul className="space-y-0.5">
-            {APP_NAV_ITEMS.map((item) => {
-              const active = isAppNavItemActive(pathname, item.to);
-              const Icon = item.icon;
-              const label = t(item.key);
-              const showUnread = item.to === "/app/chat" && chatUnreadCount > 0;
-              const tipLabel = showUnread
-                ? `${label} (${chatUnreadCount > 99 ? "99+" : chatUnreadCount})`
-                : label;
-              return (
-                <li key={item.to}>
-                  <SidebarTip collapsed={collapsed} label={tipLabel}>
-                    <Link
-                      to={item.to}
-                      title={collapsed ? tipLabel : undefined}
-                      aria-current={active ? "page" : undefined}
-                      aria-label={
-                        showUnread
-                          ? t("chat.navUnread").replace("{count}", String(chatUnreadCount))
-                          : undefined
-                      }
-                      className={cn(
-                        "group relative flex items-center rounded-lg text-sm transition",
-                        collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2",
-                        active
-                          ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-border"
-                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
-                        !collapsed &&
-                          active &&
-                          "border-l-2 border-l-primary pl-[calc(0.75rem-2px)]",
-                      )}
-                    >
-                      <Icon
+        <nav className={cn("mt-6 flex min-h-0 flex-1 flex-col", collapsed ? "px-2" : "px-3")}>
+          <div className="shrink-0">
+            {!collapsed && (
+              <div className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {t("side.workspace")}
+              </div>
+            )}
+            <ul className="space-y-0.5">
+              {APP_NAV_ITEMS.map((item) => {
+                const active = isAppNavItemActive(pathname, item.to);
+                const Icon = item.icon;
+                const label = t(item.key);
+                const isPlansItem = item.to === "/app/billing";
+                const planBadge = isPlansItem ? t("billing.plan.free") : null;
+                const showUnread = item.to === "/app/chat" && chatUnreadCount > 0;
+                const tipLabel = showUnread
+                  ? `${label} (${chatUnreadCount > 99 ? "99+" : chatUnreadCount})`
+                  : isPlansItem && planBadge
+                    ? `${label} — ${planBadge}`
+                    : label;
+                return (
+                  <li key={item.to}>
+                    <SidebarTip collapsed={collapsed} label={tipLabel}>
+                      <Link
+                        to={item.to}
+                        title={collapsed ? tipLabel : undefined}
+                        aria-current={active ? "page" : undefined}
+                        aria-label={
+                          showUnread
+                            ? t("chat.navUnread").replace("{count}", String(chatUnreadCount))
+                            : undefined
+                        }
                         className={cn(
-                          "size-4 shrink-0",
+                          "group relative flex items-center rounded-lg text-sm transition",
+                          collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2",
                           active
-                            ? "text-primary"
-                            : "text-muted-foreground group-hover:text-sidebar-foreground",
+                            ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-border"
+                            : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                          !collapsed &&
+                            active &&
+                            "border-l-2 border-l-primary pl-[calc(0.75rem-2px)]",
                         )}
-                      />
-                      {!collapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}
-                      {showUnread ? (
-                        <span
+                      >
+                        <Icon
                           className={cn(
-                            "inline-flex items-center justify-center rounded-full bg-primary font-semibold text-primary-foreground",
-                            collapsed
-                              ? "absolute top-1.5 right-1.5 size-2"
-                              : "h-5 min-w-5 px-1.5 text-[10px]",
+                            "size-4 shrink-0",
+                            active
+                              ? "text-primary"
+                              : "text-muted-foreground group-hover:text-sidebar-foreground",
                           )}
-                        >
-                          {collapsed ? null : chatUnreadCount > 99 ? "99+" : chatUnreadCount}
-                        </span>
-                      ) : null}
-                    </Link>
-                  </SidebarTip>
-                </li>
-              );
-            })}
-          </ul>
+                        />
+                        {!collapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}
+                        {!collapsed && planBadge ? (
+                          <span className="shrink-0 text-[11px] font-normal text-muted-foreground">
+                            {planBadge}
+                          </span>
+                        ) : null}
+                        {showUnread ? (
+                          <span
+                            className={cn(
+                              "inline-flex items-center justify-center rounded-full bg-primary font-semibold text-primary-foreground",
+                              collapsed
+                                ? "absolute top-1.5 right-1.5 size-2"
+                                : "h-5 min-w-5 px-1.5 text-[10px]",
+                            )}
+                          >
+                            {collapsed ? null : chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+                          </span>
+                        ) : null}
+                      </Link>
+                    </SidebarTip>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
 
-          {!collapsed && (
-            <div className="mt-8 px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {t("side.projects")}
-            </div>
-          )}
-          {collapsed && <div className="mt-6" aria-hidden />}
-          <ul className="space-y-0.5">
-            {!collapsed && projectsLoading && (
-              <li className="px-3 py-1.5 text-xs text-muted-foreground">
-                {t("side.loadingProjects")}
-              </li>
+          <div className="mt-8 flex min-h-0 flex-1 flex-col pb-3">
+            {!collapsed && (
+              <div className="shrink-0 px-2 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {t("side.projects")}
+              </div>
             )}
-            {!collapsed && !projectsLoading && projects.length === 0 && (
-              <li className="px-3 py-1.5 text-xs text-muted-foreground">
-                {t("side.noProjectsYet")}
-              </li>
-            )}
-            {projects.map((project) => {
-              const projectActive = activeProjectId === project.id;
-              const projectLabel = displayProjectName(project.name, lang);
-              const { dot: accentDot, gradient: accentGradient } = getProjectAccent(project);
-              return (
-                <li key={project.id}>
-                  <SidebarTip collapsed={collapsed} label={projectLabel}>
-                    <Link
-                      to="/app/projects/$projectId"
-                      params={{ projectId: project.id }}
-                      title={collapsed ? projectLabel : undefined}
-                      aria-current={projectActive ? "page" : undefined}
+            {collapsed && <div className="shrink-0" aria-hidden />}
+            <ul className="app-scrollbar min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain">
+              {!collapsed && projectsLoading && (
+                <li className="px-3 py-1.5 text-xs text-muted-foreground">
+                  {t("side.loadingProjects")}
+                </li>
+              )}
+              {!collapsed && !projectsLoading && projects.length === 0 && (
+                <li className="px-3 py-1.5 text-xs text-muted-foreground">
+                  {t("side.noProjectsYet")}
+                </li>
+              )}
+              {projects.map((project) => {
+                const projectActive = activeProjectId === project.id;
+                const projectLabel = displayProjectName(project.name, lang);
+                const { dot: accentDot, gradient: accentGradient } = getProjectAccent(project);
+                return (
+                  <li key={project.id}>
+                    <SidebarTip collapsed={collapsed} label={projectLabel}>
+                      <Link
+                        to="/app/projects/$projectId"
+                        params={{ projectId: project.id }}
+                        title={collapsed ? projectLabel : undefined}
+                        aria-current={projectActive ? "page" : undefined}
+                        className={cn(
+                          "flex w-full items-center rounded-lg text-left text-sm transition hover:bg-sidebar-accent/60",
+                          collapsed ? "justify-center px-2 py-2" : "gap-2 px-3 py-1.5",
+                          projectActive
+                            ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-border"
+                            : "text-sidebar-foreground/80",
+                          !collapsed &&
+                            projectActive &&
+                            "border-l-2 border-l-primary pl-[calc(0.75rem-2px)]",
+                        )}
+                      >
+                        {collapsed ? (
+                          <span
+                            className={cn(
+                              "grid size-7 place-items-center rounded-md text-[10px] font-semibold",
+                              projectActive
+                                ? cn("bg-gradient-to-br text-white", accentGradient)
+                                : "border border-sidebar-border bg-card text-sidebar-foreground",
+                            )}
+                          >
+                            {nameToInitials(project.name)}
+                          </span>
+                        ) : (
+                          <>
+                            <span className={cn("size-2 shrink-0 rounded-full", accentDot)} />
+                            <span className="truncate">{projectLabel}</span>
+                          </>
+                        )}
+                      </Link>
+                    </SidebarTip>
+                  </li>
+                );
+              })}
+              {canManageProjects ? (
+                <li>
+                  <NewProjectDialog workspaceId={workspace?.id}>
+                    <button
+                      type="button"
+                      title={collapsed ? t("common.newProject") : undefined}
                       className={cn(
-                        "flex w-full items-center rounded-lg text-left text-sm transition hover:bg-sidebar-accent/60",
+                        "flex w-full items-center rounded-lg text-sm text-muted-foreground hover:text-foreground",
                         collapsed ? "justify-center px-2 py-2" : "gap-2 px-3 py-1.5",
-                        projectActive
-                          ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-border"
-                          : "text-sidebar-foreground/80",
-                        !collapsed &&
-                          projectActive &&
-                          "border-l-2 border-l-primary pl-[calc(0.75rem-2px)]",
                       )}
                     >
-                      {collapsed ? (
-                        <span
-                          className={cn(
-                            "grid size-7 place-items-center rounded-md text-[10px] font-semibold",
-                            projectActive
-                              ? cn("bg-gradient-to-br text-white", accentGradient)
-                              : "border border-sidebar-border bg-card text-sidebar-foreground",
-                          )}
-                        >
-                          {nameToInitials(project.name)}
-                        </span>
-                      ) : (
-                        <>
-                          <span className={cn("size-2 shrink-0 rounded-full", accentDot)} />
-                          <span className="truncate">{projectLabel}</span>
-                        </>
-                      )}
-                    </Link>
-                  </SidebarTip>
+                      <Plus className={cn("shrink-0", collapsed ? "size-4" : "size-3.5")} />
+                      {!collapsed && t("common.newProject")}
+                    </button>
+                  </NewProjectDialog>
                 </li>
-              );
-            })}
-            {canManageProjects ? (
-              <li>
-                <NewProjectDialog workspaceId={workspace?.id}>
-                  <button
-                    type="button"
-                    title={collapsed ? t("common.newProject") : undefined}
-                    className={cn(
-                      "flex w-full items-center rounded-lg text-sm text-muted-foreground hover:text-foreground",
-                      collapsed ? "justify-center px-2 py-2" : "gap-2 px-3 py-1.5",
-                    )}
-                  >
-                    <Plus className={cn("shrink-0", collapsed ? "size-4" : "size-3.5")} />
-                    {!collapsed && t("common.newProject")}
-                  </button>
-                </NewProjectDialog>
-              </li>
-            ) : null}
-          </ul>
-        </nav>
-
-        {!collapsed && (
-          <div className="m-3 rounded-xl border border-sidebar-border bg-card p-3 shadow-soft">
-            <div className="text-xs font-medium">{t("billing.plans")}</div>
-            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-              {t("billing.viewAvailableLimits")}
-            </p>
-            <Link
-              to="/app/billing"
-              className="mt-2 inline-flex text-[11px] font-medium text-primary hover:underline"
-            >
-              {t("billing.viewPlans")}
-            </Link>
+              ) : null}
+            </ul>
           </div>
-        )}
+        </nav>
       </aside>
     </TooltipProvider>
   );
