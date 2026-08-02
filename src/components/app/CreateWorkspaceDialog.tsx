@@ -214,8 +214,8 @@ export function CreateWorkspaceDialog({ children }: CreateWorkspaceDialogProps) 
             </Button>
             <Button
               type="submit"
+              variant="brand"
               disabled={!isValid || isSubmitting || mutation.isPending}
-              className="bg-gradient-brand text-white shadow-glow hover:opacity-95"
             >
               {mutation.isPending ? t("common.loading") : t("workspace.createWorkspace")}
             </Button>
