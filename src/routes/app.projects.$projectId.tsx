@@ -865,6 +865,7 @@ function ProjectMembersCard({
   projectId: string;
   canManageMembers: boolean;
 }) {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 

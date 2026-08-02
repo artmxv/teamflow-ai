@@ -156,8 +156,8 @@ export function ChatMessageReactionProvider({
 
   const currentUserProfile: ChatMessageReactionUser = {
     id: currentUserId,
-    name: me?.displayName?.trim() || me?.name || t("chat.you"),
-    avatarUrl: me?.avatarUrl ?? null,
+    name: me?.user.displayName?.trim() || me?.user.name || t("chat.you"),
+    avatarUrl: me?.user.avatarUrl ?? null,
   };
 
   const mutation = useMutation({

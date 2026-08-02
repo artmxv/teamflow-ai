@@ -873,6 +873,7 @@ function TaskCommentRow({
   onUpdate: (commentId: string, body: string) => Promise<unknown>;
   onRequestDelete: (commentId: string) => void;
 }) {
+  const { t } = useI18n();
   const [isEditing, setIsEditing] = useState(false);
   const [editBody, setEditBody] = useState(comment.body);
 
