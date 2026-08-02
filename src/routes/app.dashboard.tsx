@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { createFileRoute, Link, type LinkProps } from "@tanstack/react-router";
+import { useMemo, useState, type ReactNode } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
@@ -37,6 +37,7 @@ import {
   type DashboardAnalyticsPeriod,
 } from "@/lib/dashboard-analytics";
 import type { TasksSearch } from "@/routes/app.tasks";
+import type { ProjectsSearch } from "@/lib/project-status-url";
 import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
 import { resolveProjectGradient } from "@/lib/project-color";
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
@@ -111,6 +112,41 @@ type DashboardProjectCard = {
 };
 
 const analyticsPeriods: DashboardAnalyticsPeriod[] = ["week", "month", "year"];
+
+const sectionSurfaceClass =
+  "min-w-0 rounded-2xl border border-border/80 bg-card p-4 shadow-soft sm:p-5";
+
+const sectionLinkClass =
+  "text-xs font-medium text-primary transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+function DashboardSectionHeader({
+  title,
+  description,
+  action,
+  className,
+}: {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3",
+        className,
+      )}
+    >
+      <div className="min-w-0">
+        <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
+        {description ? (
+          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{description}</p>
+        ) : null}
+      </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
+    </div>
+  );
+}
 
 function Dashboard() {
   const { t, lang } = useI18n();
@@ -196,6 +232,7 @@ function Dashboard() {
           to: "/app/projects" as const,
           search: { status: "active" as const },
           ariaKey: "dashboard.viewActiveProjects" as const,
+          accent: "primary" as const,
         },
         {
           label: t("dashboard.openTasks"),
@@ -204,6 +241,7 @@ function Dashboard() {
           to: "/app/tasks" as const,
           search: { status: "open" as const },
           ariaKey: "dashboard.viewOpenTasks" as const,
+          accent: "info" as const,
         },
         {
           label: t("dashboard.completed"),
@@ -212,6 +250,7 @@ function Dashboard() {
           to: "/app/tasks" as const,
           search: { status: "done" as const },
           ariaKey: "dashboard.viewCompletedTasks" as const,
+          accent: "success" as const,
         },
         {
           label: t("dashboard.teamMembers"),
@@ -219,6 +258,7 @@ function Dashboard() {
           icon: Users,
           to: "/app/team" as const,
           ariaKey: "dashboard.viewTeamMembers" as const,
+          accent: "muted" as const,
         },
       ]
     : [];
@@ -228,7 +268,7 @@ function Dashboard() {
     value: number;
     icon: typeof AlertTriangle;
     ariaKey: TKey;
-    tone: string;
+    tone: AnalyticsMetricTone;
     search: TasksSearch;
   }[] = [
     {
@@ -236,7 +276,7 @@ function Dashboard() {
       value: taskAnalyticsCounts.overdue,
       icon: AlertTriangle,
       ariaKey: "dashboard.viewOverdueTasks",
-      tone: "text-destructive",
+      tone: "destructive",
       search: { status: "open", due: "overdue" },
     },
     {
@@ -244,7 +284,7 @@ function Dashboard() {
       value: taskAnalyticsCounts.dueSoon,
       icon: CalendarClock,
       ariaKey: "dashboard.viewDueSoonTasks",
-      tone: "text-warning-foreground",
+      tone: "warning",
       search: { status: "open", due: "soon" },
     },
     {
@@ -252,7 +292,7 @@ function Dashboard() {
       value: taskAnalyticsCounts.highPriorityOpen,
       icon: Flame,
       ariaKey: "dashboard.viewHighPriorityTasks",
-      tone: "text-warning-foreground",
+      tone: "warning",
       search: { status: "open", priority: "high" },
     },
     {
@@ -260,7 +300,7 @@ function Dashboard() {
       value: taskAnalyticsCounts.unassigned,
       icon: UserX,
       ariaKey: "dashboard.viewUnassignedTasks",
-      tone: "text-muted-foreground",
+      tone: "muted",
       search: { status: "open", assignee: "unassigned" },
     },
   ];
@@ -273,7 +313,7 @@ function Dashboard() {
         actions={
           canManageProjects ? (
             <NewProjectDialog>
-              <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+              <Button>
                 {t("common.newProject")} <ArrowUpRight className="size-4" />
               </Button>
             </NewProjectDialog>
@@ -281,197 +321,213 @@ function Dashboard() {
         }
       />
 
-      {isEmptyWorkspace ? (
-        <EmptyState
-          className="mb-6"
-          icon={Rocket}
-          title={t("workspace.onboardingTitle")}
-          description={
-            canManageProjects || canManageTeam
-              ? t("workspace.onboardingDescription")
-              : t("workspace.permissionHint")
-          }
-          primaryAction={
-            canManageProjects ? (
-              <NewProjectDialog>
-                <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
-                  {t("common.createProject")}
+      <div className="space-y-6">
+        {isEmptyWorkspace ? (
+          <EmptyState
+            icon={Rocket}
+            title={t("workspace.onboardingTitle")}
+            description={
+              canManageProjects || canManageTeam
+                ? t("workspace.onboardingDescription")
+                : t("workspace.permissionHint")
+            }
+            primaryAction={
+              canManageProjects ? (
+                <NewProjectDialog>
+                  <Button>{t("common.createProject")}</Button>
+                </NewProjectDialog>
+              ) : undefined
+            }
+            secondaryAction={
+              canManageTeam ? (
+                <Button variant="outline" asChild>
+                  <Link to="/app/team">{t("team.inviteMember")}</Link>
                 </Button>
-              </NewProjectDialog>
-            ) : undefined
-          }
-          secondaryAction={
-            canManageTeam ? (
-              <Button variant="outline" asChild>
-                <Link to="/app/team">{t("team.inviteMember")}</Link>
-              </Button>
-            ) : undefined
-          }
-        />
-      ) : null}
+              ) : undefined
+            }
+          />
+        ) : null}
 
-      {isLoading ? (
-        <StatCardSkeletons />
-      ) : isError ? (
-        <ApiErrorState
-          title={t("dashboard.loadErrorTitle")}
-          error={error}
-          onRetry={() => void refetch()}
-        />
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {stats.map((s) => (
-            <StatCard
-              key={s.label}
-              to={s.to}
-              search={"search" in s ? s.search : undefined}
-              ariaLabel={t(s.ariaKey)}
-              icon={s.icon}
-              value={s.value}
-              label={s.label}
-            />
-          ))}
-        </div>
-      )}
-
-      <div className="mt-6">
-        <Link
-          to="/app/tasks"
-          search={{ status: "open" }}
-          className="mb-3 inline-flex text-xs text-muted-foreground transition hover:text-primary hover:underline"
-        >
-          {t("dashboard.basedOnWorkspaceTasks")}
-        </Link>
-        {tasksLoading ? (
-          <AnalyticsCardsSkeleton />
-        ) : tasksError ? null : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {analyticsCards.map((card) => (
-              <AnalyticsMetricCard
-                key={card.labelKey}
-                to="/app/tasks"
-                search={card.search}
-                ariaLabel={t(card.ariaKey)}
-                icon={card.icon}
-                value={card.value}
-                label={t(card.labelKey)}
-                iconClassName={card.tone}
+        {isLoading ? (
+          <StatCardSkeletons />
+        ) : isError ? (
+          <ApiErrorState
+            title={t("dashboard.loadErrorTitle")}
+            error={error}
+            onRetry={() => void refetch()}
+          />
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+            {stats.map((s) => (
+              <StatCard
+                key={s.label}
+                target={s}
+                ariaLabel={t(s.ariaKey)}
+                icon={s.icon}
+                value={s.value}
+                label={s.label}
+                accent={s.accent}
               />
             ))}
           </div>
         )}
-      </div>
 
-      <div className="mt-6 grid gap-4 xl:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft xl:col-span-2">
-          <TaskActivityChartSection
-            period={activityPeriod}
-            onPeriodChange={setActivityPeriod}
-            buckets={taskActivityBuckets}
-            hasData={taskActivityChartHasData}
-            isLoading={tasksLoading}
-            isError={tasksError}
-            t={t}
-          />
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-          <h2 className="text-base font-semibold">{t("dashboard.taskStatus")}</h2>
-          <p className="text-xs text-muted-foreground">{t("dashboard.acrossActiveProjects")}</p>
-          {isLoading ? (
-            <TaskStatusChartSkeleton />
-          ) : isError ? null : (
-            <>
-              <ChartContainer config={taskStatusChartConfig} className="mx-auto h-56 w-full">
-                <PieChart>
-                  <ChartTooltip content={<ChartTooltipContent hideLabel nameKey="statusKey" />} />
-                  <Pie
-                    data={taskStatusChartData}
-                    dataKey="value"
-                    nameKey="statusKey"
-                    innerRadius={50}
-                    outerRadius={80}
-                    paddingAngle={2}
-                  >
-                    {taskStatusChartData.map((entry, i) => (
-                      <Cell key={i} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ChartContainer>
-              <ul className="space-y-1.5 text-xs">
-                {taskStatusChartData.map((s) => (
-                  <li key={s.statusKey} className="flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <span className="size-2.5 rounded-sm" style={{ background: s.fill }} />
-                      {dashboardStatusLabel(s.statusKey, t)}
-                    </span>
-                    <span className="font-medium text-muted-foreground">{s.value}</span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-6 grid gap-4 xl:grid-cols-3">
-        <DashboardAiInsightsCard />
-
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-soft xl:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-semibold">{t("dashboard.projectProgress")}</h2>
-            <Link to="/app/projects" className="text-xs text-primary hover:underline">
-              {t("common.viewAll")}
-            </Link>
-          </div>
-          {projectsLoading ? (
-            <ProjectCardsSkeleton />
-          ) : projectsError ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              {t("common.errorServerHint")}
-            </p>
-          ) : dashboardProjects.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              {t("projects.emptyHint")}
-            </p>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {dashboardProjects.map((p) => (
-                <DashboardProjectCard key={p.id} project={p} t={t} lang={lang} />
+        <div className="min-w-0">
+          <Link
+            to="/app/tasks"
+            search={{ status: "open" }}
+            className="mb-3 inline-flex text-xs text-muted-foreground transition hover:text-primary hover:underline"
+          >
+            {t("dashboard.basedOnWorkspaceTasks")}
+          </Link>
+          {tasksLoading ? (
+            <AnalyticsCardsSkeleton />
+          ) : tasksError ? null : (
+            <div className="grid gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+              {analyticsCards.map((card) => (
+                <AnalyticsMetricCard
+                  key={card.labelKey}
+                  to="/app/tasks"
+                  search={card.search}
+                  ariaLabel={t(card.ariaKey)}
+                  icon={card.icon}
+                  value={card.value}
+                  label={t(card.labelKey)}
+                  tone={card.tone}
+                />
               ))}
             </div>
           )}
         </div>
-      </div>
 
-      <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-soft">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-semibold">{t("dashboard.recentActivity")}</h2>
-          <Link
-            to="/app/tasks"
-            search={{ status: "open" }}
-            className="text-xs text-primary hover:underline"
-          >
-            {t("common.seeAll")}
-          </Link>
+        <div className="grid min-w-0 gap-4 xl:grid-cols-3">
+          <div className={cn(sectionSurfaceClass, "xl:col-span-2")}>
+            <TaskActivityChartSection
+              period={activityPeriod}
+              onPeriodChange={setActivityPeriod}
+              buckets={taskActivityBuckets}
+              hasData={taskActivityChartHasData}
+              isLoading={tasksLoading}
+              isError={tasksError}
+              t={t}
+            />
+          </div>
+
+          <div className={sectionSurfaceClass}>
+            <DashboardSectionHeader
+              title={t("dashboard.taskStatus")}
+              description={t("dashboard.acrossActiveProjects")}
+              className="mb-3"
+            />
+            {isLoading ? (
+              <TaskStatusChartSkeleton />
+            ) : isError ? null : (
+              <div className="flex min-w-0 flex-col gap-4">
+                <ChartContainer
+                  config={taskStatusChartConfig}
+                  className="mx-auto aspect-auto h-48 w-full max-w-full sm:h-52"
+                >
+                  <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+                    <ChartTooltip content={<ChartTooltipContent hideLabel nameKey="statusKey" />} />
+                    <Pie
+                      data={taskStatusChartData}
+                      dataKey="value"
+                      nameKey="statusKey"
+                      innerRadius={48}
+                      outerRadius={72}
+                      paddingAngle={2}
+                    >
+                      {taskStatusChartData.map((entry, i) => (
+                        <Cell key={i} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ChartContainer>
+                <ul className="grid min-w-0 gap-2">
+                  {taskStatusChartData.map((s) => (
+                    <li
+                      key={s.statusKey}
+                      className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-xs"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span
+                          className="size-2.5 shrink-0 rounded-sm"
+                          style={{ background: s.fill }}
+                          aria-hidden
+                        />
+                        <span className="truncate text-foreground/90">
+                          {dashboardStatusLabel(s.statusKey, t)}
+                        </span>
+                      </span>
+                      <span className="shrink-0 tabular-nums font-semibold text-muted-foreground">
+                        {s.value}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
-        {isLoading ? (
-          <RecentTasksSkeleton />
-        ) : isError ? null : data && data.recentTasks.length === 0 ? (
-          <EmptyState
-            compact
-            className="border-0 bg-transparent shadow-none"
-            title={t("dashboard.noRecentActivityTitle")}
-            description={t("dashboard.noRecentActivityHint")}
+
+        <div className="grid min-w-0 gap-4 xl:grid-cols-3">
+          <DashboardAiInsightsCard />
+
+          <div className={cn(sectionSurfaceClass, "xl:col-span-2 self-start h-fit")}>
+            <DashboardSectionHeader
+              title={t("dashboard.projectProgress")}
+              action={
+                <Link to="/app/projects" className={sectionLinkClass}>
+                  {t("common.viewAll")}
+                </Link>
+              }
+            />
+            {projectsLoading ? (
+              <ProjectCardsSkeleton />
+            ) : projectsError ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                {t("common.errorServerHint")}
+              </p>
+            ) : dashboardProjects.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                {t("projects.emptyHint")}
+              </p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {dashboardProjects.map((p) => (
+                  <DashboardProjectCard key={p.id} project={p} t={t} lang={lang} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className={sectionSurfaceClass}>
+          <DashboardSectionHeader
+            title={t("dashboard.recentActivity")}
+            action={
+              <Link to="/app/tasks" search={{ status: "open" }} className={sectionLinkClass}>
+                {t("common.seeAll")}
+              </Link>
+            }
           />
-        ) : (
-          <ul className="divide-y divide-border">
-            {data?.recentTasks.map((task) => (
-              <RecentTaskRow key={task.id} task={task} t={t} lang={lang} />
-            ))}
-          </ul>
-        )}
+          {isLoading ? (
+            <RecentTasksSkeleton />
+          ) : isError ? null : data && data.recentTasks.length === 0 ? (
+            <EmptyState
+              compact
+              className="border-0 bg-transparent shadow-none"
+              title={t("dashboard.noRecentActivityTitle")}
+              description={t("dashboard.noRecentActivityHint")}
+            />
+          ) : (
+            <ul className="-mx-1 divide-y divide-border/80 sm:mx-0">
+              {data?.recentTasks.map((task) => (
+                <RecentTaskRow key={task.id} task={task} t={t} lang={lang} />
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </AppShell>
   );
@@ -502,33 +558,44 @@ function RecentTaskRow({
         to="/app/tasks"
         search={taskSearch}
         aria-label={`${t("dashboard.viewTask")}: ${translateStarterTitle(task.title, lang)}`}
-        className="flex items-center gap-3 rounded-lg py-3 text-sm transition hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex gap-3 rounded-xl px-2 py-3 text-sm transition hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:items-center"
       >
         {assigneeOptions.length > 0 ? (
-          <AssigneeAvatars assignees={assigneeOptions} maxVisible={2} className="shrink-0" />
+          <AssigneeAvatars
+            assignees={assigneeOptions}
+            maxVisible={2}
+            className="mt-0.5 shrink-0 sm:mt-0"
+          />
         ) : (
-          <div className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
+          <div className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground sm:mt-0">
             —
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
             <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
               {task.key}
             </span>
-            <span className="truncate font-medium">{translateStarterTitle(task.title, lang)}</span>
+            <span className="min-w-0 break-words font-medium leading-snug sm:truncate">
+              {translateStarterTitle(task.title, lang)}
+            </span>
           </div>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span>{translateStarterProjectName(task.project.name, lang)}</span>
+          <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="max-w-full truncate">
+              {translateStarterProjectName(task.project.name, lang)}
+            </span>
             <Badge variant="secondary" className={status.tone + " border-0 capitalize"}>
               {t(status.labelKey)}
             </Badge>
             <Badge variant="secondary" className={recentPriorityTone[task.priority] + " border-0"}>
               {dashboardPriorityLabel(task.priority, t)}
             </Badge>
+            <span className="tabular-nums text-muted-foreground/90 sm:hidden">
+              {formatUpdatedAt(task.updatedAt)}
+            </span>
           </div>
         </div>
-        <div className="shrink-0 text-xs text-muted-foreground">
+        <div className="hidden shrink-0 self-start text-xs tabular-nums text-muted-foreground sm:block sm:self-center">
           {formatUpdatedAt(task.updatedAt)}
         </div>
       </Link>
@@ -578,17 +645,18 @@ function DashboardProjectCard({
   const meta = projectStatusMeta[project.status];
   const cardBody = (
     <>
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <div className={"h-1.5 w-10 rounded-full bg-gradient-to-r " + project.color} />
-          <div className="mt-2 text-sm font-semibold">
+          <div className="mt-2 truncate text-sm font-semibold leading-snug">
             {translateStarterProjectName(project.name, lang)}
           </div>
-          <div className="text-xs text-muted-foreground">
-            {project.openTasks} open · {project.totalTasks} total
+          <div className="mt-1 text-xs text-muted-foreground">
+            <span className="tabular-nums">{project.openTasks}</span> open ·{" "}
+            <span className="tabular-nums">{project.totalTasks}</span> total
           </div>
         </div>
-        <Badge variant="secondary" className={meta.className + " border-0"}>
+        <Badge variant="secondary" className={cn(meta.className, "shrink-0 border-0")}>
           {projectStatusLabel(project.status, t)}
         </Badge>
       </div>
@@ -598,14 +666,16 @@ function DashboardProjectCard({
           style={{ width: project.progress + "%" }}
         />
       </div>
-      <div className="mt-3 flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">{project.progress}%</span>
+      <div className="mt-2.5 flex items-center justify-between gap-2">
+        <span className="text-xs tabular-nums text-muted-foreground">{project.progress}%</span>
       </div>
     </>
   );
 
   if (!project.id) {
-    return <div className="rounded-xl border border-border p-4">{cardBody}</div>;
+    return (
+      <div className="rounded-xl border border-border/80 bg-background/40 p-4">{cardBody}</div>
+    );
   }
 
   return (
@@ -613,7 +683,7 @@ function DashboardProjectCard({
       to="/app/projects/$projectId"
       params={{ projectId: project.id }}
       aria-label={`${t("dashboard.viewProject")}: ${translateStarterProjectName(project.name, lang)}`}
-      className="group block rounded-xl border border-border p-4 transition hover:border-primary/30 hover:bg-accent/30"
+      className="group block min-w-0 rounded-xl border border-border/80 bg-background/40 p-4 transition hover:border-primary/30 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {cardBody}
     </Link>
@@ -641,14 +711,21 @@ function DashboardAiInsightsCard() {
   const showSuccess = !!data && !isEmptyWorkspace;
 
   return (
-    <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/8 via-card to-card p-5 shadow-soft xl:col-span-1">
+    <div
+      className={cn(
+        sectionSurfaceClass,
+        "border-primary/25 bg-primary/4 xl:col-span-1 dark:bg-primary/7",
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Sparkles className="size-4 shrink-0 text-primary" />
+          <div className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground">
+            <span className="grid size-7 place-items-center rounded-lg bg-primary/10 text-primary">
+              <Sparkles className="size-3.5 shrink-0" />
+            </span>
             <span className="truncate">{t("dashboard.aiInsights")}</span>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
             {t("dashboard.aiInsightsDescription")}
           </p>
         </div>
@@ -696,16 +773,16 @@ function DashboardAiInsightsCard() {
           </p>
 
           {previewRisks.length > 0 ? (
-            <div className="mt-4 min-w-0">
-              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-warning-foreground">
-                <AlertTriangle className="size-3.5 shrink-0" />
+            <div className="mt-4 min-w-0 rounded-xl border border-warning/25 bg-warning/10 px-3 py-2.5 dark:border-warning/35 dark:bg-warning/15">
+              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                <AlertTriangle className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
                 {t("ai.risks")}
               </div>
               <ul className="space-y-1.5">
                 {previewRisks.map((risk, index) => (
                   <li
                     key={`risk-${index}`}
-                    className="line-clamp-2 break-words rounded-lg border border-border/60 bg-card/70 px-2.5 py-1.5 text-xs text-muted-foreground"
+                    className="line-clamp-2 break-words text-xs leading-relaxed text-foreground/85"
                   >
                     {risk}
                   </li>
@@ -716,7 +793,7 @@ function DashboardAiInsightsCard() {
 
           {previewActions.length > 0 ? (
             <div className="mt-4 min-w-0">
-              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-info">
+              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-primary">
                 <ListChecks className="size-3.5 shrink-0" />
                 {t("ai.actions")}
               </div>
@@ -757,12 +834,12 @@ function ProjectCardsSkeleton() {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} className="rounded-xl border border-border p-4">
+        <div key={index} className="rounded-xl border border-border/80 bg-background/40 p-4">
           <Skeleton className="h-1.5 w-10 rounded-full" />
           <Skeleton className="mt-2 h-4 w-32" />
           <Skeleton className="mt-2 h-3 w-24" />
           <Skeleton className="mt-3 h-1.5 w-full rounded-full" />
-          <Skeleton className="mt-3 h-3 w-10" />
+          <Skeleton className="mt-2.5 h-3 w-10" />
         </div>
       ))}
     </div>
@@ -771,12 +848,15 @@ function ProjectCardsSkeleton() {
 
 function StatCardSkeletons() {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
       {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-          <Skeleton className="size-9 rounded-xl" />
-          <Skeleton className="mt-4 h-9 w-16" />
-          <Skeleton className="mt-2 h-3 w-24" />
+        <div key={index} className={cn(cardLinkClass, "pointer-events-none")}>
+          <div className="flex items-start justify-between gap-3">
+            <Skeleton className="size-7 rounded-lg sm:size-9 sm:rounded-xl" />
+            <Skeleton className="mt-1 h-3 w-16" />
+          </div>
+          <Skeleton className="mt-1.5 h-6 w-12 sm:mt-4 sm:h-9 sm:w-16" />
+          <Skeleton className="mt-1 h-3 w-24" />
         </div>
       ))}
     </div>
@@ -785,12 +865,12 @@ function StatCardSkeletons() {
 
 function TaskStatusChartSkeleton() {
   return (
-    <div className="mt-4 space-y-3">
-      <Skeleton className="mx-auto h-56 w-56 rounded-full" />
+    <div className="mt-1 space-y-3">
+      <Skeleton className="mx-auto h-48 w-48 rounded-full sm:h-52 sm:w-52" />
       {Array.from({ length: 5 }).map((_, index) => (
-        <div key={index} className="flex items-center justify-between">
-          <Skeleton className="h-3 w-24" />
-          <Skeleton className="h-3 w-8" />
+        <div key={index} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+          <Skeleton className="h-3 w-24 max-w-full" />
+          <Skeleton className="h-3 w-6" />
         </div>
       ))}
     </div>
@@ -799,15 +879,15 @@ function TaskStatusChartSkeleton() {
 
 function RecentTasksSkeleton() {
   return (
-    <ul className="divide-y divide-border">
+    <ul className="divide-y divide-border/80">
       {Array.from({ length: 5 }).map((_, index) => (
-        <li key={index} className="flex items-center gap-3 py-3">
-          <Skeleton className="size-8 rounded-full" />
+        <li key={index} className="flex items-start gap-3 px-2 py-3 sm:items-center">
+          <Skeleton className="size-8 shrink-0 rounded-full" />
           <div className="min-w-0 flex-1 space-y-2">
-            <Skeleton className="h-4 w-2/3" />
-            <Skeleton className="h-3 w-1/2" />
+            <Skeleton className="h-4 w-2/3 max-w-full" />
+            <Skeleton className="h-3 w-1/2 max-w-full" />
           </div>
-          <Skeleton className="h-3 w-20" />
+          <Skeleton className="hidden h-3 w-20 sm:block" />
         </li>
       ))}
     </ul>
@@ -815,7 +895,30 @@ function RecentTasksSkeleton() {
 }
 
 const cardLinkClass =
-  "rounded-2xl border border-border bg-card p-5 shadow-soft transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "min-w-0 rounded-2xl border border-border bg-card p-2.5 shadow-soft transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-5";
+
+const analyticsCardLinkClass =
+  "min-w-0 rounded-2xl border border-border/60 bg-card/60 p-2.5 shadow-none transition hover:border-border hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-4";
+
+type AnalyticsMetricTone = "destructive" | "warning" | "muted";
+
+const analyticsToneClass: Record<
+  AnalyticsMetricTone,
+  { icon: string; value: string }
+> = {
+  destructive: {
+    icon: "bg-destructive/10 text-destructive group-hover:bg-destructive/15",
+    value: "text-foreground",
+  },
+  warning: {
+    icon: "bg-warning/15 text-warning-foreground group-hover:bg-warning/20",
+    value: "text-foreground",
+  },
+  muted: {
+    icon: "bg-muted text-muted-foreground group-hover:bg-accent",
+    value: "text-foreground",
+  },
+};
 
 const periodLabelKeys: Record<DashboardAnalyticsPeriod, TKey> = {
   week: "dashboard.periodWeek",
@@ -848,14 +951,18 @@ function TaskActivityChartSection({
 
   return (
     <>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-base font-semibold">{t("dashboard.taskActivity")}</h2>
-          <p className="text-xs text-muted-foreground">{t("dashboard.doneTasksActivityNote")}</p>
+      <div className="mb-4 flex min-w-0 flex-col gap-3">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold tracking-tight text-foreground">
+            {t("dashboard.taskActivity")}
+          </h2>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+            {t("dashboard.doneTasksActivityNote")}
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div
-            className="inline-flex rounded-lg border border-border bg-muted/40 p-0.5"
+            className="inline-flex max-w-full rounded-lg border border-border bg-muted/40 p-0.5"
             role="group"
             aria-label={t("dashboard.taskActivity")}
           >
@@ -866,7 +973,7 @@ function TaskActivityChartSection({
                 onClick={() => onPeriodChange(value)}
                 aria-pressed={period === value}
                 className={cn(
-                  "rounded-md px-3 py-1.5 text-xs font-medium transition",
+                  "rounded-md px-2.5 py-1.5 text-xs font-medium transition sm:px-3",
                   period === value
                     ? "bg-card text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground",
@@ -876,24 +983,25 @@ function TaskActivityChartSection({
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <span className="size-2 rounded-sm bg-primary" /> {t("dashboard.createdTasks")}
+              <span className="size-2 shrink-0 rounded-sm bg-primary" />{" "}
+              {t("dashboard.createdTasks")}
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="size-2 rounded-sm bg-info" /> {t("dashboard.doneTasks")}
+              <span className="size-2 shrink-0 rounded-sm bg-info" /> {t("dashboard.doneTasks")}
             </span>
           </div>
         </div>
       </div>
       {isLoading ? (
-        <Skeleton className="h-64 w-full rounded-xl" />
+        <Skeleton className="h-56 w-full rounded-xl sm:h-64" />
       ) : isError ? (
-        <p className="flex h-64 items-center justify-center text-sm text-muted-foreground">
+        <p className="flex h-56 items-center justify-center text-sm text-muted-foreground sm:h-64">
           {t("common.errorServerHint")}
         </p>
       ) : !hasData ? (
-        <p className="flex h-64 items-center justify-center text-sm text-muted-foreground">
+        <p className="flex h-56 items-center justify-center text-sm text-muted-foreground sm:h-64">
           {t("dashboard.noTasksInPeriod")}
         </p>
       ) : (
@@ -902,9 +1010,14 @@ function TaskActivityChartSection({
             created: { label: t("dashboard.createdTasks"), color: "var(--primary)" },
             done: { label: t("dashboard.doneTasks"), color: "var(--info)" },
           }}
-          className="h-64 w-full [&_.recharts-cartesian-grid_line]:stroke-border/80"
+          className="aspect-auto h-56 w-full min-w-0 sm:h-64 [&_.recharts-cartesian-grid_line]:stroke-border/80"
         >
-          <BarChart data={chartData} barGap={4} barCategoryGap="18%">
+          <BarChart
+            data={chartData}
+            barGap={4}
+            barCategoryGap="18%"
+            margin={{ top: 8, right: 4, left: -18, bottom: period === "month" ? 8 : 0 }}
+          >
             <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/60" />
             <XAxis
               dataKey="label"
@@ -918,6 +1031,7 @@ function TaskActivityChartSection({
             />
             <YAxis
               allowDecimals={false}
+              width={36}
               tickLine={false}
               axisLine={false}
               tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
@@ -939,7 +1053,7 @@ function AnalyticsMetricCard({
   icon: Icon,
   value,
   label,
-  iconClassName,
+  tone = "muted",
 }: {
   to: "/app/tasks";
   search: TasksSearch;
@@ -947,91 +1061,123 @@ function AnalyticsMetricCard({
   icon: typeof AlertTriangle;
   value: number;
   label: string;
-  iconClassName?: string;
+  tone?: AnalyticsMetricTone;
 }) {
+  const toneStyles = analyticsToneClass[tone];
+
   return (
     <Link
       to={to}
       search={search}
       aria-label={ariaLabel}
-      className={cn("group block", cardLinkClass)}
+      className={cn("group block", analyticsCardLinkClass)}
     >
+      <div className="flex items-start justify-between gap-3">
+        <div
+          className={cn(
+            "grid size-7 place-items-center rounded-lg transition sm:size-9 sm:rounded-xl",
+            toneStyles.icon,
+          )}
+        >
+          <Icon className="size-3.5 sm:size-4" />
+        </div>
+      </div>
       <div
         className={cn(
-          "grid size-9 place-items-center rounded-xl bg-accent text-accent-foreground transition group-hover:bg-primary/10",
-          iconClassName,
+          "mt-1.5 text-xl font-semibold tracking-tight tabular-nums sm:mt-3.5 sm:text-[1.75rem]",
+          toneStyles.value,
         )}
       >
-        <Icon className="size-4" />
+        {value}
       </div>
-      <div className="mt-4 text-3xl font-semibold tracking-tight">{value}</div>
-      <div className="mt-0.5 text-xs text-muted-foreground">{label}</div>
+      <div className="mt-0.5 text-xs leading-snug text-muted-foreground">{label}</div>
     </Link>
   );
 }
 
 function AnalyticsCardsSkeleton() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
       {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-          <Skeleton className="size-9 rounded-xl" />
-          <Skeleton className="mt-4 h-9 w-12" />
-          <Skeleton className="mt-2 h-3 w-28" />
+        <div key={index} className={cn(analyticsCardLinkClass, "pointer-events-none")}>
+          <Skeleton className="size-7 rounded-lg sm:size-9 sm:rounded-xl" />
+          <Skeleton className="mt-1.5 h-6 w-10 sm:mt-3 sm:h-8 sm:w-12" />
+          <Skeleton className="mt-1 h-3 w-28 sm:mt-2" />
         </div>
       ))}
     </div>
   );
 }
 
-type StatCardSearch =
-  | { status: "done" | "open" }
-  | { status: "active" | "planning" | "on_hold" | "completed" | "all" };
+type StatCardTarget =
+  | { to: "/app/tasks"; search: TasksSearch }
+  | { to: "/app/projects"; search: ProjectsSearch }
+  | { to: "/app/team"; search?: never };
+
+type StatCardAccent = "primary" | "info" | "success" | "muted";
+
+const statAccentClass: Record<StatCardAccent, string> = {
+  primary: "bg-primary/10 text-primary group-hover:bg-primary/15",
+  info: "bg-info/10 text-info group-hover:bg-info/15",
+  success: "bg-success/10 text-success group-hover:bg-success/15",
+  muted: "bg-accent text-accent-foreground group-hover:bg-primary/10 group-hover:text-primary",
+};
 
 function StatCard({
-  to,
-  search,
+  target,
   ariaLabel,
   icon: Icon,
   value,
   label,
+  accent = "muted",
 }: {
-  to: LinkProps["to"];
-  search?: StatCardSearch;
+  target: StatCardTarget;
   ariaLabel: string;
   icon: typeof FolderKanban;
   value: number;
   label: string;
+  accent?: StatCardAccent;
 }) {
   const content = (
     <>
-      <div className="grid size-9 place-items-center rounded-xl bg-accent text-accent-foreground transition group-hover:bg-primary/10 group-hover:text-primary">
-        <Icon className="size-4" />
+      <div className="flex items-start justify-between gap-3">
+        <div
+          className={cn(
+            "grid size-7 place-items-center rounded-lg transition sm:size-9 sm:rounded-xl",
+            statAccentClass[accent],
+          )}
+        >
+          <Icon className="size-3.5 sm:size-4" />
+        </div>
       </div>
-      <div className="mt-4 text-3xl font-semibold tracking-tight">{value}</div>
-      <div className="mt-0.5 text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1.5 text-xl font-semibold tracking-tight tabular-nums sm:mt-4 sm:text-3xl">
+        {value}
+      </div>
+      <div className="mt-0.5 text-xs font-medium leading-snug text-foreground/80 sm:mt-1 sm:font-normal sm:text-muted-foreground">
+        {label}
+      </div>
     </>
   );
   const className = cn("group block", cardLinkClass);
 
-  if (to === "/app/tasks" && search) {
+  if (target.to === "/app/tasks") {
     return (
-      <Link to="/app/tasks" search={search} aria-label={ariaLabel} className={className}>
+      <Link to="/app/tasks" search={target.search} aria-label={ariaLabel} className={className}>
         {content}
       </Link>
     );
   }
 
-  if (to === "/app/projects" && search) {
+  if (target.to === "/app/projects") {
     return (
-      <Link to="/app/projects" search={search} aria-label={ariaLabel} className={className}>
+      <Link to="/app/projects" search={target.search} aria-label={ariaLabel} className={className}>
         {content}
       </Link>
     );
   }
 
   return (
-    <Link to={to} aria-label={ariaLabel} className={className}>
+    <Link to={target.to} aria-label={ariaLabel} className={className}>
       {content}
     </Link>
   );
