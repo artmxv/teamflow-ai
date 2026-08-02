@@ -939,7 +939,7 @@ function TaskCommentRow({
                 size="icon"
                 className="size-7 text-muted-foreground hover:text-foreground"
                 disabled={isUpdating || isDeleting}
-                aria-label="Edit comment"
+                aria-label={t("comments.editComment")}
                 onClick={startEditing}
               >
                 <Pencil className="size-3.5" />
@@ -950,7 +950,7 @@ function TaskCommentRow({
                 size="icon"
                 className="size-7 text-muted-foreground hover:text-destructive"
                 disabled={isUpdating || isDeleting}
-                aria-label="Delete comment"
+                aria-label={t("comments.deleteComment")}
                 onClick={handleDelete}
               >
                 <Trash2 className="size-3.5" />

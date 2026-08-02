@@ -238,7 +238,7 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
         </DialogHeader>
         <form onSubmit={handleSubmit(submit)} className="space-y-4">
           <Field label={t("projects.new.projectName")} error={errors.name?.message}>
-            <Input {...register("name")} placeholder="Orion launch" />
+            <Input {...register("name")} placeholder={t("projects.new.namePlaceholder")} />
           </Field>
           <Field label={t("projects.new.description")} error={errors.description?.message}>
             <Textarea

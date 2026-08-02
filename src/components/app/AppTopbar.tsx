@@ -176,10 +176,13 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
         <LanguageSwitcher />
         <ThemeToggle />
         <button
+          type="button"
           onClick={() => setHelpOpen(true)}
+          title={t("top.help")}
+          aria-label={t("top.help")}
           className="hidden sm:grid size-9 place-items-center rounded-lg text-muted-foreground transition hover:bg-secondary hover:text-foreground"
         >
-          <HelpCircle className="size-4" />
+          <HelpCircle className="size-4" aria-hidden />
         </button>
         <DropdownMenu
           modal={false}

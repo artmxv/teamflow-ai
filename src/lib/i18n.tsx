@@ -405,6 +405,7 @@ const dict = {
     "projects.notReady": "Project is not ready yet",
     "projects.new.dialogDesc": "Set up a project and optionally add teammates from your workspace.",
     "projects.new.projectName": "Project name",
+    "projects.new.namePlaceholder": "Orion launch",
     "projects.new.description": "Description",
     "projects.new.status": "Status",
     "projects.new.dueDate": "Due date",
@@ -530,7 +531,8 @@ const dict = {
     "settings.email": "Email",
     "settings.timeZone": "Time zone",
     "settings.bio": "Bio",
-    "settings.notificationDesc": "Choose what you want to be notified about.",
+    "settings.notificationDesc":
+      "Preview of upcoming notification preferences. Saving is not available yet.",
     "settings.notifyComments": "New comments on my tasks",
     "settings.notifyEmailInApp": "Email + in-app",
     "settings.notifyMentions": "Mentions",
@@ -1395,6 +1397,7 @@ const dict = {
     "projects.new.dialogDesc":
       "Настройте проект и при необходимости добавьте участников из пространства.",
     "projects.new.projectName": "Название проекта",
+    "projects.new.namePlaceholder": "Запуск Orion",
     "projects.new.description": "Описание",
     "projects.new.status": "Статус",
     "projects.new.dueDate": "Дата срока",
@@ -1526,7 +1529,8 @@ const dict = {
     "settings.email": "Email",
     "settings.timeZone": "Часовой пояс",
     "settings.bio": "О себе",
-    "settings.notificationDesc": "Выберите, о чём получать уведомления.",
+    "settings.notificationDesc":
+      "Предпросмотр будущих настроек уведомлений. Сохранение пока недоступно.",
     "settings.notifyComments": "Новые комментарии к моим задачам",
     "settings.notifyEmailInApp": "Email + в приложении",
     "settings.notifyMentions": "Упоминания",

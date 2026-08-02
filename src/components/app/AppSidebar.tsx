@@ -25,6 +25,7 @@ import { DeleteWorkspaceDialog } from "./DeleteWorkspaceDialog";
 import { NewProjectDialog } from "./QuickActionDialogs";
 import type { Workspace } from "./AppShell";
 import { fetchProjects } from "@/lib/api/projects";
+import { fetchBillingSummary, type BillingPlanId } from "@/lib/api/billing";
 import { getProjectAccent } from "@/lib/project-color";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -37,6 +38,15 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { APP_NAV_ITEMS, isAppNavItemActive } from "@/lib/app-nav";
 import { useChatUnreadCount } from "@/lib/api/use-chat-unread-count";
+
+const BILLING_SUMMARY_QUERY_KEY = ["billing", "summary"] as const;
+
+const PLAN_LABEL_KEYS: Record<BillingPlanId, TKey> = {
+  FREE: "billing.plan.free",
+  TEAM: "billing.plan.team",
+  BUSINESS: "billing.plan.business",
+  ENTERPRISE: "billing.plan.enterprise",
+};
 
 function SidebarTip({
   collapsed,
@@ -285,6 +295,14 @@ export function AppSidebar({
     queryKey: ["projects"],
     queryFn: fetchProjects,
   });
+  const billingQuery = useQuery({
+    queryKey: BILLING_SUMMARY_QUERY_KEY,
+    queryFn: fetchBillingSummary,
+  });
+  const currentPlanLabel =
+    billingQuery.isSuccess && billingQuery.data
+      ? t(PLAN_LABEL_KEYS[billingQuery.data.currentPlan])
+      : null;
   const activeProjectId = pathname.match(/^\/app\/projects\/([^/]+)/)?.[1];
   const toggleLabel = collapsed ? t("side.expandSidebar") : t("side.collapseSidebar");
 
@@ -350,7 +368,7 @@ export function AppSidebar({
                 const Icon = item.icon;
                 const label = t(item.key);
                 const isPlansItem = item.to === "/app/billing";
-                const planBadge = isPlansItem ? t("billing.plan.free") : null;
+                const planBadge = isPlansItem ? currentPlanLabel : null;
                 const showUnread = item.to === "/app/chat" && chatUnreadCount > 0;
                 const tipLabel = showUnread
                   ? `${label} (${chatUnreadCount > 99 ? "99+" : chatUnreadCount})`

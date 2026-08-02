@@ -790,27 +790,25 @@ function SettingsPage() {
             <div className="divide-y divide-border">
               {[
                 { l: t("settings.notifyComments"), d: t("settings.notifyEmailInApp") },
-                {
-                  l: t("settings.notifyMentions"),
-                  d: t("settings.notifyEmailInApp"),
-                  on: true,
-                },
+                { l: t("settings.notifyMentions"), d: t("settings.notifyEmailInApp") },
                 {
                   l: t("settings.notifyWeeklyDigest"),
                   d: t("settings.notifyWeeklyDigestSchedule"),
-                  on: true,
                 },
                 {
                   l: t("settings.notifyProjectStatus"),
                   d: t("settings.notifyDailySummary"),
                 },
               ].map((n) => (
-                <div key={n.l} className="flex items-center justify-between py-3.5">
-                  <div>
+                <div key={n.l} className="flex items-center justify-between gap-3 py-3.5">
+                  <div className="min-w-0">
                     <div className="text-sm font-medium">{n.l}</div>
                     <div className="text-xs text-muted-foreground">{n.d}</div>
                   </div>
-                  <Switch defaultChecked={n.on} />
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{t("common.comingSoon")}</span>
+                    <Switch disabled checked={false} />
+                  </div>
                 </div>
               ))}
             </div>
