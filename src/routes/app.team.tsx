@@ -732,7 +732,7 @@ function TeamPage() {
             </Button>
             <Button
               onClick={handleSaveRole}
-              className="bg-gradient-brand text-white"
+              variant="brand"
               disabled={updateRoleMutation.isPending}
             >
               {t("team.updateRole")}
