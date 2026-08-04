@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { toast } from "sonner";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { useCurrentWorkspace } from "@/lib/auth/use-current-user";
@@ -182,7 +183,7 @@ function AssistantPage() {
             <Button
               variant="outline"
               size="sm"
-              className="ml-auto shrink-0"
+              className="ml-auto h-10 shrink-0"
               disabled={!workspaceId || isLoading || isFetching}
               onClick={() => void handleRegenerate()}
             >
@@ -260,24 +261,9 @@ function AssistantPage() {
                   </div>
 
                   <div id="standup" className="scroll-mt-20">
-                    <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      <Megaphone className="size-3.5" /> {t("ai.standupSummary")}
-                      {data.standupSummary.trim() ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="ml-auto h-7 gap-1.5 text-xs font-medium normal-case tracking-normal"
-                          onClick={() => void copyStandupSummary(data.standupSummary, t)}
-                        >
-                          <Copy className="size-3.5" />
-                          {t("ai.copy")}
-                        </Button>
-                      ) : null}
-                    </div>
-                    <AssistantBubble
-                      content={data.standupSummary}
-                      emptyMessage={t("ai.standupEmpty")}
+                    <StandupSummaryBlock
+                      summary={data.standupSummary}
+                      onCopy={() => copyStandupSummary(data.standupSummary, t)}
                     />
                   </div>
 
@@ -301,9 +287,50 @@ async function copyStandupSummary(text: string, t: (key: TKey) => string) {
   try {
     await navigator.clipboard.writeText(text);
     toast.success(t("ai.copied"));
+    return true;
   } catch {
     toast.error(t("ai.copyError"));
+    return false;
   }
+}
+
+function StandupSummaryBlock({
+  summary,
+  onCopy,
+}: {
+  summary: string;
+  onCopy: () => Promise<boolean> | boolean | void;
+}) {
+  const { t } = useI18n();
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    const result = await onCopy();
+    if (result === false) return;
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <>
+      <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <Megaphone className="size-3.5" /> {t("ai.standupSummary")}
+        {summary.trim() ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="ml-auto h-8 gap-1.5 text-xs font-medium normal-case tracking-normal"
+            onClick={() => void handleCopy()}
+          >
+            <Copy className="size-3.5" />
+            {copied ? t("ai.copiedShort") : t("ai.copy")}
+          </Button>
+        ) : null}
+      </div>
+      <AssistantBubble content={summary} emptyMessage={t("ai.standupEmpty")} />
+    </>
+  );
 }
 
 function AssistantBubble({ content, emptyMessage }: { content: string; emptyMessage?: string }) {

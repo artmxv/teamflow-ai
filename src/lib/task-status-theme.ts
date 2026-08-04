@@ -12,11 +12,11 @@ export const taskStatusColumnDotClass: Record<TaskStatus, string> = {
 
 /** Status chips in task lists, dashboard activity, and similar UI. */
 export const taskStatusChipClass: Record<TaskStatus, string> = {
-  backlog: "bg-muted text-muted-foreground",
-  todo: "bg-info/15 text-info",
-  in_progress: "bg-primary/15 text-primary",
-  review: "bg-warning/20 text-warning-foreground",
-  done: "bg-success/15 text-success",
+  backlog: "border border-border/60 bg-muted text-foreground/80",
+  todo: "border border-info/20 bg-info/15 text-info",
+  in_progress: "border border-primary/20 bg-primary/15 text-primary",
+  review: "border border-warning/25 bg-warning/20 text-warning-foreground",
+  done: "border border-success/20 bg-success/15 text-success",
 };
 
 /**

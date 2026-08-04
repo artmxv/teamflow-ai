@@ -11,25 +11,22 @@ export const deadlineStatusDateTimeRowClassName =
 
 /** Shared purple focus/open ring for deadline triggers (matches Input/Select). */
 const deadlineFocusRing =
-  "focus-visible:outline-none focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring";
+  "focus-visible:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30";
 
 const deadlineOpenRing =
-  "data-[state=open]:border-ring data-[state=open]:ring-1 data-[state=open]:ring-ring";
+  "data-[state=open]:border-ring data-[state=open]:ring-2 data-[state=open]:ring-ring/30";
 
 /** Shared trigger look for deadline date + time fields (matches Input). */
-export function deadlineFieldTriggerClassName(options?: {
-  empty?: boolean;
-  className?: string;
-}) {
+export function deadlineFieldTriggerClassName(options?: { empty?: boolean; className?: string }) {
   return cn(
-    "flex h-9 w-full cursor-pointer items-center gap-2 rounded-md border border-input bg-transparent px-3 py-1 text-left text-sm shadow-sm",
+    "flex h-10 w-full cursor-pointer items-center gap-2 rounded-md border border-control-border bg-control px-3 py-1 text-left text-sm text-control-foreground shadow-sm",
     "transition-[color,background-color,border-color,box-shadow]",
-    "hover:border-ring/45 hover:bg-secondary/40",
+    "hover:bg-control-hover",
     deadlineFocusRing,
     deadlineOpenRing,
-    "active:border-ring active:bg-secondary/50",
-    "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-input disabled:hover:bg-transparent",
-    options?.empty ? "text-muted-foreground" : "text-foreground",
+    "active:bg-control-active",
+    "disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-control",
+    options?.empty ? "text-muted-foreground" : "text-control-foreground",
     options?.className,
   );
 }

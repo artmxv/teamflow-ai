@@ -51,7 +51,7 @@ import {
 } from "@/lib/api/tasks";
 import { fetchProjects } from "@/lib/api/projects";
 import { taskStatusLabel, useI18n, type TKey } from "@/lib/i18n";
-import { Filter, FolderKanban, ListTodo, Plus } from "lucide-react";
+import { Filter, FolderKanban, ListTodo, Plus, RotateCcw } from "lucide-react";
 import { fetchWorkspaceMembers } from "@/lib/api/workspace-members";
 import {
   buildAssigneeOptionsFromWorkspaceMembers,
@@ -313,16 +313,16 @@ function Board() {
         }
       />
 
-      <div className="mb-4 flex flex-col gap-2 rounded-2xl border border-border bg-card p-3 shadow-soft sm:flex-row sm:items-center">
-        <div className="flex items-center gap-2 text-sm font-medium">
+      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-border bg-card p-3 shadow-soft sm:flex-row sm:items-center">
+        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
           <Filter className="size-4 text-muted-foreground" /> {t("board.filters")}
         </div>
-        <div className="grid gap-2 sm:ml-auto sm:grid-cols-3">
+        <div className="grid w-full gap-2 sm:ml-auto sm:w-auto sm:grid-cols-[minmax(10rem,1fr)_minmax(10rem,1fr)_auto]">
           <Select
             value={priority}
             onValueChange={(value) => setPriority(value as Priority | "all")}
           >
-            <SelectTrigger className="w-full sm:w-40">
+            <SelectTrigger className="w-full min-w-[10rem]">
               <SelectValue placeholder={t("tasks.priority")} />
             </SelectTrigger>
             <SelectContent>
@@ -334,11 +334,11 @@ function Board() {
             </SelectContent>
           </Select>
           <Select value={assignee} onValueChange={setAssignee}>
-            <SelectTrigger className="w-full sm:w-44">
+            <SelectTrigger className="w-full min-w-[10rem]">
               <SelectValue placeholder={t("tasks.assignee")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{t("tasks.assignee")}</SelectItem>
+              <SelectItem value="all">{t("tasks.allAssignees")}</SelectItem>
               {assigneeOptions.map((option) => (
                 <SelectItem key={option.id} value={option.id}>
                   {option.name}
@@ -348,12 +348,14 @@ function Board() {
           </Select>
           <Button
             variant="outline"
-            size="sm"
+            className="h-10 w-full sm:w-auto"
+            disabled={priority === "all" && assignee === "all"}
             onClick={() => {
               setPriority("all");
               setAssignee("all");
             }}
           >
+            <RotateCcw className="size-4" />
             {t("common.clearFilters")}
           </Button>
         </div>

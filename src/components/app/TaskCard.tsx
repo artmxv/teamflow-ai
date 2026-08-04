@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { taskStatusColumnDotClass } from "@/lib/task-status-theme";
 
 export type TaskDragData = {
   type: "task";
@@ -131,13 +132,31 @@ export function TaskCard({
             disabled={isStatusUpdating}
             onValueChange={(value) => onStatusChange(value as TaskStatus)}
           >
-            <SelectTrigger className="h-7 w-full text-xs">
-              <SelectValue placeholder="Status" />
+            <SelectTrigger className="h-9 w-full text-xs">
+              <SelectValue placeholder="Status">
+                <span className="inline-flex min-w-0 items-center gap-2">
+                  <span
+                    className={
+                      "size-2 shrink-0 rounded-full " + taskStatusColumnDotClass[task.status]
+                    }
+                    aria-hidden
+                  />
+                  <span className="min-w-0">{taskStatusLabel(task.status, t)}</span>
+                </span>
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {statusColumns.map((col) => (
                 <SelectItem key={col.key} value={col.key}>
-                  {taskStatusLabel(col.key, t)}
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className={
+                        "size-2 shrink-0 rounded-full " + taskStatusColumnDotClass[col.key]
+                      }
+                      aria-hidden
+                    />
+                    {taskStatusLabel(col.key, t)}
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>

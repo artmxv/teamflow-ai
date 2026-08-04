@@ -524,111 +524,113 @@ export function NewTaskDialog({
           <DialogTitle>{t("common.newTask")}</DialogTitle>
           <DialogDescription>{t("tasks.new.dialogDesc")}</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(submit)} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <form
+          onSubmit={handleSubmit(submit)}
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        >
           <div className="app-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-6 pb-4 pt-1">
-          {showProjectSelect ? (
-            <Field label={t("tasks.selectProject")}>
-              <Select
-                value={projectSelectValue}
-                onValueChange={(value) => {
-                  if (value !== "__no_project__") {
-                    setSelectedProjectId(value);
-                  }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t("tasks.selectProject")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {projectOptions.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          ) : null}
-          <div className="space-y-3">
-            <Field label={t("tasks.task")} error={errors.title?.message}>
-              <Input {...register("title")} placeholder={t("tasks.new.titlePlaceholder")} />
-            </Field>
-            <div className={deadlineStatusDateTimeRowClassName}>
-              <Field
-                className="min-w-0"
-                label={t("tasks.status")}
-                error={errors.status?.message}
-              >
-                <Controller
-                  control={control}
-                  name="status"
-                  render={({ field }) => (
-                    <Select
-                      value={field.value ?? initialStatus}
-                      onValueChange={(value) => field.onChange(value as TaskStatus)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("tasks.new.selectStatus")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="backlog">{t("board.backlog")}</SelectItem>
-                        <SelectItem value="todo">{t("board.todo")}</SelectItem>
-                        <SelectItem value="in_progress">{t("board.inProgress")}</SelectItem>
-                        <SelectItem value="review">{t("board.review")}</SelectItem>
-                        <SelectItem value="done">{t("board.done")}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
+            {showProjectSelect ? (
+              <Field label={t("tasks.selectProject")}>
+                <Select
+                  value={projectSelectValue}
+                  onValueChange={(value) => {
+                    if (value !== "__no_project__") {
+                      setSelectedProjectId(value);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("tasks.selectProject")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projectOptions.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            ) : null}
+            <div className="space-y-3">
+              <Field label={t("tasks.task")} error={errors.title?.message}>
+                <Input {...register("title")} placeholder={t("tasks.new.titlePlaceholder")} />
+              </Field>
+              <div className={deadlineStatusDateTimeRowClassName}>
+                <Field className="min-w-0" label={t("tasks.status")} error={errors.status?.message}>
+                  <Controller
+                    control={control}
+                    name="status"
+                    render={({ field }) => (
+                      <Select
+                        value={field.value ?? initialStatus}
+                        onValueChange={(value) => field.onChange(value as TaskStatus)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={t("tasks.new.selectStatus")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="backlog">{t("board.backlog")}</SelectItem>
+                          <SelectItem value="todo">{t("board.todo")}</SelectItem>
+                          <SelectItem value="in_progress">{t("board.inProgress")}</SelectItem>
+                          <SelectItem value="review">{t("board.review")}</SelectItem>
+                          <SelectItem value="done">{t("board.done")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </Field>
+                <Field
+                  className="min-w-0"
+                  label={t("tasks.dueDate")}
+                  error={errors.dueDate?.message}
+                >
+                  <Controller
+                    control={control}
+                    name="dueDate"
+                    render={({ field }) => (
+                      <DeadlineDatePicker
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        aria-label={t("tasks.dueDate")}
+                        aria-invalid={Boolean(errors.dueDate)}
+                      />
+                    )}
+                  />
+                </Field>
+                <Field
+                  className="min-w-0"
+                  label={t("tasks.dueTime")}
+                  labelClassName="whitespace-nowrap"
+                  error={errors.dueTime?.message}
+                >
+                  <Controller
+                    control={control}
+                    name="dueTime"
+                    render={({ field }) => (
+                      <DeadlineTimePicker
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        aria-label={t("tasks.dueTime")}
+                        aria-invalid={Boolean(errors.dueTime)}
+                      />
+                    )}
+                  />
+                </Field>
+              </div>
+              <Field label={t("tasks.description")} error={errors.description?.message}>
+                <Textarea
+                  {...register("description")}
+                  rows={2}
+                  className="min-h-[52px] resize-none"
+                  placeholder={t("tasks.new.descriptionPlaceholder")}
                 />
               </Field>
               <Field
-                className="min-w-0"
-                label={t("tasks.dueDate")}
-                error={errors.dueDate?.message}
+                className="max-w-xs"
+                label={t("tasks.priority")}
+                error={errors.priority?.message}
               >
-                <Controller
-                  control={control}
-                  name="dueDate"
-                  render={({ field }) => (
-                    <DeadlineDatePicker
-                      value={field.value ?? ""}
-                      onChange={field.onChange}
-                      aria-label={t("tasks.dueDate")}
-                      aria-invalid={Boolean(errors.dueDate)}
-                    />
-                  )}
-                />
-              </Field>
-              <Field
-                className="min-w-0"
-                label={t("tasks.dueTime")}
-                labelClassName="whitespace-nowrap"
-                error={errors.dueTime?.message}
-              >
-                <Controller
-                  control={control}
-                  name="dueTime"
-                  render={({ field }) => (
-                    <DeadlineTimePicker
-                      value={field.value ?? ""}
-                      onChange={field.onChange}
-                      aria-label={t("tasks.dueTime")}
-                      aria-invalid={Boolean(errors.dueTime)}
-                    />
-                  )}
-                />
-              </Field>
-            </div>
-            <Field label={t("tasks.description")} error={errors.description?.message}>
-              <Textarea
-                {...register("description")}
-                rows={2}
-                className="min-h-[52px] resize-none"
-                placeholder={t("tasks.new.descriptionPlaceholder")}
-              />
-            </Field>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label={t("tasks.priority")} error={errors.priority?.message}>
                 <Controller
                   control={control}
                   name="priority"
@@ -650,34 +652,32 @@ export function NewTaskDialog({
                   )}
                 />
               </Field>
-              <div className="sm:col-span-2">
-                <Field label={t("tasks.assignees")} error={errors.assigneeIds?.message}>
-                  <Controller
-                    control={control}
-                    name="assigneeIds"
-                    render={({ field }) => (
-                      <AssigneeMultiPicker
-                        compact
-                        options={resolvedAssigneeOptions}
-                        value={field.value ?? []}
-                        disabled={isSubmitting}
-                        isLoading={assigneeOptionsLoading}
-                        onChange={field.onChange}
-                      />
-                    )}
-                  />
-                </Field>
-              </div>
+              <Field label={t("tasks.assignees")} error={errors.assigneeIds?.message}>
+                <Controller
+                  control={control}
+                  name="assigneeIds"
+                  render={({ field }) => (
+                    <AssigneeMultiPicker
+                      compact
+                      options={resolvedAssigneeOptions}
+                      value={field.value ?? []}
+                      disabled={isSubmitting}
+                      isLoading={assigneeOptionsLoading}
+                      onChange={field.onChange}
+                    />
+                  )}
+                />
+              </Field>
             </div>
           </div>
-          </div>
-          <DialogFooter className="shrink-0 border-t border-border bg-background px-6 py-3">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+          <DialogFooter className="sticky bottom-0 shrink-0 border-t border-border bg-background px-6 py-3">
+            <Button type="button" variant="outline" className="h-10" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>
             <Button
               type="submit"
               variant="brand"
+              className="h-10"
               disabled={!isValid || isSubmitting || (showProjectSelect && !selectedProjectId)}
             >
               {isSubmitting ? t("tasks.new.creating") : t("common.createTask")}
