@@ -313,7 +313,7 @@ function Dashboard() {
         actions={
           canManageProjects ? (
             <NewProjectDialog>
-              <Button>
+              <Button variant="brand">
                 {t("common.newProject")} <ArrowUpRight className="size-4" />
               </Button>
             </NewProjectDialog>
@@ -334,7 +334,7 @@ function Dashboard() {
             primaryAction={
               canManageProjects ? (
                 <NewProjectDialog>
-                  <Button>{t("common.createProject")}</Button>
+                  <Button variant="brand">{t("common.createProject")}</Button>
                 </NewProjectDialog>
               ) : undefined
             }

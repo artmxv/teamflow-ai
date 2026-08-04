@@ -849,7 +849,7 @@ function TaskCommentsSection({
         />
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] text-muted-foreground">{trimmedLength}/1000</span>
-          <Button type="button" size="sm" disabled={!canSubmit} onClick={onSubmit}>
+          <Button type="button" size="sm" variant="brand" disabled={!canSubmit} onClick={onSubmit}>
             {isSubmitting ? t("tasks.postingComment") : t("tasks.postComment")}
           </Button>
         </div>
@@ -989,6 +989,7 @@ function TaskCommentRow({
               <Button
                 type="button"
                 size="sm"
+                variant="brand"
                 className="h-7 px-2 text-xs"
                 disabled={!canSaveEdit}
                 onClick={saveEditing}

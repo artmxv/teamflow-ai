@@ -11,7 +11,8 @@ const buttonVariants = cva(
       variant: {
         default:
           "bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/15 hover:bg-primary/90 dark:bg-primary dark:shadow-none dark:ring-0",
-        brand: "border-transparent bg-gradient-brand text-white shadow-soft hover:opacity-95",
+        brand:
+          "border-transparent bg-gradient-brand text-[var(--brand-foreground)] shadow-glow hover:opacity-95 focus-visible:ring-[color-mix(in_oklch,var(--brand-ring)_25%,transparent)]",
         destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
         outline:
           "border border-input bg-card shadow-sm hover:bg-accent hover:text-accent-foreground",
