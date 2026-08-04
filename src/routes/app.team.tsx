@@ -447,8 +447,8 @@ function TeamPage() {
                     {t("common.cancel")}
                   </Button>
                   <Button
+                    variant="brand"
                     onClick={handleSendInvite}
-                    className="bg-gradient-brand text-white"
                     disabled={createInviteMutation.isPending}
                   >
                     {createInviteMutation.isPending
@@ -732,7 +732,7 @@ function TeamPage() {
             </Button>
             <Button
               onClick={handleSaveRole}
-              className="bg-gradient-brand text-white"
+              variant="brand"
               disabled={updateRoleMutation.isPending}
             >
               {t("team.updateRole")}

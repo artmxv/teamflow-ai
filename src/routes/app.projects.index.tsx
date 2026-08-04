@@ -312,7 +312,7 @@ function ProjectsEmptyState({ canManageProjects }: { canManageProjects: boolean 
       primaryAction={
         canManageProjects ? (
           <NewProjectDialog>
-            <Button className="bg-gradient-brand text-white shadow-glow hover:opacity-95">
+            <Button variant="brand">
               <Plus className="size-4" /> {t("common.createProject")}
             </Button>
           </NewProjectDialog>
