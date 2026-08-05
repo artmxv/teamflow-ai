@@ -1,7 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Sparkles,
   Plus,
   PanelLeftClose,
   PanelLeftOpen,
@@ -20,6 +19,7 @@ import { ApiError, setSelectedWorkspaceId } from "@/lib/api/client";
 import { fetchWorkspaces, switchWorkspace } from "@/lib/api/workspaces";
 import { invalidateWorkspaceScopedQueries, WORKSPACES_QUERY_KEY } from "@/lib/workspace-queries";
 import { getWorkspaceAccent, type WorkspaceColorInput } from "@/lib/workspace-color";
+import { BrandMark } from "@/components/brand/BrandLogo";
 import { CreateWorkspaceDialog } from "./CreateWorkspaceDialog";
 import { DeleteWorkspaceDialog } from "./DeleteWorkspaceDialog";
 import { NewProjectDialog } from "./QuickActionDialogs";
@@ -320,8 +320,8 @@ export function AppSidebar({
             collapsed ? "flex-col justify-center gap-2 px-2" : "px-4",
           )}
         >
-          <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-gradient-brand shadow-soft">
-            <Sparkles className="size-3.5 text-white" />
+          <div className="grid size-8 shrink-0 place-items-center">
+            <BrandMark className="h-5 w-[26px]" />
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1 leading-tight">

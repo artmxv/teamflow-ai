@@ -1,6 +1,14 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import type { DashboardTaskPriority, DashboardTaskStatus } from "@/lib/api/dashboard";
 import type { ProjectApiStatus } from "@/lib/api/projects";
+import { parseLang, persistLang } from "@/lib/i18n-locale";
 import type { Priority, ProjectStatus, TaskStatus } from "@/lib/mock-data";
 
 export type Lang = "en" | "ru";
@@ -235,6 +243,8 @@ const dict = {
     "common.cancel": "Cancel",
     "common.delete": "Delete",
     "common.edit": "Edit",
+    "common.save": "Save",
+    "common.saving": "Saving…",
     "common.clearFilters": "Clear filters",
     "common.createProject": "Create project",
     "common.createTask": "Create task",
@@ -323,6 +333,7 @@ const dict = {
     "nav.docs": "Docs",
     "nav.signin": "Sign in",
     "nav.start": "Get started free",
+    "nav.closeMenu": "Close navigation menu",
     "auth.continueWithGoogle": "Continue with Google",
     "auth.googleUnavailable": "Google sign-in is unavailable",
     "auth.googleSignInFailed": "Could not complete Google sign in",
@@ -382,6 +393,11 @@ const dict = {
     "auth.shell.quoteAuthor": "Rita Bauer",
     "auth.shell.quoteRole": "Head of Product, Northwind",
     "auth.shell.copyright": "© 2026 TeamFlow Labs, Inc.",
+    "auth.shell.leadTitle": "One workspace for the work that matters",
+    "auth.shell.leadBody":
+      "TeamFlow AI brings projects, tasks, deadlines, team chat, and grounded workspace briefings together — based on data you can access.",
+    "auth.shell.previewHint":
+      "Projects, Kanban, chat, and AI briefings are already part of the product — not a marketing mockup of future features.",
     "projects.active": "Active",
     "projects.all": "All",
     "projects.allProjects": "All projects",
@@ -693,6 +709,9 @@ const dict = {
     "tasks.new.selectPriority": "Select priority",
     "tasks.new.selectStatus": "Select status",
     "tasks.description": "Description",
+    "tasks.descriptionEmpty": "No description yet.",
+    "tasks.descriptionPlaceholder": "Add a description",
+    "tasks.editDescription": "Edit description",
     "tasks.count": "{count} tasks",
     "tasks.countOne": "1 task",
     "tasks.priorityLow": "Low",
@@ -955,10 +974,12 @@ const dict = {
     "landing.cta.subtitle":
       "Create a free workspace for projects, tasks, team chat, and grounded briefings.",
     "landing.hero.badge": "Workspace briefings and standup summaries",
+    "landing.hero.title": "Team. Projects. Results.",
     "landing.hero.titleBefore": "The focused workspace for",
     "landing.hero.titleAccent": "modern product teams",
     "landing.hero.subtitle":
       "TeamFlow AI brings projects, tasks, deadlines, and team chat into one calm workspace — with briefings based on the workspace data you can access.",
+    "landing.hero.explore": "Explore features",
     "landing.hero.planNote": "Free plan: up to 5 members and 1 workspace.",
     "landing.preview.windowTitle": "TeamFlow AI workspace",
     "landing.preview.activeProjects": "Active projects",
@@ -969,10 +990,25 @@ const dict = {
     "landing.preview.briefingTitle": "Workspace briefing",
     "landing.preview.briefingBody":
       "Overview from accessible projects: 3 high-priority tasks are unassigned. Next: assign owners and review open risks.",
+    "landing.preview.deadlinesTitle": "Upcoming deadlines",
+    "landing.preview.deadlineOne": "Review board cards · Today",
+    "landing.preview.deadlineTwo": "Ship onboarding copy · Tomorrow",
+    "landing.preview.projectOrion": "Orion Web App",
+    "landing.preview.projectMobile": "Mobile App v3",
+    "landing.preview.projectMarketing": "Marketing Site",
     "landing.preview.kanbanTitle": "Sprint board · Kanban",
     "landing.preview.kanbanTasks": "{count} tasks",
     "landing.preview.sampleTask": "Polish onboarding copy",
     "landing.preview.sampleTag": "design",
+    "landing.preview.taskReleaseStructure": "Prepare release structure",
+    "landing.preview.taskKanbanResponsive": "Check Kanban responsive layout",
+    "landing.preview.taskTeamRoles": "Configure team roles",
+    "landing.preview.taskProjectStatuses": "Update project statuses",
+    "landing.preview.taskSprintDeadlines": "Align sprint deadlines",
+    "landing.preview.taskFileUploads": "Verify file uploads",
+    "landing.preview.taskAiBriefing": "Prepare AI briefing",
+    "landing.preview.taskAddMembers": "Add workspace members",
+    "landing.preview.taskCloseRelease": "Close release tasks",
     "landing.features.eyebrow": "Why TeamFlow",
     "landing.features.title": "What TeamFlow AI includes today",
     "landing.features.subtitle":
@@ -1003,6 +1039,7 @@ const dict = {
     "landing.product.pointRoles": "Roles, invitations, notifications, and deadline reminders",
     "landing.footer.navLabel": "Footer links",
     "landing.footer.githubAria": "TeamFlow AI on GitHub (opens in a new tab)",
+    "landing.footer.copyright": "© 2026 TeamFlow AI. All rights reserved.",
   },
   ru: {
     "ai.assistant": "AI-ассистент пространства",
@@ -1235,6 +1272,8 @@ const dict = {
     "common.cancel": "Отмена",
     "common.delete": "Удалить",
     "common.edit": "Редактировать",
+    "common.save": "Сохранить",
+    "common.saving": "Сохранение…",
     "common.clearFilters": "Сбросить фильтры",
     "common.createProject": "Создать проект",
     "common.createTask": "Создать задачу",
@@ -1324,6 +1363,7 @@ const dict = {
     "nav.docs": "Документация",
     "nav.signin": "Войти",
     "nav.start": "Начать бесплатно",
+    "nav.closeMenu": "Закрыть меню навигации",
     "auth.continueWithGoogle": "Продолжить с Google",
     "auth.googleUnavailable": "Вход через Google недоступен",
     "auth.googleSignInFailed": "Не удалось завершить вход через Google",
@@ -1382,6 +1422,11 @@ const dict = {
     "auth.shell.quoteAuthor": "Рита Бауэр",
     "auth.shell.quoteRole": "Руководитель продукта, Northwind",
     "auth.shell.copyright": "© 2026 TeamFlow Labs, Inc.",
+    "auth.shell.leadTitle": "Одно пространство для важной работы",
+    "auth.shell.leadBody":
+      "TeamFlow AI объединяет проекты, задачи, сроки, командный чат и сводки пространства — на основе данных, к которым у вас есть доступ.",
+    "auth.shell.previewHint":
+      "Проекты, канбан, чат и AI-сводки уже есть в продукте — это не макет будущих функций.",
     "projects.active": "Активные",
     "projects.all": "Все",
     "projects.allProjects": "Все проекты",
@@ -1698,6 +1743,9 @@ const dict = {
     "tasks.new.selectPriority": "Выберите приоритет",
     "tasks.new.selectStatus": "Выберите статус",
     "tasks.description": "Описание",
+    "tasks.descriptionEmpty": "Описание пока не добавлено.",
+    "tasks.descriptionPlaceholder": "Добавьте описание",
+    "tasks.editDescription": "Редактировать описание",
     "tasks.count": "{count} задач",
     "tasks.countOne": "1 задача",
     "tasks.priorityLow": "Низкий",
@@ -1960,10 +2008,12 @@ const dict = {
     "landing.cta.subtitle":
       "Создайте бесплатное пространство для проектов, задач, командного чата и сводок.",
     "landing.hero.badge": "Сводки пространства и стендап-резюме",
+    "landing.hero.title": "Команда. Проекты. Результат.",
     "landing.hero.titleBefore": "Сфокусированное пространство для",
     "landing.hero.titleAccent": "современных продуктовых команд",
     "landing.hero.subtitle":
       "TeamFlow AI объединяет проекты, задачи, сроки и командный чат в одном спокойном пространстве — со сводками на основе доступных вам данных.",
+    "landing.hero.explore": "Смотреть возможности",
     "landing.hero.planNote": "Бесплатный тариф: до 5 участников и 1 рабочее пространство.",
     "landing.preview.windowTitle": "Рабочее пространство TeamFlow AI",
     "landing.preview.activeProjects": "Активные проекты",
@@ -1974,10 +2024,25 @@ const dict = {
     "landing.preview.briefingTitle": "Сводка пространства",
     "landing.preview.briefingBody":
       "Обзор по доступным проектам: 3 задачи с высоким приоритетом без исполнителя. Далее: назначить ответственных и проверить открытые риски.",
+    "landing.preview.deadlinesTitle": "Ближайшие сроки",
+    "landing.preview.deadlineOne": "Проверить карточки доски · Сегодня",
+    "landing.preview.deadlineTwo": "Отправить текст онбординга · Завтра",
+    "landing.preview.projectOrion": "Веб-приложение Orion",
+    "landing.preview.projectMobile": "Мобильное приложение v3",
+    "landing.preview.projectMarketing": "Маркетинговый сайт",
     "landing.preview.kanbanTitle": "Спринт · Канбан",
     "landing.preview.kanbanTasks": "Задач: {count}",
     "landing.preview.sampleTask": "Улучшить текст онбординга",
     "landing.preview.sampleTag": "дизайн",
+    "landing.preview.taskReleaseStructure": "Подготовить структуру релиза",
+    "landing.preview.taskKanbanResponsive": "Проверить адаптив Kanban",
+    "landing.preview.taskTeamRoles": "Настроить роли команды",
+    "landing.preview.taskProjectStatuses": "Обновить статусы проекта",
+    "landing.preview.taskSprintDeadlines": "Согласовать сроки спринта",
+    "landing.preview.taskFileUploads": "Проверить загрузку файлов",
+    "landing.preview.taskAiBriefing": "Подготовить AI-сводку",
+    "landing.preview.taskAddMembers": "Добавить участников",
+    "landing.preview.taskCloseRelease": "Закрыть задачи релиза",
     "landing.features.eyebrow": "Почему TeamFlow",
     "landing.features.title": "Что уже есть в TeamFlow AI",
     "landing.features.subtitle":
@@ -2009,6 +2074,7 @@ const dict = {
     "landing.product.pointRoles": "Роли, приглашения, уведомления и напоминания о сроках",
     "landing.footer.navLabel": "Ссылки в подвале",
     "landing.footer.githubAria": "TeamFlow AI на GitHub (откроется в новой вкладке)",
+    "landing.footer.copyright": "© 2026 TeamFlow AI. Все права защищены.",
   },
 } as const;
 
@@ -2098,18 +2164,34 @@ const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void; t: (k: TKey)
   t: (k) => k,
 });
 
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("en");
+export function LanguageProvider({
+  children,
+  initialLang = "en",
+}: {
+  children: ReactNode;
+  /** Must match SSR cookie value to avoid EN→RU flash and hydration mismatch. */
+  initialLang?: Lang;
+}) {
+  const [lang, setLangState] = useState<Lang>(initialLang);
+
+  // After LANG_INIT_SCRIPT migrates localStorage → cookie, align React before paint.
+  useLayoutEffect(() => {
+    if (typeof document === "undefined") return;
+    const match = document.cookie.match(/(?:^|; )tf_lang=(ru|en)/);
+    const cookieLang = parseLang(match?.[1]);
+    if (cookieLang && cookieLang !== initialLang) {
+      setLangState(cookieLang);
+    }
+  }, [initialLang]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem("tf_lang") as Lang | null;
-    if (stored === "en" || stored === "ru") setLangState(stored);
-  }, []);
+    if (typeof document === "undefined") return;
+    document.documentElement.lang = lang;
+  }, [lang]);
 
   const setLang = (l: Lang) => {
     setLangState(l);
-    if (typeof window !== "undefined") window.localStorage.setItem("tf_lang", l);
+    persistLang(l);
   };
 
   const t = (k: TKey) => dict[lang][k] ?? dict.en[k] ?? k;

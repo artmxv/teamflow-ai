@@ -456,21 +456,18 @@ function WorkspaceChatPage() {
                 isDesktop && "flex",
               )}
             >
-              <div className="flex shrink-0 items-center justify-end gap-2 border-b border-border/60 px-3 py-2.5">
+              <div className="flex shrink-0 flex-col gap-2.5 border-b border-border/60 px-3 py-3">
                 <Button
                   type="button"
                   size="sm"
-                  variant="brand"
-                  className="h-10 shrink-0 gap-1.5 px-3"
+                  variant="outline"
+                  className="h-9 w-full justify-center gap-1.5"
                   aria-label={t("chat.newMessage")}
                   onClick={() => setDirectDialogOpen(true)}
                 >
                   <Plus className="size-4" aria-hidden="true" />
-                  <span className="hidden sm:inline">{t("chat.newMessage")}</span>
+                  <span>{t("chat.newMessage")}</span>
                 </Button>
-              </div>
-
-              <div className="shrink-0 border-b border-border/60 px-3 py-2">
                 <div className="relative">
                   <Search
                     className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
@@ -481,7 +478,7 @@ function WorkspaceChatPage() {
                     onChange={(event) => setConversationFilter(event.target.value)}
                     placeholder={t("chat.searchConversations")}
                     aria-label={t("chat.searchConversations")}
-                    className="h-9 bg-background/60 pl-8 text-sm sm:h-8"
+                    className="h-9 w-full bg-background/60 pl-8 text-sm"
                   />
                 </div>
               </div>
@@ -504,7 +501,7 @@ function WorkspaceChatPage() {
                     className="border-0 bg-transparent py-8 shadow-none"
                   />
                 ) : (
-                  <div className="p-2">
+                  <div className="px-2 py-2">
                     <ul className="space-y-0.5">
                       {[...pinned, ...unpinned].map((item) => (
                         <ConversationRow
@@ -651,7 +648,7 @@ function ConversationRow({
           className="flex min-h-12 min-w-0 flex-1 items-center gap-2.5 px-1 py-1.5 text-left"
         >
           {conversation.type === "DIRECT" && conversation.otherParticipant ? (
-            <span className="relative shrink-0">
+            <span className="relative flex size-8 shrink-0 items-center justify-center">
               <UserAvatar
                 id={conversation.otherParticipant.id}
                 name={conversation.otherParticipant.name}
@@ -671,17 +668,20 @@ function ConversationRow({
               ) : null}
             </span>
           ) : (
-            <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/15 text-primary">
-              <Users className="size-3.5" aria-hidden="true" />
+            <span
+              className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary"
+              aria-hidden="true"
+            >
+              <Users className="size-3.5 shrink-0" />
             </span>
           )}
-          <span className="min-w-0 flex-1 overflow-hidden">
-            <span className="flex min-w-0 items-center gap-2">
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">{name}</span>
+          <span className="flex min-w-0 flex-1 flex-col justify-center overflow-hidden">
+            <span className="flex min-w-0 items-center gap-2 leading-none">
+              <span className="min-w-0 flex-1 truncate text-sm font-medium leading-5">{name}</span>
               <SidebarTime iso={conversation.latestMessageAt} />
             </span>
             <span className="mt-0.5 flex min-w-0 items-center gap-2">
-              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+              <span className="min-w-0 flex-1 truncate text-xs leading-4 text-muted-foreground">
                 {preview}
               </span>
               {conversation.unreadCount > 0 ? (
