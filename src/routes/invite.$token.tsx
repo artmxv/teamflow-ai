@@ -210,7 +210,7 @@ function AcceptInvitePage() {
               <InviteSummary preview={preview} t={t} />
               <p className="text-sm text-muted-foreground">{shell.body}</p>
               {signedIn ? (
-                <Button asChild className="w-full bg-gradient-brand text-white">
+                <Button asChild variant="brand" className="w-full">
                   <Link to="/app/dashboard">{t("invite.goToDashboard")}</Link>
                 </Button>
               ) : (
@@ -226,7 +226,7 @@ function AcceptInvitePage() {
             <InviteSummary preview={preview} t={t} />
             <p className="text-sm text-muted-foreground">{t("invite.signInToAccept")}</p>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <Button asChild className="w-full min-w-0 bg-gradient-brand text-white sm:flex-1">
+              <Button asChild variant="brand" className="w-full min-w-0 sm:flex-1">
                 <Link to="/signin" search={{ redirect: returnPath }}>
                   {t("nav.signin")}
                 </Link>
@@ -271,13 +271,14 @@ function AcceptInvitePage() {
                 {viewState.messageKey === "invite.alreadyMember" ||
                 viewState.messageKey === "invite.seatLimit" ||
                 viewState.messageKey === "invite.noLongerAvailable" ? (
-                  <Button asChild className="w-full bg-gradient-brand text-white">
+                  <Button asChild variant="brand" className="w-full">
                     <Link to="/app/dashboard">{t("invite.goToDashboard")}</Link>
                   </Button>
                 ) : null}
                 {viewState.retryable ? (
                   <Button
-                    className="w-full bg-gradient-brand text-white"
+                    variant="brand"
+                    className="w-full"
                     aria-label={t("invite.acceptAria")}
                     disabled={isAccepting}
                     onClick={() => acceptMutation.mutate()}
@@ -298,7 +299,8 @@ function AcceptInvitePage() {
             {viewState.kind === "ready" && (
               <>
                 <Button
-                  className="w-full bg-gradient-brand text-white"
+                  variant="brand"
+                  className="w-full"
                   aria-label={t("invite.acceptAria")}
                   disabled={isAccepting}
                   onClick={() => acceptMutation.mutate()}

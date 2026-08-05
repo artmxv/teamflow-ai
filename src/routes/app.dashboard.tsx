@@ -9,7 +9,7 @@ import {
   CheckCircle2,
   ListTodo,
   Users,
-  ArrowUpRight,
+  Plus,
   Rocket,
   Sparkles,
   AlertTriangle,
@@ -28,7 +28,7 @@ import {
   type DashboardTaskStatus,
 } from "@/lib/api/dashboard";
 import { fetchWorkspaceAiSummary, workspaceAiSummaryQueryKey } from "@/lib/api/ai";
-import { fetchTasks } from "@/lib/api/tasks";
+import { fetchTasks, type TaskApiItem } from "@/lib/api/tasks";
 import {
   buildTaskActivitySeries,
   computeTaskAnalyticsCounts,
@@ -36,6 +36,7 @@ import {
   taskActivityHasData,
   type DashboardAnalyticsPeriod,
 } from "@/lib/dashboard-analytics";
+import { effectiveDueDate, formatDueDateTimeShort } from "@/lib/due-datetime";
 import type { TasksSearch } from "@/routes/app.tasks";
 import type { ProjectsSearch } from "@/lib/project-status-url";
 import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
@@ -215,6 +216,11 @@ function Dashboard() {
     [apiProjects],
   );
 
+  const upcomingDeadlines = useMemo(
+    () => pickUpcomingDeadlines(workspaceTasks, 5),
+    [workspaceTasks],
+  );
+
   const isEmptyWorkspace =
     !isLoading &&
     !isError &&
@@ -313,8 +319,8 @@ function Dashboard() {
         actions={
           canManageProjects ? (
             <NewProjectDialog>
-              <Button>
-                {t("common.newProject")} <ArrowUpRight className="size-4" />
+              <Button variant="brand">
+                <Plus className="size-4" /> {t("common.newProject")}
               </Button>
             </NewProjectDialog>
           ) : undefined
@@ -334,7 +340,7 @@ function Dashboard() {
             primaryAction={
               canManageProjects ? (
                 <NewProjectDialog>
-                  <Button>{t("common.createProject")}</Button>
+                  <Button variant="brand">{t("common.createProject")}</Button>
                 </NewProjectDialog>
               ) : undefined
             }
@@ -473,32 +479,62 @@ function Dashboard() {
         <div className="grid min-w-0 gap-4 xl:grid-cols-3">
           <DashboardAiInsightsCard />
 
-          <div className={cn(sectionSurfaceClass, "xl:col-span-2 self-start h-fit")}>
-            <DashboardSectionHeader
-              title={t("dashboard.projectProgress")}
-              action={
-                <Link to="/app/projects" className={sectionLinkClass}>
-                  {t("common.viewAll")}
-                </Link>
-              }
-            />
-            {projectsLoading ? (
-              <ProjectCardsSkeleton />
-            ) : projectsError ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                {t("common.errorServerHint")}
-              </p>
-            ) : dashboardProjects.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                {t("projects.emptyHint")}
-              </p>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {dashboardProjects.map((p) => (
-                  <DashboardProjectCard key={p.id} project={p} t={t} lang={lang} />
-                ))}
-              </div>
-            )}
+          <div className="flex min-w-0 flex-col gap-4 xl:col-span-2">
+            <div className={sectionSurfaceClass}>
+              <DashboardSectionHeader
+                title={t("dashboard.projectProgress")}
+                action={
+                  <Link to="/app/projects" className={sectionLinkClass}>
+                    {t("common.viewAll")}
+                  </Link>
+                }
+              />
+              {projectsLoading ? (
+                <ProjectCardsSkeleton />
+              ) : projectsError ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  {t("common.errorServerHint")}
+                </p>
+              ) : dashboardProjects.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  {t("projects.emptyHint")}
+                </p>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {dashboardProjects.map((p) => (
+                    <DashboardProjectCard key={p.id} project={p} t={t} lang={lang} />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className={sectionSurfaceClass}>
+              <DashboardSectionHeader
+                title={t("dashboard.upcomingDeadlines")}
+                action={
+                  <Link to="/app/tasks" search={{ status: "open" }} className={sectionLinkClass}>
+                    {t("common.seeAll")}
+                  </Link>
+                }
+              />
+              {tasksLoading ? (
+                <UpcomingDeadlinesSkeleton />
+              ) : tasksError ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  {t("common.errorServerHint")}
+                </p>
+              ) : upcomingDeadlines.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  {t("dashboard.noUpcomingDeadlines")}
+                </p>
+              ) : (
+                <ul className="divide-y divide-border/80">
+                  {upcomingDeadlines.map((task) => (
+                    <UpcomingDeadlineRow key={task.id} task={task} t={t} lang={lang} />
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         </div>
 
@@ -619,6 +655,130 @@ function formatUpdatedAt(value: string) {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function pickUpcomingDeadlines(tasks: TaskApiItem[], limit: number) {
+  return tasks
+    .filter((task) => task.status !== "DONE" && Boolean(task.dueDate))
+    .map((task) => ({
+      task,
+      dueMs: effectiveDueDate(task.dueDate!).getTime(),
+    }))
+    .filter((entry) => Number.isFinite(entry.dueMs))
+    .sort((a, b) => a.dueMs - b.dueMs)
+    .slice(0, limit)
+    .map((entry) => entry.task);
+}
+
+function dueUrgencyMeta(
+  dueDate: string,
+  now = new Date(),
+): { tone: "destructive" | "warning" | "muted"; hintKey: TKey | null } {
+  const due = effectiveDueDate(dueDate);
+  const startToday = new Date(now);
+  startToday.setHours(0, 0, 0, 0);
+  const startTomorrow = new Date(startToday);
+  startTomorrow.setDate(startTomorrow.getDate() + 1);
+  const startDayAfter = new Date(startToday);
+  startDayAfter.setDate(startDayAfter.getDate() + 2);
+
+  if (due.getTime() < now.getTime()) {
+    return { tone: "destructive", hintKey: "dashboard.dueOverdue" };
+  }
+  if (due.getTime() < startTomorrow.getTime()) {
+    return { tone: "warning", hintKey: "dashboard.dueToday" };
+  }
+  if (due.getTime() < startDayAfter.getTime()) {
+    return { tone: "warning", hintKey: "dashboard.dueTomorrow" };
+  }
+  return { tone: "muted", hintKey: null };
+}
+
+function UpcomingDeadlineRow({
+  task,
+  t,
+  lang,
+}: {
+  task: TaskApiItem;
+  t: (key: TKey) => string;
+  lang: import("@/lib/i18n").Lang;
+}) {
+  const status = recentStatusMeta[task.status];
+  const urgency = task.dueDate
+    ? dueUrgencyMeta(task.dueDate)
+    : { tone: "muted" as const, hintKey: null };
+  const assigneeOptions = task.assignees.map((assignee) => ({
+    id: assignee.id,
+    name: assignee.name,
+    email: assignee.email,
+    avatar: initialsFromName(assignee.name),
+    avatarUrl: assignee.avatarUrl ?? null,
+  }));
+  const dueLabel = task.dueDate ? formatDueDateTimeShort(task.dueDate) : "—";
+
+  return (
+    <li>
+      <Link
+        to="/app/tasks"
+        search={{ taskId: task.id }}
+        aria-label={`${t("dashboard.viewTask")}: ${translateStarterTitle(task.title, lang)}`}
+        className="flex gap-3 rounded-xl px-1 py-3 text-sm transition hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:items-center"
+      >
+        {assigneeOptions.length > 0 ? (
+          <AssigneeAvatars
+            assignees={assigneeOptions}
+            maxVisible={2}
+            className="mt-0.5 shrink-0 sm:mt-0"
+          />
+        ) : (
+          <div className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground sm:mt-0">
+            —
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="min-w-0 break-words font-medium leading-snug sm:truncate">
+            {translateStarterTitle(task.title, lang)}
+          </div>
+          <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="max-w-full truncate">
+              {translateStarterProjectName(task.project.name, lang)}
+            </span>
+            <Badge variant="secondary" className={status.tone + " capitalize"}>
+              {t(status.labelKey)}
+            </Badge>
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 tabular-nums font-medium",
+                urgency.tone === "destructive" && "text-destructive",
+                urgency.tone === "warning" && "text-warning-foreground",
+                urgency.tone === "muted" && "text-muted-foreground",
+              )}
+            >
+              <CalendarClock className="size-3 shrink-0" aria-hidden />
+              {dueLabel}
+              {urgency.hintKey ? <span className="font-normal">· {t(urgency.hintKey)}</span> : null}
+            </span>
+          </div>
+        </div>
+      </Link>
+    </li>
+  );
+}
+
+function UpcomingDeadlinesSkeleton() {
+  return (
+    <div className="space-y-3 py-1">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div key={index} className="flex items-center gap-3">
+          <Skeleton className="size-8 shrink-0 rounded-full" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-3 w-1/2" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function mapApiProjectToDashboardCard(project: ProjectApiItem): DashboardProjectCard {
@@ -902,10 +1062,7 @@ const analyticsCardLinkClass =
 
 type AnalyticsMetricTone = "destructive" | "warning" | "muted";
 
-const analyticsToneClass: Record<
-  AnalyticsMetricTone,
-  { icon: string; value: string }
-> = {
+const analyticsToneClass: Record<AnalyticsMetricTone, { icon: string; value: string }> = {
   destructive: {
     icon: "bg-destructive/10 text-destructive group-hover:bg-destructive/15",
     value: "text-foreground",

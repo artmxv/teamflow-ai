@@ -3,23 +3,29 @@ import { Moon, Sun } from "lucide-react";
 
 type Theme = "light" | "dark";
 
-/** Inline IIFE for <head>: applies theme before React/hydration. SSR-safe (runs only in browser). */
+const DEFAULT_BRAND_THEME = "default";
+
+/** Inline IIFE for <head>: applies brand + light/dark before React/hydration. SSR-safe. */
 export const THEME_INIT_SCRIPT = `
 (function () {
   try {
+    var root = document.documentElement;
+    root.setAttribute("data-brand-theme", "${DEFAULT_BRAND_THEME}");
     var stored = localStorage.getItem("tf_theme");
     var isDark;
     if (stored === "dark") isDark = true;
     else if (stored === "light") isDark = false;
     else isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.classList.toggle("dark", isDark);
+    root.classList.toggle("dark", isDark);
   } catch (_) {}
 })();
 `.trim();
 
-function readThemeFromDocument(): Theme {
-  if (typeof document === "undefined") return "light";
-  return document.documentElement.classList.contains("dark") ? "dark" : "light";
+function ensureBrandThemeAttribute() {
+  if (typeof document === "undefined") return;
+  if (!document.documentElement.getAttribute("data-brand-theme")) {
+    document.documentElement.setAttribute("data-brand-theme", DEFAULT_BRAND_THEME);
+  }
 }
 
 const Ctx = createContext<{ theme: Theme; toggle: () => void; setTheme: (t: Theme) => void }>({
@@ -31,12 +37,13 @@ const Ctx = createContext<{ theme: Theme; toggle: () => void; setTheme: (t: Them
 export function ThemeProvider({ children }: { children: ReactNode }) {
   // Important for SSR/hydration consistency:
   // - SSR can't know user's theme, so the server-rendered tree is effectively "light".
-  // - THEME_INIT_SCRIPT applies the correct <html class="dark"> before hydration to avoid flash.
+  // - THEME_INIT_SCRIPT applies data-brand-theme + <html class="dark"> before hydration to avoid flash.
   // - We keep the first client render aligned with SSR ("light") and then sync in an effect.
   const [theme, setThemeState] = useState<Theme>("light");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    ensureBrandThemeAttribute();
     const stored = window.localStorage.getItem("tf_theme") as Theme | null;
     const prefers = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     const initial = stored ?? prefers;
@@ -47,6 +54,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const apply = (t: Theme) => {
     setThemeState(t);
     if (typeof window !== "undefined") {
+      ensureBrandThemeAttribute();
       window.localStorage.setItem("tf_theme", t);
       document.documentElement.classList.toggle("dark", t === "dark");
     }

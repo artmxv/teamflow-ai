@@ -105,11 +105,7 @@ import {
   Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  combineLocalDateAndTime,
-  formatDueDateTime,
-  splitLocalDateTime,
-} from "@/lib/due-datetime";
+import { combineLocalDateAndTime, formatDueDateTime, splitLocalDateTime } from "@/lib/due-datetime";
 
 export type TaskDrawerUpdates = {
   title: string;
@@ -339,6 +335,7 @@ export function TaskDrawer({
   const project = getProject(task.projectId);
   const prio = priorityMeta[task.priority];
   const statusLabel = taskStatusLabel(task.status, t);
+  const descriptionText = displayTaskDescription(task.description, lang).trim();
 
   function handleSaveChanges() {
     if (!onSaveChanges || isSaving) return;
@@ -358,7 +355,9 @@ export function TaskDrawer({
       title: draftTitle.trim(),
       assigneeIds: draftAssigneeIds,
       dueDate:
-        hasDate && hasTime ? combineLocalDateAndTime(draftDueDate.trim(), draftDueTime.trim()) : null,
+        hasDate && hasTime
+          ? combineLocalDateAndTime(draftDueDate.trim(), draftDueTime.trim())
+          : null,
       status: draftStatus,
       priority: draftPriority,
     });
@@ -415,41 +414,43 @@ export function TaskDrawer({
             </section>
           ) : null}
 
-          <div className="grid gap-6 py-4 lg:grid-cols-[1fr_220px]">
+          <div className="grid gap-6 py-4 lg:grid-cols-[1fr_240px]">
             <div className="min-w-0 space-y-6">
-              <section>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {t("projects.new.description")}
-                </h3>
-                <p className="text-sm leading-relaxed text-foreground/90">
-                  {displayTaskDescription(task.description, lang)}
-                </p>
-              </section>
+              {descriptionText ? (
+                <section>
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {t("projects.new.description")}
+                  </h3>
+                  <p className="text-sm leading-relaxed text-foreground/90">{descriptionText}</p>
+                </section>
+              ) : null}
 
-              <section>
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {t("tasks.sectionChecklist")}
-                </h3>
-                <ul className="space-y-1.5">
-                  {task.checklist.map((c) => (
-                    <li key={c.id} className="flex items-center gap-2 text-sm">
-                      <span
-                        className={cn(
-                          "grid size-5 place-items-center rounded-md border",
-                          c.done
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-input",
-                        )}
-                      >
-                        {c.done && <Check className="size-3" />}
-                      </span>
-                      <span className={cn(c.done && "text-muted-foreground line-through")}>
-                        {c.label}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
+              {task.checklist.length > 0 ? (
+                <section>
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {t("tasks.sectionChecklist")}
+                  </h3>
+                  <ul className="space-y-1.5">
+                    {task.checklist.map((c) => (
+                      <li key={c.id} className="flex items-center gap-2 text-sm">
+                        <span
+                          className={cn(
+                            "grid size-5 place-items-center rounded-md border",
+                            c.done
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-input",
+                          )}
+                        >
+                          {c.done && <Check className="size-3" />}
+                        </span>
+                        <span className={cn(c.done && "text-muted-foreground line-through")}>
+                          {c.label}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
 
               <TaskAttachmentsSection
                 attachments={attachmentsQuery.data ?? []}
@@ -558,7 +559,7 @@ export function TaskDrawer({
                     disabled={isSaving}
                     onValueChange={(value) => setDraftStatus(value as TaskStatus)}
                   >
-                    <SelectTrigger className="h-9 w-full">
+                    <SelectTrigger className="h-10 w-full">
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -583,7 +584,7 @@ export function TaskDrawer({
                     disabled={isSaving}
                     onValueChange={(value) => setDraftPriority(value as Priority)}
                   >
-                    <SelectTrigger className="h-9 w-full">
+                    <SelectTrigger className="h-10 w-full">
                       <SelectValue placeholder="Select priority" />
                     </SelectTrigger>
                     <SelectContent>
@@ -612,31 +613,27 @@ export function TaskDrawer({
               ) : null}
               <Field icon={Calendar} label={t("tasks.dueDate")}>
                 {canEditTask ? (
-                  <div className="flex flex-wrap items-start gap-2.5">
-                    <div className="min-w-[min(100%,14.375rem)] flex-[1.15_1_14.375rem]">
-                      <DeadlineDatePicker
-                        disabled={isSaving}
-                        value={draftDueDate}
-                        aria-label={t("tasks.dueDate")}
-                        onChange={(next) => {
-                          setDraftDueDate(next);
-                          setDueDateTimeError(null);
-                        }}
-                      />
-                    </div>
-                    <div className="min-w-[min(100%,11.875rem)] flex-[1_1_11.875rem]">
-                      <DeadlineTimePicker
-                        disabled={isSaving}
-                        value={draftDueTime}
-                        aria-label={t("tasks.dueTime")}
-                        onChange={(next) => {
-                          setDraftDueTime(next);
-                          setDueDateTimeError(null);
-                        }}
-                      />
-                    </div>
+                  <div className="grid w-full gap-2.5">
+                    <DeadlineDatePicker
+                      disabled={isSaving}
+                      value={draftDueDate}
+                      aria-label={t("tasks.dueDate")}
+                      onChange={(next) => {
+                        setDraftDueDate(next);
+                        setDueDateTimeError(null);
+                      }}
+                    />
+                    <DeadlineTimePicker
+                      disabled={isSaving}
+                      value={draftDueTime}
+                      aria-label={t("tasks.dueTime")}
+                      onChange={(next) => {
+                        setDraftDueTime(next);
+                        setDueDateTimeError(null);
+                      }}
+                    />
                     {dueDateTimeError ? (
-                      <p className="basis-full text-xs leading-4 text-destructive">{dueDateTimeError}</p>
+                      <p className="text-xs leading-4 text-destructive">{dueDateTimeError}</p>
                     ) : null}
                   </div>
                 ) : (
@@ -646,9 +643,8 @@ export function TaskDrawer({
               {canEditTask && (
                 <Button
                   type="button"
-                  size="sm"
                   variant="brand"
-                  className="w-full"
+                  className="h-10 w-full"
                   disabled={!canSaveChanges || isSaving}
                   onClick={handleSaveChanges}
                 >
@@ -659,8 +655,7 @@ export function TaskDrawer({
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
-                  className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  className="h-10 w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
                   disabled={isDeleting}
                   onClick={() => setDeleteTaskOpen(true)}
                 >
@@ -848,8 +843,10 @@ function TaskCommentsSection({
           }}
         />
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] text-muted-foreground">{trimmedLength}/1000</span>
-          <Button type="button" size="sm" disabled={!canSubmit} onClick={onSubmit}>
+          <span className="text-[11px] tabular-nums text-muted-foreground">
+            {trimmedLength >= 900 ? `${trimmedLength}/1000` : null}
+          </span>
+          <Button type="button" size="sm" variant="brand" disabled={!canSubmit} onClick={onSubmit}>
             {isSubmitting ? t("tasks.postingComment") : t("tasks.postComment")}
           </Button>
         </div>
@@ -989,6 +986,7 @@ function TaskCommentRow({
               <Button
                 type="button"
                 size="sm"
+                variant="brand"
                 className="h-7 px-2 text-xs"
                 disabled={!canSaveEdit}
                 onClick={saveEditing}
@@ -1054,8 +1052,8 @@ function TaskAttachmentsSection({
           <Button
             type="button"
             size="sm"
-            variant="brand"
-            className="h-7 gap-1.5 px-2 text-xs"
+            variant="outline"
+            className="h-8 gap-1.5 px-2.5 text-xs"
             disabled={isUploading}
             onClick={onPickFile}
           >
@@ -1102,8 +1100,8 @@ function TaskAttachmentsSection({
               <Button
                 type="button"
                 size="sm"
-                variant="brand"
-                className="h-7 gap-1.5 px-2 text-xs"
+                variant="outline"
+                className="h-8 gap-1.5 px-2.5 text-xs"
                 disabled={isUploading}
                 onClick={onPickFile}
               >
@@ -1153,7 +1151,9 @@ function TaskAttachmentsSection({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeletingSelected}>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeletingSelected}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
             <Button
               type="button"
               variant="destructive"

@@ -360,7 +360,7 @@ function TeamPage() {
         <button
           type="button"
           aria-label={t("team.memberActionsAria").replace("{name}", member.name)}
-          className="rounded-md p-1 text-muted-foreground transition outline-none hover:bg-secondary hover:text-foreground focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground/30"
+          className="grid size-8 place-items-center rounded-md border border-transparent text-muted-foreground transition outline-none hover:border-control-border hover:bg-control-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
         >
           <MoreHorizontal className="size-4" />
         </button>

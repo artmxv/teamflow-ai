@@ -138,10 +138,10 @@ function ProjectsIndexPage() {
               key={f.key}
               onClick={() => setStatusFilter(f.key)}
               className={
-                "rounded-lg px-3 py-1.5 text-sm transition " +
+                "h-10 rounded-lg border px-3 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 " +
                 (filter === f.key
-                  ? "bg-foreground text-background"
-                  : "bg-secondary text-secondary-foreground hover:bg-secondary/70")
+                  ? "border-primary/30 bg-primary/12 text-primary shadow-sm"
+                  : "border-control-border bg-control text-control-foreground hover:bg-control-hover")
               }
             >
               {t(f.labelKey)}

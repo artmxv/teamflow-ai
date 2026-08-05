@@ -219,7 +219,10 @@ function SidebarTime({ iso }: { iso: string | null }) {
   }, [iso, lang, t]);
 
   return (
-    <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums" suppressHydrationWarning>
+    <span
+      className="shrink-0 text-[10px] text-muted-foreground tabular-nums"
+      suppressHydrationWarning
+    >
       {label}
     </span>
   );
@@ -457,12 +460,12 @@ function WorkspaceChatPage() {
                 <Button
                   type="button"
                   size="sm"
-                  variant="outline"
-                  className="h-9 shrink-0 gap-1.5 px-2.5 sm:h-8"
+                  variant="brand"
+                  className="h-10 shrink-0 gap-1.5 px-3"
                   aria-label={t("chat.newMessage")}
                   onClick={() => setDirectDialogOpen(true)}
                 >
-                  <Plus className="size-3.5" aria-hidden="true" />
+                  <Plus className="size-4" aria-hidden="true" />
                   <span className="hidden sm:inline">{t("chat.newMessage")}</span>
                 </Button>
               </div>
@@ -570,11 +573,7 @@ function WorkspaceChatPage() {
   );
 }
 
-function ChatRealtimeStatus({
-  status,
-}: {
-  status: ReturnType<typeof getChatSocketStatus>;
-}) {
+function ChatRealtimeStatus({ status }: { status: ReturnType<typeof getChatSocketStatus> }) {
   const { t } = useI18n();
 
   if (status === "connected") {
@@ -600,10 +599,7 @@ function ChatRealtimeStatus({
   }
 
   return (
-    <p
-      className="shrink-0 text-xs text-amber-700 dark:text-amber-400"
-      aria-live="polite"
-    >
+    <p className="shrink-0 text-xs text-amber-700 dark:text-amber-400" aria-live="polite">
       {label}
     </p>
   );
@@ -685,7 +681,9 @@ function ConversationRow({
               <SidebarTime iso={conversation.latestMessageAt} />
             </span>
             <span className="mt-0.5 flex min-w-0 items-center gap-2">
-              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{preview}</span>
+              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                {preview}
+              </span>
               {conversation.unreadCount > 0 ? (
                 <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
                   {conversation.unreadCount > 99 ? "99+" : conversation.unreadCount}
@@ -1351,9 +1349,7 @@ function ConversationMessagePane({
         requestAnimationFrame(() => resolve());
       });
 
-      const target = listRef.current?.querySelector(
-        `[data-message-id="${CSS.escape(messageId)}"]`,
-      );
+      const target = listRef.current?.querySelector(`[data-message-id="${CSS.escape(messageId)}"]`);
       if (target instanceof HTMLElement) {
         ignoreScrollEventsRef.current = true;
         target.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1478,9 +1474,7 @@ function ConversationMessagePane({
       const previous = queryClient.getQueryData<ChatConversation[]>(conversationsQueryKey);
       updateChatConversationsCache(queryClient, (old) =>
         old.map((item) =>
-          item.id === conversationId
-            ? { ...item, title: nextTitle, displayName: nextTitle }
-            : item,
+          item.id === conversationId ? { ...item, title: nextTitle, displayName: nextTitle } : item,
         ),
       );
       return { previous };
@@ -1621,8 +1615,7 @@ function ConversationMessagePane({
     pendingFiles.length > 0 || pendingTasks.length > 0 || pendingProjects.length > 0;
   const remaining = CHAT_MESSAGE_MAX_LENGTH - draft.length;
   const canSend =
-    (draft.trim().length > 0 || hasAttachments) &&
-    draft.trim().length <= CHAT_MESSAGE_MAX_LENGTH;
+    (draft.trim().length > 0 || hasAttachments) && draft.trim().length <= CHAT_MESSAGE_MAX_LENGTH;
   const showCharCounter = draft.length >= COMPOSER_COUNTER_SOFT_LIMIT || remaining < 0;
   const showComposerMeta = Boolean(draftError) || showCharCounter;
   const showConversationMeta = page?.pageInfo.hasMoreOlder;
@@ -1682,25 +1675,25 @@ function ConversationMessagePane({
       ) : (
         <>
           {showConversationMeta ? (
-          <div className="flex shrink-0 items-center justify-center border-b border-border/60 px-4 py-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 text-xs text-muted-foreground"
-              disabled={loadingOlder}
-              onClick={() => void handleLoadOlder()}
-            >
-              {loadingOlder ? (
-                <>
-                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                  {t("common.loading")}
-                </>
-              ) : (
-                t("chat.loadOlder")
-              )}
-            </Button>
-          </div>
+            <div className="flex shrink-0 items-center justify-center border-b border-border/60 px-4 py-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs text-muted-foreground"
+                disabled={loadingOlder}
+                onClick={() => void handleLoadOlder()}
+              >
+                {loadingOlder ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                    {t("common.loading")}
+                  </>
+                ) : (
+                  t("chat.loadOlder")
+                )}
+              </Button>
+            </div>
           ) : null}
 
           <div
@@ -1749,177 +1742,178 @@ function ConversationMessagePane({
                           "bg-primary/10 ring-2 ring-primary/35 ring-offset-2 ring-offset-background",
                       )}
                     >
-                    <UserAvatar
-                      id={message.sender.id}
-                      name={message.sender.name}
-                      avatar={message.sender.avatar}
-                      avatarUrl={message.sender.avatarUrl}
-                      size="sm"
-                      className="mt-0.5 shrink-0"
-                    />
-                    {currentUserId ? (
-                      <ChatMessageReactionProvider
-                        conversationId={conversationId}
-                        message={message}
-                        currentUserId={currentUserId}
-                        align={align}
-                      >
-                        <div
-                          className={cn(
-                            "flex min-w-0 max-w-[min(100%,calc(100%-2.75rem),36rem)] flex-1 gap-1",
-                            isOwn ? "flex-row-reverse" : "flex-row",
-                          )}
+                      <UserAvatar
+                        id={message.sender.id}
+                        name={message.sender.name}
+                        avatar={message.sender.avatar}
+                        avatarUrl={message.sender.avatarUrl}
+                        size="sm"
+                        className="mt-0.5 shrink-0"
+                      />
+                      {currentUserId ? (
+                        <ChatMessageReactionProvider
+                          conversationId={conversationId}
+                          message={message}
+                          currentUserId={currentUserId}
+                          align={align}
                         >
                           <div
-                            tabIndex={0}
                             className={cn(
-                              "min-w-0 max-w-full overflow-hidden rounded-2xl border px-3 py-2.5 text-left sm:px-3.5",
-                              "outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-                              isOwn
-                                ? "border-primary/25 bg-primary/10"
-                                : "border-border/80 bg-background/60",
-                              activeMessageId === message.id && "bg-muted/40 ring-1 ring-border/80",
+                              "flex min-w-0 max-w-[min(100%,calc(100%-2.75rem),36rem)] flex-1 gap-1",
+                              isOwn ? "flex-row-reverse" : "flex-row",
                             )}
-                            onClick={() => {
-                              if (messageLongPressOpenedIdRef.current === message.id) {
-                                messageLongPressOpenedIdRef.current = null;
-                                return;
-                              }
-                              setActiveMessageId(message.id);
-                            }}
-                            onFocus={() => setActiveMessageId(message.id)}
-                            onKeyDown={(event) => {
-                              if (event.key === "Escape") {
-                                clearActiveMessage();
-                                (event.currentTarget as HTMLElement).blur();
-                              }
-                            }}
-                            onPointerDown={(event) => {
-                              if (!isMessageLongPressPointer(event.pointerType)) {
-                                return;
-                              }
-                              if (shouldIgnoreMessageLongPress(event.target)) {
-                                return;
-                              }
-
-                              const startX = event.clientX;
-                              const startY = event.clientY;
-                              const bubble = event.currentTarget;
-
-                              clearMessageLongPressTimer();
-                              messageLongPressTimerRef.current = window.setTimeout(() => {
-                                messageLongPressTimerRef.current = null;
-                                messageLongPressOpenedIdRef.current = message.id;
-                                setActiveMessageId(message.id);
-                                setActionsMenuMessageId(message.id);
-                              }, MESSAGE_LONG_PRESS_MS);
-
-                              const clear = () => {
-                                clearMessageLongPressTimer();
-                                bubble.removeEventListener("pointermove", onMove);
-                                bubble.removeEventListener("pointerup", clear);
-                                bubble.removeEventListener("pointercancel", clear);
-                              };
-
-                              const onMove = (moveEvent: PointerEvent) => {
-                                const dx = moveEvent.clientX - startX;
-                                const dy = moveEvent.clientY - startY;
-                                if (Math.hypot(dx, dy) > MESSAGE_LONG_PRESS_MOVE_PX) {
-                                  clear();
-                                }
-                              };
-
-                              bubble.addEventListener("pointermove", onMove);
-                              bubble.addEventListener("pointerup", clear);
-                              bubble.addEventListener("pointercancel", clear);
-                            }}
                           >
-                            {message.pin ? <ChatMessagePinBadge pin={message.pin} /> : null}
-                            <div className="mb-1 flex min-w-0 items-start gap-x-1.5">
-                              <div
-                                className={cn(
-                                  "flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5",
-                                  isOwn ? "justify-end" : "justify-start",
-                                )}
-                              >
-                                <span className="max-w-full truncate text-xs font-medium text-foreground/90">
-                                  {isOwn ? t("chat.you") : message.sender.name}
-                                </span>
-                                <ChatTimestamp iso={message.createdAt} />
-                              </div>
-                              <ChatMessageActions
-                                variant="menu"
-                                conversationId={conversationId}
-                                message={message}
-                                workspaceId={workspaceId}
-                                isOwn={isOwn}
-                                align={align}
-                                isActive={activeMessageId === message.id}
-                                menuOpen={actionsMenuMessageId === message.id}
-                                onMenuOpenChange={(open) => {
-                                  setActionsMenuMessageId(open ? message.id : null);
-                                  if (open) {
-                                    setActiveMessageId(message.id);
+                            <div
+                              tabIndex={0}
+                              className={cn(
+                                "min-w-0 max-w-full overflow-hidden rounded-2xl border px-3 py-2.5 text-left sm:px-3.5",
+                                "outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                                isOwn
+                                  ? "border-primary/25 bg-primary/10"
+                                  : "border-border/80 bg-background/60",
+                                activeMessageId === message.id &&
+                                  "bg-muted/40 ring-1 ring-border/80",
+                              )}
+                              onClick={() => {
+                                if (messageLongPressOpenedIdRef.current === message.id) {
+                                  messageLongPressOpenedIdRef.current = null;
+                                  return;
+                                }
+                                setActiveMessageId(message.id);
+                              }}
+                              onFocus={() => setActiveMessageId(message.id)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Escape") {
+                                  clearActiveMessage();
+                                  (event.currentTarget as HTMLElement).blur();
+                                }
+                              }}
+                              onPointerDown={(event) => {
+                                if (!isMessageLongPressPointer(event.pointerType)) {
+                                  return;
+                                }
+                                if (shouldIgnoreMessageLongPress(event.target)) {
+                                  return;
+                                }
+
+                                const startX = event.clientX;
+                                const startY = event.clientY;
+                                const bubble = event.currentTarget;
+
+                                clearMessageLongPressTimer();
+                                messageLongPressTimerRef.current = window.setTimeout(() => {
+                                  messageLongPressTimerRef.current = null;
+                                  messageLongPressOpenedIdRef.current = message.id;
+                                  setActiveMessageId(message.id);
+                                  setActionsMenuMessageId(message.id);
+                                }, MESSAGE_LONG_PRESS_MS);
+
+                                const clear = () => {
+                                  clearMessageLongPressTimer();
+                                  bubble.removeEventListener("pointermove", onMove);
+                                  bubble.removeEventListener("pointerup", clear);
+                                  bubble.removeEventListener("pointercancel", clear);
+                                };
+
+                                const onMove = (moveEvent: PointerEvent) => {
+                                  const dx = moveEvent.clientX - startX;
+                                  const dy = moveEvent.clientY - startY;
+                                  if (Math.hypot(dx, dy) > MESSAGE_LONG_PRESS_MOVE_PX) {
+                                    clear();
                                   }
-                                }}
-                                onDelete={() => setDeleteTarget(message)}
+                                };
+
+                                bubble.addEventListener("pointermove", onMove);
+                                bubble.addEventListener("pointerup", clear);
+                                bubble.addEventListener("pointercancel", clear);
+                              }}
+                            >
+                              {message.pin ? <ChatMessagePinBadge pin={message.pin} /> : null}
+                              <div className="mb-1 flex min-w-0 items-start gap-x-1.5">
+                                <div
+                                  className={cn(
+                                    "flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5",
+                                    isOwn ? "justify-end" : "justify-start",
+                                  )}
+                                >
+                                  <span className="max-w-full truncate text-xs font-medium text-foreground/90">
+                                    {isOwn ? t("chat.you") : message.sender.name}
+                                  </span>
+                                  <ChatTimestamp iso={message.createdAt} />
+                                </div>
+                                <ChatMessageActions
+                                  variant="menu"
+                                  conversationId={conversationId}
+                                  message={message}
+                                  workspaceId={workspaceId}
+                                  isOwn={isOwn}
+                                  align={align}
+                                  isActive={activeMessageId === message.id}
+                                  menuOpen={actionsMenuMessageId === message.id}
+                                  onMenuOpenChange={(open) => {
+                                    setActionsMenuMessageId(open ? message.id : null);
+                                    if (open) {
+                                      setActiveMessageId(message.id);
+                                    }
+                                  }}
+                                  onDelete={() => setDeleteTarget(message)}
+                                />
+                              </div>
+                              {message.content.trim() ? (
+                                <p className="max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-relaxed text-foreground/95">
+                                  {message.content}
+                                </p>
+                              ) : null}
+                              <ChatMessageAttachments
+                                attachments={message.attachments ?? []}
+                                onPreviewLayoutSettle={handlePreviewLayoutSettle}
                               />
+                              <ChatMessageReactionChips />
                             </div>
-                            {message.content.trim() ? (
-                              <p className="max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-relaxed text-foreground/95">
-                                {message.content}
-                              </p>
-                            ) : null}
-                            <ChatMessageAttachments
-                              attachments={message.attachments ?? []}
-                              onPreviewLayoutSettle={handlePreviewLayoutSettle}
+                            <ChatMessageActions
+                              variant="toolbar"
+                              conversationId={conversationId}
+                              message={message}
+                              workspaceId={workspaceId}
+                              isOwn={isOwn}
+                              align={align}
+                              onDelete={() => setDeleteTarget(message)}
                             />
-                            <ChatMessageReactionChips />
                           </div>
-                          <ChatMessageActions
-                            variant="toolbar"
-                            conversationId={conversationId}
-                            message={message}
-                            workspaceId={workspaceId}
-                            isOwn={isOwn}
-                            align={align}
-                            onDelete={() => setDeleteTarget(message)}
-                          />
-                        </div>
-                      </ChatMessageReactionProvider>
-                    ) : (
-                      <div
-                        className={cn(
-                          "min-w-0 max-w-[min(100%,calc(100%-2.75rem),36rem)] overflow-hidden rounded-2xl border px-3 py-2.5 sm:px-3.5",
-                          isOwn
-                            ? "border-primary/25 bg-primary/10"
-                            : "border-border/80 bg-background/60",
-                        )}
-                      >
-                        {message.pin ? <ChatMessagePinBadge pin={message.pin} /> : null}
+                        </ChatMessageReactionProvider>
+                      ) : (
                         <div
                           className={cn(
-                            "mb-1 flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5",
-                            isOwn ? "justify-end" : "justify-start",
+                            "min-w-0 max-w-[min(100%,calc(100%-2.75rem),36rem)] overflow-hidden rounded-2xl border px-3 py-2.5 sm:px-3.5",
+                            isOwn
+                              ? "border-primary/25 bg-primary/10"
+                              : "border-border/80 bg-background/60",
                           )}
                         >
-                          <span className="max-w-full truncate text-xs font-medium text-foreground/90">
-                            {isOwn ? t("chat.you") : message.sender.name}
-                          </span>
-                          <ChatTimestamp iso={message.createdAt} />
+                          {message.pin ? <ChatMessagePinBadge pin={message.pin} /> : null}
+                          <div
+                            className={cn(
+                              "mb-1 flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5",
+                              isOwn ? "justify-end" : "justify-start",
+                            )}
+                          >
+                            <span className="max-w-full truncate text-xs font-medium text-foreground/90">
+                              {isOwn ? t("chat.you") : message.sender.name}
+                            </span>
+                            <ChatTimestamp iso={message.createdAt} />
+                          </div>
+                          {message.content.trim() ? (
+                            <p className="max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-relaxed text-foreground/95">
+                              {message.content}
+                            </p>
+                          ) : null}
+                          <ChatMessageAttachments
+                            attachments={message.attachments ?? []}
+                            onPreviewLayoutSettle={handlePreviewLayoutSettle}
+                          />
                         </div>
-                        {message.content.trim() ? (
-                          <p className="max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-relaxed text-foreground/95">
-                            {message.content}
-                          </p>
-                        ) : null}
-                        <ChatMessageAttachments
-                          attachments={message.attachments ?? []}
-                          onPreviewLayoutSettle={handlePreviewLayoutSettle}
-                        />
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
                   </div>
                 );
               })
@@ -1991,7 +1985,7 @@ function ConversationMessagePane({
                     disabled={sendMutation.isPending}
                     rows={1}
                     maxLength={CHAT_MESSAGE_MAX_LENGTH + 50}
-                    className="min-h-9 max-h-40 resize-none overflow-x-hidden overflow-y-auto bg-card py-2 leading-5 break-words [overflow-wrap:anywhere]"
+                    className="min-h-10 max-h-40 resize-none overflow-x-hidden overflow-y-auto border-control-border bg-control py-2 leading-5 break-words [overflow-wrap:anywhere]"
                   />
                   {showComposerMeta ? (
                     <div className="mt-1 flex items-center justify-between gap-2 px-0.5">
@@ -2012,9 +2006,11 @@ function ConversationMessagePane({
               </div>
               <Button
                 type="submit"
+                variant="brand"
                 disabled={!canSend || sendMutation.isPending}
-                className="h-10 w-full shrink-0 sm:h-9 sm:w-auto"
+                className="h-10 w-full shrink-0 sm:w-auto"
                 aria-label={t("chat.send")}
+                title={t("chat.send")}
               >
                 {sendMutation.isPending ? (
                   <>
@@ -2024,7 +2020,7 @@ function ConversationMessagePane({
                 ) : (
                   <>
                     <Send className="size-4" aria-hidden="true" />
-                    {t("chat.send")}
+                    <span className="hidden sm:inline">{t("chat.send")}</span>
                   </>
                 )}
               </Button>
@@ -2107,7 +2103,12 @@ function ConversationMessagePane({
             >
               {t("common.cancel")}
             </Button>
-            <Button type="button" onClick={submitRename} disabled={renameMutation.isPending}>
+            <Button
+              type="button"
+              onClick={submitRename}
+              variant="brand"
+              disabled={renameMutation.isPending}
+            >
               {renameMutation.isPending ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
