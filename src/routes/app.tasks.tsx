@@ -8,6 +8,7 @@ import { useCurrentWorkspace } from "@/lib/auth/use-current-user";
 import { invalidateWorkspaceContentQueries } from "@/lib/workspace-queries";
 import { AppShell } from "@/components/app/AppShell";
 import { ApiErrorState } from "@/components/app/ApiErrorState";
+import { CREATE_ACTION_BUTTON_CLASSNAME, FilterBar } from "@/components/app/FilterBar";
 import { type Task, type TaskStatus, type Priority } from "@/lib/mock-data";
 import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
@@ -316,6 +317,22 @@ function TasksPage() {
       toast.error(t("tasks.updateFailed"));
     },
   });
+  const updateDescriptionMutation = useMutation({
+    mutationFn: ({ id, description }: { id: string; description: string | null }) =>
+      updateTask(id, { description }),
+    onSuccess: async (updated) => {
+      await invalidateWorkspaceContentQueries(queryClient, workspaceId);
+      invalidateNotifications(queryClient);
+      setSelected((prev) => {
+        if (!prev || prev.id !== updated.id) return prev;
+        return mapApiTaskToRow(updated);
+      });
+      toast.success(t("tasks.updated"));
+    },
+    onError: () => {
+      toast.error(t("tasks.updateFailed"));
+    },
+  });
   const assigneeOptions = useMemo(
     () =>
       buildFilterAssigneeOptions(
@@ -476,7 +493,7 @@ function TasksPage() {
               projectOptions={projectOptions}
               onSubmit={handleCreateTask}
             >
-              <Button size="sm" variant="brand">
+              <Button size="sm" variant="brand" className={CREATE_ACTION_BUTTON_CLASSNAME}>
                 <Plus className="size-4" /> {t("common.newTask")}
               </Button>
             </NewTaskDialog>
@@ -486,77 +503,79 @@ function TasksPage() {
         }
       />
 
-      <div className="mb-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-        <div className="relative min-w-0 w-full">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={t("tasks.searchTasks")}
-            className="pl-9"
-          />
+      <FilterBar>
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+          <div className="relative min-w-0 w-full">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={t("tasks.searchTasks")}
+              className="border-control-border bg-background/70 pl-9"
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(9rem,auto)_minmax(9rem,auto)_minmax(11rem,auto)_auto]">
+            <Select
+              value={status}
+              onValueChange={(value) => setStatusFilter(value as TaskListStatusFilter)}
+            >
+              <SelectTrigger className="w-full min-w-[9rem] border-control-border bg-background/70">
+                <SelectValue>{getStatusFilterTriggerLabel(status, t)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("tasks.allStatus")}</SelectItem>
+                <SelectItem value="open">{t("tasks.openStatus")}</SelectItem>
+                {(Object.keys(statusMeta) as TaskStatus[]).map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {t(statusMeta[s].labelKey)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={priority}
+              onValueChange={(value) => setPriority(value as Priority | "all")}
+            >
+              <SelectTrigger className="w-full min-w-[9rem] border-control-border bg-background/70">
+                <SelectValue>{getPriorityFilterTriggerLabel(priority, t)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("tasks.allPriorities")}</SelectItem>
+                {(["low", "medium", "high", "urgent"] as Priority[]).map((p) => (
+                  <SelectItem key={p} value={p}>
+                    {t(priorityMeta[p].labelKey)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={assigneeFilter} onValueChange={(value) => setAssigneeListFilter(value)}>
+              <SelectTrigger className="w-full min-w-[11rem] border-control-border bg-background/70">
+                <SelectValue>
+                  {getAssigneeFilterTriggerLabel(assigneeFilter, assigneeOptions, t)}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("tasks.allAssignees")}</SelectItem>
+                <SelectItem value="unassigned">{t("tasks.noAssignees")}</SelectItem>
+                {assigneeOptions.map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    {option.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              className="h-10 w-full sm:w-auto"
+              disabled={!hasActiveFilters}
+              onClick={clearFilters}
+            >
+              <RotateCcw className="size-4" />
+              {t("common.resetFilters")}
+            </Button>
+          </div>
         </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(9rem,auto)_minmax(9rem,auto)_minmax(11rem,auto)_auto]">
-          <Select
-            value={status}
-            onValueChange={(value) => setStatusFilter(value as TaskListStatusFilter)}
-          >
-            <SelectTrigger className="w-full min-w-[9rem]">
-              <SelectValue>{getStatusFilterTriggerLabel(status, t)}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("tasks.allStatus")}</SelectItem>
-              <SelectItem value="open">{t("tasks.openStatus")}</SelectItem>
-              {(Object.keys(statusMeta) as TaskStatus[]).map((s) => (
-                <SelectItem key={s} value={s}>
-                  {t(statusMeta[s].labelKey)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={priority}
-            onValueChange={(value) => setPriority(value as Priority | "all")}
-          >
-            <SelectTrigger className="w-full min-w-[9rem]">
-              <SelectValue>{getPriorityFilterTriggerLabel(priority, t)}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("tasks.allPriorities")}</SelectItem>
-              {(["low", "medium", "high", "urgent"] as Priority[]).map((p) => (
-                <SelectItem key={p} value={p}>
-                  {t(priorityMeta[p].labelKey)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={assigneeFilter} onValueChange={(value) => setAssigneeListFilter(value)}>
-            <SelectTrigger className="w-full min-w-[11rem]">
-              <SelectValue>
-                {getAssigneeFilterTriggerLabel(assigneeFilter, assigneeOptions, t)}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("tasks.allAssignees")}</SelectItem>
-              <SelectItem value="unassigned">{t("tasks.noAssignees")}</SelectItem>
-              {assigneeOptions.map((option) => (
-                <SelectItem key={option.id} value={option.id}>
-                  {option.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            className="h-10 w-full sm:w-auto"
-            disabled={!hasActiveFilters}
-            onClick={clearFilters}
-          >
-            <RotateCcw className="size-4" />
-            {t("common.resetFilters")}
-          </Button>
-        </div>
-      </div>
+      </FilterBar>
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
         <div className="hidden grid-cols-[minmax(0,1fr)_100px_100px_120px_100px_88px] items-center gap-3 border-b border-border bg-muted/30 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground md:grid">
@@ -703,6 +722,13 @@ function TasksPage() {
           });
         }}
         isSaving={updateAssigneeMutation.isPending}
+        onSaveDescription={async (description) => {
+          if (!selected || updateDescriptionMutation.isPending) {
+            throw new Error("Description update already in progress");
+          }
+          await updateDescriptionMutation.mutateAsync({ id: selected.id, description });
+        }}
+        isSavingDescription={updateDescriptionMutation.isPending}
         onOpenChange={handleDrawerOpenChange}
         onDelete={(taskId) => deleteTaskMutation.mutate(taskId)}
         isDeleting={deleteTaskMutation.isPending}

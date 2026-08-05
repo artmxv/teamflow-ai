@@ -46,8 +46,7 @@ export function ChatConversationHeader({
   onPinnedPanelOpenChange,
 }: ChatConversationHeaderProps) {
   const { t } = useI18n();
-  const directParticipant =
-    conversation.type === "DIRECT" ? conversation.otherParticipant : null;
+  const directParticipant = conversation.type === "DIRECT" ? conversation.otherParticipant : null;
   const showRename = conversation.type === "WORKSPACE" && canRenameGeneral;
   const pinLabel = conversation.isPinned ? t("chat.unpinChat") : t("chat.pinChat");
 
@@ -110,12 +109,15 @@ export function ChatConversationHeader({
         </>
       ) : (
         <>
-          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/15 text-primary">
-            <Users className="size-3.5" aria-hidden="true" />
+          <span
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary"
+            aria-hidden="true"
+          >
+            <Users className="size-3.5 shrink-0" />
           </span>
-          <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 flex-1 flex-col justify-center">
             <h3 className="truncate text-sm font-semibold leading-5">{title}</h3>
-            <p className="h-4 truncate text-[11px] leading-4 text-muted-foreground">
+            <p className="mt-0.5 h-4 truncate text-[11px] leading-4 text-muted-foreground">
               {conversation.unreadCount > 0
                 ? conversation.unreadCount === 1
                   ? t("chat.unreadOne")

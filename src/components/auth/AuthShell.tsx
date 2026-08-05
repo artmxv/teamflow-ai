@@ -1,7 +1,15 @@
 import { type ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
-import { Sparkles } from "lucide-react";
-import { useI18n } from "@/lib/i18n";
+import { Bot, Check, KanbanSquare, ListTodo, MessageSquare } from "lucide-react";
+import { BrandLogo } from "@/components/brand/BrandLogo";
+import { PublicPageShell } from "@/components/landing/PublicPageShell";
+import { LanguageSwitcher, useI18n, type TKey } from "@/lib/i18n";
+
+const AUTH_POINTS: TKey[] = [
+  "landing.features.projectsTitle",
+  "landing.features.kanbanTitle",
+  "landing.features.chatTitle",
+  "landing.features.briefingsTitle",
+];
 
 export function AuthShell({
   title,
@@ -17,52 +25,75 @@ export function AuthShell({
   const { t } = useI18n();
 
   return (
-    <div className="grid min-h-screen lg:grid-cols-2">
-      {/* Left brand panel */}
-      <div className="relative hidden overflow-hidden lg:flex">
-        <div className="absolute inset-0 bg-gradient-brand" />
-        <div className="absolute inset-0 bg-grid opacity-30" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.25),transparent_50%)]" />
-        <div className="relative z-10 flex w-full flex-col justify-between p-12 text-white">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="grid size-9 place-items-center rounded-xl bg-white/15 backdrop-blur">
-              <Sparkles className="size-4" />
-            </div>
-            <span className="text-base font-semibold tracking-tight">TeamFlow AI</span>
-          </Link>
-          <div className="space-y-6">
-            <div className="rounded-2xl border border-white/15 bg-white/10 p-5 backdrop-blur">
-              <p className="text-sm leading-relaxed text-white/90">"{t("auth.shell.quote")}"</p>
-              <div className="mt-4 flex items-center gap-3">
-                <div className="grid size-9 place-items-center rounded-full bg-white/20 text-xs font-semibold">
-                  RB
-                </div>
-                <div className="text-sm">
-                  <div className="font-medium">{t("auth.shell.quoteAuthor")}</div>
-                  <div className="text-white/70 text-xs">{t("auth.shell.quoteRole")}</div>
-                </div>
+    <PublicPageShell className="relative">
+      <div className="pointer-events-none absolute inset-0 public-ambient opacity-90" />
+      <div className="pointer-events-none absolute inset-0 bg-grid opacity-30" />
+
+      <div className="relative z-10 grid min-h-screen lg:grid-cols-2">
+        {/* Brand panel — desktop only; mobile shows the form first */}
+        <aside className="relative hidden overflow-hidden border-r border-border/60 lg:flex lg:flex-col lg:justify-center lg:px-10 lg:py-12 xl:px-14">
+          <div className="mx-auto w-full max-w-lg">
+            <BrandLogo />
+            <h2 className="public-heading mt-10 max-w-md text-balance text-3xl font-semibold tracking-tight xl:text-[2.1rem]">
+              {t("auth.shell.leadTitle")}
+            </h2>
+            <p className="public-body mt-3 max-w-md text-sm text-muted-foreground">
+              {t("auth.shell.leadBody")}
+            </p>
+            <ul className="mt-8 space-y-3 text-sm leading-[1.45]">
+              {AUTH_POINTS.map((key) => (
+                <li key={key} className="flex items-center gap-2.5 text-foreground/90">
+                  <span className="grid size-6 place-items-center rounded-md bg-accent text-accent-foreground">
+                    <Check className="size-3.5" aria-hidden />
+                  </span>
+                  {t(key)}
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-10 rounded-2xl border border-border bg-card/80 p-5 shadow-card">
+              <div className="mb-4 text-xs font-medium leading-[1.3] text-muted-foreground">
+                {t("landing.preview.windowTitle")}
               </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <MiniTile icon={ListTodo} label={t("side.projects")} />
+                <MiniTile icon={KanbanSquare} label={t("side.kanban")} />
+                <MiniTile icon={MessageSquare} label={t("side.chat")} />
+                <MiniTile icon={Bot} label={t("side.assistant")} />
+              </div>
+              <p className="public-body mt-4 text-xs text-muted-foreground">
+                {t("auth.shell.previewHint")}
+              </p>
             </div>
-            <div className="text-xs text-white/60">{t("auth.shell.copyright")}</div>
+          </div>
+        </aside>
+
+        {/* Form panel */}
+        <div className="flex items-center justify-center px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
+          <div className="w-full max-w-[420px]">
+            <div className="mb-5 flex items-center justify-between gap-3 lg:mb-6">
+              <BrandLogo className="lg:hidden" />
+              <LanguageSwitcher className="ml-auto shrink-0" />
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card/85 p-5 shadow-card sm:p-7">
+              <h1 className="public-heading text-2xl font-semibold tracking-tight">{title}</h1>
+              <p className="public-body mt-1.5 text-sm text-muted-foreground">{subtitle}</p>
+              <div className="mt-6">{children}</div>
+              <div className="mt-5 text-sm leading-[1.45] text-muted-foreground">{footer}</div>
+            </div>
           </div>
         </div>
       </div>
+    </PublicPageShell>
+  );
+}
 
-      {/* Right form panel */}
-      <div className="flex items-center justify-center px-6 py-12 sm:px-12">
-        <div className="w-full max-w-md">
-          <Link to="/" className="mb-8 flex items-center gap-2 lg:hidden">
-            <div className="grid size-8 place-items-center rounded-lg bg-gradient-brand">
-              <Sparkles className="size-4 text-white" />
-            </div>
-            <span className="text-base font-semibold tracking-tight">TeamFlow AI</span>
-          </Link>
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-          <div className="mt-8">{children}</div>
-          <div className="mt-6 text-sm text-muted-foreground">{footer}</div>
-        </div>
-      </div>
+function MiniTile({ icon: Icon, label }: { icon: typeof ListTodo; label: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-background/70 p-3">
+      <Icon className="size-4 text-primary" aria-hidden />
+      <div className="mt-2 truncate text-xs font-medium leading-[1.3]">{label}</div>
     </div>
   );
 }

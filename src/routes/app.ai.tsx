@@ -126,7 +126,7 @@ function AssistantPage() {
         </ul>
       </nav>
 
-      <div className="grid gap-4 lg:h-[calc(100vh-11rem)] lg:grid-cols-[260px_1fr]">
+      <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
         <aside className="hidden flex-col rounded-2xl border border-border bg-card p-3 shadow-soft lg:flex">
           <div className="border-b border-border/60 pb-3">
             <div className="mb-2 flex items-center gap-1.5 px-2 pt-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/80">
@@ -140,11 +140,11 @@ function AssistantPage() {
               <p className="px-2 py-2 text-xs text-muted-foreground">{t("ai.metricsPending")}</p>
             )}
           </div>
-          <div className="mt-4 flex min-h-0 flex-1 flex-col border-b border-border/60 pb-3">
+          <div className="mt-4 flex flex-col border-b border-border/60 pb-3">
             <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/80">
               {t("ai.sectionsTitle")}
             </div>
-            <ul className="flex-1 space-y-0.5 overflow-y-auto">
+            <ul className="space-y-0.5">
               {SECTIONS.filter((section) => section.id !== "metrics").map((section) => (
                 <li key={section.id}>
                   <button
@@ -160,18 +160,18 @@ function AssistantPage() {
             </ul>
           </div>
           <Button
-            variant="brand"
+            variant="outline"
             size="sm"
-            className="mt-4 w-full"
+            className="mt-4 h-9 w-full justify-center gap-1.5 border-border bg-control text-control-foreground hover:bg-control-hover"
             disabled={!workspaceId || isLoading || isFetching}
             onClick={() => void handleRegenerate()}
           >
-            <RefreshCw className={"mr-1.5 size-3.5 " + (isFetching ? "animate-spin" : "")} />
+            <RefreshCw className={"size-3.5 " + (isFetching ? "animate-spin" : "")} />
             {isFetching ? t("ai.regenerating") : t("ai.regenerate")}
           </Button>
         </aside>
 
-        <section className="flex flex-col rounded-2xl border border-border bg-card shadow-soft lg:min-h-0">
+        <section className="flex flex-col rounded-2xl border border-border bg-card shadow-soft">
           <div className="flex items-center gap-3 border-b border-border px-5 py-3">
             <div className="grid size-9 place-items-center rounded-xl bg-gradient-brand shadow-glow">
               <Sparkles className="size-4 text-white" />
@@ -183,16 +183,16 @@ function AssistantPage() {
             <Button
               variant="outline"
               size="sm"
-              className="ml-auto h-10 shrink-0"
+              className="ml-auto h-9 shrink-0 justify-center gap-1.5 border-border bg-control text-control-foreground hover:bg-control-hover"
               disabled={!workspaceId || isLoading || isFetching}
               onClick={() => void handleRegenerate()}
             >
-              <RefreshCw className={"mr-1.5 size-3.5 " + (isFetching ? "animate-spin" : "")} />
+              <RefreshCw className={"size-3.5 " + (isFetching ? "animate-spin" : "")} />
               {isFetching ? t("ai.regenerating") : t("ai.regenerate")}
             </Button>
           </div>
 
-          <div className="space-y-6 px-5 py-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+          <div className="space-y-6 px-5 py-6">
             {!workspaceId || isLoading ? (
               <SummarySkeleton />
             ) : isError ? (
@@ -320,7 +320,7 @@ function StandupSummaryBlock({
             type="button"
             variant="outline"
             size="sm"
-            className="ml-auto h-8 gap-1.5 text-xs font-medium normal-case tracking-normal"
+            className="ml-auto h-8 gap-1.5 border-border bg-control text-xs font-medium normal-case tracking-normal text-control-foreground hover:bg-control-hover"
             onClick={() => void handleCopy()}
           >
             <Copy className="size-3.5" />

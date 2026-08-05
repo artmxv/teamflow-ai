@@ -304,6 +304,22 @@ function ProjectDetailPage() {
       toast.error(t("tasks.updateFailed"));
     },
   });
+  const updateDescriptionMutation = useMutation({
+    mutationFn: ({ id, description }: { id: string; description: string | null }) =>
+      updateTask(id, { description }),
+    onSuccess: async (updated) => {
+      await invalidateWorkspaceContentQueries(queryClient, workspaceId);
+      invalidateNotifications(queryClient);
+      setSelectedTask((prev) => {
+        if (!prev || prev.id !== updated.id) return prev;
+        return mapApiTaskToTask(updated, t);
+      });
+      toast.success(t("tasks.updated"));
+    },
+    onError: () => {
+      toast.error(t("tasks.updateFailed"));
+    },
+  });
 
   const selectedAssignees = useMemo(
     () => (selectedTask ? resolveTaskAssignees(apiTasks, selectedTask.id) : []),
@@ -409,6 +425,13 @@ function ProjectDetailPage() {
           });
         }}
         isSaving={updateAssigneeMutation.isPending}
+        onSaveDescription={async (description) => {
+          if (!selectedTask || updateDescriptionMutation.isPending) {
+            throw new Error("Description update already in progress");
+          }
+          await updateDescriptionMutation.mutateAsync({ id: selectedTask.id, description });
+        }}
+        isSavingDescription={updateDescriptionMutation.isPending}
         onOpenChange={(open) => !open && setSelectedTask(null)}
         onDelete={(taskId) => deleteTaskMutation.mutate(taskId)}
         isDeleting={deleteTaskMutation.isPending}
@@ -494,9 +517,7 @@ function EditProjectDialog({
               description: description.trim(),
               status,
               dueDate:
-                hasDate && hasTime
-                  ? combineLocalDateAndTime(dueDate.trim(), dueTime.trim())
-                  : null,
+                hasDate && hasTime ? combineLocalDateAndTime(dueDate.trim(), dueTime.trim()) : null,
             }).then(() => setOpen(false));
           }}
         >
@@ -559,9 +580,7 @@ function EditProjectDialog({
               />
             </div>
           </div>
-          {dueDateTimeError ? (
-            <p className="text-xs text-destructive">{dueDateTimeError}</p>
-          ) : null}
+          {dueDateTimeError ? <p className="text-xs text-destructive">{dueDateTimeError}</p> : null}
           <DialogFooter>
             <Button
               type="button"
@@ -1391,7 +1410,9 @@ function ProjectDocumentsSection({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeletingSelected}>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeletingSelected}>
+              {t("common.cancel")}
+            </AlertDialogCancel>
             <Button
               type="button"
               variant="destructive"

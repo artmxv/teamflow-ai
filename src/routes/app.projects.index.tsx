@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AvatarStack } from "@/components/app/Avatar";
 import { EmptyState } from "@/components/app/EmptyState";
+import { CREATE_ACTION_BUTTON_CLASSNAME, FilterBar } from "@/components/app/FilterBar";
 import { PageHeader } from "@/components/app/PageHeader";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import { members, projectStatusMeta, type Project, type ProjectStatus } from "@/lib/mock-data";
@@ -123,7 +124,7 @@ function ProjectsIndexPage() {
         actions={
           canManageProjects ? (
             <NewProjectDialog>
-              <Button variant="brand">
+              <Button variant="brand" className={CREATE_ACTION_BUTTON_CLASSNAME}>
                 <Plus className="size-4" /> {t("common.newProject")}
               </Button>
             </NewProjectDialog>
@@ -131,33 +132,35 @@ function ProjectsIndexPage() {
         }
       />
 
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-1.5">
-          {filters.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setStatusFilter(f.key)}
-              className={
-                "h-10 rounded-lg border px-3 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 " +
-                (filter === f.key
-                  ? "border-primary/30 bg-primary/12 text-primary shadow-sm"
-                  : "border-control-border bg-control text-control-foreground hover:bg-control-hover")
-              }
-            >
-              {t(f.labelKey)}
-            </button>
-          ))}
+      <FilterBar>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap gap-1.5">
+            {filters.map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setStatusFilter(f.key)}
+                className={
+                  "h-10 rounded-lg border px-3 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 " +
+                  (filter === f.key
+                    ? "border-primary/30 bg-primary/12 text-primary shadow-sm"
+                    : "border-control-border bg-background/70 text-control-foreground hover:bg-control-hover")
+                }
+              >
+                {t(f.labelKey)}
+              </button>
+            ))}
+          </div>
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={t("projects.searchProjects")}
+              className="border-control-border bg-background/70 pl-9"
+            />
+          </div>
         </div>
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={t("projects.searchProjects")}
-            className="pl-9"
-          />
-        </div>
-      </div>
+      </FilterBar>
 
       {isLoading ? (
         <LoadingGrid />

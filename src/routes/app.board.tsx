@@ -18,6 +18,7 @@ import { invalidateNotifications } from "@/lib/api/notifications";
 import { invalidateWorkspaceContentQueries } from "@/lib/workspace-queries";
 import { AppShell } from "@/components/app/AppShell";
 import { ApiErrorState } from "@/components/app/ApiErrorState";
+import { CREATE_ACTION_BUTTON_CLASSNAME, FilterBar } from "@/components/app/FilterBar";
 import { statusColumns, type Priority, type Task, type TaskStatus } from "@/lib/mock-data";
 import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
@@ -190,6 +191,19 @@ function Board() {
       toast.error(t("tasks.updateFailed"));
     },
   });
+  const updateDescriptionMutation = useMutation({
+    mutationFn: ({ id, description }: { id: string; description: string | null }) =>
+      updateTask(id, { description }),
+    onSuccess: async (updated) => {
+      await invalidateWorkspaceContentQueries(queryClient, workspaceId);
+      invalidateNotifications(queryClient);
+      setSelected((prev) => (prev?.id === updated.id ? mapApiTaskToTask(updated, t) : prev));
+      toast.success(t("tasks.updated"));
+    },
+    onError: () => {
+      toast.error(t("tasks.updateFailed"));
+    },
+  });
   const assigneeOptions = useMemo(
     () =>
       buildFilterAssigneeOptions(
@@ -303,7 +317,7 @@ function Board() {
               projectOptions={projectOptions}
               onSubmit={handleCreateTask}
             >
-              <Button size="sm" variant="brand">
+              <Button size="sm" variant="brand" className={CREATE_ACTION_BUTTON_CLASSNAME}>
                 <Plus className="size-4" /> {t("common.newTask")}
               </Button>
             </NewTaskDialog>
@@ -313,7 +327,7 @@ function Board() {
         }
       />
 
-      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-border bg-card p-3 shadow-soft sm:flex-row sm:items-center">
+      <FilterBar className="sm:flex-row sm:items-center">
         <div className="flex items-center gap-2 text-sm font-medium text-foreground">
           <Filter className="size-4 text-muted-foreground" /> {t("board.filters")}
         </div>
@@ -322,7 +336,7 @@ function Board() {
             value={priority}
             onValueChange={(value) => setPriority(value as Priority | "all")}
           >
-            <SelectTrigger className="w-full min-w-[10rem]">
+            <SelectTrigger className="w-full min-w-[10rem] border-control-border bg-background/70">
               <SelectValue placeholder={t("tasks.priority")} />
             </SelectTrigger>
             <SelectContent>
@@ -334,7 +348,7 @@ function Board() {
             </SelectContent>
           </Select>
           <Select value={assignee} onValueChange={setAssignee}>
-            <SelectTrigger className="w-full min-w-[10rem]">
+            <SelectTrigger className="w-full min-w-[10rem] border-control-border bg-background/70">
               <SelectValue placeholder={t("tasks.assignee")} />
             </SelectTrigger>
             <SelectContent>
@@ -359,7 +373,7 @@ function Board() {
             {t("common.clearFilters")}
           </Button>
         </div>
-      </div>
+      </FilterBar>
 
       {isError ? (
         <ApiErrorState
@@ -504,6 +518,13 @@ function Board() {
           });
         }}
         isSaving={updateAssigneeMutation.isPending}
+        onSaveDescription={async (description) => {
+          if (!selected || updateDescriptionMutation.isPending) {
+            throw new Error("Description update already in progress");
+          }
+          await updateDescriptionMutation.mutateAsync({ id: selected.id, description });
+        }}
+        isSavingDescription={updateDescriptionMutation.isPending}
         onOpenChange={(o) => !o && setSelected(null)}
         onDelete={(taskId) => deleteTaskMutation.mutate(taskId)}
         isDeleting={deleteTaskMutation.isPending}

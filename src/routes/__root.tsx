@@ -12,12 +12,15 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { THEME_INIT_SCRIPT, ThemeProvider } from "../lib/theme";
-import { LanguageProvider, useI18n } from "../lib/i18n";
+import { getPreferredLang } from "../lib/i18n-lang";
+import { LANG_INIT_SCRIPT } from "../lib/i18n-locale";
+import { LanguageProvider, useI18n, type Lang } from "../lib/i18n";
 import { Toaster } from "../components/ui/sonner";
 
 function NotFoundComponent() {
+  const { lang } = Route.useRouteContext();
   return (
-    <LanguageProvider>
+    <LanguageProvider initialLang={lang}>
       <NotFoundInner />
     </LanguageProvider>
   );
@@ -89,7 +92,11 @@ function ErrorInner({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
-export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient; lang: Lang }>()({
+  beforeLoad: async () => {
+    const lang = await getPreferredLang();
+    return { lang };
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -124,6 +131,7 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en" className="app-scrollbar" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: LANG_INIT_SCRIPT }} />
         <HeadContent />
       </head>
       <body>
@@ -135,12 +143,12 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 function RootComponent() {
-  const { queryClient } = Route.useRouteContext();
+  const { queryClient, lang } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <LanguageProvider>
+        <LanguageProvider initialLang={lang}>
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <Outlet />
           <Toaster />

@@ -128,6 +128,8 @@ export function TaskDrawer({
   onOpenChange,
   onSaveChanges,
   isSaving = false,
+  onSaveDescription,
+  isSavingDescription = false,
   onDelete,
   isDeleting = false,
 }: {
@@ -136,6 +138,8 @@ export function TaskDrawer({
   onOpenChange: (open: boolean) => void;
   onSaveChanges?: (updates: TaskDrawerUpdates) => void;
   isSaving?: boolean;
+  onSaveDescription?: (description: string | null) => void | Promise<void>;
+  isSavingDescription?: boolean;
   onDelete?: (taskId: string) => void;
   isDeleting?: boolean;
 }) {
@@ -152,6 +156,8 @@ export function TaskDrawer({
   const [commentBody, setCommentBody] = useState("");
   const [deleteTaskOpen, setDeleteTaskOpen] = useState(false);
   const [dueDateTimeError, setDueDateTimeError] = useState<string | null>(null);
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [draftDescription, setDraftDescription] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useLayoutEffect(() => {
@@ -163,6 +169,8 @@ export function TaskDrawer({
       setDraftStatus("backlog");
       setDraftPriority("medium");
       setDueDateTimeError(null);
+      setEditingDescription(false);
+      setDraftDescription("");
       return;
     }
     const dueParts = splitLocalDateTime(task.dueDate);
@@ -173,10 +181,13 @@ export function TaskDrawer({
     setDraftStatus(task.status);
     setDraftPriority(task.priority);
     setDueDateTimeError(null);
+    setEditingDescription(false);
+    setDraftDescription(displayTaskDescription(task.description, lang));
   }, [
     lang,
     task?.assigneeId,
     task?.assigneeIds,
+    task?.description,
     task?.dueDate,
     task?.id,
     task?.priority,
@@ -317,6 +328,7 @@ export function TaskDrawer({
   const savedAssigneeIds = task.assigneeIds ?? (task.assigneeId ? [task.assigneeId] : []);
   const canEditTask = !!onSaveChanges;
   const canEditAssignees = canEditTask;
+  const canEditDescription = !!onSaveDescription;
   const displayedTaskTitle = displayTaskTitle(task.title, lang);
   const initialDueParts = splitLocalDateTime(task.dueDate);
   const hasTitleChanges = draftTitle.trim() !== displayedTaskTitle.trim();
@@ -336,6 +348,26 @@ export function TaskDrawer({
   const prio = priorityMeta[task.priority];
   const statusLabel = taskStatusLabel(task.status, t);
   const descriptionText = displayTaskDescription(task.description, lang).trim();
+  const savedDescriptionText = descriptionText;
+  const descriptionDraftNormalized = draftDescription.trim();
+  const hasDescriptionChanges = descriptionDraftNormalized !== savedDescriptionText;
+
+  async function handleSaveDescription() {
+    if (!onSaveDescription || isSavingDescription) return;
+    const next = descriptionDraftNormalized.length > 0 ? descriptionDraftNormalized : null;
+    try {
+      await onSaveDescription(next);
+      setEditingDescription(false);
+    } catch {
+      // Parent shows the API error toast; keep edit mode open.
+    }
+  }
+
+  function handleCancelDescriptionEdit() {
+    if (!task) return;
+    setDraftDescription(displayTaskDescription(task.description, lang));
+    setEditingDescription(false);
+  }
 
   function handleSaveChanges() {
     if (!onSaveChanges || isSaving) return;
@@ -366,7 +398,10 @@ export function TaskDrawer({
   return (
     <>
       <Sheet open={!!task} onOpenChange={onOpenChange}>
-        <SheetContent side="right" className="app-scrollbar w-full overflow-y-auto sm:max-w-2xl">
+        <SheetContent
+          side="right"
+          className="app-scrollbar w-full overflow-x-hidden overflow-y-auto sm:max-w-2xl"
+        >
           <SheetHeader className="space-y-1 border-b border-border pb-4">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="font-mono">{task.key}</span>
@@ -414,16 +449,89 @@ export function TaskDrawer({
             </section>
           ) : null}
 
-          <div className="grid gap-6 py-4 lg:grid-cols-[1fr_240px]">
+          <div className="grid gap-6 py-4 lg:grid-cols-[minmax(0,1fr)_240px]">
             <div className="min-w-0 space-y-6">
-              {descriptionText ? (
-                <section>
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    {t("projects.new.description")}
+              <section className="min-w-0">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {t("tasks.description")}
                   </h3>
-                  <p className="text-sm leading-relaxed text-foreground/90">{descriptionText}</p>
-                </section>
-              ) : null}
+                  {canEditDescription && !editingDescription ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 shrink-0 gap-1.5 px-2 text-xs"
+                      aria-label={t("tasks.editDescription")}
+                      onClick={() => {
+                        setDraftDescription(displayTaskDescription(task.description, lang));
+                        setEditingDescription(true);
+                      }}
+                    >
+                      <Pencil className="size-3.5" aria-hidden />
+                      {t("common.edit")}
+                    </Button>
+                  ) : null}
+                </div>
+
+                {editingDescription && canEditDescription ? (
+                  <div className="min-w-0 space-y-3">
+                    <Textarea
+                      id="task-drawer-description"
+                      value={draftDescription}
+                      disabled={isSavingDescription}
+                      rows={5}
+                      aria-label={t("tasks.description")}
+                      placeholder={t("tasks.descriptionPlaceholder")}
+                      className="min-h-[7.5rem] max-w-full resize-y break-words text-sm leading-relaxed [overflow-wrap:anywhere]"
+                      onChange={(event) => setDraftDescription(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape") {
+                          event.preventDefault();
+                          handleCancelDescriptionEdit();
+                        }
+                      }}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="brand"
+                        className="h-9 gap-1.5"
+                        disabled={isSavingDescription || !hasDescriptionChanges}
+                        onClick={() => void handleSaveDescription()}
+                      >
+                        {isSavingDescription ? (
+                          <>
+                            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                            {t("common.saving")}
+                          </>
+                        ) : (
+                          t("common.save")
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-9"
+                        disabled={isSavingDescription}
+                        onClick={handleCancelDescriptionEdit}
+                      >
+                        {t("common.cancel")}
+                      </Button>
+                    </div>
+                  </div>
+                ) : descriptionText ? (
+                  <p className="max-w-full break-words text-sm leading-relaxed text-foreground/90 [overflow-wrap:anywhere]">
+                    {descriptionText}
+                  </p>
+                ) : (
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {t("tasks.descriptionEmpty")}
+                  </p>
+                )}
+              </section>
 
               {task.checklist.length > 0 ? (
                 <section>
@@ -550,7 +658,7 @@ export function TaskDrawer({
               ) : null}
             </div>
 
-            <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+            <aside className="w-full space-y-4 lg:w-[240px] lg:shrink-0 lg:sticky lg:top-4 lg:self-start">
               <Field icon={CircleDot} label={t("tasks.status")}>
                 {canEditTask ? (
                   <Select

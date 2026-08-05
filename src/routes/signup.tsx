@@ -3,6 +3,7 @@ import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-rout
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AuthShell } from "@/components/auth/AuthShell";
+import { GoogleAuthButton } from "@/components/auth/GoogleAuthButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,14 +41,23 @@ export const Route = createFileRoute("/signup")({
       throw redirect({ href: getSafeRedirectPath(search.redirect) });
     }
   },
-  head: () => ({ meta: [{ title: "Create account — TeamFlow AI" }] }),
+  head: () => ({
+    meta: [
+      { title: "Create account — TeamFlow AI" },
+      {
+        name: "description",
+        content:
+          "Create a TeamFlow AI account for projects, tasks, Kanban, team chat, and grounded workspace briefings.",
+      },
+    ],
+  }),
   component: SignUp,
 });
 
 function SignUp() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { redirect: redirectPath, error: googleError } = Route.useSearch();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -56,6 +66,10 @@ function SignUp() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState<PasswordErrorCode | null>(null);
   const [confirmPasswordError, setConfirmPasswordError] = useState(false);
+
+  useEffect(() => {
+    document.title = `${t("auth.createAccount")} — TeamFlow AI`;
+  }, [lang, t]);
 
   useEffect(() => {
     if (!googleError) {
@@ -88,7 +102,7 @@ function SignUp() {
           <Link
             to="/signin"
             search={redirectPath ? { redirect: redirectPath } : undefined}
-            className="font-medium text-primary hover:underline"
+            className="font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/40"
           >
             {t("auth.signIn")}
           </Link>
@@ -126,14 +140,11 @@ function SignUp() {
           });
         }}
       >
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
+        <GoogleAuthButton
+          label={t("auth.continueWithGoogle")}
           onClick={() => startGoogleAuth(redirectPath)}
-        >
-          <GoogleIcon /> {t("auth.continueWithGoogle")}
-        </Button>
+          disabled={registerMutation.isPending}
+        />
         <div className="relative my-2 text-center text-xs text-muted-foreground">
           <span className="relative z-10 bg-background px-2">{t("auth.orWithEmail")}</span>
           <span className="absolute inset-x-0 top-1/2 -z-0 h-px bg-border" />
@@ -229,7 +240,8 @@ function SignUp() {
         </div>
         <Button
           type="submit"
-          className="w-full bg-gradient-brand text-white shadow-glow hover:opacity-95"
+          variant="brand"
+          className="w-full"
           disabled={registerMutation.isPending}
         >
           {registerMutation.isPending ? t("auth.creatingWorkspace") : t("auth.createWorkspace")}
@@ -237,16 +249,5 @@ function SignUp() {
         <p className="text-center text-xs text-muted-foreground">{t("auth.termsAgree")}</p>
       </form>
     </AuthShell>
-  );
-}
-
-function GoogleIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="size-4">
-      <path
-        fill="#EA4335"
-        d="M12 10.2v3.9h5.5c-.2 1.4-1.6 4-5.5 4-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.7 3.7 14.5 2.7 12 2.7 6.9 2.7 2.7 6.9 2.7 12s4.2 9.3 9.3 9.3c5.4 0 8.9-3.8 8.9-9.1 0-.6-.1-1-.1-1.5H12z"
-      />
-    </svg>
   );
 }
