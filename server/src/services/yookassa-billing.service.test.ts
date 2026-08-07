@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
-import { after, before, beforeEach, describe, it } from "node:test";
+import { after, afterEach, before, beforeEach, describe, it } from "node:test";
 import { Prisma } from "@prisma/client";
 
 import { env } from "../config/env.js";
@@ -20,6 +20,7 @@ import {
   yookassaBillingGateway,
   type YooKassaPaymentObject,
 } from "./yookassa-billing.service.js";
+import { createWorkspaceForUser } from "./workspaces.service.js";
 
 const suffix = randomBytes(4).toString("hex");
 const testEmailSuffix = `.${suffix}@yookassa-billing-test.teamflow.local`;
@@ -511,6 +512,188 @@ describe("yookassa-billing.service", () => {
     );
   });
 
+  it("applies Free downgrade atomically so concurrent usage cannot bypass Free limits", async () => {
+    const results = await Promise.allSettled([
+      createBillingPlanChangeSession({
+        userId: ownerId,
+        workspaceId,
+        role: "OWNER",
+        targetPlan: "FREE",
+      }),
+      createWorkspaceForUser({
+        userId: ownerId,
+        selectedWorkspaceId: workspaceId,
+        data: {
+          name: "Race Extra",
+          slug: `yookassa-extra-${suffix}-race`,
+        },
+      }),
+    ]);
+
+    const ownedCount = await prisma.workspaceMember.count({
+      where: { userId: ownerId, role: "OWNER", status: "ACTIVE" },
+    });
+    const plan = (
+      await prisma.workspace.findUniqueOrThrow({
+        where: { id: workspaceId },
+        select: { plan: true },
+      })
+    ).plan;
+
+    // Locks serialize the two billing paths: never Free with >1 owned workspace.
+    assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+    assert.equal(results.filter((result) => result.status === "rejected").length, 1);
+    assert.ok(!(plan === "FREE" && ownedCount > 1));
+    if (plan === "FREE") {
+      assert.equal(ownedCount, 1);
+    } else {
+      assert.equal(plan, "BUSINESS");
+      assert.equal(ownedCount, 2);
+    }
+  });
+
+  it("rejects non-test YooKassa payments on create and does not return a confirmation URL", async () => {
+    await prisma.workspace.update({
+      where: { id: workspaceId },
+      data: { plan: "FREE" },
+    });
+
+    yookassaBillingGateway.request = async (input) => {
+      yookassaRequests.push(input);
+      return {
+        id: `yk_live_${suffix}`,
+        status: "pending",
+        amount: { value: "990.00", currency: "RUB" },
+        test: false,
+        confirmation: {
+          type: "redirect",
+          confirmation_url: "https://yoomoney.ru/checkout/payments/v2/contract?orderId=live",
+        },
+        metadata: {},
+      };
+    };
+
+    await assert.rejects(
+      () =>
+        createBillingPlanChangeSession({
+          userId: ownerId,
+          workspaceId,
+          role: "OWNER",
+          targetPlan: "TEAM",
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.code, "YOOKASSA_TEST_MODE_REQUIRED");
+        assert.equal(error.statusCode, 502);
+        return true;
+      },
+    );
+
+    const payments = await prisma.billingPayment.findMany({ where: { workspaceId } });
+    assert.equal(payments.length, 1);
+    assert.equal(payments[0]?.status, "CANCELED");
+    assert.equal(payments[0]?.providerPaymentId, null);
+    assert.equal(
+      (await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).plan,
+      "FREE",
+    );
+  });
+
+  it("rejects non-test YooKassa payments on confirmation and does not change the plan", async () => {
+    await prisma.workspace.update({
+      where: { id: workspaceId },
+      data: { plan: "FREE" },
+    });
+    const payment = await prisma.billingPayment.create({
+      data: {
+        workspaceId,
+        provider: "YOOKASSA",
+        providerPaymentId: `yk_live_confirm_${suffix}`,
+        targetPlan: "TEAM",
+        amount: new Prisma.Decimal("990.00"),
+        currency: "RUB",
+        status: "PENDING",
+      },
+    });
+
+    await assert.rejects(
+      () =>
+        confirmProviderPayment({
+          id: payment.providerPaymentId!,
+          status: "succeeded",
+          amount: { value: "990.00", currency: "RUB" },
+          test: false,
+          metadata: {
+            workspaceId,
+            targetPlan: "TEAM",
+            paymentId: payment.id,
+          },
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.code, "YOOKASSA_TEST_MODE_REQUIRED");
+        return true;
+      },
+    );
+
+    assert.equal(
+      (await prisma.billingPayment.findUniqueOrThrow({ where: { id: payment.id } })).status,
+      "PENDING",
+    );
+    assert.equal(
+      (await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).plan,
+      "FREE",
+    );
+  });
+
+  it("rejects confirmation when providerPaymentId does not match the provider payment id", async () => {
+    await prisma.workspace.update({
+      where: { id: workspaceId },
+      data: { plan: "FREE" },
+    });
+    const payment = await prisma.billingPayment.create({
+      data: {
+        workspaceId,
+        provider: "YOOKASSA",
+        providerPaymentId: `yk_linked_${suffix}`,
+        targetPlan: "TEAM",
+        amount: new Prisma.Decimal("990.00"),
+        currency: "RUB",
+        status: "PENDING",
+      },
+    });
+
+    await assert.rejects(
+      () =>
+        confirmProviderPayment({
+          id: `yk_other_${suffix}`,
+          status: "succeeded",
+          amount: { value: "990.00", currency: "RUB" },
+          test: true,
+          metadata: {
+            workspaceId,
+            targetPlan: "TEAM",
+            paymentId: payment.id,
+          },
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.code, "PAYMENT_METADATA_MISMATCH");
+        assert.equal(error.statusCode, 409);
+        return true;
+      },
+    );
+
+    assert.equal(
+      (await prisma.billingPayment.findUniqueOrThrow({ where: { id: payment.id } })).status,
+      "PENDING",
+    );
+    assert.equal(
+      (await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).plan,
+      "FREE",
+    );
+  });
+
   it("keeps Enterprise member and workspace usage unlimited", async () => {
     await addActiveMembers(4);
     await addPendingInvitations(3);
@@ -605,6 +788,7 @@ describe("yookassa-billing.service", () => {
           id: payment.providerPaymentId!,
           status: "succeeded",
           amount: { value: "1.00", currency: "RUB" },
+          test: true,
           metadata: {
             workspaceId,
             targetPlan: "TEAM",
@@ -647,6 +831,7 @@ describe("yookassa-billing.service", () => {
           id: payment.providerPaymentId!,
           status: "succeeded",
           amount: { value: "990.00", currency: "RUB" },
+          test: true,
           metadata: {
             workspaceId: "other-workspace",
             targetPlan: "TEAM",
@@ -687,6 +872,7 @@ describe("yookassa-billing.service", () => {
       id: providerId,
       status: "canceled",
       amount: { value: "2490.00", currency: "RUB" },
+      test: true,
       metadata: {
         workspaceId,
         targetPlan: "BUSINESS",
@@ -704,6 +890,108 @@ describe("yookassa-billing.service", () => {
     assert.equal(
       (await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).plan,
       "FREE",
+    );
+  });
+});
+
+describe("yookassaRequest transport boundary", () => {
+  const originalFetch = globalThis.fetch;
+
+  before(() => {
+    env.YOOKASSA_SHOP_ID = "shop_test_teamflow";
+    env.YOOKASSA_SECRET_KEY = "secret_test_teamflow";
+    yookassaBillingGateway.request = originalYooKassaRequest;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  after(() => {
+    globalThis.fetch = originalFetch;
+    yookassaBillingGateway.request = originalYooKassaRequest;
+    env.YOOKASSA_SHOP_ID = originalYooKassaConfig.shopId;
+    env.YOOKASSA_SECRET_KEY = originalYooKassaConfig.secretKey;
+    env.YOOKASSA_RETURN_URL = originalYooKassaConfig.returnUrl;
+  });
+
+  it("maps network failures to PAYMENT_PROVIDER_UNAVAILABLE", async () => {
+    globalThis.fetch = (async () => {
+      throw new TypeError("fetch failed");
+    }) as typeof fetch;
+
+    await assert.rejects(
+      () => yookassaBillingGateway.request({ method: "GET", path: "/payments/x" }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.code, "PAYMENT_PROVIDER_UNAVAILABLE");
+        assert.equal(error.statusCode, 503);
+        assert.ok(!String(error.message).includes("shop_test"));
+        assert.ok(!String(error.message).includes("secret_test"));
+        assert.ok(!String(error.message).toLowerCase().includes("authorization"));
+        return true;
+      },
+    );
+  });
+
+  it("maps AbortError / timeout to PAYMENT_PROVIDER_UNAVAILABLE", async () => {
+    globalThis.fetch = (async () => {
+      const error = new Error("This operation was aborted");
+      error.name = "AbortError";
+      throw error;
+    }) as typeof fetch;
+
+    await assert.rejects(
+      () => yookassaBillingGateway.request({ method: "GET", path: "/payments/x" }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.code, "PAYMENT_PROVIDER_UNAVAILABLE");
+        assert.equal(error.statusCode, 503);
+        return true;
+      },
+    );
+  });
+
+  it("maps invalid non-JSON provider responses to PAYMENT_PROVIDER_UNAVAILABLE", async () => {
+    globalThis.fetch = (async () =>
+      new Response("not-json-at-all", {
+        status: 200,
+        headers: { "Content-Type": "text/plain" },
+      })) as typeof fetch;
+
+    await assert.rejects(
+      () => yookassaBillingGateway.request({ method: "GET", path: "/payments/x" }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.code, "PAYMENT_PROVIDER_UNAVAILABLE");
+        assert.equal(error.statusCode, 502);
+        return true;
+      },
+    );
+  });
+
+  it("keeps HTTP API failures as YOOKASSA_ERROR without leaking credentials", async () => {
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ description: "Invalid request", code: "invalid_request" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      })) as typeof fetch;
+
+    await assert.rejects(
+      () =>
+        yookassaBillingGateway.request({
+          method: "POST",
+          path: "/payments",
+          body: { amount: { value: "990.00", currency: "RUB" } },
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.code, "YOOKASSA_ERROR");
+        assert.equal(error.statusCode, 502);
+        assert.equal(error.message, "Invalid request");
+        assert.ok(!String(error.message).includes("secret_test"));
+        return true;
+      },
     );
   });
 });

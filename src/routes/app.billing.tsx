@@ -114,6 +114,8 @@ function billingErrorMessage(
     PLAN_ALREADY_CURRENT: "billing.error.alreadyCurrent",
     PLAN_NOT_SELF_SERVICE: "billing.error.notSelfService",
     YOOKASSA_ERROR: "billing.error.yookassa",
+    PAYMENT_PROVIDER_UNAVAILABLE: "billing.error.providerUnavailable",
+    YOOKASSA_TEST_MODE_REQUIRED: "billing.error.testModeRequired",
     PAYMENT_AMOUNT_MISMATCH: "billing.error.paymentFailed",
     PAYMENT_METADATA_MISMATCH: "billing.error.paymentFailed",
     PAYMENT_CANCELED: "billing.error.paymentCanceled",
@@ -500,16 +502,16 @@ function PlanCard({
   const labelKey = PLAN_LABEL_KEYS[plan.id];
   const planName = t(labelKey);
   const canChange = canManageBilling && plan.action === "SELECT";
+  const unavailableReasonText =
+    plan.action === "UNAVAILABLE" && plan.unavailableReason
+      ? t(UNAVAILABLE_REASON_KEYS[plan.unavailableReason])
+      : null;
   const actionLabel =
     plan.action === "SELECT"
       ? plan.id === "FREE"
         ? t("billing.selectFreeCta")
         : t("billing.selectPlanCta")
-      : plan.action === "UNAVAILABLE" && plan.unavailableReason
-        ? t(UNAVAILABLE_REASON_KEYS[plan.unavailableReason])
-        : !canManageBilling
-          ? t("billing.readOnlyAction")
-          : t("billing.unavailableAction");
+      : t("billing.unavailableAction");
 
   const priceLabel =
     plan.monthlyPriceRub === 0
@@ -585,6 +587,13 @@ function PlanCard({
             {pending ? t("billing.openingPayment") : actionLabel}
           </Button>
         )}
+        <div className="mt-2 min-h-[2.5rem]">
+          {unavailableReasonText ? (
+            <p className="text-center text-xs leading-snug text-muted-foreground">
+              {unavailableReasonText}
+            </p>
+          ) : null}
+        </div>
       </div>
     </div>
   );

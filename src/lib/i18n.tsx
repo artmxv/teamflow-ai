@@ -247,6 +247,9 @@ const dict = {
     "billing.error.alreadyCurrent": "This is already the current plan.",
     "billing.error.notSelfService": "This plan cannot be changed through self-service billing.",
     "billing.error.yookassa": "Could not open YooKassa payment. Please try again.",
+    "billing.error.providerUnavailable": "Could not connect to YooKassa. Please try again.",
+    "billing.error.testModeRequired":
+      "Only YooKassa test payments are supported. The plan was not changed.",
     "billing.error.paymentFailed": "Payment confirmation failed. The plan was not changed.",
     "billing.error.paymentCanceled": "Payment was canceled. The plan was not changed.",
     "billing.error.paymentPending": "Payment is still pending. Please wait a moment and try again.",
@@ -1321,6 +1324,9 @@ const dict = {
     "billing.error.alreadyCurrent": "Этот тариф уже используется.",
     "billing.error.notSelfService": "Этот тариф нельзя изменить самостоятельно.",
     "billing.error.yookassa": "Не удалось открыть оплату ЮKassa. Попробуйте ещё раз.",
+    "billing.error.providerUnavailable": "Не удалось подключиться к ЮKassa. Попробуйте ещё раз.",
+    "billing.error.testModeRequired":
+      "Поддерживаются только тестовые платежи ЮKassa. Тариф не изменён.",
     "billing.error.paymentFailed": "Не удалось подтвердить оплату. Тариф не изменён.",
     "billing.error.paymentCanceled": "Оплата отменена. Тариф не изменён.",
     "billing.error.paymentPending": "Оплата ещё обрабатывается. Подождите и попробуйте снова.",

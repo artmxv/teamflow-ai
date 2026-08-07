@@ -16,6 +16,8 @@ import {
 import type { WorkspaceRole } from "./workspace-context.service.js";
 
 const YOOKASSA_API = "https://api.yookassa.ru/v3";
+/** Provider HTTP timeout for create/GET Payment calls (V1 test billing). */
+export const YOOKASSA_REQUEST_TIMEOUT_MS = 15_000;
 
 export type YooKassaAmount = {
   value: string;
@@ -65,6 +67,24 @@ type YooKassaRequestInput = {
   idempotenceKey?: string;
 };
 
+function throwPaymentProviderUnavailable(): never {
+  throw new AuthError(
+    "Payment provider is temporarily unavailable",
+    503,
+    "PAYMENT_PROVIDER_UNAVAILABLE",
+  );
+}
+
+function assertYooKassaTestPayment(providerPayment: YooKassaPaymentObject): void {
+  if (providerPayment.test !== true) {
+    throw new AuthError(
+      "Only YooKassa test payments are accepted in V1",
+      502,
+      "YOOKASSA_TEST_MODE_REQUIRED",
+    );
+  }
+}
+
 async function yookassaRequest(input: YooKassaRequestInput): Promise<YooKassaPaymentObject> {
   if (!env.YOOKASSA_SHOP_ID || !env.YOOKASSA_SECRET_KEY) {
     throw new AuthError("YooKassa billing is not configured", 503, "BILLING_NOT_CONFIGURED");
@@ -78,19 +98,55 @@ async function yookassaRequest(input: YooKassaRequestInput): Promise<YooKassaPay
     headers["Idempotence-Key"] = input.idempotenceKey ?? randomUUID();
   }
 
-  const response = await fetch(`${YOOKASSA_API}${input.path}`, {
-    method: input.method,
-    headers,
-    body: input.body ? JSON.stringify(input.body) : undefined,
-  });
-  const payload = (await response.json()) as YooKassaPaymentObject & {
-    description?: string;
-    code?: string;
-  };
-  if (!response.ok) {
-    throw new AuthError(payload.description ?? "YooKassa request failed", 502, "YOOKASSA_ERROR");
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), YOOKASSA_REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    try {
+      response = await fetch(`${YOOKASSA_API}${input.path}`, {
+        method: input.method,
+        headers,
+        body: input.body ? JSON.stringify(input.body) : undefined,
+        signal: controller.signal,
+      });
+    } catch {
+      // Network / DNS / connect timeout / AbortError — never leak credentials.
+      throwPaymentProviderUnavailable();
+    }
+
+    let rawBody: string;
+    try {
+      rawBody = await response.text();
+    } catch {
+      throwPaymentProviderUnavailable();
+    }
+
+    let payload: YooKassaPaymentObject & { description?: string; code?: string };
+    try {
+      payload = (rawBody ? JSON.parse(rawBody) : {}) as YooKassaPaymentObject & {
+        description?: string;
+        code?: string;
+      };
+    } catch {
+      throw new AuthError(
+        "Payment provider returned an invalid response",
+        502,
+        "PAYMENT_PROVIDER_UNAVAILABLE",
+      );
+    }
+
+    if (!response.ok) {
+      const description =
+        typeof payload.description === "string" && payload.description.trim()
+          ? payload.description
+          : "YooKassa request failed";
+      throw new AuthError(description, 502, "YOOKASSA_ERROR");
+    }
+    return payload;
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return payload;
 }
 
 /** Test seam: unit tests replace this boundary instead of calling YooKassa. */
@@ -282,6 +338,12 @@ export async function confirmProviderPayment(
     return null;
   }
 
+  if (payment.providerPaymentId && payment.providerPaymentId !== providerPayment.id) {
+    throw new AuthError("Payment provider id mismatch", 409, "PAYMENT_METADATA_MISMATCH");
+  }
+
+  assertYooKassaTestPayment(providerPayment);
+
   if (metadataWorkspaceId && metadataWorkspaceId !== payment.workspaceId) {
     throw new AuthError("Payment metadata mismatch", 409, "PAYMENT_METADATA_MISMATCH");
   }
@@ -426,6 +488,38 @@ export async function createBillingPlanChangeSession(input: {
   // Leaving Enterprise via self-service is allowed (guards + payment still apply).
   // Entering Enterprise remains blocked above (targetPlan === ENTERPRISE).
 
+  // Free does not require YooKassa in V1 (no recurring subscription to cancel).
+  // Validate + apply inside one transaction so usage cannot race past the limits check.
+  if (input.targetPlan === "FREE") {
+    await prisma.$transaction(async (tx) => {
+      await lockWorkspaceBillingUsage(tx, input.workspaceId);
+      await lockWorkspaceOwnerUsage(tx, input.workspaceId);
+
+      const current = await tx.workspace.findUnique({
+        where: { id: input.workspaceId },
+        select: { plan: true },
+      });
+      if (!current) {
+        throw new AuthError("Workspace not found", 404);
+      }
+      if (current.plan === "FREE") {
+        throw new AuthError("This is already the current plan", 409, "PLAN_ALREADY_CURRENT");
+      }
+
+      await assertPlanUsageWithinLimits({
+        workspaceId: input.workspaceId,
+        targetPlan: "FREE",
+        db: tx,
+      });
+
+      await tx.workspace.update({
+        where: { id: input.workspaceId },
+        data: { plan: "FREE" },
+      });
+    });
+    return { flow: "APPLIED", currentPlan: "FREE" };
+  }
+
   if (isBillingPlanDowngrade(workspace.plan, input.targetPlan)) {
     await prisma.$transaction(async (tx) => {
       await lockWorkspaceBillingUsage(tx, input.workspaceId);
@@ -436,15 +530,6 @@ export async function createBillingPlanChangeSession(input: {
         db: tx,
       });
     });
-  }
-
-  // Free does not require YooKassa in V1 (no recurring subscription to cancel).
-  if (input.targetPlan === "FREE") {
-    await prisma.workspace.update({
-      where: { id: input.workspaceId },
-      data: { plan: "FREE" },
-    });
-    return { flow: "APPLIED", currentPlan: "FREE" };
   }
 
   if (!isPaidSelfServicePlan(input.targetPlan)) {
@@ -492,6 +577,16 @@ export async function createBillingPlanChangeSession(input: {
       },
     },
   });
+
+  try {
+    assertYooKassaTestPayment(providerPayment);
+  } catch (error) {
+    await prisma.billingPayment.update({
+      where: { id: payment.id },
+      data: { status: "CANCELED", completedAt: new Date() },
+    });
+    throw error;
+  }
 
   const confirmationUrl = providerPayment.confirmation?.confirmation_url;
   if (!confirmationUrl || !providerPayment.id) {
