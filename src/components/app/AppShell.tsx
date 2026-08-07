@@ -60,7 +60,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       ) : (
         <AuthenticatedImageLightboxProvider>
-          <div className="flex min-h-screen w-full bg-background">
+          <div className="app-shell-enter flex min-h-screen w-full bg-background">
             <AppSidebar
               workspace={workspace}
               workspaceLoading={workspaceLoading}
