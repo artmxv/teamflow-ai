@@ -27,6 +27,16 @@ enum BillingPlan {
   ENTERPRISE
 }
 
+enum BillingPaymentProvider {
+  YOOKASSA
+}
+
+enum BillingPaymentStatus {
+  PENDING
+  SUCCEEDED
+  CANCELED
+}
+
 enum MemberStatus {
   ACTIVE
   INVITED
@@ -123,6 +133,26 @@ model Workspace {
   aiSummaries       AiSummary[]
   notifications     Notification[]
   chatConversations ChatConversation[]
+  billingPayments   BillingPayment[]
+}
+
+model BillingPayment {
+  id                String                 @id @default(cuid())
+  workspaceId       String
+  provider          BillingPaymentProvider @default(YOOKASSA)
+  providerPaymentId String?                @unique
+  targetPlan        BillingPlan
+  amount            Decimal                @db.Decimal(12, 2)
+  currency          String                 @default("RUB")
+  status            BillingPaymentStatus   @default(PENDING)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  completedAt       DateTime?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([status])
 }
 
 model WorkspaceMember {

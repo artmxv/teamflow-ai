@@ -26,6 +26,9 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
   SUPABASE_STORAGE_BUCKET: z.preprocess(emptyToUndefined, z.string().optional()),
   TASK_REMINDER_CRON_SECRET: z.preprocess(emptyToUndefined, z.string().optional()),
+  YOOKASSA_SHOP_ID: z.preprocess(emptyToUndefined, z.string().optional()),
+  YOOKASSA_SECRET_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
+  YOOKASSA_RETURN_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
 });
 
 const parsed = envSchema.parse(process.env);
@@ -166,4 +169,7 @@ export const env = {
   SUPABASE_SERVICE_ROLE_KEY: parsed.SUPABASE_SERVICE_ROLE_KEY?.trim() || undefined,
   SUPABASE_STORAGE_BUCKET: parsed.SUPABASE_STORAGE_BUCKET?.trim() || undefined,
   TASK_REMINDER_CRON_SECRET: parsed.TASK_REMINDER_CRON_SECRET?.trim() || undefined,
+  YOOKASSA_SHOP_ID: parsed.YOOKASSA_SHOP_ID?.trim() || undefined,
+  YOOKASSA_SECRET_KEY: parsed.YOOKASSA_SECRET_KEY?.trim() || undefined,
+  YOOKASSA_RETURN_URL: parsed.YOOKASSA_RETURN_URL?.trim() || undefined,
 };

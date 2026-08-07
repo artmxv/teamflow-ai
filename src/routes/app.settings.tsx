@@ -52,7 +52,12 @@ import {
   type PhoneCountryId,
 } from "@/lib/profile-contact";
 import { UserAvatar } from "@/components/app/UserAvatar";
-import { fetchBillingSummary, type BillingPlanId } from "@/lib/api/billing";
+import {
+  BILLING_SUMMARY_QUERY_KEY,
+  fetchBillingSummary,
+  type BillingPlanId,
+  type BillingSummary,
+} from "@/lib/api/billing";
 import { updateWorkspace } from "@/lib/api/workspace";
 import { canEditWorkspaceSettings, useCurrentUser } from "@/lib/auth/use-current-user";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -90,6 +95,14 @@ const WORKSPACE_TEAM_SIZE_OPTIONS: {
   { value: "51+", labelKey: "settings.teamSize51plus" },
 ];
 
+const TEAM_SIZE_REQUIRED_MEMBERS: Record<(typeof WORKSPACE_TEAM_SIZE_VALUES)[number], number> = {
+  "0-5": 5,
+  "6-10": 10,
+  "11-20": 20,
+  "21-50": 50,
+  "51+": 51,
+};
+
 const TEAM_SIZE_SELECT_EMPTY = "__none__";
 
 function isKnownTeamSizeValue(value: string): value is (typeof WORKSPACE_TEAM_SIZE_VALUES)[number] {
@@ -116,6 +129,46 @@ function normalizeTeamSizeValue(raw: string): string {
     return "51+";
   }
   return trimmed;
+}
+
+function teamSizeRecommendation(
+  rawTeamSize: string,
+  currentPlan: BillingPlanId | undefined,
+  plans: BillingSummary["plans"] | undefined,
+  t: (key: TKey) => string,
+): string {
+  const teamSize = normalizeTeamSizeValue(rawTeamSize);
+  if (!isKnownTeamSizeValue(teamSize)) {
+    return t("settings.teamSizeChooseHint");
+  }
+
+  if (!plans) {
+    return t("settings.teamSizeRecommendationLoading");
+  }
+
+  const requiredMembers = TEAM_SIZE_REQUIRED_MEMBERS[teamSize];
+  const recommendedPlan = plans.find(
+    (plan) => plan.maxMembers === null || plan.maxMembers >= requiredMembers,
+  )?.id;
+  if (!recommendedPlan) {
+    return t("settings.teamSizeRecommendationUnavailable");
+  }
+
+  const sizeOption = WORKSPACE_TEAM_SIZE_OPTIONS.find((option) => option.value === teamSize);
+  const sizeLabel = sizeOption ? t(sizeOption.labelKey) : teamSize;
+  const recommendedLabel = t(SETTINGS_PLAN_LABEL_KEYS[recommendedPlan]);
+  const currentPlanIndex = currentPlan ? plans.findIndex((plan) => plan.id === currentPlan) : -1;
+  const recommendedPlanIndex = plans.findIndex((plan) => plan.id === recommendedPlan);
+
+  if (currentPlan && currentPlanIndex >= recommendedPlanIndex) {
+    return t("settings.teamSizeCurrentPlanFits")
+      .replace("{plan}", t(SETTINGS_PLAN_LABEL_KEYS[currentPlan]))
+      .replace("{size}", sizeLabel);
+  }
+
+  return t("settings.teamSizeRecommendation")
+    .replace("{size}", sizeLabel)
+    .replace("{plan}", recommendedLabel);
 }
 
 function workspaceFormFromWorkspace(
@@ -280,9 +333,9 @@ function SettingsPage() {
   const activeTab = tab ?? "workspace";
 
   const billingQuery = useQuery({
-    queryKey: ["billing", "summary"],
+    queryKey: BILLING_SUMMARY_QUERY_KEY,
     queryFn: fetchBillingSummary,
-    enabled: activeTab === "billing",
+    enabled: activeTab === "billing" || activeTab === "workspace",
   });
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [profileForm, setProfileForm] = useState<ProfileFormState | null>(null);
@@ -595,7 +648,14 @@ function SettingsPage() {
                   }
                   disabled={workspaceFieldsDisabled}
                 />
-                <p className="mt-1.5 text-xs text-muted-foreground">{t("settings.teamSizeHint")}</p>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  {teamSizeRecommendation(
+                    workspaceForm?.teamSize ?? "",
+                    billingQuery.data?.currentPlan ?? workspace?.plan,
+                    billingQuery.data?.plans,
+                    t,
+                  )}
+                </p>
               </Field>
             </div>
             {canEditWorkspace ? (
@@ -853,7 +913,11 @@ function SettingsPage() {
                 <div className="mt-1 text-sm text-muted-foreground">{t("board.errorTitle")}</div>
               )}
               <p className="mt-4 text-xs text-muted-foreground">
-                {t("billing.onlineBillingUnavailable")}
+                {billingQuery.data?.billingConfigured
+                  ? billingQuery.data.canManageBilling
+                    ? t("billing.yookassaReadyOwnerDesc")
+                    : t("billing.readOnlyDesc")
+                  : t("billing.yookassaUnavailableDesc")}
               </p>
               <Button variant="brand" className="mt-4" asChild>
                 <Link to="/app/billing">{t("billing.viewPlans")}</Link>

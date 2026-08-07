@@ -376,7 +376,7 @@ async function seedDemoWorkspace() {
       {
         taskId: taskByKey("TF-103").id,
         authorId: priya.id,
-        body: "Stripe webhooks are wired; still need downgrade grace period handling.",
+        body: "YooKassa test payments are wired; still need downgrade grace period handling.",
       },
       {
         taskId: taskByKey("TF-104").id,

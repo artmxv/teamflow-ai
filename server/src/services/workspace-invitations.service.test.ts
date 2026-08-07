@@ -445,6 +445,82 @@ describe("workspace-invitations.service", () => {
     await prisma.workspace.delete({ where: { id: seatWorkspace.id } });
   });
 
+  it("counts active members and PENDING invitations when creating an invite", async () => {
+    const inviteWorkspace = await prisma.workspace.create({
+      data: {
+        name: `Invite Seat Limit ${suffix}`,
+        slug: `invite-seat-limit-${suffix}`,
+        plan: "FREE",
+      },
+    });
+    const inviteOwner = await prisma.user.create({
+      data: {
+        name: "Invite Seat Owner",
+        email: email("invite-seat-owner"),
+        passwordHash: "test-hash",
+      },
+    });
+    userIds.push(inviteOwner.id);
+    await prisma.workspaceMember.create({
+      data: {
+        workspaceId: inviteWorkspace.id,
+        userId: inviteOwner.id,
+        role: "OWNER",
+        status: "ACTIVE",
+      },
+    });
+
+    for (let index = 0; index < 3; index += 1) {
+      const filler = await prisma.user.create({
+        data: {
+          name: `Invite Seat Filler ${index}`,
+          email: email(`invite-seat-filler-${index}`),
+          passwordHash: "test-hash",
+        },
+      });
+      userIds.push(filler.id);
+      await prisma.workspaceMember.create({
+        data: {
+          workspaceId: inviteWorkspace.id,
+          userId: filler.id,
+          role: "MEMBER",
+          status: "ACTIVE",
+        },
+      });
+    }
+
+    await createWorkspaceInvitation({
+      workspaceId: inviteWorkspace.id,
+      workspaceName: inviteWorkspace.name,
+      workspacePlan: "FREE",
+      inviterUserId: inviteOwner.id,
+      inviterRole: "OWNER",
+      email: email("invite-seat-pending"),
+      role: "MEMBER",
+    });
+
+    await assert.rejects(
+      () =>
+        createWorkspaceInvitation({
+          workspaceId: inviteWorkspace.id,
+          workspaceName: inviteWorkspace.name,
+          workspacePlan: "FREE",
+          inviterUserId: inviteOwner.id,
+          inviterRole: "OWNER",
+          email: email("invite-seat-overflow"),
+          role: "MEMBER",
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.statusCode, 409);
+        assert.equal(error.code, MEMBER_LIMIT_REACHED_CODE);
+        return true;
+      },
+    );
+
+    await prisma.workspace.delete({ where: { id: inviteWorkspace.id } });
+  });
+
   it("OWNER can resend a pending invitation with a new token and extended expiry", async () => {
     const created = await createWorkspaceInvitation({
       workspaceId,
