@@ -1,13 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Plus,
-  PanelLeftClose,
-  PanelLeftOpen,
-  ChevronDown,
-  Check,
-  Trash2,
-} from "lucide-react";
+import { Plus, PanelLeftClose, PanelLeftOpen, ChevronDown, Check, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useI18n, type TKey } from "@/lib/i18n";
@@ -25,7 +18,11 @@ import { DeleteWorkspaceDialog } from "./DeleteWorkspaceDialog";
 import { NewProjectDialog } from "./QuickActionDialogs";
 import type { Workspace } from "./AppShell";
 import { fetchProjects } from "@/lib/api/projects";
-import { fetchBillingSummary, type BillingPlanId } from "@/lib/api/billing";
+import {
+  BILLING_SUMMARY_QUERY_KEY,
+  fetchBillingSummary,
+  type BillingPlanId,
+} from "@/lib/api/billing";
 import { getProjectAccent } from "@/lib/project-color";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -38,8 +35,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { APP_NAV_ITEMS, isAppNavItemActive } from "@/lib/app-nav";
 import { useChatUnreadCount } from "@/lib/api/use-chat-unread-count";
-
-const BILLING_SUMMARY_QUERY_KEY = ["billing", "summary"] as const;
 
 const PLAN_LABEL_KEYS: Record<BillingPlanId, TKey> = {
   FREE: "billing.plan.free",

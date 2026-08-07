@@ -11,6 +11,7 @@ import { notFoundMiddleware } from "./middleware/not-found.middleware.js";
 import { aiRouter } from "./routes/ai.routes.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { billingRouter } from "./routes/billing.routes.js";
+import { billingWebhookRouter } from "./routes/billing-webhook.routes.js";
 import { chatRouter } from "./routes/chat.routes.js";
 import { dashboardRouter } from "./routes/dashboard.routes.js";
 import { healthRouter } from "./routes/health.routes.js";
@@ -68,6 +69,7 @@ app.use(
   }),
 );
 app.use("/uploads", express.static(uploadsRoot));
+app.use("/api/billing/webhook", billingWebhookRouter);
 app.use(express.json());
 
 if (env.NODE_ENV !== "production") {

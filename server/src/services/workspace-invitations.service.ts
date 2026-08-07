@@ -7,7 +7,12 @@ import { ensureUserInWorkspaceGeneralConversation } from "../lib/chat-conversati
 import { prisma } from "../lib/prisma.js";
 import type { PublicUser } from "./auth.service.js";
 import { AuthError } from "./auth.service.js";
-import { assertCanAcceptMember, assertCanInviteMember } from "./billing-plans.service.js";
+import {
+  assertCanAcceptMember,
+  assertCanInviteMember,
+  lockWorkspaceBillingUsage,
+  type BillingDbClient,
+} from "./billing-plans.service.js";
 import {
   sendWorkspaceInviteEmail,
   type SendWorkspaceInviteEmailInput,
@@ -125,8 +130,12 @@ function toInvitationDto(invite: {
   };
 }
 
-async function findActivePendingInvite(workspaceId: string, email: string) {
-  return prisma.workspaceInvitation.findFirst({
+async function findActivePendingInvite(
+  workspaceId: string,
+  email: string,
+  db: BillingDbClient = prisma,
+) {
+  return db.workspaceInvitation.findFirst({
     where: {
       workspaceId,
       email,
@@ -138,8 +147,12 @@ async function findActivePendingInvite(workspaceId: string, email: string) {
   });
 }
 
-async function assertNotWorkspaceMember(workspaceId: string, email: string): Promise<void> {
-  const existingMember = await prisma.workspaceMember.findFirst({
+async function assertNotWorkspaceMember(
+  workspaceId: string,
+  email: string,
+  db: BillingDbClient = prisma,
+): Promise<void> {
+  const existingMember = await db.workspaceMember.findFirst({
     where: {
       workspaceId,
       user: { email },
@@ -202,38 +215,59 @@ export async function createWorkspaceInvitation(input: {
     throw new AuthError("Email is required", 400);
   }
 
-  await assertNotWorkspaceMember(input.workspaceId, email);
+  const prepared = await prisma.$transaction(async (tx) => {
+    await lockWorkspaceBillingUsage(tx, input.workspaceId);
+    await assertNotWorkspaceMember(input.workspaceId, email, tx);
 
-  const existing = await findActivePendingInvite(input.workspaceId, email);
-  if (existing) {
+    const existing = await findActivePendingInvite(input.workspaceId, email, tx);
+    if (existing) {
+      return { invitation: existing, reused: true as const };
+    }
+
+    const workspace = await tx.workspace.findUnique({
+      where: { id: input.workspaceId },
+      select: { plan: true },
+    });
+    if (!workspace) {
+      throw new AuthError("Workspace not found", 404);
+    }
+
+    await assertCanInviteMember({
+      workspaceId: input.workspaceId,
+      plan: workspace.plan,
+      isReusingPendingInvite: false,
+      db: tx,
+    });
+
+    const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
+    const token = generateInviteToken();
+    const invitation = await tx.workspaceInvitation.create({
+      data: {
+        workspaceId: input.workspaceId,
+        email,
+        role: input.role,
+        token,
+        invitedById: input.inviterUserId,
+        expiresAt,
+      },
+      select: invitationSelect,
+    });
+
+    return { invitation, reused: false as const };
+  });
+
+  if (prepared.reused) {
     return {
-      invitation: toInvitationDto(existing),
+      invitation: toInvitationDto(prepared.invitation),
       deliveryMode: "existing",
       emailSent: false,
       reused: true,
     };
   }
 
-  await assertCanInviteMember({
-    workspaceId: input.workspaceId,
-    plan: input.workspacePlan,
-    isReusingPendingInvite: false,
-  });
-
-  const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
-  const token = generateInviteToken();
-
-  const invite = await prisma.workspaceInvitation.create({
-    data: {
-      workspaceId: input.workspaceId,
-      email,
-      role: input.role,
-      token,
-      invitedById: input.inviterUserId,
-      expiresAt,
-    },
-    select: invitationSelect,
-  });
+  const invite = prepared.invitation;
+  const expiresAt = invite.expiresAt;
+  const token = invite.token;
 
   const acceptUrl = buildWorkspaceInviteAcceptUrl(token);
 
@@ -557,9 +591,28 @@ export async function acceptWorkspaceInvitation(
   }
 
   await prisma.$transaction(async (tx) => {
+    await lockWorkspaceBillingUsage(tx, resolved.workspaceId);
+    const currentInvite = await tx.workspaceInvitation.findUnique({
+      where: { id: resolved.id },
+      include: {
+        workspace: { select: { plan: true } },
+      },
+    });
+    if (
+      !currentInvite ||
+      currentInvite.status !== "PENDING" ||
+      currentInvite.expiresAt.getTime() <= Date.now()
+    ) {
+      throw new AuthError(
+        "This invitation is no longer available.",
+        404,
+        "INVITATION_NO_LONGER_AVAILABLE",
+      );
+    }
+
     await assertCanAcceptMember({
       workspaceId: resolved.workspaceId,
-      plan: invite.workspace.plan,
+      plan: currentInvite.workspace.plan,
       db: tx,
     });
 

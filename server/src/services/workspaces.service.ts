@@ -3,7 +3,13 @@ import type { BillingPlan } from "@prisma/client";
 import { ensureUserInWorkspaceGeneralConversation } from "../lib/chat-conversation-ensure.js";
 import { prisma } from "../lib/prisma.js";
 import { AuthError } from "./auth.service.js";
-import { getBillingPlanConfig } from "./billing-plans.service.js";
+import {
+  countUserWorkspaces,
+  getBillingPlanConfig,
+  lockUserWorkspaceUsage,
+  lockWorkspaceBillingUsage,
+  WORKSPACE_LIMIT_REACHED_CODE,
+} from "./billing-plans.service.js";
 import {
   getUserCurrentWorkspace,
   WORKSPACE_SLUG_PATTERN,
@@ -58,16 +64,6 @@ function optionalStringToNull(value: string | undefined): string | null | undefi
   return trimmed.length === 0 ? null : trimmed;
 }
 
-export async function countOwnedWorkspaces(userId: string): Promise<number> {
-  return prisma.workspaceMember.count({
-    where: {
-      userId,
-      role: "OWNER",
-      status: "ACTIVE",
-    },
-  });
-}
-
 export async function assertCanCreateWorkspace(
   plan: BillingPlan,
   ownedCount: number,
@@ -81,7 +77,7 @@ export async function assertCanCreateWorkspace(
     throw new AuthError(
       "Workspace limit reached for your current plan",
       409,
-      "WORKSPACE_LIMIT_REACHED",
+      WORKSPACE_LIMIT_REACHED_CODE,
     );
   }
 }
@@ -147,9 +143,6 @@ export async function createWorkspaceForUser(input: {
     throw new AuthError("You do not have permission to create workspaces from this workspace", 403);
   }
 
-  const ownedCount = await countOwnedWorkspaces(input.userId);
-  await assertCanCreateWorkspace(currentWorkspace.plan, ownedCount);
-
   const name = input.data.name.trim();
   let slug: string;
 
@@ -168,6 +161,20 @@ export async function createWorkspaceForUser(input: {
   }
 
   const workspace = await prisma.$transaction(async (tx) => {
+    await lockWorkspaceBillingUsage(tx, currentWorkspace.id);
+    await lockUserWorkspaceUsage(tx, input.userId);
+
+    const billingWorkspace = await tx.workspace.findUnique({
+      where: { id: currentWorkspace.id },
+      select: { plan: true },
+    });
+    if (!billingWorkspace) {
+      throw new AuthError("Workspace not found", 403);
+    }
+
+    const ownedCount = await countUserWorkspaces(input.userId, tx);
+    await assertCanCreateWorkspace(billingWorkspace.plan, ownedCount);
+
     const created = await tx.workspace.create({
       data: {
         name,
@@ -288,7 +295,7 @@ export async function deleteWorkspaceForUser(
     throw new AuthError("Only the owner can delete this workspace", 403);
   }
 
-  const ownedCount = await countOwnedWorkspaces(userId);
+  const ownedCount = await countUserWorkspaces(userId);
   if (ownedCount <= 1) {
     throw new AuthError(
       "You cannot delete your last workspace",

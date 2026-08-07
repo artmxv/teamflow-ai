@@ -129,6 +129,7 @@ export class ApiError extends Error {
     message: string,
     readonly status: number,
     readonly code?: string,
+    readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "ApiError";
@@ -201,9 +202,10 @@ export async function apiUpload<T>(
     const body = (await response.json().catch(() => null)) as {
       message?: string;
       code?: string;
+      details?: Record<string, unknown>;
     } | null;
     const message = body?.message ?? `Upload failed with status ${response.status}`;
-    throw new ApiError(message, response.status, body?.code);
+    throw new ApiError(message, response.status, body?.code, body?.details);
   }
 
   return response.json() as Promise<T>;
@@ -228,9 +230,10 @@ export async function apiRequest<T>(path: string, options?: ApiRequestOptions): 
     const body = (await response.json().catch(() => null)) as {
       message?: string;
       code?: string;
+      details?: Record<string, unknown>;
     } | null;
     const message = body?.message ?? `API request failed with status ${response.status}`;
-    throw new ApiError(message, response.status, body?.code);
+    throw new ApiError(message, response.status, body?.code, body?.details);
   }
 
   return response.json() as Promise<T>;
