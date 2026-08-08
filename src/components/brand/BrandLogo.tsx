@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type BrandLogoProps = {
@@ -9,48 +10,53 @@ type BrandLogoProps = {
   size?: "sm" | "md";
 };
 
-/** Thin dual spark / bloom mark — purple + cyan, no filled tile. */
-export function BrandMark({ className }: { className?: string }) {
+type BrandAiBadgeProps = {
+  className?: string;
+};
+
+/**
+ * Theme-aware "AI" chip used next to the TeamFlow wordmark in app chrome and boot.
+ * Uses active theme primary tokens (default / ocean / emerald / sunset × light / dark).
+ */
+export function BrandAiBadge({ className }: BrandAiBadgeProps) {
   return (
-    <svg
-      viewBox="0 0 36 28"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-      aria-hidden
+    <span
+      className={cn(
+        "rounded-md bg-primary/14 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary",
+        className,
+      )}
     >
-      {/* Violet bloom / spark (left) */}
-      <path
-        d="M10 3.5C10 8.2 6.8 11.5 2.5 12.5C6.8 13.5 10 16.8 10 21.5C10 16.8 13.2 13.5 17.5 12.5C13.2 11.5 10 8.2 10 3.5Z"
-        stroke="#A78BFA"
-        strokeWidth="1.35"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M10 7.2v10.6M5.1 12.5h9.8"
-        stroke="#A78BFA"
-        strokeWidth="1.15"
-        strokeLinecap="round"
-      />
-      {/* Cyan bloom / spark (right, slightly lower) */}
-      <path
-        d="M24.5 6C24.5 10.1 21.8 12.9 18 13.8C21.8 14.7 24.5 17.5 24.5 21.6C24.5 17.5 27.2 14.7 31 13.8C27.2 12.9 24.5 10.1 24.5 6Z"
-        stroke="#67E8F9"
-        strokeWidth="1.35"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M24.5 9.2v9.2M20.3 13.8h8.4"
-        stroke="#67E8F9"
-        strokeWidth="1.15"
-        strokeLinecap="round"
-      />
-    </svg>
+      AI
+    </span>
   );
 }
 
 /**
- * Public brand logo: dual thin geometric sparks + TeamFlow (light) / AI (cyan).
+ * Compact AI flash mark (restored from backup/yookassa-ui-wip-2026-08-07).
+ * Colors come from --brand-from / --brand-to of the active product theme.
+ */
+export function BrandMark({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "brand-mark relative inline-flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-xl",
+        className,
+      )}
+      aria-hidden
+    >
+      <span className="brand-mark__glow" />
+      <span className="brand-mark__shine" />
+      <Sparkles
+        className="brand-mark__icon relative z-10 size-[58%] text-white"
+        strokeWidth={2.35}
+      />
+    </span>
+  );
+}
+
+/**
+ * TeamFlow wordmark with a distinct AI accent.
+ * Public surfaces may override via --public-wordmark / --public-ai*; app falls back to theme tokens.
  */
 export function BrandLogo({
   className,
@@ -58,7 +64,7 @@ export function BrandLogo({
   asLink = true,
   size = "md",
 }: BrandLogoProps) {
-  const markSize = size === "sm" ? "h-6 w-[30px]" : "h-7 w-9";
+  const markSize = size === "sm" ? "size-7 rounded-[10px]" : "size-8 rounded-xl";
   const textSize = size === "sm" ? "text-sm" : "text-base";
 
   const content = (
@@ -71,8 +77,10 @@ export function BrandLogo({
           wordmarkClassName,
         )}
       >
-        <span className="text-[color:var(--public-wordmark,#f4f6fb)]">TeamFlow</span>{" "}
-        <span className="text-[color:var(--public-ai,#67E8F9)]">AI</span>
+        <span className="text-[color:var(--public-wordmark,var(--foreground))]">TeamFlow</span>{" "}
+        <span className="rounded-[0.35em] bg-[color:var(--public-ai-surface,color-mix(in_oklch,var(--primary)_16%,transparent))] px-[0.3em] py-[0.08em] text-[color:var(--public-ai,var(--primary))]">
+          AI
+        </span>
       </span>
     </>
   );

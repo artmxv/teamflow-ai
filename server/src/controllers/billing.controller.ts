@@ -13,7 +13,7 @@ import {
 } from "../services/yookassa-billing.service.js";
 
 export const planChangeSchema = z.object({
-  plan: z.enum(["FREE", "TEAM", "BUSINESS"]),
+  plan: z.enum(["FREE", "TEAM", "BUSINESS", "ENTERPRISE"]),
 });
 
 export const confirmPaymentSchema = z.object({
@@ -45,7 +45,7 @@ export async function getBillingSummaryController(req: Request, res: Response, n
       return;
     }
 
-    const summary = await getBillingSummary(context.workspaceId, context.role);
+    const summary = await getBillingSummary(context.workspaceId, context.role, req.userId);
     res.json({ data: summary });
   } catch (error) {
     handleBillingError(error, res, next);

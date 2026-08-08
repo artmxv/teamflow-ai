@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { toast } from "sonner";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { AppShell } from "@/components/app/AppShell";
@@ -21,11 +21,12 @@ import {
   type BillingPlanUnavailableReason,
   type BillingSummary,
 } from "@/lib/api/billing";
-import { Check, CreditCard, ExternalLink, Info, Loader2 } from "lucide-react";
+import { Check, CreditCard, Info, Loader2 } from "lucide-react";
 import { assertBrowserOnline, friendlyApiErrorMessage } from "@/lib/api-error";
 import { ApiError } from "@/lib/api/client";
 import { AUTH_ME_QUERY_KEY } from "@/lib/auth/auth-cache";
 import { WORKSPACES_QUERY_KEY } from "@/lib/workspace-queries";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/billing")({
   beforeLoad: requireAuth,
@@ -142,7 +143,7 @@ function BillingPage() {
   const summary = summaryQuery.data;
   const planChangeMutation = useMutation({
     networkMode: "always",
-    mutationFn: async (plan: Exclude<BillingPlanId, "ENTERPRISE">) => {
+    mutationFn: async (plan: BillingPlanId) => {
       assertBrowserOnline();
       return createBillingPlanChange(plan);
     },
@@ -327,7 +328,7 @@ function BillingContent({
   t: (k: TKey) => string;
   locale: string;
   planChangePending: BillingPlanId | null;
-  onPlanChange: (plan: Exclude<BillingPlanId, "ENTERPRISE">) => void;
+  onPlanChange: (plan: BillingPlanId) => void;
 }) {
   const currentPlanKey = PLAN_LABEL_KEYS[summary.currentPlan];
   const seatsUsed = summary.usage.members + summary.usage.pendingInvitations;
@@ -446,7 +447,7 @@ function BillingContent({
           ))}
         </div>
         <p className="mt-4 text-sm text-muted-foreground">{t("billing.ownerNote")}</p>
-        <p className="mt-2 text-sm text-muted-foreground">{t("billing.noAutoRenewalNote")}</p>
+        <p className="mt-1.5 text-xs text-muted-foreground/70">{t("billing.noAutoRenewalNote")}</p>
       </section>
     </>
   );
@@ -497,21 +498,16 @@ function PlanCard({
   canManageBilling: boolean;
   busy: boolean;
   pending: boolean;
-  onPlanChange: (plan: Exclude<BillingPlanId, "ENTERPRISE">) => void;
+  onPlanChange: (plan: BillingPlanId) => void;
 }) {
   const labelKey = PLAN_LABEL_KEYS[plan.id];
   const planName = t(labelKey);
-  const canChange = canManageBilling && plan.action === "SELECT";
+  const tierClass = plan.id.toLowerCase();
+  const canSelect = canManageBilling && plan.action === "SELECT" && !plan.isCurrent;
   const unavailableReasonText =
     plan.action === "UNAVAILABLE" && plan.unavailableReason
       ? t(UNAVAILABLE_REASON_KEYS[plan.unavailableReason])
       : null;
-  const actionLabel =
-    plan.action === "SELECT"
-      ? plan.id === "FREE"
-        ? t("billing.selectFreeCta")
-        : t("billing.selectPlanCta")
-      : t("billing.unavailableAction");
 
   const priceLabel =
     plan.monthlyPriceRub === 0
@@ -520,18 +516,58 @@ function PlanCard({
         ? t("billing.priceOnRequest")
         : `${formatRubPrice(plan.monthlyPriceRub, locale)} ₽`;
 
+  const triggerSelect = () => {
+    if (!canSelect || busy) {
+      return;
+    }
+    onPlanChange(plan.id);
+  };
+
+  const interactive = canSelect;
+
+  const onCardKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!interactive || busy) {
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      triggerSelect();
+    }
+  };
+
+  const ctaClassName = cn(
+    "billing-plan-card__cta",
+    `billing-plan-card__cta--${tierClass}`,
+    plan.isCurrent && "billing-plan-card__cta--current",
+  );
+
   return (
     <div
-      className={`relative flex flex-col rounded-2xl border bg-card p-5 shadow-soft ${
-        plan.isCurrent ? "border-primary ring-1 ring-primary/25" : "border-border"
-      }`}
+      className={cn(
+        "billing-plan-card",
+        `billing-plan-card--${tierClass}`,
+        `plan-${tierClass}`,
+        plan.isCurrent && "billing-plan-card--current",
+        canSelect && "billing-plan-card--select",
+        plan.action === "UNAVAILABLE" && "billing-plan-card--unavailable",
+      )}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive && !busy ? 0 : undefined}
+      aria-disabled={interactive ? busy : undefined}
+      onClick={() => {
+        if (busy || plan.isCurrent || !canSelect) {
+          return;
+        }
+        triggerSelect();
+      }}
+      onKeyDown={onCardKeyDown}
     >
       {plan.isCurrent ? (
         <Badge className="absolute right-3 top-3 border-0 bg-primary/15 font-normal text-primary">
           {t("billing.currentPlan")}
         </Badge>
       ) : null}
-      <div className={`text-lg font-semibold ${plan.isCurrent ? "pr-24" : ""}`}>{planName}</div>
+      <div className={cn("text-lg font-semibold", plan.isCurrent && "pr-24")}>{planName}</div>
       <div className="mt-3 flex items-end gap-1">
         <span className="text-2xl font-semibold tracking-tight">{priceLabel}</span>
         {plan.monthlyPriceRub ? (
@@ -557,34 +593,29 @@ function PlanCard({
       </ul>
       <div className="mt-4">
         {plan.isCurrent ? (
-          <Button variant="outline" size="sm" className="w-full" disabled>
-            {t("billing.currentPlan")}
-          </Button>
-        ) : plan.action === "CONTACT" && canManageBilling ? (
-          <Button asChild variant="warning" size="sm" className="w-full">
-            <a href="mailto:sales@teamflow.ai?subject=TeamFlow%20Enterprise">
-              {t("billing.contactSales")}
-              <ExternalLink className="size-3.5" />
-            </a>
+          <Button type="button" variant="ghost" size="sm" className={ctaClassName} disabled>
+            <CreditCard className="size-4" />
+            {t("billing.activePlanCta")}
           </Button>
         ) : (
           <Button
-            variant={plan.id === "BUSINESS" ? "brand" : "info"}
+            type="button"
+            variant="ghost"
             size="sm"
-            className="w-full"
-            disabled={!canChange || busy}
-            onClick={() => {
-              if (plan.id !== "ENTERPRISE") {
-                onPlanChange(plan.id);
-              }
+            className={ctaClassName}
+            disabled={!canSelect || busy}
+            tabIndex={canSelect ? -1 : undefined}
+            onClick={(event) => {
+              event.stopPropagation();
+              triggerSelect();
             }}
           >
             {pending ? (
               <Loader2 className="size-4 animate-spin" />
-            ) : (
+            ) : canSelect ? (
               <CreditCard className="size-4" />
-            )}
-            {pending ? t("billing.openingPayment") : actionLabel}
+            ) : null}
+            {pending ? t("billing.openingPayment") : t("billing.selectPlanCta")}
           </Button>
         )}
         <div className="mt-2 min-h-[2.5rem]">

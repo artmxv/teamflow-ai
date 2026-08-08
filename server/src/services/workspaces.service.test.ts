@@ -107,6 +107,7 @@ describe("workspaces.service billing limits", () => {
       },
     });
     assert.equal(created.role, "OWNER");
+    assert.equal(created.plan, "TEAM");
 
     await assert.rejects(
       () =>
@@ -172,5 +173,38 @@ describe("workspaces.service billing limits", () => {
         return true;
       },
     );
+  });
+
+  it("inherits owner plan for a new workspace even if current workspace row drifted", async () => {
+    const paidWorkspace = await prisma.workspace.create({
+      data: {
+        name: `Workspace Limit Paid ${suffix}`,
+        slug: `workspace-limit-extra-${suffix}-paid-source`,
+        plan: "BUSINESS",
+        members: {
+          create: [{ userId: ownerId, role: "OWNER", status: "ACTIVE" }],
+        },
+      },
+    });
+
+    try {
+      // Drifted current workspace still FREE in DB; owner effective plan is BUSINESS.
+      await prisma.workspace.update({
+        where: { id: currentWorkspaceId },
+        data: { plan: "FREE" },
+      });
+
+      const created = await createWorkspaceForUser({
+        userId: ownerId,
+        selectedWorkspaceId: currentWorkspaceId,
+        data: {
+          name: "Inherited Business",
+          slug: `workspace-limit-extra-${suffix}-inherited-business`,
+        },
+      });
+      assert.equal(created.plan, "BUSINESS");
+    } finally {
+      await prisma.workspace.delete({ where: { id: paidWorkspace.id } }).catch(() => undefined);
+    }
   });
 });

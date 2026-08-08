@@ -5,12 +5,13 @@ import { env } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
 import { AuthError } from "./auth.service.js";
 import {
-  assertPlanUsageWithinLimits,
   getPlanAmountValue,
-  isBillingPlanDowngrade,
   isPaidSelfServicePlan,
   lockWorkspaceBillingUsage,
   lockWorkspaceOwnerUsage,
+  resolveOwnerBillingPlan,
+  setOwnedWorkspacesPlan,
+  syncOwnedWorkspacesToOwnerPlan,
   type PaidSelfServicePlan,
 } from "./billing-plans.service.js";
 import type { WorkspaceRole } from "./workspace-context.service.js";
@@ -199,6 +200,7 @@ async function applySucceededPayment(input: {
   workspaceId: string;
   targetPlan: PaidSelfServicePlan;
   providerPaymentId: string;
+  ownerUserId?: string;
 }): Promise<BillingPaymentConfirmationResult> {
   return prisma.$transaction(async (tx) => {
     await lockWorkspaceBillingUsage(tx, input.workspaceId);
@@ -244,17 +246,7 @@ async function applySucceededPayment(input: {
       throw new AuthError("Workspace not found", 404);
     }
 
-    if (
-      payment.targetPlan !== workspace.plan &&
-      isBillingPlanDowngrade(workspace.plan, payment.targetPlan)
-    ) {
-      await lockWorkspaceOwnerUsage(tx, input.workspaceId);
-      await assertPlanUsageWithinLimits({
-        workspaceId: input.workspaceId,
-        targetPlan: payment.targetPlan,
-        db: tx,
-      });
-    }
+    await lockWorkspaceOwnerUsage(tx, input.workspaceId);
 
     const completedAt = new Date();
     await tx.billingPayment.update({
@@ -265,10 +257,30 @@ async function applySucceededPayment(input: {
         completedAt,
       },
     });
-    await tx.workspace.update({
-      where: { id: input.workspaceId },
-      data: { plan: payment.targetPlan },
-    });
+
+    // Owner-scoped: paid plan applies to every workspace this owner owns.
+    let ownerUserId = input.ownerUserId;
+    if (!ownerUserId) {
+      const owner = await tx.workspaceMember.findFirst({
+        where: {
+          workspaceId: input.workspaceId,
+          role: "OWNER",
+          status: "ACTIVE",
+        },
+        select: { userId: true },
+        orderBy: { joinedAt: "asc" },
+      });
+      ownerUserId = owner?.userId;
+    }
+
+    if (ownerUserId) {
+      await setOwnedWorkspacesPlan(ownerUserId, payment.targetPlan, tx);
+    } else {
+      await tx.workspace.update({
+        where: { id: input.workspaceId },
+        data: { plan: payment.targetPlan },
+      });
+    }
 
     return {
       paymentId: payment.id,
@@ -323,6 +335,7 @@ export async function confirmProviderPayment(
   const metadataPaymentId = providerPayment.metadata?.paymentId;
   const metadataWorkspaceId = providerPayment.metadata?.workspaceId;
   const metadataTargetPlan = providerPayment.metadata?.targetPlan;
+  const metadataOwnerUserId = providerPayment.metadata?.ownerUserId;
 
   const payment =
     (metadataPaymentId
@@ -373,6 +386,7 @@ export async function confirmProviderPayment(
       workspaceId: payment.workspaceId,
       targetPlan: payment.targetPlan,
       providerPaymentId: providerPayment.id,
+      ownerUserId: metadataOwnerUserId,
     });
   }
   if (mapped === "CANCELED") {
@@ -465,13 +479,9 @@ export async function createBillingPlanChangeSession(input: {
   targetPlan: BillingPlan;
 }): Promise<BillingPlanChangeResult> {
   assertOwner(input.role);
-  if (input.targetPlan === "ENTERPRISE") {
-    throw new AuthError(
-      "Enterprise is not available through self-service billing",
-      400,
-      "PLAN_NOT_SELF_SERVICE",
-    );
-  }
+
+  // Keep owner workspaces aligned before comparing / applying a plan change.
+  const currentPlan = await syncOwnedWorkspacesToOwnerPlan(input.userId);
 
   const workspace = await prisma.workspace.findUnique({
     where: { id: input.workspaceId },
@@ -481,60 +491,30 @@ export async function createBillingPlanChangeSession(input: {
     throw new AuthError("Workspace not found", 404);
   }
 
-  if (workspace.plan === input.targetPlan) {
+  if (currentPlan === input.targetPlan || workspace.plan === input.targetPlan) {
     throw new AuthError("This is already the current plan", 409, "PLAN_ALREADY_CURRENT");
   }
 
-  // Leaving Enterprise via self-service is allowed (guards + payment still apply).
-  // Entering Enterprise remains blocked above (targetPlan === ENTERPRISE).
-
   // Free does not require YooKassa in V1 (no recurring subscription to cancel).
-  // Validate + apply inside one transaction so usage cannot race past the limits check.
+  // Apply to every workspace owned by this user (owner-scoped billing).
   if (input.targetPlan === "FREE") {
     await prisma.$transaction(async (tx) => {
       await lockWorkspaceBillingUsage(tx, input.workspaceId);
       await lockWorkspaceOwnerUsage(tx, input.workspaceId);
 
-      const current = await tx.workspace.findUnique({
-        where: { id: input.workspaceId },
-        select: { plan: true },
-      });
-      if (!current) {
-        throw new AuthError("Workspace not found", 404);
-      }
-      if (current.plan === "FREE") {
+      const ownerPlan = await resolveOwnerBillingPlan(input.userId, tx);
+      if (ownerPlan === "FREE") {
         throw new AuthError("This is already the current plan", 409, "PLAN_ALREADY_CURRENT");
       }
 
-      await assertPlanUsageWithinLimits({
-        workspaceId: input.workspaceId,
-        targetPlan: "FREE",
-        db: tx,
-      });
-
-      await tx.workspace.update({
-        where: { id: input.workspaceId },
-        data: { plan: "FREE" },
-      });
+      await setOwnedWorkspacesPlan(input.userId, "FREE", tx);
     });
     return { flow: "APPLIED", currentPlan: "FREE" };
   }
 
-  if (isBillingPlanDowngrade(workspace.plan, input.targetPlan)) {
-    await prisma.$transaction(async (tx) => {
-      await lockWorkspaceBillingUsage(tx, input.workspaceId);
-      await lockWorkspaceOwnerUsage(tx, input.workspaceId);
-      await assertPlanUsageWithinLimits({
-        workspaceId: input.workspaceId,
-        targetPlan: input.targetPlan,
-        db: tx,
-      });
-    });
-  }
-
   if (!isPaidSelfServicePlan(input.targetPlan)) {
     throw new AuthError(
-      "Enterprise is not available through self-service billing",
+      "This plan is not available through self-service billing",
       400,
       "PLAN_NOT_SELF_SERVICE",
     );
@@ -574,6 +554,7 @@ export async function createBillingPlanChangeSession(input: {
         workspaceId: input.workspaceId,
         targetPlan: input.targetPlan,
         paymentId: payment.id,
+        ownerUserId: input.userId,
       },
     },
   });

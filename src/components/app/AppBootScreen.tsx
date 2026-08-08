@@ -1,4 +1,4 @@
-import { BrandMark } from "@/components/brand/BrandLogo";
+import { BrandAiBadge, BrandMark } from "@/components/brand/BrandLogo";
 import { useSlowLoadingMessage } from "@/hooks/use-slow-loading-message";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -44,9 +44,7 @@ export function AppBootScreen({ variant = "shell" }: AppBootScreenProps) {
 
         <div className="mt-7 flex items-center gap-2 tracking-tight" aria-hidden>
           <span className="text-2xl font-semibold text-foreground">TeamFlow</span>
-          <span className="rounded-md bg-primary/14 px-1.5 py-0.5 text-sm font-semibold leading-none text-primary">
-            AI
-          </span>
+          <BrandAiBadge className="px-1.5 py-0.5 text-sm" />
         </div>
         <p className="mt-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
           {t("side.tagline")}

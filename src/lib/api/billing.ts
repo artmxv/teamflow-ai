@@ -57,7 +57,7 @@ export type BillingPaymentConfirmation = {
 };
 
 export async function createBillingPlanChange(
-  plan: Exclude<BillingPlanId, "ENTERPRISE">,
+  plan: BillingPlanId,
 ): Promise<BillingPlanChangeResult> {
   const response = await apiRequest<{ data: BillingPlanChangeResult }>("/api/billing/change-plan", {
     method: "POST",

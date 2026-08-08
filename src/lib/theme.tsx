@@ -2,15 +2,19 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { Moon, Sun } from "lucide-react";
 
 type Theme = "light" | "dark";
+export type BrandTheme = "default" | "ocean" | "emerald" | "sunset";
 
 const DEFAULT_BRAND_THEME = "default";
+const BRAND_THEMES: BrandTheme[] = ["default", "ocean", "emerald", "sunset"];
 
 /** Inline IIFE for <head>: applies brand + light/dark before React/hydration. SSR-safe. */
 export const THEME_INIT_SCRIPT = `
 (function () {
   try {
     var root = document.documentElement;
-    root.setAttribute("data-brand-theme", "${DEFAULT_BRAND_THEME}");
+    var brand = localStorage.getItem("tf_brand_theme");
+    if (!["default", "ocean", "emerald", "sunset"].includes(brand)) brand = "${DEFAULT_BRAND_THEME}";
+    root.setAttribute("data-brand-theme", brand);
     var stored = localStorage.getItem("tf_theme");
     var isDark;
     if (stored === "dark") isDark = true;
@@ -28,10 +32,18 @@ function ensureBrandThemeAttribute() {
   }
 }
 
-const Ctx = createContext<{ theme: Theme; toggle: () => void; setTheme: (t: Theme) => void }>({
+const Ctx = createContext<{
+  theme: Theme;
+  brandTheme: BrandTheme;
+  toggle: () => void;
+  setTheme: (t: Theme) => void;
+  setBrandTheme: (theme: BrandTheme) => void;
+}>({
   theme: "light",
+  brandTheme: DEFAULT_BRAND_THEME,
   toggle: () => {},
   setTheme: () => {},
+  setBrandTheme: () => {},
 });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -40,6 +52,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // - THEME_INIT_SCRIPT applies data-brand-theme + <html class="dark"> before hydration to avoid flash.
   // - We keep the first client render aligned with SSR ("light") and then sync in an effect.
   const [theme, setThemeState] = useState<Theme>("light");
+  const [brandTheme, setBrandThemeState] = useState<BrandTheme>(DEFAULT_BRAND_THEME);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -47,8 +60,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const stored = window.localStorage.getItem("tf_theme") as Theme | null;
     const prefers = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     const initial = stored ?? prefers;
+    const storedBrand = window.localStorage.getItem("tf_brand_theme") as BrandTheme | null;
+    const initialBrand =
+      storedBrand && BRAND_THEMES.includes(storedBrand) ? storedBrand : DEFAULT_BRAND_THEME;
     setThemeState(initial);
+    setBrandThemeState(initialBrand);
     document.documentElement.classList.toggle("dark", initial === "dark");
+    document.documentElement.setAttribute("data-brand-theme", initialBrand);
   }, []);
 
   const apply = (t: Theme) => {
@@ -60,9 +78,23 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const applyBrand = (next: BrandTheme) => {
+    setBrandThemeState(next);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("tf_brand_theme", next);
+      document.documentElement.setAttribute("data-brand-theme", next);
+    }
+  };
+
   return (
     <Ctx.Provider
-      value={{ theme, setTheme: apply, toggle: () => apply(theme === "dark" ? "light" : "dark") }}
+      value={{
+        theme,
+        brandTheme,
+        setTheme: apply,
+        setBrandTheme: applyBrand,
+        toggle: () => apply(theme === "dark" ? "light" : "dark"),
+      }}
     >
       {children}
     </Ctx.Provider>

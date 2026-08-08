@@ -7,6 +7,7 @@ import {
   getBillingPlans,
   getWorkspaceMemberUsage,
   getWorkspaceOwnerWorkspaceUsage,
+  resolveOwnerBillingPlan,
 } from "./billing-plans.service.js";
 import { isYooKassaBillingConfigured } from "./yookassa-billing.service.js";
 import type { WorkspaceRole } from "./workspace-context.service.js";
@@ -53,23 +54,11 @@ type PlanActionResult = {
   unavailableReason: BillingPlanUnavailableReason | null;
 };
 
-function getUsageBlockReason(input: {
-  targetPlan: BillingPlan;
-  seatsUsed: number;
-  workspacesUsed: number;
-}): BillingPlanUnavailableReason | null {
-  const { limits } = getBillingPlanConfig(input.targetPlan);
-
-  if (limits.maxMembers !== null && input.seatsUsed > limits.maxMembers) {
-    return "MEMBER_LIMIT_EXCEEDED";
-  }
-  if (limits.maxWorkspaces !== null && input.workspacesUsed > limits.maxWorkspaces) {
-    return "WORKSPACE_LIMIT_EXCEEDED";
-  }
-  return null;
-}
-
-/** Plan action matrix for the billing summary UI. Enterprise is contact-only as a TARGET. */
+/**
+ * Plan action matrix for the billing summary UI.
+ * V1 keeps this simple: no usage-based UNAVAILABLE / prepare-downgrade UX.
+ * Limits still apply when creating workspaces or inviting members.
+ */
 export function getPlanAction(input: {
   currentPlan: BillingPlan;
   targetPlan: BillingPlan;
@@ -80,20 +69,6 @@ export function getPlanAction(input: {
 }): PlanActionResult {
   if (input.targetPlan === input.currentPlan) {
     return { action: "CURRENT", unavailableReason: null };
-  }
-
-  // Enterprise is never self-service as a destination. Leaving Enterprise is allowed.
-  if (input.targetPlan === "ENTERPRISE") {
-    return { action: "CONTACT", unavailableReason: null };
-  }
-
-  const usageBlock = getUsageBlockReason({
-    targetPlan: input.targetPlan,
-    seatsUsed: input.seatsUsed,
-    workspacesUsed: input.workspacesUsed,
-  });
-  if (usageBlock) {
-    return { action: "UNAVAILABLE", unavailableReason: usageBlock };
   }
 
   // Free downgrade does not need YooKassa.
@@ -118,6 +93,7 @@ export function getPlanAction(input: {
 export async function getBillingSummary(
   workspaceId: string,
   role: WorkspaceRole,
+  userId?: string,
 ): Promise<BillingSummaryDto> {
   const workspace = await prisma.workspace.findUnique({
     where: { id: workspaceId },
@@ -130,9 +106,13 @@ export async function getBillingSummary(
     throw new AuthError("Workspace not found", 404);
   }
 
-  const currentConfig = getBillingPlanConfig(workspace.plan);
-  const billingConfigured = isYooKassaBillingConfigured();
   const canManageBilling = role === "OWNER";
+  // Owner-scoped + read-only: never write from GET. Resolve the owner's plan without healing DB.
+  const currentPlan =
+    canManageBilling && userId ? await resolveOwnerBillingPlan(userId) : workspace.plan;
+
+  const currentConfig = getBillingPlanConfig(currentPlan);
+  const billingConfigured = isYooKassaBillingConfigured();
   const [memberUsage, workspaces] = await Promise.all([
     getWorkspaceMemberUsage(workspaceId),
     getWorkspaceOwnerWorkspaceUsage(workspaceId),
@@ -140,7 +120,7 @@ export async function getBillingSummary(
   const seatsUsed = memberUsage.members + memberUsage.pendingInvitations;
 
   return {
-    currentPlan: workspace.plan,
+    currentPlan,
     planLabel: currentConfig.label,
     currency: "RUB",
     limits: currentConfig.limits,
@@ -154,7 +134,7 @@ export async function getBillingSummary(
     testMode: true,
     plans: getBillingPlans().map((plan) => {
       const { action, unavailableReason } = getPlanAction({
-        currentPlan: workspace.plan,
+        currentPlan,
         targetPlan: plan.id,
         billingConfigured,
         canManageBilling,
@@ -167,7 +147,7 @@ export async function getBillingSummary(
         label: plan.label,
         maxMembers: plan.limits.maxMembers,
         maxWorkspaces: plan.limits.maxWorkspaces,
-        isCurrent: plan.id === workspace.plan,
+        isCurrent: plan.id === currentPlan,
         monthlyPriceRub: plan.monthlyPriceRub,
         currency: "RUB" as const,
         action,

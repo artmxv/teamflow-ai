@@ -8,10 +8,7 @@ import { prisma } from "../lib/prisma.js";
 import { AuthError } from "./auth.service.js";
 import {
   assertPlanUsageWithinLimits,
-  BillingPlanUsageError,
   getPlanAmountValue,
-  PLAN_MEMBER_LIMIT_EXCEEDED_CODE,
-  PLAN_WORKSPACE_LIMIT_EXCEEDED_CODE,
 } from "./billing-plans.service.js";
 import {
   confirmProviderPayment,
@@ -382,137 +379,114 @@ describe("yookassa-billing.service", () => {
     });
   });
 
-  it("blocks Enterprise -> Free when owner workspace usage exceeds Free limit", async () => {
+  it("allows Enterprise -> Free even when owner has more than one workspace", async () => {
     await prisma.workspace.update({
       where: { id: workspaceId },
       data: { plan: "ENTERPRISE" },
     });
     await addOwnedWorkspaces(1);
 
-    await assert.rejects(
-      () =>
-        createBillingPlanChangeSession({
-          userId: ownerId,
-          workspaceId,
-          role: "OWNER",
-          targetPlan: "FREE",
-        }),
-      (error: unknown) => {
-        assert.ok(error instanceof BillingPlanUsageError);
-        assert.equal(error.code, PLAN_WORKSPACE_LIMIT_EXCEEDED_CODE);
-        assert.deepEqual(error.details, { targetPlan: "FREE", used: 2, limit: 1 });
-        return true;
-      },
-    );
+    const result = await createBillingPlanChangeSession({
+      userId: ownerId,
+      workspaceId,
+      role: "OWNER",
+      targetPlan: "FREE",
+    });
+
+    assert.deepEqual(result, { flow: "APPLIED", currentPlan: "FREE" });
     assert.equal(yookassaRequests.length, 0);
+
+    const owned = await prisma.workspaceMember.findMany({
+      where: { userId: ownerId, role: "OWNER", status: "ACTIVE" },
+      select: { workspace: { select: { plan: true } } },
+    });
+    assert.ok(owned.length >= 2);
+    assert.ok(owned.every((row) => row.workspace.plan === "FREE"));
   });
 
-  it("still rejects self-service transitions that target Enterprise", async () => {
+  it("creates an Enterprise payment for Business -> Enterprise", async () => {
     await prisma.workspace.update({
       where: { id: workspaceId },
       data: { plan: "BUSINESS" },
     });
 
-    await assert.rejects(
-      () =>
-        createBillingPlanChangeSession({
-          userId: ownerId,
-          workspaceId,
-          role: "OWNER",
-          targetPlan: "ENTERPRISE",
-        }),
-      (error: unknown) => {
-        assert.ok(error instanceof AuthError);
-        assert.equal(error.code, "PLAN_NOT_SELF_SERVICE");
-        return true;
-      },
-    );
-    assert.equal(yookassaRequests.length, 0);
+    const result = await createBillingPlanChangeSession({
+      userId: ownerId,
+      workspaceId,
+      role: "OWNER",
+      targetPlan: "ENTERPRISE",
+    });
+
+    assert.equal(result.flow, "PAYMENT");
+    assert.deepEqual(yookassaRequests[0]?.body?.amount, {
+      value: "4990.00",
+      currency: "RUB",
+    });
   });
 
-  it("blocks Business -> Team when seats exceed Team limits before opening YooKassa", async () => {
+  it("opens Business -> Team payment even when seats exceed Team limits", async () => {
     await addActiveMembers(8);
 
-    await assert.rejects(
-      () =>
-        createBillingPlanChangeSession({
-          userId: ownerId,
-          workspaceId,
-          role: "OWNER",
-          targetPlan: "TEAM",
-        }),
-      (error: unknown) => {
-        assert.ok(error instanceof BillingPlanUsageError);
-        assert.equal(error.code, PLAN_MEMBER_LIMIT_EXCEEDED_CODE);
-        assert.deepEqual(error.details, { targetPlan: "TEAM", used: 11, limit: 10 });
-        return true;
-      },
-    );
-    assert.equal(yookassaRequests.length, 0);
+    const result = await createBillingPlanChangeSession({
+      userId: ownerId,
+      workspaceId,
+      role: "OWNER",
+      targetPlan: "TEAM",
+    });
+
+    assert.equal(result.flow, "PAYMENT");
+    assert.deepEqual(yookassaRequests[0]?.body?.amount, {
+      value: "990.00",
+      currency: "RUB",
+    });
   });
 
-  it("blocks downgrade when active members exceed the target seat limit", async () => {
+  it("applies Free even when active members exceed Free seat limit", async () => {
     await addActiveMembers(4);
 
-    await assert.rejects(
-      () =>
-        createBillingPlanChangeSession({
-          userId: ownerId,
-          workspaceId,
-          role: "OWNER",
-          targetPlan: "FREE",
-        }),
-      (error: unknown) => {
-        assert.ok(error instanceof BillingPlanUsageError);
-        assert.equal(error.code, PLAN_MEMBER_LIMIT_EXCEEDED_CODE);
-        assert.deepEqual(error.details, { targetPlan: "FREE", used: 7, limit: 5 });
-        return true;
-      },
-    );
+    const result = await createBillingPlanChangeSession({
+      userId: ownerId,
+      workspaceId,
+      role: "OWNER",
+      targetPlan: "FREE",
+    });
+
+    assert.deepEqual(result, { flow: "APPLIED", currentPlan: "FREE" });
     assert.equal(yookassaRequests.length, 0);
   });
 
-  it("counts valid PENDING invitations as occupied seats during downgrade", async () => {
+  it("applies Free even when pending invitations exceed Free seat limit", async () => {
     await addPendingInvitations(3);
 
-    await assert.rejects(
-      () =>
-        createBillingPlanChangeSession({
-          userId: ownerId,
-          workspaceId,
-          role: "OWNER",
-          targetPlan: "FREE",
-        }),
-      (error: unknown) => {
-        assert.ok(error instanceof BillingPlanUsageError);
-        assert.equal(error.code, PLAN_MEMBER_LIMIT_EXCEEDED_CODE);
-        assert.deepEqual(error.details, { targetPlan: "FREE", used: 6, limit: 5 });
-        return true;
-      },
-    );
+    const result = await createBillingPlanChangeSession({
+      userId: ownerId,
+      workspaceId,
+      role: "OWNER",
+      targetPlan: "FREE",
+    });
+
+    assert.deepEqual(result, { flow: "APPLIED", currentPlan: "FREE" });
   });
 
-  it("blocks downgrade when the owner exceeds the target workspace limit", async () => {
+  it("applies Free across all owned workspaces when owner exceeds Free workspace limit", async () => {
     await addOwnedWorkspaces(1);
 
-    await assert.rejects(
-      () =>
-        createBillingPlanChangeSession({
-          userId: ownerId,
-          workspaceId,
-          role: "OWNER",
-          targetPlan: "FREE",
-        }),
-      (error: unknown) => {
-        assert.ok(error instanceof BillingPlanUsageError);
-        assert.equal(error.code, PLAN_WORKSPACE_LIMIT_EXCEEDED_CODE);
-        assert.deepEqual(error.details, { targetPlan: "FREE", used: 2, limit: 1 });
-        return true;
-      },
-    );
+    const result = await createBillingPlanChangeSession({
+      userId: ownerId,
+      workspaceId,
+      role: "OWNER",
+      targetPlan: "FREE",
+    });
+
+    assert.deepEqual(result, { flow: "APPLIED", currentPlan: "FREE" });
+    const owned = await prisma.workspaceMember.findMany({
+      where: { userId: ownerId, role: "OWNER", status: "ACTIVE" },
+      select: { workspace: { select: { plan: true } } },
+    });
+    assert.ok(owned.every((row) => row.workspace.plan === "FREE"));
   });
 
-  it("applies Free downgrade atomically so concurrent usage cannot bypass Free limits", async () => {
+  it("serializes Free downgrade and workspace create with billing locks", async () => {
     const results = await Promise.allSettled([
       createBillingPlanChangeSession({
         userId: ownerId,
@@ -540,14 +514,10 @@ describe("yookassa-billing.service", () => {
       })
     ).plan;
 
-    // Locks serialize the two billing paths: never Free with >1 owned workspace.
-    assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
-    assert.equal(results.filter((result) => result.status === "rejected").length, 1);
-    assert.ok(!(plan === "FREE" && ownedCount > 1));
-    if (plan === "FREE") {
-      assert.equal(ownedCount, 1);
-    } else {
-      assert.equal(plan, "BUSINESS");
+    // Locks still serialize both paths; Free may already own multiple workspaces in V1.
+    assert.equal(results.filter((result) => result.status === "fulfilled").length >= 1, true);
+    assert.ok(plan === "FREE" || plan === "BUSINESS");
+    if (plan === "BUSINESS") {
       assert.equal(ownedCount, 2);
     }
   });
@@ -708,11 +678,12 @@ describe("yookassa-billing.service", () => {
     );
   });
 
-  it("activates the plan after a succeeded payment and stays idempotent", async () => {
+  it("activates the plan after a succeeded payment across all owned workspaces", async () => {
     await prisma.workspace.update({
       where: { id: workspaceId },
       data: { plan: "FREE" },
     });
+    await addOwnedWorkspaces(1);
 
     const created = await createBillingPlanChangeSession({
       userId: ownerId,
@@ -736,6 +707,7 @@ describe("yookassa-billing.service", () => {
         workspaceId,
         targetPlan: "TEAM",
         paymentId: payment.id,
+        ownerUserId: ownerId,
       },
     });
 
@@ -744,11 +716,12 @@ describe("yookassa-billing.service", () => {
       object: { id: providerId, status: "succeeded", amount: { value: "1.00", currency: "RUB" } },
     });
 
-    const workspace = await prisma.workspace.findUniqueOrThrow({
-      where: { id: workspaceId },
-      select: { plan: true },
+    const owned = await prisma.workspaceMember.findMany({
+      where: { userId: ownerId, role: "OWNER", status: "ACTIVE" },
+      select: { workspace: { select: { plan: true } } },
     });
-    assert.equal(workspace.plan, "TEAM");
+    assert.ok(owned.length >= 2);
+    assert.ok(owned.every((row) => row.workspace.plan === "TEAM"));
 
     const first = await prisma.billingPayment.findUniqueOrThrow({ where: { id: payment.id } });
     assert.equal(first.status, "SUCCEEDED");
@@ -759,9 +732,13 @@ describe("yookassa-billing.service", () => {
     });
     const second = await prisma.billingPayment.findUniqueOrThrow({ where: { id: payment.id } });
     assert.equal(second.status, "SUCCEEDED");
-    assert.equal(
-      (await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).plan,
-      "TEAM",
+    assert.ok(
+      (
+        await prisma.workspaceMember.findMany({
+          where: { userId: ownerId, role: "OWNER", status: "ACTIVE" },
+          select: { workspace: { select: { plan: true } } },
+        })
+      ).every((row) => row.workspace.plan === "TEAM"),
     );
   });
 
