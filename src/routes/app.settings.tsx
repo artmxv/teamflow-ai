@@ -23,7 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useI18n, type Lang, type TKey } from "@/lib/i18n";
@@ -61,9 +60,17 @@ import {
 import { updateWorkspace } from "@/lib/api/workspace";
 import { canEditWorkspaceSettings, useCurrentUser } from "@/lib/auth/use-current-user";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Loader2 } from "lucide-react";
+import { Check, Loader2, Moon, Palette, Sun } from "lucide-react";
+import { useTheme, type BrandTheme } from "@/lib/theme";
 
-const SETTINGS_TABS = ["workspace", "profile", "notifications", "billing"] as const;
+const SETTINGS_TABS = ["workspace", "profile", "appearance", "billing"] as const;
+
+const APPEARANCE_THEMES: { id: BrandTheme; colors: [string, string, string] }[] = [
+  { id: "default", colors: ["#7657ff", "#3b82f6", "#22d3ee"] },
+  { id: "ocean", colors: ["#2563eb", "#06b6d4", "#67e8f9"] },
+  { id: "emerald", colors: ["#059669", "#14b8a6", "#6ee7b7"] },
+  { id: "sunset", colors: ["#f43f5e", "#f97316", "#fbbf24"] },
+];
 
 const SETTINGS_PLAN_LABEL_KEYS: Record<BillingPlanId, TKey> = {
   FREE: "billing.plan.free",
@@ -323,6 +330,7 @@ type WorkspaceFormState = {
 
 function SettingsPage() {
   const { t, lang } = useI18n();
+  const { theme, setTheme, brandTheme, setBrandTheme } = useTheme();
   const { tab } = Route.useSearch();
   const navigate = Route.useNavigate();
   const queryClient = useQueryClient();
@@ -569,7 +577,7 @@ function SettingsPage() {
         <TabsList>
           <TabsTrigger value="workspace">{t("side.workspace")}</TabsTrigger>
           <TabsTrigger value="profile">{t("settings.profileSettings")}</TabsTrigger>
-          <TabsTrigger value="notifications">{t("settings.notificationSettings")}</TabsTrigger>
+          <TabsTrigger value="appearance">{t("settings.appearanceSettings")}</TabsTrigger>
           <TabsTrigger value="billing">{t("side.billing")}</TabsTrigger>
         </TabsList>
 
@@ -842,35 +850,83 @@ function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="notifications" className="mt-5">
-          <Card
-            title={t("settings.notificationSettings")}
-            description={t("settings.notificationDesc")}
-          >
-            <div className="divide-y divide-border">
-              {[
-                { l: t("settings.notifyComments"), d: t("settings.notifyEmailInApp") },
-                { l: t("settings.notifyMentions"), d: t("settings.notifyEmailInApp") },
-                {
-                  l: t("settings.notifyWeeklyDigest"),
-                  d: t("settings.notifyWeeklyDigestSchedule"),
-                },
-                {
-                  l: t("settings.notifyProjectStatus"),
-                  d: t("settings.notifyDailySummary"),
-                },
-              ].map((n) => (
-                <div key={n.l} className="flex items-center justify-between gap-3 py-3.5">
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium">{n.l}</div>
-                    <div className="text-xs text-muted-foreground">{n.d}</div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span className="text-xs text-muted-foreground">{t("common.comingSoon")}</span>
-                    <Switch disabled checked={false} />
-                  </div>
+        <TabsContent value="appearance" className="mt-5">
+          <Card title={t("settings.themeSettings")} description={t("settings.appearanceDesc")}>
+            <div className="grid gap-6 lg:grid-cols-[0.72fr_1.28fr]">
+              <div>
+                <div className="mb-3 text-sm font-medium">{t("settings.themeMode")}</div>
+                <div className="grid grid-cols-2 gap-3">
+                  {(["light", "dark"] as const).map((mode) => {
+                    const Icon = mode === "light" ? Sun : Moon;
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setTheme(mode)}
+                        className={`relative rounded-xl border p-4 text-left transition ${
+                          theme === mode
+                            ? "border-primary bg-primary/10 text-foreground shadow-soft"
+                            : "border-border bg-background/45 text-muted-foreground hover:border-primary/45"
+                        }`}
+                      >
+                        <Icon className="size-5" />
+                        <div className="mt-3 text-sm font-medium">
+                          {mode === "light"
+                            ? t("settings.themeModeLight")
+                            : t("settings.themeModeDark")}
+                        </div>
+                        {theme === mode ? (
+                          <Check className="absolute right-3 top-3 size-4 text-primary" />
+                        ) : null}
+                      </button>
+                    );
+                  })}
                 </div>
-              ))}
+              </div>
+
+              <div>
+                <div className="mb-3 flex items-center gap-2 text-sm font-medium">
+                  <Palette className="size-4 text-primary" />
+                  {t("settings.colorAccent")}
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {APPEARANCE_THEMES.map((option) => {
+                    const titleKey = `settings.theme.${option.id}.title` as TKey;
+                    const descKey = `settings.theme.${option.id}.desc` as TKey;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setBrandTheme(option.id)}
+                        className={`relative flex items-center gap-3 rounded-xl border p-3 text-left transition ${
+                          brandTheme === option.id
+                            ? "border-primary bg-primary/8 shadow-soft"
+                            : "border-border bg-background/45 hover:border-primary/45"
+                        }`}
+                      >
+                        <span className="flex shrink-0 -space-x-1">
+                          {option.colors.map((color) => (
+                            <span
+                              key={color}
+                              className="size-8 rounded-full border-2 border-card"
+                              style={{ background: color }}
+                            />
+                          ))}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-medium">{t(titleKey)}</span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {t(descKey)}
+                          </span>
+                        </span>
+                        {brandTheme === option.id ? (
+                          <Check className="ml-auto size-4 shrink-0 text-primary" />
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </Card>
         </TabsContent>

@@ -82,7 +82,7 @@ describe("billing.service", () => {
   });
 
   it("returns billing summary with real plan limits and usage", async () => {
-    const summary = await getBillingSummary(workspaceId, "OWNER");
+    const summary = await getBillingSummary(workspaceId, "OWNER", ownerId);
     const freeConfig = getBillingPlanConfig("FREE");
 
     assert.equal(summary.currentPlan, "FREE");
@@ -107,7 +107,7 @@ describe("billing.service", () => {
         { id: "FREE", action: "CURRENT", reason: null },
         { id: "TEAM", action: "SELECT", reason: null },
         { id: "BUSINESS", action: "SELECT", reason: null },
-        { id: "ENTERPRISE", action: "CONTACT", reason: null },
+        { id: "ENTERPRISE", action: "SELECT", reason: null },
       ],
     );
   });
@@ -140,7 +140,7 @@ describe("billing.service", () => {
         { id: "FREE", members: 5, workspaces: 1, price: 0, currency: "RUB" },
         { id: "TEAM", members: 10, workspaces: 2, price: 990, currency: "RUB" },
         { id: "BUSINESS", members: 20, workspaces: 5, price: 2490, currency: "RUB" },
-        { id: "ENTERPRISE", members: null, workspaces: null, price: null, currency: "RUB" },
+        { id: "ENTERPRISE", members: null, workspaces: null, price: 4990, currency: "RUB" },
       ],
     );
     assert.deepEqual(
@@ -153,7 +153,7 @@ describe("billing.service", () => {
         { id: "FREE", action: "CURRENT", reason: null },
         { id: "TEAM", action: "UNAVAILABLE", reason: "OWNER_ONLY" },
         { id: "BUSINESS", action: "UNAVAILABLE", reason: "OWNER_ONLY" },
-        { id: "ENTERPRISE", action: "CONTACT", reason: null },
+        { id: "ENTERPRISE", action: "UNAVAILABLE", reason: "OWNER_ONLY" },
       ],
     );
 
@@ -177,20 +177,20 @@ describe("billing.service", () => {
       maxMembers: null,
       maxWorkspaces: null,
     });
+    assert.equal(getBillingPlanConfig("ENTERPRISE").monthlyPriceRub, 4990);
   });
 
-  it("accepts self-service plan-change payloads and rejects Enterprise", () => {
+  it("accepts self-service plan-change payloads including Enterprise", () => {
     assert.equal(planChangeSchema.safeParse({ plan: "TEAM" }).success, true);
     assert.equal(planChangeSchema.safeParse({ plan: "BUSINESS" }).success, true);
     assert.equal(planChangeSchema.safeParse({ plan: "FREE" }).success, true);
-    assert.equal(planChangeSchema.safeParse({ plan: "ENTERPRISE" }).success, false);
+    assert.equal(planChangeSchema.safeParse({ plan: "ENTERPRISE" }).success, true);
     assert.equal(planChangeSchema.safeParse({ plan: "GOLD" }).success, false);
     assert.equal(planChangeSchema.safeParse({}).success, false);
     assert.equal(planChangeSchema.safeParse({ plan: 1 }).success, false);
   });
 
-  it("allows leaving Enterprise when usage fits, and blocks Free on workspace limit", () => {
-    // Mirrors seeded demo: Enterprise + 5 seats + 2 workspaces.
+  it("allows Free and paid targets without usage-based UNAVAILABLE actions", () => {
     const base = {
       currentPlan: "ENTERPRISE" as const,
       billingConfigured: true,
@@ -212,12 +212,12 @@ describe("billing.service", () => {
       unavailableReason: null,
     });
     assert.deepEqual(getPlanAction({ ...base, targetPlan: "FREE" }), {
-      action: "UNAVAILABLE",
-      unavailableReason: "WORKSPACE_LIMIT_EXCEEDED",
+      action: "SELECT",
+      unavailableReason: null,
     });
   });
 
-  it("marks Enterprise only as CONTACT when it is the target plan", () => {
+  it("marks Enterprise as SELECT when it is the target plan", () => {
     assert.deepEqual(
       getPlanAction({
         currentPlan: "BUSINESS",
@@ -227,7 +227,7 @@ describe("billing.service", () => {
         seatsUsed: 3,
         workspacesUsed: 1,
       }),
-      { action: "CONTACT", unavailableReason: null },
+      { action: "SELECT", unavailableReason: null },
     );
   });
 
@@ -256,7 +256,7 @@ describe("billing.service", () => {
     );
   });
 
-  it("returns Enterprise leave actions from billing summary for OWNER", async () => {
+  it("resolves owner plan across owned workspaces without writing from billing summary", async () => {
     await prisma.workspace.update({
       where: { id: workspaceId },
       data: { plan: "ENTERPRISE" },
@@ -274,25 +274,73 @@ describe("billing.service", () => {
     });
 
     try {
-      const summary = await getBillingSummary(workspaceId, "OWNER");
-      assert.equal(summary.currentPlan, "ENTERPRISE");
-      assert.equal(summary.usage.members, 3);
-      assert.equal(summary.usage.workspaces, 2);
+      const summaryA = await getBillingSummary(workspaceId, "OWNER", ownerId);
+      const summaryB = await getBillingSummary(extraWorkspace.id, "OWNER", ownerId);
+
+      assert.equal(summaryA.currentPlan, "ENTERPRISE");
+      assert.equal(summaryB.currentPlan, "ENTERPRISE");
+      assert.equal(summaryA.usage.workspaces, 2);
+      assert.equal(summaryB.usage.workspaces, 2);
       assert.deepEqual(
-        summary.plans.map((plan) => ({
+        summaryA.plans.map((plan) => ({
           id: plan.id,
           action: plan.action,
           reason: plan.unavailableReason,
         })),
         [
-          { id: "FREE", action: "UNAVAILABLE", reason: "WORKSPACE_LIMIT_EXCEEDED" },
+          { id: "FREE", action: "SELECT", reason: null },
           { id: "TEAM", action: "SELECT", reason: null },
           { id: "BUSINESS", action: "SELECT", reason: null },
           { id: "ENTERPRISE", action: "CURRENT", reason: null },
         ],
       );
+
+      // GET must stay read-only: drifted row is not healed by summary.
+      const drifted = await prisma.workspace.findUniqueOrThrow({
+        where: { id: extraWorkspace.id },
+        select: { plan: true },
+      });
+      assert.equal(drifted.plan, "FREE");
     } finally {
       await prisma.workspace.delete({ where: { id: extraWorkspace.id } });
+      await prisma.workspace.update({
+        where: { id: workspaceId },
+        data: { plan: "FREE" },
+      });
+    }
+  });
+
+  it("keeps the same owner plan when switching between owned workspaces", async () => {
+    const workspaceB = await prisma.workspace.create({
+      data: {
+        name: `Billing Switch ${suffix}`,
+        slug: `billing-switch-${suffix}`,
+        plan: "ENTERPRISE",
+        members: {
+          create: [{ userId: ownerId, role: "OWNER", status: "ACTIVE" }],
+        },
+      },
+    });
+
+    try {
+      await prisma.workspace.update({
+        where: { id: workspaceId },
+        data: { plan: "ENTERPRISE" },
+      });
+
+      for (const plan of ["ENTERPRISE", "BUSINESS", "TEAM", "FREE"] as const) {
+        await prisma.workspace.updateMany({
+          where: { id: { in: [workspaceId, workspaceB.id] } },
+          data: { plan },
+        });
+
+        const summaryA = await getBillingSummary(workspaceId, "OWNER", ownerId);
+        const summaryB = await getBillingSummary(workspaceB.id, "OWNER", ownerId);
+        assert.equal(summaryA.currentPlan, plan);
+        assert.equal(summaryB.currentPlan, plan);
+      }
+    } finally {
+      await prisma.workspace.delete({ where: { id: workspaceB.id } });
       await prisma.workspace.update({
         where: { id: workspaceId },
         data: { plan: "FREE" },

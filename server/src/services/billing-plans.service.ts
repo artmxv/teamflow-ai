@@ -35,7 +35,7 @@ export type BillingPlanLimits = {
 export type BillingPlanConfig = {
   id: BillingPlan;
   label: string;
-  /** Monthly price in RUB. `null` means contact sales. */
+  /** Monthly price in RUB. `0` is Free; paid plans use a fixed self-service price. */
   monthlyPriceRub: number | null;
   currency: "RUB";
   limits: BillingPlanLimits;
@@ -66,17 +66,17 @@ const PLAN_CONFIG: Record<BillingPlan, BillingPlanConfig> = {
   ENTERPRISE: {
     id: "ENTERPRISE",
     label: "Enterprise",
-    monthlyPriceRub: null,
+    monthlyPriceRub: 4990,
     currency: "RUB",
     limits: { maxMembers: null, maxWorkspaces: null },
   },
 };
 
 /** Paid self-service plans that require a one-time YooKassa payment in V1. */
-export type PaidSelfServicePlan = Extract<BillingPlan, "TEAM" | "BUSINESS">;
+export type PaidSelfServicePlan = Extract<BillingPlan, "TEAM" | "BUSINESS" | "ENTERPRISE">;
 
 export function isPaidSelfServicePlan(plan: BillingPlan): plan is PaidSelfServicePlan {
-  return plan === "TEAM" || plan === "BUSINESS";
+  return plan === "TEAM" || plan === "BUSINESS" || plan === "ENTERPRISE";
 }
 
 /** YooKassa amount.value format, e.g. "990.00". */
@@ -98,8 +98,89 @@ export function getBillingPlans(): BillingPlanConfig[] {
   return PLAN_ORDER.map((plan) => PLAN_CONFIG[plan]);
 }
 
+export function compareBillingPlans(a: BillingPlan, b: BillingPlan): number {
+  return PLAN_ORDER.indexOf(a) - PLAN_ORDER.indexOf(b);
+}
+
 export function isBillingPlanDowngrade(currentPlan: BillingPlan, targetPlan: BillingPlan): boolean {
-  return PLAN_ORDER.indexOf(targetPlan) < PLAN_ORDER.indexOf(currentPlan);
+  return compareBillingPlans(targetPlan, currentPlan) < 0;
+}
+
+/** Workspace ids where the user is an active OWNER. */
+export async function listOwnedWorkspaceIds(
+  userId: string,
+  db: BillingDbClient = prisma,
+): Promise<string[]> {
+  const memberships = await db.workspaceMember.findMany({
+    where: {
+      userId,
+      role: "OWNER",
+      status: "ACTIVE",
+    },
+    select: { workspaceId: true },
+  });
+  return memberships.map((membership) => membership.workspaceId);
+}
+
+/**
+ * Owner-scoped billing: one plan applies to every workspace the user owns.
+ * Keeps Workspace.plan in sync without a separate billing account table.
+ */
+export async function setOwnedWorkspacesPlan(
+  userId: string,
+  plan: BillingPlan,
+  db: BillingDbClient = prisma,
+): Promise<void> {
+  const workspaceIds = await listOwnedWorkspaceIds(userId, db);
+  if (workspaceIds.length === 0) {
+    return;
+  }
+  await db.workspace.updateMany({
+    where: { id: { in: workspaceIds } },
+    data: { plan },
+  });
+}
+
+/** Highest plan among all workspaces owned by the user (source of truth for UI). */
+export async function resolveOwnerBillingPlan(
+  userId: string,
+  db: BillingDbClient = prisma,
+): Promise<BillingPlan> {
+  const memberships = await db.workspaceMember.findMany({
+    where: {
+      userId,
+      role: "OWNER",
+      status: "ACTIVE",
+    },
+    select: {
+      workspace: {
+        select: { plan: true },
+      },
+    },
+  });
+
+  if (memberships.length === 0) {
+    return "FREE";
+  }
+
+  return memberships.reduce<BillingPlan>((best, membership) => {
+    return compareBillingPlans(membership.workspace.plan, best) > 0
+      ? membership.workspace.plan
+      : best;
+  }, "FREE");
+}
+
+/**
+ * If owned workspaces drifted (e.g. paid on one, created another as FREE),
+ * align them to the owner's effective plan.
+ */
+export async function syncOwnedWorkspacesToOwnerPlan(
+  userId: string,
+  db: BillingDbClient = prisma,
+): Promise<BillingPlan> {
+  const plan = await resolveOwnerBillingPlan(userId, db);
+  await setOwnedWorkspacesPlan(userId, plan, db);
+  return plan;
 }
 
 export async function lockWorkspaceBillingUsage(

@@ -8,6 +8,7 @@ import {
   getBillingPlanConfig,
   lockUserWorkspaceUsage,
   lockWorkspaceBillingUsage,
+  resolveOwnerBillingPlan,
   WORKSPACE_LIMIT_REACHED_CODE,
 } from "./billing-plans.service.js";
 import {
@@ -166,21 +167,23 @@ export async function createWorkspaceForUser(input: {
 
     const billingWorkspace = await tx.workspace.findUnique({
       where: { id: currentWorkspace.id },
-      select: { plan: true },
+      select: { id: true },
     });
     if (!billingWorkspace) {
       throw new AuthError("Workspace not found", 403);
     }
 
+    // Owner-scoped: limit + inheritance come from the owner's plan, not a drifted workspace row.
+    const ownerPlan = await resolveOwnerBillingPlan(input.userId, tx);
     const ownedCount = await countUserWorkspaces(input.userId, tx);
-    await assertCanCreateWorkspace(billingWorkspace.plan, ownedCount);
+    await assertCanCreateWorkspace(ownerPlan, ownedCount);
 
     const created = await tx.workspace.create({
       data: {
         name,
         slug,
         teamSize: optionalStringToNull(input.data.teamSize) ?? null,
-        plan: "FREE",
+        plan: ownerPlan,
       },
       select: {
         id: true,

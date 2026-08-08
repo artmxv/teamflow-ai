@@ -12,7 +12,7 @@ import { ApiError, setSelectedWorkspaceId } from "@/lib/api/client";
 import { fetchWorkspaces, switchWorkspace } from "@/lib/api/workspaces";
 import { invalidateWorkspaceScopedQueries, WORKSPACES_QUERY_KEY } from "@/lib/workspace-queries";
 import { getWorkspaceAccent, type WorkspaceColorInput } from "@/lib/workspace-color";
-import { BrandMark } from "@/components/brand/BrandLogo";
+import { BrandAiBadge, BrandMark } from "@/components/brand/BrandLogo";
 import { CreateWorkspaceDialog } from "./CreateWorkspaceDialog";
 import { DeleteWorkspaceDialog } from "./DeleteWorkspaceDialog";
 import { NewProjectDialog } from "./QuickActionDialogs";
@@ -316,12 +316,13 @@ export function AppSidebar({
           )}
         >
           <div className="grid size-8 shrink-0 place-items-center">
-            <BrandMark className="h-5 w-[26px]" />
+            <BrandMark className="size-7 rounded-[10px]" />
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1 leading-tight">
-              <div className="text-sm font-semibold tracking-tight text-sidebar-foreground">
+              <div className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-sidebar-foreground">
                 TeamFlow
+                <BrandAiBadge />
               </div>
               <div className="text-[11px] text-muted-foreground">{t("side.tagline")}</div>
             </div>

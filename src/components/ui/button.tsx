@@ -13,11 +13,16 @@ const buttonVariants = cva(
           "bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/15 hover:bg-primary/90 dark:bg-primary dark:shadow-none dark:ring-0",
         brand:
           "border-transparent bg-gradient-brand text-[var(--brand-foreground)] shadow-glow hover:opacity-95 focus-visible:ring-[color-mix(in_oklch,var(--brand-ring)_25%,transparent)]",
+        brandSoft:
+          "button-brand-soft shadow-sm hover:opacity-95 focus-visible:ring-[color-mix(in_oklch,var(--brand-ring)_25%,transparent)]",
         destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+        dangerSoft: "button-danger-soft shadow-sm focus-visible:ring-destructive/25",
         outline:
           "border border-control-border bg-control text-control-foreground shadow-sm hover:bg-control-hover hover:text-control-foreground active:bg-control-active",
         secondary:
           "border border-transparent bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
+        warning:
+          "border border-amber-400/25 bg-amber-500/12 text-amber-800 shadow-sm hover:bg-amber-500/20 dark:text-amber-200",
         ghost: "text-foreground hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
