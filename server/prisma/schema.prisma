@@ -374,6 +374,7 @@ model AiSummary {
 
 model Notification {
   id          String    @id @default(cuid())
+  dedupeKey   String?   @unique
   workspaceId String
   recipientId String
   actorId     String?

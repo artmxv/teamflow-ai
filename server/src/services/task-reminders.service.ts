@@ -3,6 +3,7 @@ import {
   buildTaskDueSoonTitle,
   buildTaskOverdueTitle,
   buildTaskReminderDedupeBody,
+  buildTaskReminderDedupeKey,
   classifyTaskDueDate,
   TASK_REMINDER_DUE_SOON_WINDOW_MS,
   TASK_REMINDER_TYPES,
@@ -10,6 +11,14 @@ import {
 } from "../lib/task-reminder-utils.js";
 import { canAccessProject } from "./project-access.service.js";
 import { createNotification } from "./notifications.service.js";
+
+type TaskReminderDependencies = {
+  createNotification: typeof createNotification;
+};
+
+const defaultTaskReminderDependencies: TaskReminderDependencies = {
+  createNotification,
+};
 
 export type TaskReminderRunResult = {
   dueSoonCreated: number;
@@ -82,15 +91,18 @@ async function reminderAlreadyExists(params: {
   return existing !== null;
 }
 
-async function createReminderForAssignee(params: {
-  workspaceId: string;
-  taskId: string;
-  taskTitle: string;
-  recipientId: string;
-  type: TaskReminderType;
-  dedupeBody: string;
-  title: string;
-}): Promise<"created" | "skipped"> {
+async function createReminderForAssignee(
+  params: {
+    workspaceId: string;
+    taskId: string;
+    recipientId: string;
+    type: TaskReminderType;
+    dedupeBody: string;
+    dedupeKey: string;
+    title: string;
+  },
+  dependencies: TaskReminderDependencies,
+): Promise<"created" | "duplicate" | "failed"> {
   const isDuplicate = await reminderAlreadyExists({
     recipientId: params.recipientId,
     type: params.type,
@@ -99,10 +111,11 @@ async function createReminderForAssignee(params: {
   });
 
   if (isDuplicate) {
-    return "skipped";
+    return "duplicate";
   }
 
-  await createNotification({
+  const creation = await dependencies.createNotification({
+    dedupeKey: params.dedupeKey,
     workspaceId: params.workspaceId,
     recipientId: params.recipientId,
     actorId: null,
@@ -114,15 +127,21 @@ async function createReminderForAssignee(params: {
     href: `/app/tasks?taskId=${params.taskId}`,
   });
 
-  return "created";
+  if (creation === "created") {
+    return "created";
+  }
+  return creation === "duplicate" ? "duplicate" : "failed";
 }
 
-async function processTasks(params: {
-  tasks: TaskCandidate[];
-  type: TaskReminderType;
-  buildTitle: (taskTitle: string) => string;
-  result: TaskReminderRunResult;
-}) {
+async function processTasks(
+  params: {
+    tasks: TaskCandidate[];
+    type: TaskReminderType;
+    buildTitle: (taskTitle: string) => string;
+    result: TaskReminderRunResult;
+  },
+  dependencies: TaskReminderDependencies,
+) {
   for (const task of params.tasks) {
     if (!task.dueDate) {
       continue;
@@ -147,15 +166,23 @@ async function processTasks(params: {
         continue;
       }
 
-      const outcome = await createReminderForAssignee({
-        workspaceId: task.workspaceId,
-        taskId: task.id,
-        taskTitle: task.title,
-        recipientId,
-        type: params.type,
-        dedupeBody,
-        title,
-      });
+      const outcome = await createReminderForAssignee(
+        {
+          workspaceId: task.workspaceId,
+          taskId: task.id,
+          recipientId,
+          type: params.type,
+          dedupeBody,
+          dedupeKey: buildTaskReminderDedupeKey({
+            recipientId,
+            type: params.type,
+            taskId: task.id,
+            dueDate: task.dueDate,
+          }),
+          title,
+        },
+        dependencies,
+      );
 
       if (outcome === "created") {
         if (params.type === TASK_REMINDER_TYPES.DUE_SOON) {
@@ -163,14 +190,18 @@ async function processTasks(params: {
         } else {
           params.result.overdueCreated += 1;
         }
-      } else {
+      } else if (outcome === "duplicate") {
         params.result.skippedDuplicates += 1;
       }
     }
   }
 }
 
-export async function runTaskDeadlineReminders(now: Date = new Date()): Promise<TaskReminderRunResult> {
+export async function runTaskDeadlineReminders(
+  now: Date = new Date(),
+  dependencyOverrides: Partial<TaskReminderDependencies> = {},
+): Promise<TaskReminderRunResult> {
+  const dependencies = { ...defaultTaskReminderDependencies, ...dependencyOverrides };
   const result: TaskReminderRunResult = {
     dueSoonCreated: 0,
     overdueCreated: 0,
@@ -212,19 +243,25 @@ export async function runTaskDeadlineReminders(now: Date = new Date()): Promise<
     }
   }
 
-  await processTasks({
-    tasks: dueSoonTasks,
-    type: TASK_REMINDER_TYPES.DUE_SOON,
-    buildTitle: buildTaskDueSoonTitle,
-    result,
-  });
+  await processTasks(
+    {
+      tasks: dueSoonTasks,
+      type: TASK_REMINDER_TYPES.DUE_SOON,
+      buildTitle: buildTaskDueSoonTitle,
+      result,
+    },
+    dependencies,
+  );
 
-  await processTasks({
-    tasks: overdueTasks,
-    type: TASK_REMINDER_TYPES.OVERDUE,
-    buildTitle: buildTaskOverdueTitle,
-    result,
-  });
+  await processTasks(
+    {
+      tasks: overdueTasks,
+      type: TASK_REMINDER_TYPES.OVERDUE,
+      buildTitle: buildTaskOverdueTitle,
+      result,
+    },
+    dependencies,
+  );
 
   return result;
 }
