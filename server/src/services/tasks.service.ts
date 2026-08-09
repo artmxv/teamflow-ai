@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma.js";
-import { notifyTaskAssigned } from "./notifications.service.js";
+import { notifyTaskAssigned, notifyTaskMovedToReview } from "./notifications.service.js";
 import { canAccessProject, getAccessibleTaskWhere } from "./project-access.service.js";
 import { resolveProjectAccessForUser } from "./projects.service.js";
 import type { WorkspaceRole } from "./workspace-context.service.js";
@@ -32,6 +32,15 @@ const assigneeUserSelect = {
   avatar: true,
   avatarUrl: true,
 } as const;
+
+async function safelyDeliverTaskNotification(delivery: () => Promise<unknown>): Promise<void> {
+  try {
+    await delivery();
+  } catch {
+    // Task mutations remain authoritative even when best-effort notification delivery fails.
+    console.error("Failed to deliver task notification");
+  }
+}
 
 const taskDetailSelect = {
   id: true,
@@ -379,14 +388,16 @@ export async function createTask(
   });
 
   for (const assigneeUserId of assigneeIds) {
-    void notifyTaskAssigned({
-      workspaceId,
-      taskId: task.id,
-      taskTitle: task.title,
-      projectId: input.projectId,
-      assigneeId: assigneeUserId,
-      actorId: userId,
-    });
+    await safelyDeliverTaskNotification(() =>
+      notifyTaskAssigned({
+        workspaceId,
+        taskId: task.id,
+        taskTitle: task.title,
+        projectId: input.projectId,
+        assigneeId: assigneeUserId,
+        actorId: userId,
+      }),
+    );
   }
 
   return mapTaskDetail(task);
@@ -402,7 +413,7 @@ export async function updateTask(
 ) {
   const existing = await prisma.task.findFirst({
     where: { id, project: { workspaceId } },
-    select: { id: true, title: true, assigneeId: true, projectId: true },
+    select: { id: true, title: true, status: true, assigneeId: true, projectId: true },
   });
 
   if (!existing) {
@@ -480,15 +491,27 @@ export async function updateTask(
       (assigneeUserId) => !previousAssigneeIds.includes(assigneeUserId),
     );
     for (const assigneeUserId of newlyAssigned) {
-      void notifyTaskAssigned({
+      await safelyDeliverTaskNotification(() =>
+        notifyTaskAssigned({
+          workspaceId,
+          taskId: task.id,
+          taskTitle: task.title,
+          projectId: existing.projectId,
+          assigneeId: assigneeUserId,
+          actorId,
+        }),
+      );
+    }
+  }
+
+  if (actorId && existing.status !== "REVIEW" && task.status === "REVIEW") {
+    await safelyDeliverTaskNotification(() =>
+      notifyTaskMovedToReview({
         workspaceId,
         taskId: task.id,
-        taskTitle: task.title,
-        projectId: existing.projectId,
-        assigneeId: assigneeUserId,
         actorId,
-      });
-    }
+      }),
+    );
   }
 
   return mapTaskDetail(task);

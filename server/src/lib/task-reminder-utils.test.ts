@@ -5,6 +5,7 @@ import {
   buildTaskDueSoonTitle,
   buildTaskOverdueTitle,
   buildTaskReminderDedupeBody,
+  buildTaskReminderDedupeKey,
   classifyTaskDueDate,
   TASK_REMINDER_DUE_SOON_WINDOW_MS,
 } from "./task-reminder-utils.js";
@@ -43,6 +44,18 @@ describe("task-reminder-utils", () => {
     assert.notEqual(first, second);
   });
 
+  it("builds a stable recipient/type/task/effective-due-date dedupe key", () => {
+    assert.equal(
+      buildTaskReminderDedupeKey({
+        recipientId: "user-1",
+        type: "TASK_DUE_SOON",
+        taskId: "task-1",
+        dueDate: new Date("2026-07-15T00:00:00.000Z"),
+      }),
+      "task-reminder:user-1:TASK_DUE_SOON:task-1:2026-07-15T23:59:59.999Z",
+    );
+  });
+
   it("builds English titles for i18n parsing", () => {
     assert.equal(
       buildTaskDueSoonTitle("Prepare release"),
@@ -77,16 +90,10 @@ describe("validateTaskReminderCronSecret", () => {
   });
 
   it("rejects invalid bearer token", () => {
-    assert.equal(
-      validateTaskReminderCronSecret("secret", "Bearer wrong"),
-      "invalid",
-    );
+    assert.equal(validateTaskReminderCronSecret("secret", "Bearer wrong"), "invalid");
   });
 
   it("accepts valid bearer token", () => {
-    assert.equal(
-      validateTaskReminderCronSecret("secret", "Bearer secret"),
-      "valid",
-    );
+    assert.equal(validateTaskReminderCronSecret("secret", "Bearer secret"), "valid");
   });
 });

@@ -1,10 +1,18 @@
+import type { Prisma } from "@prisma/client";
+
 import { prisma } from "../lib/prisma.js";
-import { canAccessProject } from "./project-access.service.js";
+import {
+  canAccessProject,
+  getAccessibleProjectWhere,
+  getAccessibleTaskWhere,
+} from "./project-access.service.js";
 import { listPendingInvitationsForUser } from "./workspace-invitations.service.js";
+import type { WorkspaceRole } from "./workspace-context.service.js";
 
 const NOTIFICATION_LIST_LIMIT = 30;
 
 export type CreateNotificationInput = {
+  dedupeKey?: string | null;
   workspaceId: string;
   recipientId: string;
   actorId?: string | null;
@@ -15,6 +23,8 @@ export type CreateNotificationInput = {
   entityId?: string | null;
   href?: string | null;
 };
+
+export type CreateNotificationResult = "created" | "duplicate" | "skipped_self" | "failed";
 
 export type NotificationDto = {
   id: string;
@@ -106,14 +116,26 @@ function shouldSkipSelfNotification(recipientId: string, actorId?: string | null
   return Boolean(actorId && recipientId === actorId);
 }
 
-export async function createNotification(input: CreateNotificationInput) {
+function isUniqueConstraintError(error: unknown): boolean {
+  return Boolean(
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "P2002",
+  );
+}
+
+export async function createNotification(
+  input: CreateNotificationInput,
+): Promise<CreateNotificationResult> {
   if (shouldSkipSelfNotification(input.recipientId, input.actorId)) {
-    return;
+    return "skipped_self";
   }
 
   try {
     await prisma.notification.create({
       data: {
+        dedupeKey: input.dedupeKey ?? null,
         workspaceId: input.workspaceId,
         recipientId: input.recipientId,
         actorId: input.actorId ?? null,
@@ -125,8 +147,18 @@ export async function createNotification(input: CreateNotificationInput) {
         href: input.href ?? null,
       },
     });
+    return "created";
   } catch (error) {
-    console.error("Failed to create notification", error);
+    if (input.dedupeKey && isUniqueConstraintError(error)) {
+      return "duplicate";
+    }
+    console.error("Failed to create notification", {
+      code:
+        error && typeof error === "object" && "code" in error
+          ? (error as { code?: unknown }).code
+          : "unknown",
+    });
+    return "failed";
   }
 }
 
@@ -161,55 +193,102 @@ export async function createNotificationsForUsers(
   }
 }
 
-async function getActiveMemberWorkspaceIds(recipientId: string): Promise<string[]> {
-  const memberships = await prisma.workspaceMember.findMany({
+async function buildNotificationAccessWhere(params: {
+  recipientId: string;
+  workspaceId: string;
+  role: WorkspaceRole;
+}): Promise<Prisma.NotificationWhereInput> {
+  const entityReferences = await prisma.notification.findMany({
     where: {
-      userId: recipientId,
-      status: "ACTIVE",
+      recipientId: params.recipientId,
+      workspaceId: params.workspaceId,
+      entityType: { in: ["task", "project"] },
+      entityId: { not: null },
     },
-    select: { workspaceId: true },
+    distinct: ["entityType", "entityId"],
+    select: { entityType: true, entityId: true },
   });
 
-  return memberships.map((membership) => membership.workspaceId);
-}
+  const referencedTaskIds = entityReferences
+    .filter((item) => item.entityType === "task")
+    .map((item) => item.entityId)
+    .filter((id): id is string => Boolean(id));
+  const referencedProjectIds = entityReferences
+    .filter((item) => item.entityType === "project")
+    .map((item) => item.entityId)
+    .filter((id): id is string => Boolean(id));
 
-export async function getNotifications(recipientId: string, userEmail: string) {
-  const memberWorkspaceIds = await getActiveMemberWorkspaceIds(recipientId);
-
-  const [workspaceNotifications, workspaceUnreadCount, pendingInvites] = await Promise.all([
-    memberWorkspaceIds.length > 0
-      ? prisma.notification.findMany({
+  const [accessibleTasks, accessibleProjects] = await Promise.all([
+    referencedTaskIds.length > 0
+      ? prisma.task.findMany({
           where: {
-            recipientId,
-            workspaceId: { in: memberWorkspaceIds },
+            AND: [
+              getAccessibleTaskWhere(params.recipientId, params.workspaceId, params.role),
+              { id: { in: referencedTaskIds } },
+            ],
           },
-          orderBy: { createdAt: "desc" },
-          take: NOTIFICATION_LIST_LIMIT,
-          select: {
-            id: true,
-            workspaceId: true,
-            type: true,
-            title: true,
-            body: true,
-            entityType: true,
-            entityId: true,
-            href: true,
-            readAt: true,
-            createdAt: true,
-            actorId: true,
-            workspace: { select: { name: true } },
-          },
+          select: { id: true },
         })
       : Promise.resolve([]),
-    memberWorkspaceIds.length > 0
-      ? prisma.notification.count({
+    referencedProjectIds.length > 0
+      ? prisma.project.findMany({
           where: {
-            recipientId,
-            workspaceId: { in: memberWorkspaceIds },
-            readAt: null,
+            AND: [
+              getAccessibleProjectWhere(params.recipientId, params.workspaceId, params.role),
+              { id: { in: referencedProjectIds } },
+            ],
           },
+          select: { id: true },
         })
-      : Promise.resolve(0),
+      : Promise.resolve([]),
+  ]);
+
+  return {
+    recipientId: params.recipientId,
+    workspaceId: params.workspaceId,
+    OR: [
+      { entityType: null },
+      { entityType: { notIn: ["task", "project"] } },
+      { entityType: "task", entityId: { in: accessibleTasks.map((task) => task.id) } },
+      {
+        entityType: "project",
+        entityId: { in: accessibleProjects.map((project) => project.id) },
+      },
+    ],
+  };
+}
+
+export async function getNotifications(
+  recipientId: string,
+  userEmail: string,
+  workspaceId: string,
+  role: WorkspaceRole,
+) {
+  const accessWhere = await buildNotificationAccessWhere({ recipientId, workspaceId, role });
+
+  const [workspaceNotifications, workspaceUnreadCount, pendingInvites] = await Promise.all([
+    prisma.notification.findMany({
+      where: accessWhere,
+      orderBy: { createdAt: "desc" },
+      take: NOTIFICATION_LIST_LIMIT,
+      select: {
+        id: true,
+        workspaceId: true,
+        type: true,
+        title: true,
+        body: true,
+        entityType: true,
+        entityId: true,
+        href: true,
+        readAt: true,
+        createdAt: true,
+        actorId: true,
+        workspace: { select: { name: true } },
+      },
+    }),
+    prisma.notification.count({
+      where: { AND: [accessWhere, { readAt: null }] },
+    }),
     listPendingInvitationsForUser(recipientId, userEmail),
   ]);
 
@@ -224,15 +303,20 @@ export async function getNotifications(recipientId: string, userEmail: string) {
   };
 }
 
-export async function markNotificationRead(recipientId: string, notificationId: string) {
+export async function markNotificationRead(
+  recipientId: string,
+  notificationId: string,
+  workspaceId: string,
+  role: WorkspaceRole,
+) {
   if (isVirtualInviteNotificationId(notificationId)) {
     return null;
   }
 
+  const accessWhere = await buildNotificationAccessWhere({ recipientId, workspaceId, role });
   const notification = await prisma.notification.findFirst({
     where: {
-      id: notificationId,
-      recipientId,
+      AND: [accessWhere, { id: notificationId }],
     },
     select: { id: true },
   });
@@ -263,19 +347,16 @@ export async function markNotificationRead(recipientId: string, notificationId: 
   return mapNotification(updated);
 }
 
-export async function markAllNotificationsRead(recipientId: string) {
-  const memberWorkspaceIds = await getActiveMemberWorkspaceIds(recipientId);
-
-  if (memberWorkspaceIds.length > 0) {
-    await prisma.notification.updateMany({
-      where: {
-        recipientId,
-        workspaceId: { in: memberWorkspaceIds },
-        readAt: null,
-      },
-      data: { readAt: new Date() },
-    });
-  }
+export async function markAllNotificationsRead(
+  recipientId: string,
+  workspaceId: string,
+  role: WorkspaceRole,
+) {
+  const accessWhere = await buildNotificationAccessWhere({ recipientId, workspaceId, role });
+  await prisma.notification.updateMany({
+    where: { AND: [accessWhere, { readAt: null }] },
+    data: { readAt: new Date() },
+  });
 
   return { ok: true as const };
 }
@@ -433,6 +514,57 @@ export async function notifyTaskAssigned(params: {
     recipientId: params.assigneeId,
     title: "Task assigned to you",
     body: `${actorName} assigned you to ${params.taskTitle}`,
+  });
+}
+
+export async function notifyTaskMovedToReview(params: {
+  workspaceId: string;
+  taskId: string;
+  actorId: string;
+}) {
+  const task = await prisma.task.findFirst({
+    where: { id: params.taskId, project: { workspaceId: params.workspaceId } },
+    select: {
+      id: true,
+      title: true,
+      projectId: true,
+      assigneeId: true,
+      taskAssignees: { select: { userId: true } },
+      project: { select: { projectMembers: { select: { userId: true } } } },
+    },
+  });
+
+  if (!task) {
+    return;
+  }
+
+  const assigneeIds =
+    task.taskAssignees.length > 0
+      ? task.taskAssignees.map((link) => link.userId)
+      : task.assigneeId
+        ? [task.assigneeId]
+        : [];
+  const recipientIds = await filterRecipientsWithProjectAccess({
+    recipientIds: [...assigneeIds, ...task.project.projectMembers.map((member) => member.userId)],
+    projectId: task.projectId,
+    workspaceId: params.workspaceId,
+    actorId: params.actorId,
+  });
+
+  if (recipientIds.length === 0) {
+    return;
+  }
+
+  const actorName = await getUserName(params.actorId);
+  await createNotificationsForUsers(recipientIds, {
+    workspaceId: params.workspaceId,
+    actorId: params.actorId,
+    type: "TASK_REVIEW",
+    entityType: "task",
+    entityId: task.id,
+    href: `/app/tasks?taskId=${task.id}`,
+    title: `Task "${task.title}" moved to review`,
+    body: `${actorName} moved this task to review`,
   });
 }
 

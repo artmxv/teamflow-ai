@@ -98,9 +98,7 @@ export interface NotificationsResponse {
 }
 
 export async function fetchNotifications() {
-  const response = await apiRequest<{ data: NotificationsResponse }>("/api/notifications", {
-    skipWorkspaceHeader: true,
-  });
+  const response = await apiRequest<{ data: NotificationsResponse }>("/api/notifications");
   return response.data;
 }
 
@@ -233,6 +231,11 @@ function extractNotificationContext(notification: NotificationItem): Notificatio
       const match = title.match(/^Task "(.+)" is overdue$/);
       return { task: match?.[1] };
     }
+    case "TASK_REVIEW": {
+      const taskMatch = title.match(/^Task "(.+)" moved to review$/);
+      const actorMatch = body?.match(/^(.+) moved this task to review$/);
+      return { task: taskMatch?.[1], actor: actorMatch?.[1] };
+    }
     default:
       return {};
   }
@@ -284,6 +287,11 @@ export function getLocalizedNotificationTitle(
         return t("notifications.taskOverdue").replace("{task}", ctx.task);
       }
       break;
+    case "TASK_REVIEW":
+      if (ctx.task) {
+        return t("notifications.taskReview").replace("{task}", ctx.task);
+      }
+      break;
   }
 
   return notification.title;
@@ -295,9 +303,7 @@ export function getLocalizedNotificationBody(
   workspaceRoleLabel: (role: string) => string,
 ): string | null {
   if (isWorkspaceInvitationNotification(notification)) {
-    const role = notification.invitationRole
-      ? workspaceRoleLabel(notification.invitationRole)
-      : "";
+    const role = notification.invitationRole ? workspaceRoleLabel(notification.invitationRole) : "";
     const workspace = notification.workspaceName ?? notification.body ?? "";
     return t("invite.bellBody").replace("{workspace}", workspace).replace("{role}", role);
   }
@@ -339,16 +345,17 @@ export function getLocalizedNotificationBody(
     case "TASK_DUE_SOON":
     case "TASK_OVERDUE":
       return null;
+    case "TASK_REVIEW":
+      if (ctx.actor) {
+        return t("notifications.taskReviewBody").replace("{actor}", ctx.actor);
+      }
+      break;
   }
 
   return notification.body;
 }
 
-export function formatNotificationTime(
-  createdAt: string,
-  t: (key: TKey) => string,
-  lang: Lang,
-) {
+export function formatNotificationTime(createdAt: string, t: (key: TKey) => string, lang: Lang) {
   const date = new Date(createdAt);
   const diffMs = Date.now() - date.getTime();
   const diffMinutes = Math.floor(diffMs / 60_000);

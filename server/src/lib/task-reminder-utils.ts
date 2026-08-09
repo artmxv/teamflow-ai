@@ -14,6 +14,21 @@ export function buildTaskReminderDedupeBody(dueDate: Date): string {
   return `dueAt:${dueDate.toISOString()}`;
 }
 
+export function buildTaskReminderDedupeKey(params: {
+  recipientId: string;
+  type: TaskReminderType;
+  taskId: string;
+  dueDate: Date;
+}): string {
+  return [
+    "task-reminder",
+    params.recipientId,
+    params.type,
+    params.taskId,
+    effectiveDueDate(params.dueDate).toISOString(),
+  ].join(":");
+}
+
 export function buildTaskDueSoonTitle(taskTitle: string): string {
   return `Task "${taskTitle}" is due within 24 hours`;
 }
