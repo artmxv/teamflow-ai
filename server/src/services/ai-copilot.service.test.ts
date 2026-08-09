@@ -5,6 +5,7 @@ import { AiProviderError, type AiProvider } from "../providers/ai/ai-provider.js
 import type { AiWorkspaceContext } from "./ai-context.service.js";
 import { getAiCopilotChatResponse } from "./ai-copilot.service.js";
 import type { WorkspaceAiSummary } from "./ai.service.js";
+import type { AiCopilotOperationalEvent } from "./ai-copilot-operations.js";
 
 const NOW = new Date("2026-08-09T12:00:00.000Z");
 const summary: WorkspaceAiSummary = {
@@ -65,6 +66,8 @@ function dependencies(provider: AiProvider | null) {
     getSummary: async () => summary,
     getContext: async () => context,
     now: () => NOW,
+    clockMs: () => NOW.getTime(),
+    logEvent: () => undefined,
   };
 }
 
@@ -187,5 +190,91 @@ describe("getAiCopilotChatResponse", () => {
       }),
       /database unavailable/,
     );
+  });
+
+  it("logs only allowlisted operational metadata, never request or workspace content", async () => {
+    const events: AiCopilotOperationalEvent[] = [];
+    const sensitiveContext: AiWorkspaceContext = {
+      ...context,
+      workspace: { ...context.workspace, name: "PRIVATE WORKSPACE SNAPSHOT" },
+      projects: [
+        {
+          ...context.projects[0]!,
+          description: "PRIVATE PROJECT DESCRIPTION",
+        },
+      ],
+    };
+    const provider: AiProvider = {
+      name: "groq",
+      async chat() {
+        return {
+          content: "PRIVATE FULL AI ANSWER",
+          model: "configured-model",
+          usage: { promptTokens: 120, completionTokens: 25, totalTokens: 145 },
+        };
+      },
+    };
+
+    await getAiCopilotChatResponse(
+      {
+        ...baseInput,
+        message: "PRIVATE USER MESSAGE",
+        history: [{ role: "user", content: "PRIVATE HISTORY CONTENT" }],
+      },
+      {
+        ...dependencies(provider),
+        getContext: async () => sensitiveContext,
+        clockMs: (() => {
+          const values = [1_000, 1_025];
+          return () => values.shift() ?? 1_025;
+        })(),
+        logEvent: (event) => events.push(event),
+      },
+    );
+
+    assert.deepEqual(events, [
+      {
+        event: "ai_copilot_request",
+        provider: "groq",
+        mode: "llm",
+        latencyMs: 25,
+        context: { projectsIncluded: 1, tasksIncluded: 1, truncated: true },
+        usage: { promptTokens: 120, completionTokens: 25, totalTokens: 145 },
+      },
+    ]);
+    const serialized = JSON.stringify(events);
+    for (const forbidden of [
+      "PRIVATE USER MESSAGE",
+      "PRIVATE HISTORY CONTENT",
+      "PRIVATE WORKSPACE SNAPSHOT",
+      "PRIVATE PROJECT DESCRIPTION",
+      "PRIVATE FULL AI ANSWER",
+      "GROQ_API_KEY",
+      "Authorization",
+    ]) {
+      assert.equal(serialized.includes(forbidden), false);
+    }
+  });
+
+  it("logs a safe provider reason code when upstream 429 falls back", async () => {
+    const events: AiCopilotOperationalEvent[] = [];
+    const provider: AiProvider = {
+      name: "groq",
+      async chat() {
+        throw new AiProviderError(
+          "AI_PROVIDER_RATE_LIMITED",
+          "upstream detail must not be logged",
+          false,
+          429,
+        );
+      },
+    };
+    const result = await getAiCopilotChatResponse(baseInput, {
+      ...dependencies(provider),
+      logEvent: (event) => events.push(event),
+    });
+    assert.equal(result.mode, "fallback");
+    assert.equal(events[0]?.reasonCode, "AI_PROVIDER_RATE_LIMITED");
+    assert.equal(JSON.stringify(events).includes("upstream detail"), false);
   });
 });

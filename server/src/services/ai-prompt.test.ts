@@ -81,4 +81,17 @@ describe("buildAiCopilotPrompt", () => {
     assert.equal(prompt[3]?.role, "user");
     assert.match(prompt[3]?.content ?? "", /What changed\?/);
   });
+
+  it("requests concise plain-text formatting without complex Markdown", () => {
+    const prompt = buildAiCopilotPrompt({ context, question: "Summarize", locale: "en" });
+    const system = prompt[0]?.content ?? "";
+    assert.match(system, /Keep the answer concise/);
+    assert.match(system, /short paragraphs/);
+    assert.match(system, /lines beginning with "-"/);
+    assert.match(system, /5–7 main items/);
+    assert.match(system, /Do not use Markdown tables/);
+    assert.match(system, /headings, bold markers, code fences/);
+    assert.match(system, /read-only/);
+    assert.match(system, /UNTRUSTED DATA/);
+  });
 });
