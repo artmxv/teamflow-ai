@@ -1,13 +1,19 @@
 import { cn } from "@/lib/utils";
 
 /**
+ * Project dialogs keep Status wider while every track remains shrinkable.
+ * On narrow viewports the controls stack into one column.
+ */
+export const projectDeadlineStatusDateTimeRowClassName =
+  "grid grid-cols-1 items-start gap-3 sm:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,0.8fr)]";
+
+/**
  * Status + Date + Time in one compact row on dialog/desktop widths.
- * Uses fr proportions (status narrower, date medium, time medium-small).
- * `minmax(0, …)` lets columns share ~lg dialog width without wrapping;
- * below 480px the row stacks cleanly.
+ * Status gets a wider min track so RU «Планирование» fits with dot + chevron (no ellipsis).
+ * Date/time share the rest; below 480px the row stacks cleanly.
  */
 export const deadlineStatusDateTimeRowClassName =
-  "grid grid-cols-1 items-start gap-3 min-[480px]:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,0.8fr)]";
+  "grid grid-cols-1 items-start gap-3 min-[480px]:grid-cols-[minmax(185px,1.25fr)_minmax(0,1fr)_minmax(0,0.72fr)]";
 
 /** Shared purple focus/open ring for deadline triggers (matches Input/Select). */
 const deadlineFocusRing =

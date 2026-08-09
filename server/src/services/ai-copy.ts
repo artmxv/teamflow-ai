@@ -11,7 +11,6 @@ type Metrics = {
   openTasks: number;
   completedTasks: number;
   urgentTasks: number;
-  highPriorityTasks: number;
   reviewTasks: number;
   overdueTasks: number;
 };
@@ -161,19 +160,10 @@ export function unassignedRisk(locale: AiLocale, count: number, sample: string):
 
 export function missingDueDateRisk(locale: AiLocale, count: number, sample: string): string {
   if (locale === "ru") {
-    const suffix = count === 1 ? "задача HIGH/URGENT без срока" : "задач HIGH/URGENT без срока";
+    const suffix = count === 1 ? "срочная задача без срока" : "срочных задач без срока";
     return `${count} ${suffix}: ${sample}.`;
   }
-  return `${count} HIGH/URGENT task${count === 1 ? "" : "s"} without a due date: ${sample}.`;
-}
-
-export function highPriorityRisk(locale: AiLocale, count: number): string {
-  if (locale === "ru") {
-    return count === 1
-      ? "1 задача с высоким приоритетом должна быть запланирована в текущем спринте."
-      : `${count} задач с высоким приоритетом нужно запланировать в текущем спринте.`;
-  }
-  return `${count} high-priority open task${count === 1 ? "" : "s"} should be scheduled in the current sprint.`;
+  return `${count} urgent task${count === 1 ? "" : "s"} without a due date: ${sample}.`;
 }
 
 export function overdueAction(locale: AiLocale, taskRef: string): string {

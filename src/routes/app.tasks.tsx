@@ -8,11 +8,22 @@ import { useCurrentWorkspace } from "@/lib/auth/use-current-user";
 import { invalidateWorkspaceContentQueries } from "@/lib/workspace-queries";
 import { AppShell } from "@/components/app/AppShell";
 import { ApiErrorState } from "@/components/app/ApiErrorState";
-import { CREATE_ACTION_BUTTON_CLASSNAME, FilterBar } from "@/components/app/FilterBar";
+import {
+  CREATE_ACTION_BUTTON_CLASSNAME,
+  FILTER_BAR_TASKS_CONTROLS_CLASSNAME,
+  FILTER_RESET_CLASSNAME,
+  FilterBar,
+  assigneeFilterSelectClassName,
+  filterSelectActiveAttr,
+  priorityFilterSelectClassName,
+  statusFilterSelectClassName,
+} from "@/components/app/FilterBar";
 import { type Task, type TaskStatus, type Priority } from "@/lib/mock-data";
 import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
+import { TaskPriorityIndicator } from "@/components/app/TaskPriorityIndicator";
+import { TaskStatusIndicator } from "@/components/app/TaskStatusIndicator";
 import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +75,8 @@ import {
 } from "@/lib/assignee-options";
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
 import { cycleTaskSort, sortTasks, type TaskSortField, type TaskSortState } from "@/lib/task-sort";
+import { getProjectAccent } from "@/lib/project-color";
+import { taskPriorityChipClass } from "@/lib/task-priority-theme";
 import { taskStatusChipClass } from "@/lib/task-status-theme";
 import { cn } from "@/lib/utils";
 import {
@@ -114,7 +127,7 @@ function parseTasksUrlDue(value: unknown): TasksUrlDue | undefined {
 }
 
 function parseTasksUrlPriority(value: unknown): TasksUrlPriorityFilter | undefined {
-  return value === "high" ? value : undefined;
+  return value === "urgent" ? value : undefined;
 }
 
 export type TaskListStatusFilter = TaskStatus | "all" | "open";
@@ -186,16 +199,14 @@ export const Route = createFileRoute("/app/tasks")({
 
 const statusMeta: Record<TaskStatus, { labelKey: TKey; tone: string }> = {
   backlog: { labelKey: "board.backlog", tone: taskStatusChipClass.backlog },
-  todo: { labelKey: "board.todo", tone: taskStatusChipClass.todo },
   in_progress: { labelKey: "board.inProgress", tone: taskStatusChipClass.in_progress },
   review: { labelKey: "board.review", tone: taskStatusChipClass.review },
   done: { labelKey: "board.done", tone: taskStatusChipClass.done },
 };
 const priorityMeta: Record<Priority, { labelKey: TKey; tone: string }> = {
-  low: { labelKey: "tasks.priorityLow", tone: "bg-muted text-muted-foreground" },
-  medium: { labelKey: "tasks.priorityMedium", tone: "bg-info/15 text-info" },
-  high: { labelKey: "tasks.priorityHigh", tone: "bg-warning/20 text-warning-foreground" },
-  urgent: { labelKey: "tasks.priorityUrgent", tone: "bg-destructive/15 text-destructive" },
+  low: { labelKey: "tasks.priorityLow", tone: taskPriorityChipClass.low },
+  medium: { labelKey: "tasks.priorityMedium", tone: taskPriorityChipClass.medium },
+  urgent: { labelKey: "tasks.priorityUrgent", tone: taskPriorityChipClass.urgent },
 };
 
 type TaskRow = Task & {
@@ -210,7 +221,6 @@ type TaskRow = Task & {
 
 const apiStatusMap: Record<TaskApiStatus, TaskStatus> = {
   BACKLOG: "backlog",
-  TODO: "todo",
   IN_PROGRESS: "in_progress",
   REVIEW: "review",
   DONE: "done",
@@ -219,7 +229,6 @@ const apiStatusMap: Record<TaskApiStatus, TaskStatus> = {
 const apiPriorityMap: Record<TaskApiPriority, Priority> = {
   LOW: "low",
   MEDIUM: "medium",
-  HIGH: "high",
   URGENT: "urgent",
 };
 
@@ -274,9 +283,21 @@ function TasksPage() {
     queryFn: fetchWorkspaceMembers,
   });
   const projectOptions = useMemo(
-    () => apiProjects.map((project) => ({ id: project.id, name: project.name })),
+    () =>
+      apiProjects.map((project) => ({
+        id: project.id,
+        name: project.name,
+        color: project.color,
+      })),
     [apiProjects],
   );
+  const projectColorById = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const project of apiProjects) {
+      map.set(project.id, project.color);
+    }
+    return map;
+  }, [apiProjects]);
   const hasAccessibleProjects = projectOptions.length > 0;
   const createTaskMutation = useMutation({
     mutationFn: createTask,
@@ -506,28 +527,44 @@ function TasksPage() {
       <FilterBar>
         <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
           <div className="relative min-w-0 w-full">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Search
+              className="filter-search-icon absolute left-3 top-1/2 size-4 -translate-y-1/2"
+              aria-hidden="true"
+            />
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder={t("tasks.searchTasks")}
-              className="border-control-border bg-background/70 pl-9"
+              className="filter-search-input pl-9"
             />
           </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(9rem,auto)_minmax(9rem,auto)_minmax(11rem,auto)_auto]">
+          <div className={FILTER_BAR_TASKS_CONTROLS_CLASSNAME}>
             <Select
               value={status}
               onValueChange={(value) => setStatusFilter(value as TaskListStatusFilter)}
             >
-              <SelectTrigger className="w-full min-w-[9rem] border-control-border bg-background/70">
-                <SelectValue>{getStatusFilterTriggerLabel(status, t)}</SelectValue>
+              <SelectTrigger
+                data-filter-active={filterSelectActiveAttr(status !== "all")}
+                className={statusFilterSelectClassName(status)}
+              >
+                <SelectValue>
+                  {status === "all" || status === "open" ? (
+                    getStatusFilterTriggerLabel(status, t)
+                  ) : (
+                    <TaskStatusIndicator status={status}>
+                      {getStatusFilterTriggerLabel(status, t)}
+                    </TaskStatusIndicator>
+                  )}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("tasks.allStatus")}</SelectItem>
                 <SelectItem value="open">{t("tasks.openStatus")}</SelectItem>
                 {(Object.keys(statusMeta) as TaskStatus[]).map((s) => (
                   <SelectItem key={s} value={s}>
-                    {t(statusMeta[s].labelKey)}
+                    <TaskStatusIndicator status={s}>
+                      {t(statusMeta[s].labelKey)}
+                    </TaskStatusIndicator>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -536,20 +573,36 @@ function TasksPage() {
               value={priority}
               onValueChange={(value) => setPriority(value as Priority | "all")}
             >
-              <SelectTrigger className="w-full min-w-[9rem] border-control-border bg-background/70">
-                <SelectValue>{getPriorityFilterTriggerLabel(priority, t)}</SelectValue>
+              <SelectTrigger
+                data-filter-active={filterSelectActiveAttr(priority !== "all")}
+                className={priorityFilterSelectClassName(priority)}
+              >
+                <SelectValue>
+                  {priority === "all" ? (
+                    getPriorityFilterTriggerLabel(priority, t)
+                  ) : (
+                    <TaskPriorityIndicator priority={priority}>
+                      {getPriorityFilterTriggerLabel(priority, t)}
+                    </TaskPriorityIndicator>
+                  )}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("tasks.allPriorities")}</SelectItem>
-                {(["low", "medium", "high", "urgent"] as Priority[]).map((p) => (
+                {(["low", "medium", "urgent"] as Priority[]).map((p) => (
                   <SelectItem key={p} value={p}>
-                    {t(priorityMeta[p].labelKey)}
+                    <TaskPriorityIndicator priority={p}>
+                      {t(priorityMeta[p].labelKey)}
+                    </TaskPriorityIndicator>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select value={assigneeFilter} onValueChange={(value) => setAssigneeListFilter(value)}>
-              <SelectTrigger className="w-full min-w-[11rem] border-control-border bg-background/70">
+              <SelectTrigger
+                data-filter-active={filterSelectActiveAttr(assigneeFilter !== "all")}
+                className={assigneeFilterSelectClassName()}
+              >
                 <SelectValue>
                   {getAssigneeFilterTriggerLabel(assigneeFilter, assigneeOptions, t)}
                 </SelectValue>
@@ -565,8 +618,8 @@ function TasksPage() {
               </SelectContent>
             </Select>
             <Button
-              variant="outline"
-              className="h-10 w-full sm:w-auto"
+              variant="brandSoft"
+              className={FILTER_RESET_CLASSNAME}
               disabled={!hasActiveFilters}
               onClick={clearFilters}
             >
@@ -633,74 +686,91 @@ function TasksPage() {
           )
         ) : (
           <ul className="divide-y divide-border">
-            {sorted.map((task) => (
-              <li
-                key={task.id}
-                onClick={() => setSelected(task)}
-                className="grid cursor-pointer grid-cols-2 items-center gap-3 px-4 py-3 text-sm transition hover:bg-muted/30 md:grid-cols-[minmax(0,1fr)_100px_100px_120px_100px_88px]"
-              >
-                <div className="col-span-2 md:col-span-1">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                      {task.key}
+            {sorted.map((task) => {
+              const projectAccent = getProjectAccent({
+                id: task.projectId,
+                name: task.projectName,
+                color: projectColorById.get(task.projectId),
+              });
+              return (
+                <li
+                  key={task.id}
+                  onClick={() => setSelected(task)}
+                  className="grid cursor-pointer grid-cols-2 items-center gap-3 px-4 py-3 text-sm transition hover:bg-muted/30 md:grid-cols-[minmax(0,1fr)_100px_100px_120px_100px_88px]"
+                >
+                  <div className="col-span-2 md:col-span-1">
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                        {task.key}
+                      </span>
+                      <span className="font-medium">{translateStarterTitle(task.title, lang)}</span>
+                    </div>
+                    <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/35 px-2 py-0.5 font-medium text-foreground/75">
+                        <span
+                          className={"size-1.5 rounded-full " + projectAccent.dot}
+                          aria-hidden
+                        />
+                        {translateStarterProjectName(task.projectName, lang)}
+                      </span>
+                      {task.labels.slice(0, 2).map((label) => (
+                        <Badge
+                          key={label}
+                          variant="secondary"
+                          className="h-4 rounded-md px-1.5 text-[10px] font-normal"
+                        >
+                          {label}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex justify-center">
+                    <span
+                      className={
+                        "inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold " +
+                        statusMeta[task.status].tone
+                      }
+                    >
+                      <TaskStatusIndicator status={task.status} dotClassName="size-1.5">
+                        {t(statusMeta[task.status].labelKey)}
+                      </TaskStatusIndicator>
                     </span>
-                    <span className="font-medium">{translateStarterTitle(task.title, lang)}</span>
                   </div>
-                  <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{translateStarterProjectName(task.projectName, lang)}</span>
-                    {task.labels.slice(0, 2).map((label) => (
-                      <Badge
-                        key={label}
-                        variant="secondary"
-                        className="h-4 rounded-md px-1.5 text-[10px] font-normal"
-                      >
-                        {label}
-                      </Badge>
-                    ))}
+                  <div className="flex justify-center">
+                    <span
+                      className={
+                        "inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold " +
+                        priorityMeta[task.priority].tone
+                      }
+                    >
+                      <TaskPriorityIndicator priority={task.priority} dotClassName="size-1.5">
+                        {t(priorityMeta[task.priority].labelKey)}
+                      </TaskPriorityIndicator>
+                    </span>
                   </div>
-                </div>
-                <div className="flex justify-center">
-                  <span
-                    className={
-                      "inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold " +
-                      statusMeta[task.status].tone
-                    }
-                  >
-                    {t(statusMeta[task.status].labelKey)}
-                  </span>
-                </div>
-                <div className="flex justify-center">
-                  <span
-                    className={
-                      "inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold " +
-                      priorityMeta[task.priority].tone
-                    }
-                  >
-                    {t(priorityMeta[task.priority].labelKey)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-center gap-2">
-                  <AssigneeAvatars
-                    assignees={task.assigneeOptions}
-                    showUnassignedLabel
-                    maxVisible={2}
-                  />
-                </div>
-                <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                  <Calendar className="size-3.5" /> {formatDueDateTimeShort(task.dueDate)}
-                </div>
-                <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <MessageSquare className="size-3.5" />
-                    {task.commentsCount}
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <Paperclip className="size-3.5" />
-                    {task.attachmentsCount}
-                  </span>
-                </div>
-              </li>
-            ))}
+                  <div className="flex items-center justify-center gap-2">
+                    <AssigneeAvatars
+                      assignees={task.assigneeOptions}
+                      showUnassignedLabel
+                      maxVisible={2}
+                    />
+                  </div>
+                  <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                    <Calendar className="size-3.5" /> {formatDueDateTimeShort(task.dueDate)}
+                  </div>
+                  <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      <MessageSquare className="size-3.5" />
+                      {task.commentsCount}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Paperclip className="size-3.5" />
+                      {task.attachmentsCount}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
@@ -820,7 +890,7 @@ function TasksEmptyState({
 }: {
   isSubmitting: boolean;
   onCreate: (values: TaskFormValues) => Promise<void>;
-  projectOptions: { id: string; name: string }[];
+  projectOptions: { id: string; name: string; color?: string | null }[];
   hasAccessibleProjects: boolean;
 }) {
   const { t } = useI18n();
@@ -857,7 +927,7 @@ function NoResultsState({ onResetFilters }: { onResetFilters: () => void }) {
       title={t("tasks.noMatchTitle")}
       description={t("tasks.noMatchHint")}
       primaryAction={
-        <Button variant="outline" onClick={onResetFilters}>
+        <Button variant="brandSoft" onClick={onResetFilters}>
           <RotateCcw className="size-4" /> {t("common.resetFilters")}
         </Button>
       }

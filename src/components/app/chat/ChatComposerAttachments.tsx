@@ -1,12 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  FileUp,
-  FolderKanban,
-  ListTodo,
-  Paperclip,
-  Search,
-  X,
-} from "lucide-react";
+import { FileUp, FolderKanban, ListTodo, Paperclip, Search, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -83,6 +76,7 @@ export function ChatPendingAttachmentChips({
           removeLabel={t("chat.removeAttachment")}
           onRemove={() => onTasksChange(tasks.filter((item) => item.id !== task.id))}
           disabled={disabled}
+          tone="task"
         />
       ))}
       {projects.map((project) => (
@@ -93,6 +87,7 @@ export function ChatPendingAttachmentChips({
           removeLabel={t("chat.removeAttachment")}
           onRemove={() => onProjectsChange(projects.filter((item) => item.id !== project.id))}
           disabled={disabled}
+          tone="project"
         />
       ))}
     </div>
@@ -132,10 +127,7 @@ export function ChatAttachMenu({
           const remainingSlots = CHAT_MAX_FILE_ATTACHMENTS - files.length;
           if (remainingSlots <= 0) {
             onValidationError(
-              t("chat.validationTooManyFiles").replace(
-                "{max}",
-                String(CHAT_MAX_FILE_ATTACHMENTS),
-              ),
+              t("chat.validationTooManyFiles").replace("{max}", String(CHAT_MAX_FILE_ATTACHMENTS)),
             );
             return;
           }
@@ -160,10 +152,7 @@ export function ChatAttachMenu({
 
           if (selected.length > remainingSlots) {
             onValidationError(
-              t("chat.validationTooManyFiles").replace(
-                "{max}",
-                String(CHAT_MAX_FILE_ATTACHMENTS),
-              ),
+              t("chat.validationTooManyFiles").replace("{max}", String(CHAT_MAX_FILE_ATTACHMENTS)),
             );
           } else {
             onValidationError(null);
@@ -263,20 +252,40 @@ function PendingChip({
   removeLabel,
   onRemove,
   disabled,
+  tone = "neutral",
 }: {
   label: string;
   meta?: string;
   removeLabel: string;
   onRemove: () => void;
   disabled?: boolean;
+  tone?: "neutral" | "task" | "project";
 }) {
   return (
-    <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-1 text-xs">
+    <span
+      className={cn(
+        "inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-1 text-xs shadow-sm",
+        tone === "neutral" && "border-border bg-muted/50",
+        tone === "task" && "border-primary/30 bg-linear-to-br from-primary/10 to-accent/55",
+        tone === "project" &&
+          "border-auxiliary/45 bg-linear-to-br from-auxiliary/24 to-auxiliary/10",
+      )}
+    >
       <span className="truncate font-medium">{label}</span>
-      {meta ? <span className="truncate text-muted-foreground">{meta}</span> : null}
+      {meta ? (
+        <span
+          className={cn("truncate text-foreground/65", tone === "project" && "text-foreground/75")}
+        >
+          {meta}
+        </span>
+      ) : null}
       <button
         type="button"
-        className="rounded-full p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-50"
+        className={cn(
+          "grid size-5 shrink-0 place-items-center rounded-full text-muted-foreground outline-none transition-[color,background-color,box-shadow] hover:bg-destructive/12 hover:text-destructive focus-visible:bg-destructive/12 focus-visible:text-destructive focus-visible:ring-2 focus-visible:ring-destructive/20 disabled:pointer-events-none disabled:opacity-50",
+          tone === "task" && "text-primary/70",
+          tone === "project" && "bg-auxiliary/10 text-auxiliary",
+        )}
         onClick={onRemove}
         disabled={disabled}
         aria-label={removeLabel}

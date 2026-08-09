@@ -13,8 +13,8 @@ export function ChatFileAttachmentCard({ attachment }: { attachment: ChatFileAtt
   const [downloading, setDownloading] = useState(false);
 
   return (
-    <div className="flex max-w-full min-w-0 items-center gap-2 rounded-md border border-border/80 bg-background/60 px-2.5 py-2 text-sm">
-      <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+    <div className="flex max-w-full min-w-0 items-center gap-2 rounded-lg border border-auxiliary/25 bg-auxiliary/7 px-2.5 py-2 text-sm shadow-sm">
+      <FileText className="size-4 shrink-0 text-auxiliary" aria-hidden />
       <div className="min-w-0 flex-1 overflow-hidden">
         <p className="truncate font-medium" title={attachment.originalName}>
           {attachment.originalName}

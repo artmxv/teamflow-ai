@@ -201,7 +201,7 @@ Priorities:
 
 - `LOW`
 - `MEDIUM`
-- `HIGH`
+- `URGENT`
 - `URGENT`
 
 Relations:
@@ -352,7 +352,6 @@ enum TaskStatus {
 enum TaskPriority {
   LOW
   MEDIUM
-  HIGH
   URGENT
 }
 

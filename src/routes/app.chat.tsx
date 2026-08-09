@@ -20,6 +20,7 @@ import { EmptyState } from "@/components/app/EmptyState";
 import { MemberProfileDrawer } from "@/components/app/MemberProfileDrawer";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { NewDirectMessageDialog } from "@/components/app/chat/NewDirectMessageDialog";
+import { NewChannelDialog } from "@/components/app/chat/NewChannelDialog";
 import { ChatConversationHeader } from "@/components/app/chat/ChatConversationHeader";
 import { ChatMessageActions } from "@/components/app/chat/ChatMessageActions";
 import { ChatMessageAttachments } from "@/components/app/chat/ChatMessageAttachments";
@@ -122,13 +123,14 @@ import { useIsUserOnline } from "@/lib/realtime/use-chat-presence";
 import { cn } from "@/lib/utils";
 import {
   ArrowDown,
+  Hash,
   Loader2,
   MessageSquare,
   Pin,
   PinOff,
-  Plus,
   Search,
   Send,
+  SquarePen,
   Users,
 } from "lucide-react";
 
@@ -252,6 +254,7 @@ function WorkspaceChatPage() {
   const isDesktop = useIsDesktopXl();
 
   const [directDialogOpen, setDirectDialogOpen] = useState(false);
+  const [channelDialogOpen, setChannelDialogOpen] = useState(false);
   const [conversationFilter, setConversationFilter] = useState("");
   const [mobileShowList, setMobileShowList] = useState(!conversationFromUrl);
 
@@ -456,21 +459,10 @@ function WorkspaceChatPage() {
                 isDesktop && "flex",
               )}
             >
-              <div className="flex shrink-0 flex-col gap-2.5 border-b border-border/60 px-3 py-3">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-9 w-full justify-center gap-1.5"
-                  aria-label={t("chat.newMessage")}
-                  onClick={() => setDirectDialogOpen(true)}
-                >
-                  <Plus className="size-4" aria-hidden="true" />
-                  <span>{t("chat.newMessage")}</span>
-                </Button>
-                <div className="relative">
+              <div className="flex shrink-0 items-center gap-2 border-b border-border/60 px-3 py-3">
+                <div className="relative min-w-0 flex-1">
                   <Search
-                    className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+                    className="filter-search-icon pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
                     aria-hidden="true"
                   />
                   <Input
@@ -478,9 +470,31 @@ function WorkspaceChatPage() {
                     onChange={(event) => setConversationFilter(event.target.value)}
                     placeholder={t("chat.searchConversations")}
                     aria-label={t("chat.searchConversations")}
-                    className="h-9 w-full bg-background/60 pl-8 text-sm"
+                    className="filter-search-input w-full pl-9 text-sm"
                   />
                 </div>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="brand"
+                  className="size-10 shrink-0 rounded-lg shadow-sm"
+                  aria-label={t("chat.newMessage")}
+                  title={t("chat.newMessage")}
+                  onClick={() => setDirectDialogOpen(true)}
+                >
+                  <SquarePen className="size-4" aria-hidden="true" />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="size-10 shrink-0 rounded-lg border-auxiliary/30 bg-auxiliary/8 text-auxiliary hover:bg-auxiliary/14"
+                  aria-label={t("chat.createChannel")}
+                  title={t("chat.createChannel")}
+                  onClick={() => setChannelDialogOpen(true)}
+                >
+                  <Users className="size-4" aria-hidden="true" />
+                </Button>
               </div>
 
               <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
@@ -559,12 +573,20 @@ function WorkspaceChatPage() {
       </div>
 
       {user ? (
-        <NewDirectMessageDialog
-          open={directDialogOpen}
-          onOpenChange={setDirectDialogOpen}
-          currentUserId={user.id}
-          onConversationReady={(conversation) => selectConversation(conversation.id)}
-        />
+        <>
+          <NewDirectMessageDialog
+            open={directDialogOpen}
+            onOpenChange={setDirectDialogOpen}
+            currentUserId={user.id}
+            onConversationReady={(conversation) => selectConversation(conversation.id)}
+          />
+          <NewChannelDialog
+            open={channelDialogOpen}
+            onOpenChange={setChannelDialogOpen}
+            currentUserId={user.id}
+            onConversationReady={(conversation) => selectConversation(conversation.id)}
+          />
+        </>
       ) : null}
     </AppShell>
   );
@@ -639,7 +661,9 @@ function ConversationRow({
       <div
         className={cn(
           "group flex w-full min-w-0 items-center gap-1 rounded-xl px-1.5 py-1 transition",
-          active ? "bg-accent text-accent-foreground" : "hover:bg-accent/60",
+          active
+            ? "bg-auxiliary/12 text-foreground ring-1 ring-auxiliary/15"
+            : "hover:bg-auxiliary/7",
         )}
       >
         <button
@@ -672,7 +696,11 @@ function ConversationRow({
               className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary"
               aria-hidden="true"
             >
-              <Users className="size-3.5 shrink-0" />
+              {conversation.type === "CHANNEL" ? (
+                <Hash className="size-3.5 shrink-0" />
+              ) : (
+                <Users className="size-3.5 shrink-0" />
+              )}
             </span>
           )}
           <span className="flex min-w-0 flex-1 flex-col justify-center overflow-hidden">
@@ -1947,8 +1975,8 @@ function ConversationMessagePane({
               onTasksChange={setPendingTasks}
               onProjectsChange={setPendingProjects}
             />
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <div className="flex min-w-0 flex-1 items-end gap-1">
+            <div className="rounded-2xl border border-primary/20 bg-gradient-to-r from-card via-card to-primary/[0.055] p-1.5 shadow-[0_14px_45px_rgba(0,0,0,.16)] transition focus-within:border-primary/45 focus-within:shadow-glow">
+              <div className="flex min-w-0 items-end gap-1">
                 <ChatAttachMenu
                   files={pendingFiles}
                   tasks={pendingTasks}
@@ -1985,7 +2013,7 @@ function ConversationMessagePane({
                     disabled={sendMutation.isPending}
                     rows={1}
                     maxLength={CHAT_MESSAGE_MAX_LENGTH + 50}
-                    className="min-h-10 max-h-40 resize-none overflow-x-hidden overflow-y-auto border-control-border bg-control py-2 leading-5 break-words [overflow-wrap:anywhere]"
+                    className="min-h-10 max-h-40 resize-none overflow-x-hidden overflow-y-auto border-0 bg-transparent py-2 leading-5 shadow-none break-words hover:bg-transparent focus-visible:ring-0 [overflow-wrap:anywhere]"
                   />
                   {showComposerMeta ? (
                     <div className="mt-1 flex items-center justify-between gap-2 px-0.5">
@@ -2003,27 +2031,28 @@ function ConversationMessagePane({
                     </div>
                   ) : null}
                 </div>
-              </div>
-              <Button
-                type="submit"
-                variant="brand"
-                disabled={!canSend || sendMutation.isPending}
-                className="h-10 w-full shrink-0 sm:w-auto"
-                aria-label={t("chat.send")}
-                title={t("chat.send")}
-              >
-                {sendMutation.isPending ? (
-                  <>
+                <Button
+                  type="submit"
+                  variant="brand"
+                  disabled={!canSend || sendMutation.isPending}
+                  className="mb-0.5 h-10 shrink-0 rounded-xl px-3.5 shadow-glow sm:min-w-28"
+                  aria-label={t("chat.send")}
+                  title={t("chat.send")}
+                >
+                  {sendMutation.isPending ? (
                     <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                    {hasAttachments ? t("chat.uploading") : t("chat.sending")}
-                  </>
-                ) : (
-                  <>
+                  ) : (
                     <Send className="size-4" aria-hidden="true" />
-                    <span className="hidden sm:inline">{t("chat.send")}</span>
-                  </>
-                )}
-              </Button>
+                  )}
+                  <span className="hidden sm:inline">
+                    {sendMutation.isPending
+                      ? hasAttachments
+                        ? t("chat.uploading")
+                        : t("chat.sending")
+                      : t("chat.send")}
+                  </span>
+                </Button>
+              </div>
             </div>
           </form>
         </>

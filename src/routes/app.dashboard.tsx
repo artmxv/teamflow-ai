@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/app/AppShell";
+import { CREATE_ACTION_BUTTON_CLASSNAME } from "@/components/app/FilterBar";
 import { ApiErrorState } from "@/components/app/ApiErrorState";
 import {
   FolderKanban,
@@ -19,7 +20,7 @@ import {
   ListChecks,
   RefreshCw,
 } from "lucide-react";
-import { members, projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
+import { members, projectStatusMeta, type ProjectStatus, type TaskStatus } from "@/lib/mock-data";
 import {
   fetchDashboardSummary,
   mapTaskStatusCountsForChart,
@@ -40,8 +41,10 @@ import { effectiveDueDate, formatDueDateTimeShort } from "@/lib/due-datetime";
 import type { TasksSearch } from "@/routes/app.tasks";
 import type { ProjectsSearch } from "@/lib/project-status-url";
 import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
-import { resolveProjectGradient } from "@/lib/project-color";
+import { getProjectAccent, resolveProjectGradient } from "@/lib/project-color";
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
+import { ProjectAccentSurface } from "@/components/app/ProjectAccentSurface";
+import { TaskStatusIndicator } from "@/components/app/TaskStatusIndicator";
 import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
@@ -61,6 +64,7 @@ import {
   useI18n,
   type TKey,
 } from "@/lib/i18n";
+import { taskPriorityChipClass } from "@/lib/task-priority-theme";
 import { taskStatusChipClass } from "@/lib/task-status-theme";
 import { cn } from "@/lib/utils";
 import { translateStarterProjectName, translateStarterTitle } from "@/lib/starter-content";
@@ -80,19 +84,24 @@ export const Route = createFileRoute("/app/dashboard")({
 
 const initialsMap = Object.fromEntries(members.map((m) => [m.id, m.avatar]));
 
-const recentStatusMeta: Record<DashboardTaskStatus, { labelKey: TKey; tone: string }> = {
-  BACKLOG: { labelKey: "board.backlog", tone: taskStatusChipClass.backlog },
-  TODO: { labelKey: "board.todo", tone: taskStatusChipClass.todo },
-  IN_PROGRESS: { labelKey: "board.inProgress", tone: taskStatusChipClass.in_progress },
-  REVIEW: { labelKey: "board.review", tone: taskStatusChipClass.review },
-  DONE: { labelKey: "board.done", tone: taskStatusChipClass.done },
+const recentStatusMeta: Record<
+  DashboardTaskStatus,
+  { status: TaskStatus; labelKey: TKey; tone: string }
+> = {
+  BACKLOG: { status: "backlog", labelKey: "board.backlog", tone: taskStatusChipClass.backlog },
+  IN_PROGRESS: {
+    status: "in_progress",
+    labelKey: "board.inProgress",
+    tone: taskStatusChipClass.in_progress,
+  },
+  REVIEW: { status: "review", labelKey: "board.review", tone: taskStatusChipClass.review },
+  DONE: { status: "done", labelKey: "board.done", tone: taskStatusChipClass.done },
 };
 
 const recentPriorityTone: Record<DashboardTaskPriority, string> = {
-  LOW: "bg-muted text-muted-foreground",
-  MEDIUM: "bg-info/15 text-info",
-  HIGH: "bg-warning/20 text-warning-foreground",
-  URGENT: "bg-destructive/15 text-destructive",
+  LOW: taskPriorityChipClass.low,
+  MEDIUM: taskPriorityChipClass.medium,
+  URGENT: taskPriorityChipClass.urgent,
 };
 
 const apiProjectStatusMap: Record<ProjectApiStatus, ProjectStatus> = {
@@ -216,6 +225,14 @@ function Dashboard() {
     [apiProjects],
   );
 
+  const projectColorById = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const project of apiProjects) {
+      map.set(project.id, project.color);
+    }
+    return map;
+  }, [apiProjects]);
+
   const upcomingDeadlines = useMemo(
     () => pickUpcomingDeadlines(workspaceTasks, 5),
     [workspaceTasks],
@@ -238,7 +255,7 @@ function Dashboard() {
           to: "/app/projects" as const,
           search: { status: "active" as const },
           ariaKey: "dashboard.viewActiveProjects" as const,
-          accent: "primary" as const,
+          accent: "brand" as const,
         },
         {
           label: t("dashboard.openTasks"),
@@ -264,7 +281,7 @@ function Dashboard() {
           icon: Users,
           to: "/app/team" as const,
           ariaKey: "dashboard.viewTeamMembers" as const,
-          accent: "muted" as const,
+          accent: "auxiliary" as const,
         },
       ]
     : [];
@@ -282,7 +299,7 @@ function Dashboard() {
       value: taskAnalyticsCounts.overdue,
       icon: AlertTriangle,
       ariaKey: "dashboard.viewOverdueTasks",
-      tone: "destructive",
+      tone: "urgent",
       search: { status: "open", due: "overdue" },
     },
     {
@@ -290,16 +307,16 @@ function Dashboard() {
       value: taskAnalyticsCounts.dueSoon,
       icon: CalendarClock,
       ariaKey: "dashboard.viewDueSoonTasks",
-      tone: "warning",
+      tone: "review",
       search: { status: "open", due: "soon" },
     },
     {
-      labelKey: "dashboard.highPriorityOpen",
-      value: taskAnalyticsCounts.highPriorityOpen,
+      labelKey: "dashboard.urgentOpen",
+      value: taskAnalyticsCounts.urgentOpen,
       icon: Flame,
-      ariaKey: "dashboard.viewHighPriorityTasks",
-      tone: "warning",
-      search: { status: "open", priority: "high" },
+      ariaKey: "dashboard.viewUrgentTasks",
+      tone: "priorityUrgent",
+      search: { status: "open", priority: "urgent" },
     },
     {
       labelKey: "dashboard.unassigned",
@@ -319,7 +336,7 @@ function Dashboard() {
         actions={
           canManageProjects ? (
             <NewProjectDialog>
-              <Button variant="brand">
+              <Button variant="brand" className={CREATE_ACTION_BUTTON_CLASSNAME}>
                 <Plus className="size-4" /> {t("common.newProject")}
               </Button>
             </NewProjectDialog>
@@ -455,16 +472,13 @@ function Dashboard() {
                       key={s.statusKey}
                       className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-xs"
                     >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span
-                          className="size-2.5 shrink-0 rounded-sm"
-                          style={{ background: s.fill }}
-                          aria-hidden
-                        />
-                        <span className="truncate text-foreground/90">
-                          {dashboardStatusLabel(s.statusKey, t)}
-                        </span>
-                      </span>
+                      <TaskStatusIndicator
+                        status={recentStatusMeta[s.statusKey].status}
+                        className="gap-2 text-foreground/90"
+                        dotClassName="size-2.5"
+                      >
+                        {dashboardStatusLabel(s.statusKey, t)}
+                      </TaskStatusIndicator>
                       <span className="shrink-0 tabular-nums font-semibold text-muted-foreground">
                         {s.value}
                       </span>
@@ -530,7 +544,13 @@ function Dashboard() {
               ) : (
                 <ul className="divide-y divide-border/80">
                   {upcomingDeadlines.map((task) => (
-                    <UpcomingDeadlineRow key={task.id} task={task} t={t} lang={lang} />
+                    <UpcomingDeadlineRow
+                      key={task.id}
+                      task={task}
+                      t={t}
+                      lang={lang}
+                      projectColor={projectColorById.get(task.projectId)}
+                    />
                   ))}
                 </ul>
               )}
@@ -559,7 +579,13 @@ function Dashboard() {
           ) : (
             <ul className="-mx-1 divide-y divide-border/80 sm:mx-0">
               {data?.recentTasks.map((task) => (
-                <RecentTaskRow key={task.id} task={task} t={t} lang={lang} />
+                <RecentTaskRow
+                  key={task.id}
+                  task={task}
+                  t={t}
+                  lang={lang}
+                  projectColor={projectColorById.get(task.project.id)}
+                />
               ))}
             </ul>
           )}
@@ -573,12 +599,19 @@ function RecentTaskRow({
   task,
   t,
   lang,
+  projectColor,
 }: {
   task: DashboardRecentTask;
   t: (key: TKey) => string;
   lang: import("@/lib/i18n").Lang;
+  projectColor?: string | null;
 }) {
   const status = recentStatusMeta[task.status];
+  const projectAccent = getProjectAccent({
+    id: task.project.id,
+    name: task.project.name,
+    color: projectColor,
+  });
   const assigneeOptions = task.assignees.map((assignee) => ({
     id: assignee.id,
     name: assignee.name,
@@ -617,22 +650,25 @@ function RecentTaskRow({
             </span>
           </div>
           <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="max-w-full truncate">
-              {translateStarterProjectName(task.project.name, lang)}
+            <span className="inline-flex max-w-full items-center gap-1.5 truncate">
+              <span className={cn("size-2 shrink-0 rounded-full", projectAccent.dot)} aria-hidden />
+              <span className="truncate">
+                {translateStarterProjectName(task.project.name, lang)}
+              </span>
             </span>
             <Badge variant="secondary" className={status.tone + " border-0 capitalize"}>
-              {t(status.labelKey)}
+              <TaskStatusIndicator status={status.status}>{t(status.labelKey)}</TaskStatusIndicator>
             </Badge>
             <Badge variant="secondary" className={recentPriorityTone[task.priority] + " border-0"}>
               {dashboardPriorityLabel(task.priority, t)}
             </Badge>
             <span className="tabular-nums text-muted-foreground/90 sm:hidden">
-              {formatUpdatedAt(task.updatedAt)}
+              {formatUpdatedAt(task.updatedAt, lang)}
             </span>
           </div>
         </div>
         <div className="hidden shrink-0 self-start text-xs tabular-nums text-muted-foreground sm:block sm:self-center">
-          {formatUpdatedAt(task.updatedAt)}
+          {formatUpdatedAt(task.updatedAt, lang)}
         </div>
       </Link>
     </li>
@@ -648,8 +684,8 @@ function initialsFromName(name: string) {
     .toUpperCase();
 }
 
-function formatUpdatedAt(value: string) {
-  return new Date(value).toLocaleString(undefined, {
+function formatUpdatedAt(value: string, lang: import("@/lib/i18n").Lang) {
+  return new Date(value).toLocaleString(lang === "ru" ? "ru-RU" : "en-US", {
     month: "short",
     day: "numeric",
     hour: "numeric",
@@ -698,12 +734,19 @@ function UpcomingDeadlineRow({
   task,
   t,
   lang,
+  projectColor,
 }: {
   task: TaskApiItem;
   t: (key: TKey) => string;
   lang: import("@/lib/i18n").Lang;
+  projectColor?: string | null;
 }) {
   const status = recentStatusMeta[task.status];
+  const projectAccent = getProjectAccent({
+    id: task.project.id,
+    name: task.project.name,
+    color: projectColor,
+  });
   const urgency = task.dueDate
     ? dueUrgencyMeta(task.dueDate)
     : { tone: "muted" as const, hintKey: null };
@@ -740,11 +783,14 @@ function UpcomingDeadlineRow({
             {translateStarterTitle(task.title, lang)}
           </div>
           <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="max-w-full truncate">
-              {translateStarterProjectName(task.project.name, lang)}
+            <span className="inline-flex max-w-full items-center gap-1.5 truncate">
+              <span className={cn("size-2 shrink-0 rounded-full", projectAccent.dot)} aria-hidden />
+              <span className="truncate">
+                {translateStarterProjectName(task.project.name, lang)}
+              </span>
             </span>
             <Badge variant="secondary" className={status.tone + " capitalize"}>
-              {t(status.labelKey)}
+              <TaskStatusIndicator status={status.status}>{t(status.labelKey)}</TaskStatusIndicator>
             </Badge>
             <span
               className={cn(
@@ -804,38 +850,40 @@ function DashboardProjectCard({
 }) {
   const meta = projectStatusMeta[project.status];
   const cardBody = (
-    <>
+    <ProjectAccentSurface
+      gradient={project.color}
+      className="z-1 h-full border-0"
+      contentClassName="p-4"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className={"h-1.5 w-10 rounded-full bg-gradient-to-r " + project.color} />
-          <div className="mt-2 truncate text-sm font-semibold leading-snug">
+          <div className="truncate text-sm font-semibold leading-snug">
             {translateStarterProjectName(project.name, lang)}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
-            <span className="tabular-nums">{project.openTasks}</span> open ·{" "}
-            <span className="tabular-nums">{project.totalTasks}</span> total
+            {t("dashboard.projectOpenTotal")
+              .replace("{open}", String(project.openTasks))
+              .replace("{total}", String(project.totalTasks))}
           </div>
         </div>
         <Badge variant="secondary" className={cn(meta.className, "shrink-0 border-0")}>
           {projectStatusLabel(project.status, t)}
         </Badge>
       </div>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted/80">
         <div
-          className={"h-full rounded-full bg-gradient-to-r " + project.color}
+          className={"project-progress-fill h-full rounded-full bg-gradient-to-r " + project.color}
           style={{ width: project.progress + "%" }}
         />
       </div>
       <div className="mt-2.5 flex items-center justify-between gap-2">
         <span className="text-xs tabular-nums text-muted-foreground">{project.progress}%</span>
       </div>
-    </>
+    </ProjectAccentSurface>
   );
 
   if (!project.id) {
-    return (
-      <div className="rounded-xl border border-border/80 bg-background/40 p-4">{cardBody}</div>
-    );
+    return <div className="min-w-0 rounded-2xl bg-border/60 p-px">{cardBody}</div>;
   }
 
   return (
@@ -843,7 +891,10 @@ function DashboardProjectCard({
       to="/app/projects/$projectId"
       params={{ projectId: project.id }}
       aria-label={`${t("dashboard.viewProject")}: ${translateStarterProjectName(project.name, lang)}`}
-      className="group block min-w-0 rounded-xl border border-border/80 bg-background/40 p-4 transition hover:border-primary/30 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className={cn(
+        "dashboard-project-card group block min-w-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        project.color,
+      )}
     >
       {cardBody}
     </Link>
@@ -874,13 +925,15 @@ function DashboardAiInsightsCard() {
     <div
       className={cn(
         sectionSurfaceClass,
-        "border-primary/25 bg-primary/4 xl:col-span-1 dark:bg-primary/7",
+        "group xl:col-span-1 transition-[border-color,background-color,box-shadow] duration-200",
+        "hover:border-primary/30 hover:bg-primary/4 hover:shadow-[0_0_0_1px_color-mix(in_oklch,var(--brand-ring)_18%,transparent)]",
+        "dark:hover:bg-primary/7",
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground">
-            <span className="grid size-7 place-items-center rounded-lg bg-primary/10 text-primary">
+            <span className="grid size-7 place-items-center rounded-lg bg-muted text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary">
               <Sparkles className="size-3.5 shrink-0" />
             </span>
             <span className="truncate">{t("dashboard.aiInsights")}</span>
@@ -970,7 +1023,7 @@ function DashboardAiInsightsCard() {
             </div>
           ) : null}
 
-          <Button variant="outline" className="mt-4 w-full" asChild>
+          <Button variant="brand" className="mt-4 w-full" asChild>
             <Link to="/app/ai">{t("dashboard.openFullBriefing")}</Link>
           </Button>
         </>
@@ -1055,25 +1108,36 @@ function RecentTasksSkeleton() {
 }
 
 const cardLinkClass =
-  "min-w-0 rounded-2xl border border-border bg-card p-2.5 shadow-soft transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-5";
+  "surface-lift min-w-0 rounded-2xl border border-border bg-card p-2.5 shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-5";
 
 const analyticsCardLinkClass =
-  "min-w-0 rounded-2xl border border-border/60 bg-card/60 p-2.5 shadow-none transition hover:border-border hover:bg-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-4";
+  "surface-lift min-w-0 rounded-2xl border border-border/60 bg-card/60 p-2.5 shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-4";
 
-type AnalyticsMetricTone = "destructive" | "warning" | "muted";
+type AnalyticsMetricTone = "urgent" | "review" | "priorityUrgent" | "muted";
 
-const analyticsToneClass: Record<AnalyticsMetricTone, { icon: string; value: string }> = {
-  destructive: {
-    icon: "bg-destructive/10 text-destructive group-hover:bg-destructive/15",
+const analyticsToneClass: Record<
+  AnalyticsMetricTone,
+  { icon: string; value: string; lift: string }
+> = {
+  urgent: {
+    icon: "bg-red-500/10 text-red-600 group-hover:bg-red-500/15 dark:text-red-400",
     value: "text-foreground",
+    lift: "surface-lift-urgent",
   },
-  warning: {
-    icon: "bg-warning/15 text-warning-foreground group-hover:bg-warning/20",
+  review: {
+    icon: "bg-amber-500/15 text-amber-800 group-hover:bg-amber-500/20 dark:text-amber-200",
     value: "text-foreground",
+    lift: "surface-lift-review",
+  },
+  priorityUrgent: {
+    icon: "bg-red-500/12 text-red-700 group-hover:bg-red-500/18 dark:text-red-300",
+    value: "text-foreground",
+    lift: "surface-lift-urgent",
   },
   muted: {
-    icon: "bg-muted text-muted-foreground group-hover:bg-accent",
+    icon: "bg-slate-500/10 text-slate-600 group-hover:bg-slate-500/15 dark:text-slate-300",
     value: "text-foreground",
+    lift: "surface-lift-muted",
   },
 };
 
@@ -1146,7 +1210,7 @@ function TaskActivityChartSection({
               {t("dashboard.createdTasks")}
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="size-2 shrink-0 rounded-sm bg-info" /> {t("dashboard.doneTasks")}
+              <span className="size-2 shrink-0 rounded-sm bg-success" /> {t("dashboard.doneTasks")}
             </span>
           </div>
         </div>
@@ -1165,7 +1229,7 @@ function TaskActivityChartSection({
         <ChartContainer
           config={{
             created: { label: t("dashboard.createdTasks"), color: "var(--primary)" },
-            done: { label: t("dashboard.doneTasks"), color: "var(--info)" },
+            done: { label: t("dashboard.doneTasks"), color: "var(--success)" },
           }}
           className="aspect-auto h-56 w-full min-w-0 sm:h-64 [&_.recharts-cartesian-grid_line]:stroke-border/80"
         >
@@ -1227,7 +1291,7 @@ function AnalyticsMetricCard({
       to={to}
       search={search}
       aria-label={ariaLabel}
-      className={cn("group block", analyticsCardLinkClass)}
+      className={cn("group block", analyticsCardLinkClass, toneStyles.lift)}
     >
       <div className="flex items-start justify-between gap-3">
         <div
@@ -1271,13 +1335,25 @@ type StatCardTarget =
   | { to: "/app/projects"; search: ProjectsSearch }
   | { to: "/app/team"; search?: never };
 
-type StatCardAccent = "primary" | "info" | "success" | "muted";
+type StatCardAccent = "brand" | "info" | "success" | "auxiliary";
 
-const statAccentClass: Record<StatCardAccent, string> = {
-  primary: "bg-primary/10 text-primary group-hover:bg-primary/15",
-  info: "bg-info/10 text-info group-hover:bg-info/15",
-  success: "bg-success/10 text-success group-hover:bg-success/15",
-  muted: "bg-accent text-accent-foreground group-hover:bg-primary/10 group-hover:text-primary",
+const statAccentClass: Record<StatCardAccent, { icon: string; lift: string }> = {
+  brand: {
+    icon: "bg-primary/10 text-primary group-hover:bg-primary/15",
+    lift: "surface-lift-brand",
+  },
+  info: {
+    icon: "bg-info/10 text-info group-hover:bg-info/15",
+    lift: "surface-lift-info",
+  },
+  success: {
+    icon: "bg-success/10 text-success group-hover:bg-success/15",
+    lift: "surface-lift-success",
+  },
+  auxiliary: {
+    icon: "bg-auxiliary/12 text-auxiliary group-hover:bg-auxiliary/18",
+    lift: "surface-lift-auxiliary",
+  },
 };
 
 function StatCard({
@@ -1286,7 +1362,7 @@ function StatCard({
   icon: Icon,
   value,
   label,
-  accent = "muted",
+  accent = "brand",
 }: {
   target: StatCardTarget;
   ariaLabel: string;
@@ -1295,13 +1371,14 @@ function StatCard({
   label: string;
   accent?: StatCardAccent;
 }) {
+  const accentStyles = statAccentClass[accent];
   const content = (
     <>
       <div className="flex items-start justify-between gap-3">
         <div
           className={cn(
             "grid size-7 place-items-center rounded-lg transition sm:size-9 sm:rounded-xl",
-            statAccentClass[accent],
+            accentStyles.icon,
           )}
         >
           <Icon className="size-3.5 sm:size-4" />
@@ -1315,7 +1392,7 @@ function StatCard({
       </div>
     </>
   );
-  const className = cn("group block", cardLinkClass);
+  const className = cn("group block", cardLinkClass, accentStyles.lift);
 
   if (target.to === "/app/tasks") {
     return (

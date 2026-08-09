@@ -19,14 +19,14 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-10 w-full items-center justify-between gap-2 whitespace-nowrap rounded-md border border-control-border bg-control px-3 py-2 text-sm text-control-foreground shadow-sm ring-offset-background cursor-pointer transition-colors data-[placeholder]:text-muted-foreground hover:bg-control-hover focus:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 data-[state=open]:border-ring data-[state=open]:bg-control-active data-[state=open]:ring-2 data-[state=open]:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-45 [&>span]:min-w-0 [&>span]:flex-1 [&>span]:text-left",
+      "flex h-10 w-full min-w-0 items-center justify-between gap-2 overflow-hidden rounded-md border border-control-border bg-control py-2 pl-3 pr-2.5 text-sm text-control-foreground shadow-sm ring-offset-background cursor-pointer transition-colors data-[placeholder]:text-muted-foreground hover:bg-control-hover focus:outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 data-[state=open]:border-ring data-[state=open]:bg-control-active data-[state=open]:ring-2 data-[state=open]:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-45 [&>span]:flex [&>span]:min-w-0 [&>span]:flex-1 [&>span]:items-center [&>span]:overflow-hidden [&>span]:text-left [&>span]:whitespace-nowrap",
       className,
     )}
     {...props}
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-4 w-4 shrink-0 opacity-70" />
+      <ChevronDown className="pointer-events-none h-4 w-4 shrink-0 opacity-70" aria-hidden />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));

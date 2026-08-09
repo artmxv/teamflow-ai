@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { useCurrentWorkspace } from "@/lib/auth/use-current-user";
@@ -8,18 +8,20 @@ import { AppShell } from "@/components/app/AppShell";
 import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
+import { BrandMark } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Sparkles,
   RefreshCw,
   BarChart3,
-  CheckCircle2,
-  AlertTriangle,
+  ShieldAlert,
   ListChecks,
-  Megaphone,
+  ClipboardList,
+  Compass,
   Copy,
   FolderKanban,
+  Lightbulb,
+  type LucideIcon,
 } from "lucide-react";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { friendlyApiErrorMessage, isBrowserOffline } from "@/lib/api-error";
@@ -28,6 +30,7 @@ import {
   workspaceAiSummaryQueryKey,
   type WorkspaceAiMetrics,
 } from "@/lib/api/ai";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/ai")({
   beforeLoad: requireAuth,
@@ -36,12 +39,12 @@ export const Route = createFileRoute("/app/ai")({
 });
 
 const SECTIONS = [
-  { id: "overview", labelKey: "ai.sectionOverview" as const },
-  { id: "highlights", labelKey: "ai.highlights" as const },
-  { id: "risks", labelKey: "ai.risks" as const },
-  { id: "actions", labelKey: "ai.actions" as const },
-  { id: "standup", labelKey: "ai.standupSummary" as const },
-  { id: "metrics", labelKey: "ai.sectionMetrics" as const },
+  { id: "overview", labelKey: "ai.sectionOverview" as const, icon: Compass },
+  { id: "highlights", labelKey: "ai.highlights" as const, icon: Lightbulb },
+  { id: "risks", labelKey: "ai.risks" as const, icon: ShieldAlert },
+  { id: "actions", labelKey: "ai.actions" as const, icon: ListChecks },
+  { id: "standup", labelKey: "ai.standupSummary" as const, icon: ClipboardList },
+  { id: "metrics", labelKey: "ai.sectionMetrics" as const, icon: BarChart3 },
 ] as const;
 
 function AssistantPage() {
@@ -140,50 +143,44 @@ function AssistantPage() {
               <p className="px-2 py-2 text-xs text-muted-foreground">{t("ai.metricsPending")}</p>
             )}
           </div>
-          <div className="mt-4 flex flex-col border-b border-border/60 pb-3">
+          <div className="mt-4 flex flex-col">
             <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/80">
               {t("ai.sectionsTitle")}
             </div>
             <ul className="space-y-0.5">
-              {SECTIONS.filter((section) => section.id !== "metrics").map((section) => (
-                <li key={section.id}>
-                  <button
-                    type="button"
-                    onClick={() => scrollToSection(section.id)}
-                    disabled={!showSectionContent}
-                    className="flex w-full rounded-lg px-2 py-2 text-left text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
-                  >
-                    {t(section.labelKey)}
-                  </button>
-                </li>
-              ))}
+              {SECTIONS.filter((section) => section.id !== "metrics").map((section) => {
+                const Icon = section.icon;
+                return (
+                  <li key={section.id}>
+                    <button
+                      type="button"
+                      onClick={() => scrollToSection(section.id)}
+                      disabled={!showSectionContent}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                    >
+                      <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-muted/80 text-muted-foreground">
+                        <Icon className="size-3.5" strokeWidth={2} aria-hidden />
+                      </span>
+                      <span className="min-w-0 truncate">{t(section.labelKey)}</span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-4 h-9 w-full justify-center gap-1.5 border-border bg-control text-control-foreground hover:bg-control-hover"
-            disabled={!workspaceId || isLoading || isFetching}
-            onClick={() => void handleRegenerate()}
-          >
-            <RefreshCw className={"size-3.5 " + (isFetching ? "animate-spin" : "")} />
-            {isFetching ? t("ai.regenerating") : t("ai.regenerate")}
-          </Button>
         </aside>
 
         <section className="flex flex-col rounded-2xl border border-border bg-card shadow-soft">
           <div className="flex items-center gap-3 border-b border-border px-5 py-3">
-            <div className="grid size-9 place-items-center rounded-xl bg-gradient-brand shadow-glow">
-              <Sparkles className="size-4 text-white" />
-            </div>
+            <BrandMark className="size-9 rounded-xl" />
             <div className="min-w-0">
               <div className="text-sm font-semibold">{t("ai.assistant")}</div>
               <div className="text-xs text-muted-foreground">{t("ai.groundedContext")}</div>
             </div>
             <Button
-              variant="outline"
+              variant="brand"
               size="sm"
-              className="ml-auto h-9 shrink-0 justify-center gap-1.5 border-border bg-control text-control-foreground hover:bg-control-hover"
+              className="ml-auto h-9 shrink-0 justify-center gap-1.5"
               disabled={!workspaceId || isLoading || isFetching}
               onClick={() => void handleRegenerate()}
             >
@@ -207,7 +204,7 @@ function AssistantPage() {
               isEmptyWorkspace ? (
                 <>
                   <EmptyState
-                    icon={Sparkles}
+                    icon={Compass}
                     title={t("ai.emptyWorkspaceTitle")}
                     description={t("ai.emptyWorkspaceHint")}
                     primaryAction={
@@ -220,21 +217,20 @@ function AssistantPage() {
                     }
                   />
                   <div id="metrics" className="scroll-mt-20 lg:hidden">
-                    <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      {t("ai.metricsTitle")}
-                    </div>
+                    <SectionMarker icon={BarChart3} title={t("ai.metricsTitle")} />
                     <MetricsPanel metrics={data.metrics} />
                   </div>
                 </>
               ) : (
                 <>
                   <div id="overview" className="scroll-mt-20">
+                    <SectionMarker icon={Compass} title={t("ai.sectionOverview")} />
                     <AssistantBubble content={data.overview} />
                   </div>
 
                   <div id="highlights" className="scroll-mt-20">
                     <SectionBlock
-                      icon={CheckCircle2}
+                      icon={Lightbulb}
                       title={t("ai.highlights")}
                       tone="ok"
                       items={data.highlights}
@@ -243,7 +239,7 @@ function AssistantPage() {
 
                   <div id="risks" className="scroll-mt-20">
                     <SectionBlock
-                      icon={AlertTriangle}
+                      icon={ShieldAlert}
                       title={t("ai.risks")}
                       tone="warn"
                       items={data.risks}
@@ -268,9 +264,7 @@ function AssistantPage() {
                   </div>
 
                   <div id="metrics" className="scroll-mt-20 lg:hidden">
-                    <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      {t("ai.metricsTitle")}
-                    </div>
+                    <SectionMarker icon={BarChart3} title={t("ai.metricsTitle")} />
                     <MetricsPanel metrics={data.metrics} />
                   </div>
                 </>
@@ -313,23 +307,53 @@ function StandupSummaryBlock({
 
   return (
     <>
-      <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-        <Megaphone className="size-3.5" /> {t("ai.standupSummary")}
-        {summary.trim() ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="ml-auto h-8 gap-1.5 border-border bg-control text-xs font-medium normal-case tracking-normal text-control-foreground hover:bg-control-hover"
-            onClick={() => void handleCopy()}
-          >
-            <Copy className="size-3.5" />
-            {copied ? t("ai.copiedShort") : t("ai.copy")}
-          </Button>
-        ) : null}
-      </div>
+      <SectionMarker
+        icon={ClipboardList}
+        title={t("ai.standupSummary")}
+        trailing={
+          summary.trim() ? (
+            <Button
+              type="button"
+              variant="brand"
+              size="sm"
+              className="ml-auto h-8 gap-1.5 text-xs font-medium normal-case tracking-normal"
+              onClick={() => void handleCopy()}
+            >
+              <Copy className="size-3.5" />
+              {copied ? t("ai.copiedShort") : t("ai.copy")}
+            </Button>
+          ) : null
+        }
+      />
       <AssistantBubble content={summary} emptyMessage={t("ai.standupEmpty")} />
     </>
+  );
+}
+
+function SectionMarker({
+  icon: Icon,
+  title,
+  toneClass,
+  trailing,
+}: {
+  icon: LucideIcon;
+  title: string;
+  toneClass?: string;
+  trailing?: ReactNode;
+}) {
+  return (
+    <div className="mb-2.5 flex min-h-7 items-center gap-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <span
+        className={cn(
+          "grid size-7 shrink-0 place-items-center rounded-lg bg-muted/80",
+          toneClass ?? "text-muted-foreground",
+        )}
+      >
+        <Icon className="size-3.5" strokeWidth={2} aria-hidden />
+      </span>
+      <span className="leading-none">{title}</span>
+      {trailing}
+    </div>
   );
 }
 
@@ -337,38 +361,29 @@ function AssistantBubble({ content, emptyMessage }: { content: string; emptyMess
   const isEmpty = !content.trim();
 
   return (
-    <div className="flex max-w-[95%] gap-3">
-      <div className="grid size-8 shrink-0 place-items-center rounded-xl bg-accent text-accent-foreground">
-        <Sparkles className="size-4" />
-      </div>
-      <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md border border-border bg-card px-4 py-3 text-sm">
-        {isEmpty && emptyMessage ? (
-          <p className="text-muted-foreground">{emptyMessage}</p>
-        ) : (
-          content
-        )}
-      </div>
+    <div className="max-w-[95%] rounded-2xl rounded-tl-md border border-border bg-card px-4 py-3 text-sm">
+      {isEmpty && emptyMessage ? <p className="text-muted-foreground">{emptyMessage}</p> : content}
     </div>
   );
 }
 
 function SectionBlock({
-  icon: Icon,
+  icon,
   title,
   tone,
   items,
   ordered = false,
 }: {
-  icon: typeof CheckCircle2;
+  icon: LucideIcon;
   title: string;
   tone: "warn" | "ok" | "info";
   items: string[];
   ordered?: boolean;
 }) {
   const toneClass = {
-    warn: "bg-warning/15 text-warning-foreground",
-    ok: "bg-success/15 text-success",
-    info: "bg-info/15 text-info",
+    warn: "text-warning-foreground",
+    ok: "text-success",
+    info: "text-info",
   }[tone];
 
   const ListTag = ordered ? "ol" : "ul";
@@ -376,17 +391,7 @@ function SectionBlock({
 
   return (
     <div>
-      <div className="mb-2 flex items-center gap-2">
-        <span
-          className={
-            "inline-flex h-5 items-center gap-1 rounded-full px-2 text-[10px] font-semibold " +
-            toneClass
-          }
-        >
-          <Icon className="size-3" />
-          {title}
-        </span>
-      </div>
+      <SectionMarker icon={icon} title={title} toneClass={toneClass} />
       <div className="rounded-2xl border border-border bg-card px-4 py-3 text-sm">
         <ListTag className={"space-y-2 " + listClass}>
           {items.map((item, index) => (
@@ -407,7 +412,6 @@ function MetricsPanel({ metrics }: { metrics: WorkspaceAiMetrics }) {
     { label: t("ai.metricOpenTasks"), value: metrics.openTasks },
     { label: t("ai.metricDoneTasks"), value: metrics.completedTasks },
     { label: t("ai.metricUrgentOpen"), value: metrics.urgentTasks },
-    { label: t("ai.metricHighPriority"), value: metrics.highPriorityTasks },
     { label: t("ai.metricInReview"), value: metrics.reviewTasks },
     { label: t("ai.metricOverdue"), value: metrics.overdueTasks },
   ];
@@ -430,12 +434,15 @@ function MetricsPanel({ metrics }: { metrics: WorkspaceAiMetrics }) {
 function SummarySkeleton() {
   return (
     <div className="space-y-6">
-      <div className="flex gap-3">
-        <Skeleton className="size-8 rounded-xl" />
-        <Skeleton className="h-24 flex-1 rounded-2xl" />
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-28" />
+        <Skeleton className="h-24 w-full max-w-[95%] rounded-2xl" />
       </div>
       {Array.from({ length: 3 }).map((_, index) => (
-        <Skeleton key={index} className="h-28 w-full rounded-2xl" />
+        <div key={index} className="space-y-2">
+          <Skeleton className="h-4 w-36" />
+          <Skeleton className="h-28 w-full rounded-2xl" />
+        </div>
       ))}
     </div>
   );

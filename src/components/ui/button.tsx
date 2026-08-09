@@ -14,7 +14,7 @@ const buttonVariants = cva(
         brand:
           "border-transparent bg-gradient-brand text-[var(--brand-foreground)] shadow-glow hover:opacity-95 focus-visible:ring-[color-mix(in_oklch,var(--brand-ring)_25%,transparent)]",
         brandSoft:
-          "button-brand-soft shadow-sm hover:opacity-95 focus-visible:ring-[color-mix(in_oklch,var(--brand-ring)_25%,transparent)]",
+          "button-brand-soft focus-visible:ring-[color-mix(in_oklch,var(--brand-ring)_25%,transparent)]",
         destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
         dangerSoft: "button-danger-soft shadow-sm focus-visible:ring-destructive/25",
         outline:

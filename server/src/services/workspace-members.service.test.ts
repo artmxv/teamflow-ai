@@ -258,7 +258,7 @@ describe("workspace-members.service", () => {
         key: `CLEANUP-${suffix}`,
         projectId: project.id,
         title: `Cleanup Task ${suffix}`,
-        status: "TODO",
+        status: "BACKLOG",
         priority: "MEDIUM",
         assigneeId: removable.id,
         taskAssignees: {

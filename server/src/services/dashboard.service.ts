@@ -2,7 +2,7 @@ import { prisma } from "../lib/prisma.js";
 import { getAccessibleProjectWhere, getAccessibleTaskWhere } from "./project-access.service.js";
 import type { WorkspaceRole } from "./workspace-context.service.js";
 
-const TASK_STATUSES = ["BACKLOG", "TODO", "IN_PROGRESS", "REVIEW", "DONE"] as const;
+const TASK_STATUSES = ["BACKLOG", "IN_PROGRESS", "REVIEW", "DONE"] as const;
 
 const assigneeUserSelect = {
   id: true,

@@ -8,8 +8,8 @@ type CreateTaskInput = {
   projectId: string;
   title: string;
   description?: string;
-  status?: "BACKLOG" | "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE";
-  priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+  status?: "BACKLOG" | "IN_PROGRESS" | "REVIEW" | "DONE";
+  priority?: "LOW" | "MEDIUM" | "URGENT";
   assigneeIds?: string[];
   assigneeId?: string | null;
   dueDate?: string | null;
@@ -18,8 +18,8 @@ type CreateTaskInput = {
 type UpdateTaskInput = {
   title?: string;
   description?: string | null;
-  status?: "BACKLOG" | "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE";
-  priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+  status?: "BACKLOG" | "IN_PROGRESS" | "REVIEW" | "DONE";
+  priority?: "LOW" | "MEDIUM" | "URGENT";
   assigneeIds?: string[];
   assigneeId?: string | null;
   dueDate?: string | null;

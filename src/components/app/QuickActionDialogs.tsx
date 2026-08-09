@@ -6,10 +6,16 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { AssigneeMultiPicker } from "@/components/app/AssigneeMultiPicker";
+import { ProjectStatusSelect } from "@/components/app/ProjectStatusSelect";
+import { TaskPriorityIndicator } from "@/components/app/TaskPriorityIndicator";
+import { TaskStatusIndicator } from "@/components/app/TaskStatusIndicator";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { DeadlineDatePicker } from "@/components/app/DeadlineDatePicker";
 import { DeadlineTimePicker } from "@/components/app/DeadlineTimePicker";
-import { deadlineStatusDateTimeRowClassName } from "@/components/app/deadline-field-styles";
+import {
+  deadlineStatusDateTimeRowClassName,
+  projectDeadlineStatusDateTimeRowClassName,
+} from "@/components/app/deadline-field-styles";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -36,12 +42,22 @@ import { createProject, type ProjectApiItem, type ProjectApiStatus } from "@/lib
 import { fetchWorkspaceMembers } from "@/lib/api/workspace-members";
 import { useCurrentWorkspace } from "@/lib/auth/use-current-user";
 import { resolveEditAssigneeOptions } from "@/lib/assignee-options";
-import { useI18n, type TKey } from "@/lib/i18n";
+import { projectStatusLabel, useI18n, type TKey, priorityLabel } from "@/lib/i18n";
 import { friendlyApiErrorMessage } from "@/lib/api-error";
 import { dueDateTimeToIso } from "@/lib/due-datetime";
 import { invalidateWorkspaceContentQueries } from "@/lib/workspace-queries";
 import { type Priority, type ProjectStatus, type TaskStatus } from "@/lib/mock-data";
+import { getProjectAccent } from "@/lib/project-color";
 import { cn } from "@/lib/utils";
+
+const TASK_STATUS_OPTIONS: TaskStatus[] = ["backlog", "in_progress", "review", "done"];
+
+const TASK_STATUS_LABEL_KEY: Record<TaskStatus, TKey> = {
+  backlog: "board.backlog",
+  in_progress: "board.inProgress",
+  review: "board.review",
+  done: "board.done",
+};
 
 type Translate = (key: TKey) => string;
 
@@ -99,8 +115,8 @@ const getTaskSchema = (t: Translate) =>
     z.object({
       title: z.string().trim().min(2, t("validation.taskTitleMin")),
       description: z.string().max(500, t("validation.taskDescriptionMax")).optional(),
-      priority: z.enum(["low", "medium", "high", "urgent"]),
-      status: z.enum(["backlog", "todo", "in_progress", "review", "done"]),
+      priority: z.enum(["low", "medium", "urgent"]),
+      status: z.enum(["backlog", "in_progress", "review", "done"]),
       assigneeIds: z.array(z.string()).optional(),
       dueDate: z.string().optional(),
       dueTime: z.string().optional(),
@@ -231,7 +247,7 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{t("common.newProject")}</DialogTitle>
           <DialogDescription>{t("projects.new.dialogDesc")}</DialogDescription>
@@ -247,7 +263,7 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
               rows={3}
             />
           </Field>
-          <div className={deadlineStatusDateTimeRowClassName}>
+          <div className={projectDeadlineStatusDateTimeRowClassName}>
             <Field
               className="min-w-0"
               label={t("projects.new.status")}
@@ -257,20 +273,12 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
                 control={control}
                 name="status"
                 render={({ field }) => (
-                  <Select
-                    value={field.value ?? "planning"}
-                    onValueChange={(value) => field.onChange(value as ProjectStatus)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={t("projects.new.status")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="planning">{t("projects.statusPlanning")}</SelectItem>
-                      <SelectItem value="active">{t("projects.statusActive")}</SelectItem>
-                      <SelectItem value="on_hold">{t("projects.statusOnHold")}</SelectItem>
-                      <SelectItem value="completed">{t("projects.statusCompleted")}</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <ProjectStatusSelect
+                    value={(field.value ?? "planning") as ProjectStatus}
+                    onValueChange={field.onChange}
+                    getLabel={(status) => projectStatusLabel(status, t)}
+                    placeholder={t("projects.new.status")}
+                  />
                 )}
               />
             </Field>
@@ -286,6 +294,7 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
                   <DeadlineDatePicker
                     value={field.value ?? ""}
                     onChange={field.onChange}
+                    className="w-full min-w-0"
                     aria-label={t("projects.new.dueDate")}
                     aria-invalid={Boolean(errors.dueDate)}
                   />
@@ -305,6 +314,7 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
                   <DeadlineTimePicker
                     value={field.value ?? ""}
                     onChange={field.onChange}
+                    className="w-full min-w-0"
                     aria-label={t("projects.new.dueTime")}
                     aria-invalid={Boolean(errors.dueTime)}
                   />
@@ -388,18 +398,24 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
   );
 }
 
+type TaskProjectOption = {
+  id: string;
+  name: string;
+  color?: string | null;
+};
+
 type NewTaskDialogProps = {
   children: ReactNode;
   initialStatus?: TaskStatus;
   isSubmitting?: boolean;
   fixedProjectId?: string;
-  projectOptions?: { id: string; name: string }[];
+  projectOptions?: TaskProjectOption[];
   onSubmit: (values: TaskFormValues) => Promise<void>;
 };
 
 export function NewTaskDialog({
   children,
-  initialStatus = "todo",
+  initialStatus = "backlog",
   isSubmitting = false,
   fixedProjectId,
   projectOptions,
@@ -413,6 +429,8 @@ export function NewTaskDialog({
   const projectSelectValue = selectedProjectId || projectOptions?.[0]?.id || "__no_project__";
   const showProjectSelect = !!projectOptions && projectOptions.length > 0 && !fixedProjectId;
   const effectiveProjectId = fixedProjectId ?? (showProjectSelect ? selectedProjectId : undefined);
+  const selectedProjectOption =
+    projectOptions?.find((project) => project.id === projectSelectValue) ?? projectOptions?.[0];
   const {
     control,
     formState: { errors, isValid },
@@ -540,14 +558,36 @@ export function NewTaskDialog({
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder={t("tasks.selectProject")} />
+                    <SelectValue placeholder={t("tasks.selectProject")}>
+                      {selectedProjectOption ? (
+                        <span className="inline-flex min-w-0 items-center gap-1.5">
+                          <span
+                            className={cn(
+                              "size-2 shrink-0 rounded-full",
+                              getProjectAccent(selectedProjectOption).dot,
+                            )}
+                            aria-hidden
+                          />
+                          <span className="min-w-0 truncate">{selectedProjectOption.name}</span>
+                        </span>
+                      ) : null}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {projectOptions.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
+                    {projectOptions.map((project) => {
+                      const accent = getProjectAccent(project);
+                      return (
+                        <SelectItem key={project.id} value={project.id}>
+                          <span className="inline-flex min-w-0 items-center gap-1.5">
+                            <span
+                              className={cn("size-2 shrink-0 rounded-full", accent.dot)}
+                              aria-hidden
+                            />
+                            <span className="min-w-0 truncate">{project.name}</span>
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </Field>
@@ -567,14 +607,24 @@ export function NewTaskDialog({
                         onValueChange={(value) => field.onChange(value as TaskStatus)}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder={t("tasks.new.selectStatus")} />
+                          <SelectValue placeholder={t("tasks.new.selectStatus")}>
+                            <TaskStatusIndicator
+                              status={(field.value ?? initialStatus) as TaskStatus}
+                            >
+                              {t(
+                                TASK_STATUS_LABEL_KEY[(field.value ?? initialStatus) as TaskStatus],
+                              )}
+                            </TaskStatusIndicator>
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="backlog">{t("board.backlog")}</SelectItem>
-                          <SelectItem value="todo">{t("board.todo")}</SelectItem>
-                          <SelectItem value="in_progress">{t("board.inProgress")}</SelectItem>
-                          <SelectItem value="review">{t("board.review")}</SelectItem>
-                          <SelectItem value="done">{t("board.done")}</SelectItem>
+                          {TASK_STATUS_OPTIONS.map((status) => (
+                            <SelectItem key={status} value={status}>
+                              <TaskStatusIndicator status={status}>
+                                {t(TASK_STATUS_LABEL_KEY[status])}
+                              </TaskStatusIndicator>
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     )}
@@ -640,13 +690,20 @@ export function NewTaskDialog({
                       onValueChange={(value) => field.onChange(value as Priority)}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder={t("tasks.new.selectPriority")} />
+                        <SelectValue placeholder={t("tasks.new.selectPriority")}>
+                          <TaskPriorityIndicator priority={(field.value ?? "medium") as Priority}>
+                            {priorityLabel((field.value ?? "medium") as Priority, t)}
+                          </TaskPriorityIndicator>
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="low">{t("tasks.priorityLow")}</SelectItem>
-                        <SelectItem value="medium">{t("tasks.priorityMedium")}</SelectItem>
-                        <SelectItem value="high">{t("tasks.priorityHigh")}</SelectItem>
-                        <SelectItem value="urgent">{t("tasks.priorityUrgent")}</SelectItem>
+                        {(["low", "medium", "urgent"] as Priority[]).map((value) => (
+                          <SelectItem key={value} value={value}>
+                            <TaskPriorityIndicator priority={value}>
+                              {priorityLabel(value, t)}
+                            </TaskPriorityIndicator>
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   )}

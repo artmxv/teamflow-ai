@@ -20,12 +20,12 @@ export interface TaskActivityBucket {
 export interface TaskAnalyticsCounts {
   overdue: number;
   dueSoon: number;
-  highPriorityOpen: number;
+  urgentOpen: number;
   unassigned: number;
 }
 
 export type TasksUrlDue = "overdue" | "soon";
-export type TasksUrlPriorityFilter = "high";
+export type TasksUrlPriorityFilter = "urgent";
 export type TasksUrlAssigneeFilter = "unassigned";
 
 export type TasksUrlAnalyticsFilters = {
@@ -78,8 +78,8 @@ export function taskMatchesUrlPriorityFilter(
   task: Pick<TaskAnalyticsRecord, "status" | "priority">,
   priority: TasksUrlPriorityFilter,
 ): boolean {
-  if (priority !== "high") return true;
-  return isOpenStatus(task.status) && isHighPriority(task.priority);
+  if (priority !== "urgent") return true;
+  return isOpenStatus(task.status) && isUrgentPriority(task.priority);
 }
 
 function taskHasAssignees(task: Pick<TaskAnalyticsRecord, "assigneeIds" | "assigneeId">): boolean {
@@ -113,8 +113,8 @@ function isOpenStatus(status: TaskApiStatus) {
   return status !== "DONE";
 }
 
-function isHighPriority(priority: TaskApiPriority) {
-  return priority === "HIGH" || priority === "URGENT";
+function isUrgentPriority(priority: TaskApiPriority) {
+  return priority === "URGENT";
 }
 
 export function computeTaskAnalyticsCounts(
@@ -126,7 +126,7 @@ export function computeTaskAnalyticsCounts(
 
   let overdue = 0;
   let dueSoon = 0;
-  let highPriorityOpen = 0;
+  let urgentOpen = 0;
   let unassigned = 0;
 
   for (const task of tasks) {
@@ -140,11 +140,11 @@ export function computeTaskAnalyticsCounts(
       }
     }
 
-    if (isHighPriority(task.priority)) highPriorityOpen += 1;
+    if (isUrgentPriority(task.priority)) urgentOpen += 1;
     if (!taskHasAssignees(task)) unassigned += 1;
   }
 
-  return { overdue, dueSoon, highPriorityOpen, unassigned };
+  return { overdue, dueSoon, urgentOpen, unassigned };
 }
 
 function buildWeekBuckets(

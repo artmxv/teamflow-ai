@@ -229,7 +229,10 @@ export function GlobalSearch() {
 
   return (
     <div ref={rootRef} className="relative hidden min-w-0 flex-1 lg:block lg:max-w-sm xl:max-w-md">
-      <Search className="absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
+      <Search
+        className="filter-search-icon pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2"
+        aria-hidden="true"
+      />
       <input
         ref={inputRef}
         type="search"
@@ -239,7 +242,7 @@ export function GlobalSearch() {
         aria-autocomplete="list"
         value={query}
         placeholder={t("top.search")}
-        className="h-9 w-full rounded-lg border border-input/80 bg-card pl-9 pr-12 text-sm shadow-soft outline-none transition placeholder:text-muted-foreground focus:border-ring focus:bg-card focus:ring-2 focus:ring-ring/30"
+        className="filter-search-input w-full pl-9 pr-12 text-sm outline-none transition"
         onChange={(event) => {
           setQuery(event.target.value);
           if (!open) {
@@ -248,9 +251,6 @@ export function GlobalSearch() {
         }}
         onFocus={() => setOpen(true)}
       />
-      <kbd className="pointer-events-none absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded border border-border bg-card px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-        ⌘K
-      </kbd>
 
       {showPanel && (
         <div

@@ -1,8 +1,8 @@
 import { chartFillForDashboardStatus } from "@/lib/task-status-theme";
 import { apiRequest } from "./client";
 
-export type DashboardTaskStatus = "BACKLOG" | "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE";
-export type DashboardTaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+export type DashboardTaskStatus = "BACKLOG" | "IN_PROGRESS" | "REVIEW" | "DONE";
+export type DashboardTaskPriority = "LOW" | "MEDIUM" | "URGENT";
 
 export interface DashboardTaskStatusCount {
   status: DashboardTaskStatus;

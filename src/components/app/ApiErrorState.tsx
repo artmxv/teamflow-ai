@@ -48,7 +48,9 @@ export function ApiErrorState({
       >
         <AlertCircle className={compact ? "size-5" : "size-6"} aria-hidden />
       </div>
-      <h3 className={cn("font-semibold tracking-tight", compact ? "mt-3 text-sm" : "mt-4 text-base")}>
+      <h3
+        className={cn("font-semibold tracking-tight", compact ? "mt-3 text-sm" : "mt-4 text-base")}
+      >
         {resolvedTitle}
       </h3>
       <p
@@ -61,7 +63,7 @@ export function ApiErrorState({
       </p>
       {onRetry ? (
         <Button
-          variant="outline"
+          variant="brand"
           onClick={onRetry}
           disabled={isRetrying}
           className={cn(compact ? "mt-4" : "mt-5")}

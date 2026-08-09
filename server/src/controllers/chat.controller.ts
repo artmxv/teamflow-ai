@@ -16,6 +16,7 @@ import { sendResolvedStoredFile } from "../lib/file-storage/index.js";
 import { resolveRequestWorkspaceContext } from "../lib/workspace-request.js";
 import {
   addChatMessageReaction,
+  createChannelConversation,
   createConversationMessage,
   createConversationMessageWithAttachments,
   deleteConversationMessage,
@@ -53,6 +54,15 @@ const createMessageSchema = z.object({
 
 const createDirectSchema = z.object({
   userId: z.string().trim().min(1, "userId is required"),
+});
+
+const createChannelSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, "title is required")
+    .max(CHAT_CONVERSATION_TITLE_MAX_LENGTH),
+  memberIds: z.array(z.string().trim().min(1)).max(100).default([]),
 });
 
 const pinSchema = z.object({
@@ -230,6 +240,44 @@ export async function createDirectConversationController(
 
     if (result === "target_not_member") {
       res.status(404).json({ message: "Workspace member not found" });
+      return;
+    }
+
+    res.status(201).json({ data: result.conversation });
+  } catch (error) {
+    next(error);
+  }
+}
+
+
+export async function createChannelConversationController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const context = await resolveWorkspace(req, res);
+    if (!context) return;
+
+    const parsed = createChannelSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ message: "Channel title and members are invalid", issues: parsed.error.issues });
+      return;
+    }
+
+    const result = await createChannelConversation({
+      workspaceId: context.workspaceId,
+      currentUserId: req.userId!,
+      title: parsed.data.title,
+      memberIds: parsed.data.memberIds,
+    });
+
+    if (result === "invalid_title") {
+      res.status(400).json({ message: "Channel title is invalid" });
+      return;
+    }
+    if (result === "member_not_found") {
+      res.status(400).json({ message: "One or more members are not active in this workspace" });
       return;
     }
 

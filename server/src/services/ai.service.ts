@@ -9,7 +9,6 @@ import {
   defaultHighlight,
   emptyStandup,
   emptyWorkspaceHighlight,
-  highPriorityRisk,
   inProgressHighlight,
   missingDueDateAction,
   missingDueDateRisk,
@@ -60,7 +59,6 @@ type WorkspaceAiMetrics = {
   openTasks: number;
   completedTasks: number;
   urgentTasks: number;
-  highPriorityTasks: number;
   reviewTasks: number;
   overdueTasks: number;
 };
@@ -74,7 +72,7 @@ export type WorkspaceAiSummary = {
   metrics: WorkspaceAiMetrics;
 };
 
-const OPEN_TASK_STATUSES: TaskStatus[] = ["BACKLOG", "TODO", "IN_PROGRESS", "REVIEW"];
+const OPEN_TASK_STATUSES: TaskStatus[] = ["BACKLOG", "IN_PROGRESS", "REVIEW"];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function sanitizeText(value: string): string {
@@ -118,12 +116,12 @@ function isUnassignedOpenTask(task: TaskWithRelations): boolean {
   return isOpenTask(task) && !task.assigneeId && !task.assignee && task.taskAssignees.length === 0;
 }
 
-function isHighOrUrgent(priority: TaskPriority): boolean {
-  return priority === "HIGH" || priority === "URGENT";
+function isUrgentPriority(priority: TaskPriority): boolean {
+  return priority === "URGENT";
 }
 
 function isMissingDueDatePriorityTask(task: TaskWithRelations): boolean {
-  return isOpenTask(task) && isHighOrUrgent(task.priority) && task.dueDate === null;
+  return isOpenTask(task) && isUrgentPriority(task.priority) && task.dueDate === null;
 }
 
 function getStaleInProgressThreshold(now: Date): Date {
@@ -199,7 +197,6 @@ function computeMetrics(
     openTasks: openTasks.length,
     completedTasks: tasks.filter((task) => task.status === "DONE").length,
     urgentTasks: openTasks.filter((task) => task.priority === "URGENT").length,
-    highPriorityTasks: openTasks.filter((task) => task.priority === "HIGH").length,
     reviewTasks: tasks.filter((task) => task.status === "REVIEW").length,
     overdueTasks: tasks.filter((task) => isOverdueTask(task, now)).length,
   };
@@ -287,11 +284,6 @@ function buildRisks(
     );
   }
 
-  const highPriorityOpen = openTasks.filter((task) => task.priority === "HIGH");
-  if (risks.length === 0 && highPriorityOpen.length > 0 && metrics.urgentTasks === 0) {
-    risks.push(highPriorityRisk(locale, highPriorityOpen.length));
-  }
-
   if (risks.length === 0) {
     risks.push(noRisks(locale));
   }
@@ -370,7 +362,7 @@ function buildRecommendedNextActions(
     .filter(
       (item) =>
         item.status === "IN_PROGRESS" &&
-        item.priority === "HIGH" &&
+        item.priority === "URGENT" &&
         !isStaleInProgressTask(item, now),
     )
     .slice(0, 1)) {
@@ -380,7 +372,7 @@ function buildRecommendedNextActions(
   }
 
   for (const task of openTasks
-    .filter((item) => OPEN_TASK_STATUSES.includes(item.status) && item.status === "TODO")
+    .filter((item) => OPEN_TASK_STATUSES.includes(item.status) && item.status === "BACKLOG")
     .slice(0, 1)) {
     addAction(startReadyWorkAction(locale, task.key, displayTaskTitle(task.title, locale)));
   }
