@@ -235,6 +235,9 @@ const dict = {
     "billing.yookassaReadyTitle": "YooKassa test payments",
     "billing.yookassaReadyOwnerDesc":
       "Payments use YooKassa test mode. No real money is charged. The plan changes only after server confirmation.",
+    "billing.yookassaLiveTitle": "YooKassa live payments",
+    "billing.yookassaLiveOwnerDesc":
+      "Live payments are enabled. Plans activate only after server-side YooKassa confirmation.",
     "billing.yookassaUnavailableTitle": "Online plan changes are unavailable",
     "billing.yookassaUnavailableDesc":
       "YooKassa billing is not fully configured. Your current plan and limits remain active.",
@@ -244,9 +247,8 @@ const dict = {
       "Choose a plan below. Paid plans open YooKassa checkout and activate only after payment succeeds.",
     "billing.ownerNote":
       "Only the workspace owner can change plans. The plan applies to all workspaces you own.",
-    "billing.noAutoRenewalNote": "Test payment. Auto-renewal is not available in V1 yet.",
+    "billing.noAutoRenewalNote": "One-time activation · no automatic renewal",
     "billing.priceOnRequest": "On request",
-    "billing.perMonth": "/mo",
     "billing.readOnlyAction": "View only",
     "billing.selectPlanCta": "Choose plan",
     "billing.selectFreeCta": "Choose plan",
@@ -282,6 +284,8 @@ const dict = {
     "billing.error.providerUnavailable": "Could not connect to YooKassa. Please try again.",
     "billing.error.testModeRequired":
       "Only YooKassa test payments are supported. The plan was not changed.",
+    "billing.error.modeMismatch":
+      "The payment mode does not match the server configuration. The plan was not changed.",
     "billing.error.paymentFailed": "Payment confirmation failed. The plan was not changed.",
     "billing.error.paymentCanceled": "Payment was canceled. The plan was not changed.",
     "billing.error.paymentPending": "Payment is still pending. Please wait a moment and try again.",
@@ -1350,6 +1354,9 @@ const dict = {
     "billing.yookassaReadyTitle": "Тестовая оплата ЮKassa",
     "billing.yookassaReadyOwnerDesc":
       "Оплата работает в тестовом режиме ЮKassa. Реальные деньги не списываются. Тариф меняется только после подтверждения на сервере.",
+    "billing.yookassaLiveTitle": "Рабочие платежи ЮKassa",
+    "billing.yookassaLiveOwnerDesc":
+      "Рабочие платежи включены. Тариф активируется только после серверного подтверждения ЮKassa.",
     "billing.yookassaUnavailableTitle": "Онлайн-смена тарифа недоступна",
     "billing.yookassaUnavailableDesc":
       "ЮKassa настроена не полностью. Текущий тариф и его лимиты продолжают действовать.",
@@ -1359,9 +1366,8 @@ const dict = {
       "Выберите тариф ниже. Платные тарифы открывают оплату в ЮKassa и активируются только после успешного платежа.",
     "billing.ownerNote":
       "Менять тариф может только владелец. Тариф действует во всех ваших рабочих пространствах.",
-    "billing.noAutoRenewalNote": "Тестовая оплата. Автопродления в V1 пока нет.",
+    "billing.noAutoRenewalNote": "Одноразовая активация · без автопродления",
     "billing.priceOnRequest": "По запросу",
-    "billing.perMonth": "/мес.",
     "billing.readOnlyAction": "Только просмотр",
     "billing.selectPlanCta": "Выбрать тариф",
     "billing.selectFreeCta": "Выбрать тариф",
@@ -1397,6 +1403,8 @@ const dict = {
     "billing.error.providerUnavailable": "Не удалось подключиться к ЮKassa. Попробуйте ещё раз.",
     "billing.error.testModeRequired":
       "Поддерживаются только тестовые платежи ЮKassa. Тариф не изменён.",
+    "billing.error.modeMismatch":
+      "Режим платежа не совпадает с настройкой сервера. Тариф не изменён.",
     "billing.error.paymentFailed": "Не удалось подтвердить оплату. Тариф не изменён.",
     "billing.error.paymentCanceled": "Оплата отменена. Тариф не изменён.",
     "billing.error.paymentPending": "Оплата ещё обрабатывается. Подождите и попробуйте снова.",

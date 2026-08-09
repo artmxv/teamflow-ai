@@ -116,7 +116,7 @@ function billingErrorMessage(
     PLAN_NOT_SELF_SERVICE: "billing.error.notSelfService",
     YOOKASSA_ERROR: "billing.error.yookassa",
     PAYMENT_PROVIDER_UNAVAILABLE: "billing.error.providerUnavailable",
-    YOOKASSA_TEST_MODE_REQUIRED: "billing.error.testModeRequired",
+    YOOKASSA_MODE_MISMATCH: "billing.error.modeMismatch",
     PAYMENT_AMOUNT_MISMATCH: "billing.error.paymentFailed",
     PAYMENT_METADATA_MISMATCH: "billing.error.paymentFailed",
     PAYMENT_CANCELED: "billing.error.paymentCanceled",
@@ -281,13 +281,17 @@ function BillingPage() {
           <Info className="size-4 text-primary" />
           <AlertTitle className="text-foreground">
             {summary.billingConfigured
-              ? t("billing.yookassaReadyTitle")
+              ? summary.testMode
+                ? t("billing.yookassaReadyTitle")
+                : t("billing.yookassaLiveTitle")
               : t("billing.yookassaUnavailableTitle")}
           </AlertTitle>
           <AlertDescription className="text-muted-foreground">
             {summary.billingConfigured
               ? summary.canManageBilling
-                ? t("billing.yookassaReadyOwnerDesc")
+                ? summary.testMode
+                  ? t("billing.yookassaReadyOwnerDesc")
+                  : t("billing.yookassaLiveOwnerDesc")
                 : t("billing.readOnlyDesc")
               : t("billing.yookassaUnavailableDesc")}
           </AlertDescription>
@@ -570,9 +574,6 @@ function PlanCard({
       <div className={cn("text-lg font-semibold", plan.isCurrent && "pr-24")}>{planName}</div>
       <div className="mt-3 flex items-end gap-1">
         <span className="text-2xl font-semibold tracking-tight">{priceLabel}</span>
-        {plan.monthlyPriceRub ? (
-          <span className="pb-0.5 text-xs text-muted-foreground">{t("billing.perMonth")}</span>
-        ) : null}
       </div>
       <p className="mt-2 min-h-[2.5rem] text-xs leading-relaxed text-muted-foreground">
         {t(PLAN_DESC_KEYS[plan.id])}

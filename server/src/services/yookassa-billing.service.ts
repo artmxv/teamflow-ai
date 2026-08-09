@@ -5,10 +5,11 @@ import { env } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
 import { AuthError } from "./auth.service.js";
 import {
+  compareBillingPlans,
   getPlanAmountValue,
   isPaidSelfServicePlan,
+  lockUserWorkspaceUsage,
   lockWorkspaceBillingUsage,
-  lockWorkspaceOwnerUsage,
   resolveOwnerBillingPlan,
   setOwnedWorkspacesPlan,
   syncOwnedWorkspacesToOwnerPlan,
@@ -17,8 +18,9 @@ import {
 import type { WorkspaceRole } from "./workspace-context.service.js";
 
 const YOOKASSA_API = "https://api.yookassa.ru/v3";
-/** Provider HTTP timeout for create/GET Payment calls (V1 test billing). */
+/** Total provider-call deadline, shared by the initial attempt and one transient retry. */
 export const YOOKASSA_REQUEST_TIMEOUT_MS = 15_000;
+const YOOKASSA_MAX_ATTEMPTS = 2;
 
 export type YooKassaAmount = {
   value: string;
@@ -76,12 +78,14 @@ function throwPaymentProviderUnavailable(): never {
   );
 }
 
-function assertYooKassaTestPayment(providerPayment: YooKassaPaymentObject): void {
-  if (providerPayment.test !== true) {
+function assertYooKassaPaymentMode(providerPayment: YooKassaPaymentObject): void {
+  const matchesMode =
+    env.YOOKASSA_MODE === "test" ? providerPayment.test === true : providerPayment.test === false;
+  if (!matchesMode) {
     throw new AuthError(
-      "Only YooKassa test payments are accepted in V1",
+      "Payment mode does not match billing configuration",
       502,
-      "YOOKASSA_TEST_MODE_REQUIRED",
+      "YOOKASSA_MODE_MISMATCH",
     );
   }
 }
@@ -99,55 +103,71 @@ async function yookassaRequest(input: YooKassaRequestInput): Promise<YooKassaPay
     headers["Idempotence-Key"] = input.idempotenceKey ?? randomUUID();
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), YOOKASSA_REQUEST_TIMEOUT_MS);
-
-  let response: Response;
-  try {
-    try {
-      response = await fetch(`${YOOKASSA_API}${input.path}`, {
-        method: input.method,
-        headers,
-        body: input.body ? JSON.stringify(input.body) : undefined,
-        signal: controller.signal,
-      });
-    } catch {
-      // Network / DNS / connect timeout / AbortError — never leak credentials.
+  const deadline = Date.now() + YOOKASSA_REQUEST_TIMEOUT_MS;
+  for (let attempt = 1; attempt <= YOOKASSA_MAX_ATTEMPTS; attempt += 1) {
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) {
       throwPaymentProviderUnavailable();
     }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), remainingMs);
 
-    let rawBody: string;
+    let response: Response;
     try {
-      rawBody = await response.text();
-    } catch {
-      throwPaymentProviderUnavailable();
-    }
+      try {
+        response = await fetch(`${YOOKASSA_API}${input.path}`, {
+          method: input.method,
+          headers,
+          body: input.body ? JSON.stringify(input.body) : undefined,
+          signal: controller.signal,
+        });
+      } catch {
+        if (attempt < YOOKASSA_MAX_ATTEMPTS && Date.now() < deadline) {
+          continue;
+        }
+        throwPaymentProviderUnavailable();
+      }
 
-    let payload: YooKassaPaymentObject & { description?: string; code?: string };
-    try {
-      payload = (rawBody ? JSON.parse(rawBody) : {}) as YooKassaPaymentObject & {
-        description?: string;
-        code?: string;
-      };
-    } catch {
-      throw new AuthError(
-        "Payment provider returned an invalid response",
-        502,
-        "PAYMENT_PROVIDER_UNAVAILABLE",
-      );
-    }
+      let rawBody: string;
+      try {
+        rawBody = await response.text();
+      } catch {
+        if (attempt < YOOKASSA_MAX_ATTEMPTS && Date.now() < deadline) {
+          continue;
+        }
+        throwPaymentProviderUnavailable();
+      }
 
-    if (!response.ok) {
-      const description =
-        typeof payload.description === "string" && payload.description.trim()
-          ? payload.description
-          : "YooKassa request failed";
-      throw new AuthError(description, 502, "YOOKASSA_ERROR");
+      if (!response.ok && response.status >= 500) {
+        if (attempt < YOOKASSA_MAX_ATTEMPTS && Date.now() < deadline) {
+          continue;
+        }
+        throwPaymentProviderUnavailable();
+      }
+
+      let payload: YooKassaPaymentObject & { code?: string };
+      try {
+        payload = (rawBody ? JSON.parse(rawBody) : {}) as YooKassaPaymentObject & {
+          code?: string;
+        };
+      } catch {
+        throw new AuthError(
+          "Payment provider returned an invalid response",
+          502,
+          "PAYMENT_PROVIDER_UNAVAILABLE",
+        );
+      }
+
+      if (!response.ok) {
+        throw new AuthError("YooKassa request failed", 502, "YOOKASSA_ERROR");
+      }
+      return payload;
+    } finally {
+      clearTimeout(timeoutId);
     }
-    return payload;
-  } finally {
-    clearTimeout(timeoutId);
   }
+
+  throwPaymentProviderUnavailable();
 }
 
 /** Test seam: unit tests replace this boundary instead of calling YooKassa. */
@@ -197,13 +217,19 @@ function amountsMatch(expectedValue: string, actual: YooKassaAmount | undefined)
 
 async function applySucceededPayment(input: {
   paymentRecordId: string;
-  workspaceId: string;
   targetPlan: PaidSelfServicePlan;
   providerPaymentId: string;
-  ownerUserId?: string;
+  ownerUserId: string;
 }): Promise<BillingPaymentConfirmationResult> {
   return prisma.$transaction(async (tx) => {
-    await lockWorkspaceBillingUsage(tx, input.workspaceId);
+    const source = await tx.billingPayment.findUnique({
+      where: { id: input.paymentRecordId },
+      select: { workspaceId: true },
+    });
+    if (source?.workspaceId) {
+      await lockWorkspaceBillingUsage(tx, source.workspaceId);
+    }
+    await lockUserWorkspaceUsage(tx, input.ownerUserId);
 
     const payment = await tx.billingPayment.findUnique({
       where: { id: input.paymentRecordId },
@@ -215,20 +241,17 @@ async function applySucceededPayment(input: {
         amount: true,
         currency: true,
         providerPaymentId: true,
+        ownerUserId: true,
       },
     });
-    if (!payment || payment.workspaceId !== input.workspaceId) {
+    if (!payment || payment.ownerUserId !== input.ownerUserId) {
       throw new AuthError("Billing payment not found", 404, "PAYMENT_NOT_FOUND");
     }
     if (payment.status === "SUCCEEDED") {
-      const workspace = await tx.workspace.findUniqueOrThrow({
-        where: { id: input.workspaceId },
-        select: { plan: true },
-      });
       return {
         paymentId: payment.id,
         status: "SUCCEEDED",
-        currentPlan: workspace.plan,
+        currentPlan: await resolveOwnerBillingPlan(payment.ownerUserId, tx),
       };
     }
     if (payment.status === "CANCELED") {
@@ -237,16 +260,6 @@ async function applySucceededPayment(input: {
     if (payment.targetPlan !== input.targetPlan || !isPaidSelfServicePlan(payment.targetPlan)) {
       throw new AuthError("Payment metadata mismatch", 409, "PAYMENT_METADATA_MISMATCH");
     }
-
-    const workspace = await tx.workspace.findUnique({
-      where: { id: input.workspaceId },
-      select: { plan: true },
-    });
-    if (!workspace) {
-      throw new AuthError("Workspace not found", 404);
-    }
-
-    await lockWorkspaceOwnerUsage(tx, input.workspaceId);
 
     const completedAt = new Date();
     await tx.billingPayment.update({
@@ -258,29 +271,7 @@ async function applySucceededPayment(input: {
       },
     });
 
-    // Owner-scoped: paid plan applies to every workspace this owner owns.
-    let ownerUserId = input.ownerUserId;
-    if (!ownerUserId) {
-      const owner = await tx.workspaceMember.findFirst({
-        where: {
-          workspaceId: input.workspaceId,
-          role: "OWNER",
-          status: "ACTIVE",
-        },
-        select: { userId: true },
-        orderBy: { joinedAt: "asc" },
-      });
-      ownerUserId = owner?.userId;
-    }
-
-    if (ownerUserId) {
-      await setOwnedWorkspacesPlan(ownerUserId, payment.targetPlan, tx);
-    } else {
-      await tx.workspace.update({
-        where: { id: input.workspaceId },
-        data: { plan: payment.targetPlan },
-      });
-    }
+    await setOwnedWorkspacesPlan(payment.ownerUserId, payment.targetPlan, tx);
 
     return {
       paymentId: payment.id,
@@ -298,7 +289,7 @@ async function markPaymentCanceled(
       where: { id: paymentRecordId },
       select: {
         id: true,
-        workspaceId: true,
+        ownerUserId: true,
         status: true,
       },
     });
@@ -314,14 +305,10 @@ async function markPaymentCanceled(
         },
       });
     }
-    const workspace = await tx.workspace.findUniqueOrThrow({
-      where: { id: payment.workspaceId },
-      select: { plan: true },
-    });
     return {
       paymentId: payment.id,
       status: payment.status === "SUCCEEDED" ? "SUCCEEDED" : "CANCELED",
-      currentPlan: workspace.plan,
+      currentPlan: await resolveOwnerBillingPlan(payment.ownerUserId, tx),
     };
   });
 }
@@ -331,6 +318,7 @@ async function markPaymentCanceled(
  */
 export async function confirmProviderPayment(
   providerPayment: YooKassaPaymentObject,
+  expectedPaymentRecordId?: string,
 ): Promise<BillingPaymentConfirmationResult | null> {
   const metadataPaymentId = providerPayment.metadata?.paymentId;
   const metadataWorkspaceId = providerPayment.metadata?.workspaceId;
@@ -338,13 +326,16 @@ export async function confirmProviderPayment(
   const metadataOwnerUserId = providerPayment.metadata?.ownerUserId;
 
   const payment =
-    (metadataPaymentId
-      ? await prisma.billingPayment.findUnique({ where: { id: metadataPaymentId } })
+    (expectedPaymentRecordId
+      ? await prisma.billingPayment.findUnique({ where: { id: expectedPaymentRecordId } })
       : null) ??
     (providerPayment.id
       ? await prisma.billingPayment.findFirst({
           where: { providerPaymentId: providerPayment.id },
         })
+      : null) ??
+    (metadataPaymentId
+      ? await prisma.billingPayment.findUnique({ where: { id: metadataPaymentId } })
       : null);
 
   if (!payment) {
@@ -355,12 +346,15 @@ export async function confirmProviderPayment(
     throw new AuthError("Payment provider id mismatch", 409, "PAYMENT_METADATA_MISMATCH");
   }
 
-  assertYooKassaTestPayment(providerPayment);
+  assertYooKassaPaymentMode(providerPayment);
 
-  if (metadataWorkspaceId && metadataWorkspaceId !== payment.workspaceId) {
+  if (metadataPaymentId !== payment.id) {
     throw new AuthError("Payment metadata mismatch", 409, "PAYMENT_METADATA_MISMATCH");
   }
-  if (metadataTargetPlan && metadataTargetPlan !== payment.targetPlan) {
+  if (payment.workspaceId && metadataWorkspaceId !== payment.workspaceId) {
+    throw new AuthError("Payment metadata mismatch", 409, "PAYMENT_METADATA_MISMATCH");
+  }
+  if (metadataTargetPlan !== payment.targetPlan || metadataOwnerUserId !== payment.ownerUserId) {
     throw new AuthError("Payment metadata mismatch", 409, "PAYMENT_METADATA_MISMATCH");
   }
 
@@ -377,41 +371,48 @@ export async function confirmProviderPayment(
   }
 
   const mapped = mapProviderStatus(providerPayment.status);
+  if (!mapped) {
+    throw new AuthError("Payment provider returned an unsupported status", 502, "YOOKASSA_ERROR");
+  }
+
+  if (!payment.providerPaymentId) {
+    await prisma.billingPayment.update({
+      where: { id: payment.id },
+      data: { providerPaymentId: providerPayment.id },
+    });
+  }
+
   if (mapped === "SUCCEEDED") {
     if (!isPaidSelfServicePlan(payment.targetPlan)) {
       throw new AuthError("Payment target plan is invalid", 409, "PAYMENT_METADATA_MISMATCH");
     }
     return applySucceededPayment({
       paymentRecordId: payment.id,
-      workspaceId: payment.workspaceId,
       targetPlan: payment.targetPlan,
       providerPaymentId: providerPayment.id,
-      ownerUserId: metadataOwnerUserId,
+      ownerUserId: payment.ownerUserId,
     });
   }
   if (mapped === "CANCELED") {
     return markPaymentCanceled(payment.id);
   }
 
-  const workspace = await prisma.workspace.findUniqueOrThrow({
-    where: { id: payment.workspaceId },
-    select: { plan: true },
-  });
   return {
     paymentId: payment.id,
     status: payment.status,
-    currentPlan: workspace.plan,
+    currentPlan: await resolveOwnerBillingPlan(payment.ownerUserId),
   };
 }
 
 export async function fetchAndConfirmProviderPayment(
   providerPaymentId: string,
+  expectedPaymentRecordId?: string,
 ): Promise<BillingPaymentConfirmationResult | null> {
   const providerPayment = await yookassaBillingGateway.request({
     method: "GET",
     path: `/payments/${encodeURIComponent(providerPaymentId)}`,
   });
-  return confirmProviderPayment(providerPayment);
+  return confirmProviderPayment(providerPayment, expectedPaymentRecordId);
 }
 
 export async function confirmBillingPayment(input: {
@@ -425,7 +426,7 @@ export async function confirmBillingPayment(input: {
   const payment = await prisma.billingPayment.findFirst({
     where: {
       id: input.paymentId,
-      workspaceId: input.workspaceId,
+      ownerUserId: input.userId,
     },
   });
   if (!payment) {
@@ -433,14 +434,10 @@ export async function confirmBillingPayment(input: {
   }
 
   if (payment.status === "SUCCEEDED") {
-    const workspace = await prisma.workspace.findUniqueOrThrow({
-      where: { id: input.workspaceId },
-      select: { plan: true },
-    });
     return {
       paymentId: payment.id,
       status: "SUCCEEDED",
-      currentPlan: workspace.plan,
+      currentPlan: await resolveOwnerBillingPlan(payment.ownerUserId),
     };
   }
 
@@ -448,7 +445,7 @@ export async function confirmBillingPayment(input: {
     throw new AuthError("Payment is not linked to YooKassa yet", 409, "PAYMENT_NOT_READY");
   }
 
-  const result = await fetchAndConfirmProviderPayment(payment.providerPaymentId);
+  const result = await fetchAndConfirmProviderPayment(payment.providerPaymentId, payment.id);
   if (!result) {
     throw new AuthError("Billing payment not found", 404, "PAYMENT_NOT_FOUND");
   }
@@ -468,8 +465,35 @@ export async function handleYooKassaNotification(
     return;
   }
 
-  // Never trust notification body: re-fetch Payment from YooKassa with Basic Auth.
-  await fetchAndConfirmProviderPayment(objectId);
+  let payment = await prisma.billingPayment.findUnique({
+    where: { providerPaymentId: objectId },
+  });
+
+  if (!payment) {
+    const metadata = notification.object?.metadata;
+    const metadataPaymentId = metadata?.paymentId;
+    if (!metadataPaymentId) {
+      return;
+    }
+    const candidate = await prisma.billingPayment.findFirst({
+      where: {
+        id: metadataPaymentId,
+        status: "PENDING",
+      },
+    });
+    if (
+      !candidate ||
+      metadata?.ownerUserId !== candidate.ownerUserId ||
+      metadata?.targetPlan !== candidate.targetPlan ||
+      (candidate.workspaceId && metadata?.workspaceId !== candidate.workspaceId)
+    ) {
+      return;
+    }
+    payment = candidate;
+  }
+
+  // The body only selects an existing local record. All payment data is verified after GET.
+  await fetchAndConfirmProviderPayment(objectId, payment.id);
 }
 
 export async function createBillingPlanChangeSession(input: {
@@ -495,21 +519,24 @@ export async function createBillingPlanChangeSession(input: {
     throw new AuthError("This is already the current plan", 409, "PLAN_ALREADY_CURRENT");
   }
 
-  // Free does not require YooKassa in V1 (no recurring subscription to cancel).
-  // Apply to every workspace owned by this user (owner-scoped billing).
-  if (input.targetPlan === "FREE") {
+  // Downgrades are entitlement changes, not new purchases. Existing data is preserved;
+  // plan limits only block subsequent workspace/member growth.
+  if (compareBillingPlans(input.targetPlan, currentPlan) < 0) {
     await prisma.$transaction(async (tx) => {
       await lockWorkspaceBillingUsage(tx, input.workspaceId);
-      await lockWorkspaceOwnerUsage(tx, input.workspaceId);
+      await lockUserWorkspaceUsage(tx, input.userId);
 
       const ownerPlan = await resolveOwnerBillingPlan(input.userId, tx);
-      if (ownerPlan === "FREE") {
+      if (ownerPlan === input.targetPlan) {
         throw new AuthError("This is already the current plan", 409, "PLAN_ALREADY_CURRENT");
       }
+      if (compareBillingPlans(input.targetPlan, ownerPlan) >= 0) {
+        throw new AuthError("Plan change must be confirmed again", 409, "PLAN_CHANGE_CONFLICT");
+      }
 
-      await setOwnedWorkspacesPlan(input.userId, "FREE", tx);
+      await setOwnedWorkspacesPlan(input.userId, input.targetPlan, tx);
     });
-    return { flow: "APPLIED", currentPlan: "FREE" };
+    return { flow: "APPLIED", currentPlan: input.targetPlan };
   }
 
   if (!isPaidSelfServicePlan(input.targetPlan)) {
@@ -526,6 +553,7 @@ export async function createBillingPlanChangeSession(input: {
   const payment = await prisma.billingPayment.create({
     data: {
       workspaceId: input.workspaceId,
+      ownerUserId: input.userId,
       provider: "YOOKASSA",
       targetPlan: input.targetPlan,
       amount: new Prisma.Decimal(amountValue),
@@ -534,38 +562,48 @@ export async function createBillingPlanChangeSession(input: {
     },
   });
 
-  const idempotenceKey = randomUUID();
-  const providerPayment = await yookassaBillingGateway.request({
-    method: "POST",
-    path: "/payments",
-    idempotenceKey,
-    body: {
-      amount: {
-        value: amountValue,
-        currency: "RUB",
-      },
-      capture: true,
-      confirmation: {
-        type: "redirect",
-        return_url: billingReturnUrl(payment.id),
-      },
-      description: `TeamFlow ${input.targetPlan} plan · ${workspace.name}`,
-      metadata: {
-        workspaceId: input.workspaceId,
-        targetPlan: input.targetPlan,
-        paymentId: payment.id,
-        ownerUserId: input.userId,
-      },
-    },
-  });
-
+  let providerPayment: YooKassaPaymentObject;
   try {
-    assertYooKassaTestPayment(providerPayment);
-  } catch (error) {
-    await prisma.billingPayment.update({
-      where: { id: payment.id },
-      data: { status: "CANCELED", completedAt: new Date() },
+    providerPayment = await yookassaBillingGateway.request({
+      method: "POST",
+      path: "/payments",
+      idempotenceKey: payment.id,
+      body: {
+        amount: {
+          value: amountValue,
+          currency: "RUB",
+        },
+        capture: true,
+        confirmation: {
+          type: "redirect",
+          return_url: billingReturnUrl(payment.id),
+        },
+        description: `TeamFlow ${input.targetPlan} plan · ${workspace.name}`,
+        metadata: {
+          workspaceId: input.workspaceId,
+          targetPlan: input.targetPlan,
+          paymentId: payment.id,
+          ownerUserId: input.userId,
+        },
+      },
     });
+    const confirmation = await confirmProviderPayment(providerPayment, payment.id);
+    if (!confirmation) {
+      throw new AuthError("Billing payment not found", 404, "PAYMENT_NOT_FOUND");
+    }
+    if (confirmation.status === "SUCCEEDED") {
+      return { flow: "APPLIED", currentPlan: confirmation.currentPlan };
+    }
+    if (confirmation.status === "CANCELED") {
+      throw new AuthError("Payment was canceled", 409, "PAYMENT_CANCELED");
+    }
+  } catch (error) {
+    if (error instanceof AuthError && error.code !== "PAYMENT_PROVIDER_UNAVAILABLE") {
+      await prisma.billingPayment.update({
+        where: { id: payment.id },
+        data: { status: "CANCELED", completedAt: new Date() },
+      });
+    }
     throw error;
   }
 
@@ -577,11 +615,6 @@ export async function createBillingPlanChangeSession(input: {
     });
     throw new AuthError("YooKassa confirmation URL was not returned", 502, "YOOKASSA_ERROR");
   }
-
-  await prisma.billingPayment.update({
-    where: { id: payment.id },
-    data: { providerPaymentId: providerPayment.id },
-  });
 
   return {
     flow: "PAYMENT",
