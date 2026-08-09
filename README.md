@@ -450,6 +450,16 @@ This repository shows fullstack TypeScript product work:
 - Durable private file storage via backend + Supabase
 - Honest scoping: deterministic AI, read-only billing, single-instance presence
 
+## License
+
+TeamFlow AI is source-available for portfolio review and evaluation purposes.
+
+Commercial use, redistribution, publication as another person's own project,
+and reuse of substantial portions of the source code are not permitted without
+prior written permission.
+
+See the [LICENSE](./LICENSE) file for the full terms.
+
 ---
 
 Production: [frontend](https://teamflow-ai-murex.vercel.app) · [API](https://teamflow-ai-api.onrender.com)
