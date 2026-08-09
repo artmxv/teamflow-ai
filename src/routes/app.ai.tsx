@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { useCurrentWorkspace } from "@/lib/auth/use-current-user";
@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/app/PageHeader";
 import { BrandMark } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import {
   RefreshCw,
   BarChart3,
@@ -21,13 +22,19 @@ import {
   Copy,
   FolderKanban,
   Lightbulb,
+  MessageSquareText,
+  Send,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { friendlyApiErrorMessage, isBrowserOffline } from "@/lib/api-error";
 import {
   fetchWorkspaceAiSummary,
+  sendAiCopilotMessage,
   workspaceAiSummaryQueryKey,
+  type AiCopilotChatResponse,
+  type AiCopilotHistoryMessage,
   type WorkspaceAiMetrics,
 } from "@/lib/api/ai";
 import { cn } from "@/lib/utils";
@@ -109,8 +116,10 @@ function AssistantPage() {
     <AppShell>
       <PageHeader title={t("ai.assistant")} subtitle={t("ai.groundedContext")} className="mb-4" />
 
+      <CopilotChat key={workspaceId ?? "no-workspace"} workspaceId={workspaceId} />
+
       <nav
-        className="mb-3 -mx-1 overflow-x-auto px-1 lg:hidden"
+        className="mb-3 mt-4 -mx-1 overflow-x-auto px-1 lg:hidden"
         aria-label={t("ai.sectionsNavLabel")}
       >
         <ul className="flex w-max max-w-none gap-1.5 pb-1">
@@ -274,6 +283,170 @@ function AssistantPage() {
         </section>
       </div>
     </AppShell>
+  );
+}
+
+const COPILOT_MESSAGE_MAX_CHARS = 2_000;
+const COPILOT_HISTORY_MAX_MESSAGES = 8;
+const COPILOT_HISTORY_CONTENT_MAX_CHARS = 4_000;
+
+type CopilotUiMessage = AiCopilotHistoryMessage & {
+  id: number;
+  response?: AiCopilotChatResponse;
+};
+
+function CopilotChat({ workspaceId }: { workspaceId: string | null }) {
+  const { t, lang } = useI18n();
+  const [messages, setMessages] = useState<CopilotUiMessage[]>([]);
+  const [draft, setDraft] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const nextMessageId = useRef(1);
+
+  function createMessage(
+    role: CopilotUiMessage["role"],
+    content: string,
+    response?: AiCopilotChatResponse,
+  ): CopilotUiMessage {
+    const id = nextMessageId.current;
+    nextMessageId.current += 1;
+    return { id, role, content, response };
+  }
+
+  async function sendMessage() {
+    const message = draft.trim();
+    if (!workspaceId || !message || isSending) return;
+    if (message.length > COPILOT_MESSAGE_MAX_CHARS) {
+      setError(t("ai.copilotTooLong"));
+      return;
+    }
+
+    const history = messages.slice(-COPILOT_HISTORY_MAX_MESSAGES).map(({ role, content }) => ({
+      role,
+      content: content.slice(0, COPILOT_HISTORY_CONTENT_MAX_CHARS),
+    }));
+    setMessages((current) => [...current, createMessage("user", message)]);
+    setDraft("");
+    setError(null);
+    setIsSending(true);
+
+    try {
+      const response = await sendAiCopilotMessage({ message, locale: lang, history });
+      setMessages((current) => [...current, createMessage("assistant", response.answer, response)]);
+    } catch {
+      setError(t("ai.copilotError"));
+    } finally {
+      setIsSending(false);
+    }
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    void sendMessage();
+  }
+
+  return (
+    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
+      <div className="flex items-start gap-3 border-b border-border px-5 py-4">
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+          <Sparkles className="size-4" aria-hidden />
+        </span>
+        <div>
+          <h2 className="text-sm font-semibold">{t("ai.copilotTitle")}</h2>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+            {t("ai.copilotDescription")}
+          </p>
+        </div>
+      </div>
+
+      <div
+        className="max-h-[420px] min-h-40 space-y-4 overflow-y-auto px-5 py-5"
+        aria-live="polite"
+      >
+        {messages.length === 0 ? (
+          <div className="flex min-h-28 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
+            <MessageSquareText className="size-5" aria-hidden />
+            <p>{t("ai.copilotEmpty")}</p>
+          </div>
+        ) : (
+          messages.map((message) => (
+            <div
+              key={message.id}
+              className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}
+            >
+              <div className="max-w-[88%] space-y-1.5">
+                <div className="px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {message.role === "user" ? t("ai.copilotYou") : t("ai.copilotName")}
+                </div>
+                <div
+                  className={cn(
+                    "whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed",
+                    message.role === "user"
+                      ? "rounded-tr-md bg-primary text-primary-foreground"
+                      : "rounded-tl-md border border-border bg-muted/50 text-foreground",
+                  )}
+                >
+                  {message.content}
+                </div>
+                {message.response?.mode === "fallback" ? (
+                  <div className="px-1 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">{t("ai.copilotFallback")}</span>
+                    {" · "}
+                    {t("ai.copilotFallbackHint")}
+                  </div>
+                ) : message.response?.mode === "llm" && message.response.context.truncated ? (
+                  <div className="px-1 text-xs text-muted-foreground">
+                    {t("ai.copilotContextPartial")}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ))
+        )}
+        {isSending ? (
+          <div className="flex justify-start">
+            <div className="rounded-2xl rounded-tl-md border border-border bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+              {t("ai.copilotSending")}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="border-t border-border p-4">
+        <div className="flex items-end gap-2">
+          <Textarea
+            value={draft}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              if (error) setError(null);
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder={t("ai.copilotPlaceholder")}
+            aria-label={t("ai.copilotPlaceholder")}
+            maxLength={COPILOT_MESSAGE_MAX_CHARS}
+            rows={2}
+            disabled={!workspaceId || isSending}
+            className="max-h-40 min-h-20 resize-y"
+          />
+          <Button
+            type="button"
+            variant="brand"
+            className="h-10 shrink-0 gap-2"
+            disabled={!workspaceId || !draft.trim() || isSending}
+            onClick={() => void sendMessage()}
+          >
+            <Send className="size-4" aria-hidden />
+            {t("ai.copilotSend")}
+          </Button>
+        </div>
+        {error ? (
+          <p className="mt-2 text-xs text-destructive" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </section>
   );
 }
 
