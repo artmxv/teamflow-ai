@@ -231,7 +231,7 @@ function nextProjectColor(existingColors: Array<string | null | undefined>): str
 
   // 3) Both palettes exhausted: pick the least-used identity (not a hard restart at [0]).
   const assignmentOrder = [...PROJECT_COLOR_ROTATION, ...PROJECT_COLOR_EXTENDED] as const;
-  let best = assignmentOrder[0]!;
+  let best: (typeof assignmentOrder)[number] = assignmentOrder[0]!;
   let bestCount = Number.POSITIVE_INFINITY;
   for (const color of assignmentOrder) {
     const count = existingColors.filter((c) => c?.trim() === color).length;
