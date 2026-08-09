@@ -4,7 +4,7 @@ import { after, before, describe, it } from "node:test";
 
 import { prisma } from "../lib/prisma.js";
 import { AuthError } from "./auth.service.js";
-import { MEMBER_LIMIT_REACHED_CODE } from "./billing-plans.service.js";
+import { assertCanInviteMember, MEMBER_LIMIT_REACHED_CODE } from "./billing-plans.service.js";
 import {
   acceptWorkspaceInvitation,
   createWorkspaceInvitation,
@@ -159,11 +159,7 @@ describe("workspace-invitations.service", () => {
       role: "MEMBER",
     });
 
-    const revoked = await revokeWorkspaceInvitation(
-      workspaceId,
-      created.invitation.id,
-      "OWNER",
-    );
+    const revoked = await revokeWorkspaceInvitation(workspaceId, created.invitation.id, "OWNER");
 
     assert.equal(revoked.status, "REVOKED");
 
@@ -519,6 +515,79 @@ describe("workspace-invitations.service", () => {
     );
 
     await prisma.workspace.delete({ where: { id: inviteWorkspace.id } });
+  });
+
+  it("enforces Team 10, Business 20, and unlimited Enterprise member limits", async () => {
+    const cases = [
+      { plan: "TEAM" as const, limit: 10 },
+      { plan: "BUSINESS" as const, limit: 20 },
+    ];
+
+    for (const item of cases) {
+      const matrixWorkspace = await prisma.workspace.create({
+        data: {
+          name: `${item.plan} seat matrix`,
+          slug: `seat-matrix-${item.plan.toLowerCase()}-${suffix}`,
+          plan: item.plan,
+          members: { create: { userId: ownerId, role: "OWNER", status: "ACTIVE" } },
+        },
+      });
+      try {
+        for (let index = 1; index < item.limit; index += 1) {
+          const member = await prisma.user.create({
+            data: {
+              name: `${item.plan} member ${index}`,
+              email: email(`${item.plan.toLowerCase()}-matrix-${index}`),
+              passwordHash: "test-hash",
+            },
+          });
+          userIds.push(member.id);
+          await prisma.workspaceMember.create({
+            data: {
+              workspaceId: matrixWorkspace.id,
+              userId: member.id,
+              role: "MEMBER",
+              status: "ACTIVE",
+            },
+          });
+        }
+        await assert.rejects(
+          () =>
+            assertCanInviteMember({
+              workspaceId: matrixWorkspace.id,
+              plan: item.plan,
+              isReusingPendingInvite: false,
+            }),
+          (error: unknown) => {
+            assert.ok(error instanceof AuthError);
+            assert.equal(error.code, MEMBER_LIMIT_REACHED_CODE);
+            return true;
+          },
+        );
+      } finally {
+        await prisma.workspace.delete({ where: { id: matrixWorkspace.id } });
+      }
+    }
+
+    const enterprise = await prisma.workspace.create({
+      data: {
+        name: "Enterprise seat matrix",
+        slug: `seat-matrix-enterprise-${suffix}`,
+        plan: "ENTERPRISE",
+        members: { create: { userId: ownerId, role: "OWNER", status: "ACTIVE" } },
+      },
+    });
+    try {
+      await assert.doesNotReject(() =>
+        assertCanInviteMember({
+          workspaceId: enterprise.id,
+          plan: "ENTERPRISE",
+          isReusingPendingInvite: false,
+        }),
+      );
+    } finally {
+      await prisma.workspace.delete({ where: { id: enterprise.id } });
+    }
   });
 
   it("OWNER can resend a pending invitation with a new token and extended expiry", async () => {

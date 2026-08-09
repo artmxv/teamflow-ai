@@ -34,6 +34,7 @@ const envSchema = z.object({
   YOOKASSA_SHOP_ID: z.preprocess(emptyToUndefined, z.string().optional()),
   YOOKASSA_SECRET_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
   YOOKASSA_RETURN_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
+  YOOKASSA_MODE: z.enum(["test", "live"]).default("test"),
 });
 
 const parsed = envSchema.parse(process.env);

@@ -1,5 +1,6 @@
 import type { BillingPlan } from "@prisma/client";
 
+import { env } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
 import { AuthError } from "./auth.service.js";
 import {
@@ -131,7 +132,7 @@ export async function getBillingSummary(
     },
     billingConfigured,
     canManageBilling,
-    testMode: true,
+    testMode: env.YOOKASSA_MODE === "test",
     plans: getBillingPlans().map((plan) => {
       const { action, unavailableReason } = getPlanAction({
         currentPlan,

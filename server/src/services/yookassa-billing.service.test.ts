@@ -6,11 +6,9 @@ import { Prisma } from "@prisma/client";
 import { env } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
 import { AuthError } from "./auth.service.js";
+import { assertPlanUsageWithinLimits, getPlanAmountValue } from "./billing-plans.service.js";
 import {
-  assertPlanUsageWithinLimits,
-  getPlanAmountValue,
-} from "./billing-plans.service.js";
-import {
+  confirmBillingPayment,
   confirmProviderPayment,
   createBillingPlanChangeSession,
   handleYooKassaNotification,
@@ -25,6 +23,7 @@ const originalYooKassaConfig = {
   shopId: env.YOOKASSA_SHOP_ID,
   secretKey: env.YOOKASSA_SECRET_KEY,
   returnUrl: env.YOOKASSA_RETURN_URL,
+  mode: env.YOOKASSA_MODE,
 };
 const originalYooKassaRequest = yookassaBillingGateway.request;
 
@@ -50,6 +49,7 @@ describe("yookassa-billing.service", () => {
   before(async () => {
     env.YOOKASSA_SHOP_ID = "shop_test_teamflow";
     env.YOOKASSA_SECRET_KEY = "secret_test_teamflow";
+    env.YOOKASSA_MODE = "test";
     env.YOOKASSA_RETURN_URL = "http://localhost:5173/app/billing";
 
     const [owner, admin, member] = await Promise.all([
@@ -85,12 +85,13 @@ describe("yookassa-billing.service", () => {
   });
 
   beforeEach(async () => {
+    env.YOOKASSA_MODE = "test";
     await prisma.workspace.deleteMany({
       where: {
         slug: { startsWith: `yookassa-extra-${suffix}-` },
       },
     });
-    await prisma.billingPayment.deleteMany({ where: { workspaceId } });
+    await prisma.billingPayment.deleteMany({ where: { ownerUserId: ownerId } });
     await prisma.workspaceInvitation.deleteMany({ where: { workspaceId } });
     await prisma.workspaceMember.deleteMany({
       where: {
@@ -146,12 +147,11 @@ describe("yookassa-billing.service", () => {
     env.YOOKASSA_SHOP_ID = originalYooKassaConfig.shopId;
     env.YOOKASSA_SECRET_KEY = originalYooKassaConfig.secretKey;
     env.YOOKASSA_RETURN_URL = originalYooKassaConfig.returnUrl;
+    env.YOOKASSA_MODE = originalYooKassaConfig.mode;
 
     await prisma.billingPayment.deleteMany({
       where: {
-        workspace: {
-          OR: [{ id: workspaceId }, { slug: { startsWith: `yookassa-extra-${suffix}-` } }],
-        },
+        ownerUserId: ownerId,
       },
     });
     await prisma.workspace.deleteMany({
@@ -252,12 +252,49 @@ describe("yookassa-billing.service", () => {
     assert.equal(payment.currency, "RUB");
     assert.equal(Number(payment.amount), 990);
     assert.ok(payment.providerPaymentId);
+    assert.equal(payment.ownerUserId, ownerId);
+    assert.equal(yookassaRequests[0]?.idempotenceKey, payment.id);
 
     const workspace = await prisma.workspace.findUniqueOrThrow({
       where: { id: workspaceId },
       select: { plan: true },
     });
     assert.equal(workspace.plan, "FREE");
+  });
+
+  it("applies an authoritative immediately succeeded create response without requiring a redirect", async () => {
+    await prisma.workspace.update({
+      where: { id: workspaceId },
+      data: { plan: "FREE" },
+    });
+    yookassaBillingGateway.request = async (input) => {
+      yookassaRequests.push(input);
+      const metadata = (input.body?.metadata ?? {}) as Record<string, string>;
+      return {
+        id: `yk_${suffix}_immediate_success`,
+        status: "succeeded",
+        paid: true,
+        amount: { value: "990.00", currency: "RUB" },
+        test: true,
+        metadata,
+      };
+    };
+
+    const result = await createBillingPlanChangeSession({
+      userId: ownerId,
+      workspaceId,
+      role: "OWNER",
+      targetPlan: "TEAM",
+    });
+
+    assert.deepEqual(result, { flow: "APPLIED", currentPlan: "TEAM" });
+    const payment = await prisma.billingPayment.findFirstOrThrow({
+      where: { ownerUserId: ownerId },
+      orderBy: { createdAt: "desc" },
+    });
+    assert.equal(payment.status, "SUCCEEDED");
+    assert.equal(payment.completedAt instanceof Date, true);
+    assert.equal(yookassaRequests.length, 1);
   });
 
   it("rejects ADMIN plan changes before contacting YooKassa", async () => {
@@ -315,6 +352,25 @@ describe("yookassa-billing.service", () => {
     assert.equal(workspace.plan, "FREE");
   });
 
+  it("rejects the current plan without creating a payment", async () => {
+    await assert.rejects(
+      () =>
+        createBillingPlanChangeSession({
+          userId: ownerId,
+          workspaceId,
+          role: "OWNER",
+          targetPlan: "BUSINESS",
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.code, "PLAN_ALREADY_CURRENT");
+        return true;
+      },
+    );
+    assert.equal(yookassaRequests.length, 0);
+    assert.equal(await prisma.billingPayment.count({ where: { ownerUserId: ownerId } }), 0);
+  });
+
   it("creates a Business payment for Team -> Business", async () => {
     await prisma.workspace.update({
       where: { id: workspaceId },
@@ -335,7 +391,7 @@ describe("yookassa-billing.service", () => {
     });
   });
 
-  it("allows Enterprise -> Business via YooKassa self-service payment", async () => {
+  it("applies Enterprise -> Business without contacting YooKassa", async () => {
     await prisma.workspace.update({
       where: { id: workspaceId },
       data: { plan: "ENTERPRISE" },
@@ -348,14 +404,11 @@ describe("yookassa-billing.service", () => {
       targetPlan: "BUSINESS",
     });
 
-    assert.equal(result.flow, "PAYMENT");
-    assert.deepEqual(yookassaRequests[0]?.body?.amount, {
-      value: "2490.00",
-      currency: "RUB",
-    });
+    assert.deepEqual(result, { flow: "APPLIED", currentPlan: "BUSINESS" });
+    assert.equal(yookassaRequests.length, 0);
     assert.equal(
       (await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).plan,
-      "ENTERPRISE",
+      "BUSINESS",
     );
   });
 
@@ -372,11 +425,8 @@ describe("yookassa-billing.service", () => {
       targetPlan: "TEAM",
     });
 
-    assert.equal(result.flow, "PAYMENT");
-    assert.deepEqual(yookassaRequests[0]?.body?.amount, {
-      value: "990.00",
-      currency: "RUB",
-    });
+    assert.deepEqual(result, { flow: "APPLIED", currentPlan: "TEAM" });
+    assert.equal(yookassaRequests.length, 0);
   });
 
   it("allows Enterprise -> Free even when owner has more than one workspace", async () => {
@@ -424,7 +474,7 @@ describe("yookassa-billing.service", () => {
     });
   });
 
-  it("opens Business -> Team payment even when seats exceed Team limits", async () => {
+  it("applies Business -> Team without payment even when seats exceed Team limits", async () => {
     await addActiveMembers(8);
 
     const result = await createBillingPlanChangeSession({
@@ -434,11 +484,8 @@ describe("yookassa-billing.service", () => {
       targetPlan: "TEAM",
     });
 
-    assert.equal(result.flow, "PAYMENT");
-    assert.deepEqual(yookassaRequests[0]?.body?.amount, {
-      value: "990.00",
-      currency: "RUB",
-    });
+    assert.deepEqual(result, { flow: "APPLIED", currentPlan: "TEAM" });
+    assert.equal(yookassaRequests.length, 0);
   });
 
   it("applies Free even when active members exceed Free seat limit", async () => {
@@ -553,7 +600,7 @@ describe("yookassa-billing.service", () => {
         }),
       (error: unknown) => {
         assert.ok(error instanceof AuthError);
-        assert.equal(error.code, "YOOKASSA_TEST_MODE_REQUIRED");
+        assert.equal(error.code, "YOOKASSA_MODE_MISMATCH");
         assert.equal(error.statusCode, 502);
         return true;
       },
@@ -577,6 +624,7 @@ describe("yookassa-billing.service", () => {
     const payment = await prisma.billingPayment.create({
       data: {
         workspaceId,
+        ownerUserId: ownerId,
         provider: "YOOKASSA",
         providerPaymentId: `yk_live_confirm_${suffix}`,
         targetPlan: "TEAM",
@@ -597,11 +645,12 @@ describe("yookassa-billing.service", () => {
             workspaceId,
             targetPlan: "TEAM",
             paymentId: payment.id,
+            ownerUserId: ownerId,
           },
         }),
       (error: unknown) => {
         assert.ok(error instanceof AuthError);
-        assert.equal(error.code, "YOOKASSA_TEST_MODE_REQUIRED");
+        assert.equal(error.code, "YOOKASSA_MODE_MISMATCH");
         return true;
       },
     );
@@ -616,6 +665,54 @@ describe("yookassa-billing.service", () => {
     );
   });
 
+  it("accepts live payments only when YOOKASSA_MODE=live", async () => {
+    env.YOOKASSA_MODE = "live";
+    await prisma.workspace.update({ where: { id: workspaceId }, data: { plan: "FREE" } });
+    yookassaBillingGateway.request = async (input) => {
+      yookassaRequests.push(input);
+      const metadata = (input.body?.metadata ?? {}) as Record<string, string>;
+      return {
+        id: `yk_live_enabled_${suffix}`,
+        status: "pending",
+        amount: { value: "990.00", currency: "RUB" },
+        test: false,
+        metadata,
+        confirmation: {
+          type: "redirect",
+          confirmation_url: "https://yoomoney.ru/checkout/live",
+        },
+      };
+    };
+
+    const result = await createBillingPlanChangeSession({
+      userId: ownerId,
+      workspaceId,
+      role: "OWNER",
+      targetPlan: "TEAM",
+    });
+    assert.equal(result.flow, "PAYMENT");
+  });
+
+  it("rejects test payments when YOOKASSA_MODE=live", async () => {
+    env.YOOKASSA_MODE = "live";
+    await prisma.workspace.update({ where: { id: workspaceId }, data: { plan: "FREE" } });
+
+    await assert.rejects(
+      () =>
+        createBillingPlanChangeSession({
+          userId: ownerId,
+          workspaceId,
+          role: "OWNER",
+          targetPlan: "TEAM",
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.code, "YOOKASSA_MODE_MISMATCH");
+        return true;
+      },
+    );
+  });
+
   it("rejects confirmation when providerPaymentId does not match the provider payment id", async () => {
     await prisma.workspace.update({
       where: { id: workspaceId },
@@ -624,6 +721,7 @@ describe("yookassa-billing.service", () => {
     const payment = await prisma.billingPayment.create({
       data: {
         workspaceId,
+        ownerUserId: ownerId,
         provider: "YOOKASSA",
         providerPaymentId: `yk_linked_${suffix}`,
         targetPlan: "TEAM",
@@ -644,6 +742,7 @@ describe("yookassa-billing.service", () => {
             workspaceId,
             targetPlan: "TEAM",
             paymentId: payment.id,
+            ownerUserId: ownerId,
           },
         }),
       (error: unknown) => {
@@ -742,6 +841,148 @@ describe("yookassa-billing.service", () => {
     );
   });
 
+  it("does not let a forged return or another owner activate a pending payment", async () => {
+    await prisma.workspace.update({ where: { id: workspaceId }, data: { plan: "FREE" } });
+    const created = await createBillingPlanChangeSession({
+      userId: ownerId,
+      workspaceId,
+      role: "OWNER",
+      targetPlan: "TEAM",
+    });
+    assert.equal(created.flow, "PAYMENT");
+    if (created.flow !== "PAYMENT") return;
+
+    const pending = await confirmBillingPayment({
+      userId: ownerId,
+      workspaceId,
+      role: "OWNER",
+      paymentId: created.paymentId,
+    });
+    assert.equal(pending.status, "PENDING");
+    assert.equal(
+      (await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).plan,
+      "FREE",
+    );
+
+    await assert.rejects(
+      () =>
+        confirmBillingPayment({
+          userId: adminId,
+          workspaceId,
+          role: "OWNER",
+          paymentId: created.paymentId,
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.code, "PAYMENT_NOT_FOUND");
+        return true;
+      },
+    );
+  });
+
+  it("ignores an unrelated webhook without a provider request", async () => {
+    await handleYooKassaNotification({
+      event: "payment.succeeded",
+      object: {
+        id: `unknown_${suffix}`,
+        status: "succeeded",
+        amount: { value: "990.00", currency: "RUB" },
+        metadata: { paymentId: `missing_${suffix}` },
+      },
+    });
+    assert.equal(yookassaRequests.length, 0);
+  });
+
+  it("recovers an unknown provider id through verified pending-payment metadata", async () => {
+    await prisma.workspace.update({ where: { id: workspaceId }, data: { plan: "FREE" } });
+    const local = await prisma.billingPayment.create({
+      data: {
+        workspaceId,
+        ownerUserId: ownerId,
+        targetPlan: "TEAM",
+        amount: new Prisma.Decimal("990.00"),
+        currency: "RUB",
+      },
+    });
+    const providerId = `yk_recovered_${suffix}`;
+    const metadata = {
+      paymentId: local.id,
+      workspaceId,
+      ownerUserId: ownerId,
+      targetPlan: "TEAM",
+    };
+    providerPayments.set(providerId, {
+      id: providerId,
+      status: "succeeded",
+      amount: { value: "990.00", currency: "RUB" },
+      test: true,
+      metadata,
+    });
+
+    await handleYooKassaNotification({
+      event: "payment.succeeded",
+      object: {
+        id: providerId,
+        status: "succeeded",
+        amount: { value: "1.00", currency: "RUB" },
+        metadata,
+      },
+    });
+
+    const recovered = await prisma.billingPayment.findUniqueOrThrow({ where: { id: local.id } });
+    assert.equal(recovered.providerPaymentId, providerId);
+    assert.equal(recovered.status, "SUCCEEDED");
+    assert.equal(yookassaRequests.filter((request) => request.method === "GET").length, 1);
+  });
+
+  it("preserves a payment after source workspace deletion and completes for its stored owner", async () => {
+    await prisma.workspace.update({ where: { id: workspaceId }, data: { plan: "FREE" } });
+    const source = await prisma.workspace.create({
+      data: {
+        name: "Disposable billing source",
+        slug: `yookassa-extra-${suffix}-disposable-source`,
+        plan: "FREE",
+        members: { create: { userId: ownerId, role: "OWNER", status: "ACTIVE" } },
+      },
+    });
+    const local = await prisma.billingPayment.create({
+      data: {
+        workspaceId: source.id,
+        ownerUserId: ownerId,
+        providerPaymentId: `yk_deleted_source_${suffix}`,
+        targetPlan: "TEAM",
+        amount: new Prisma.Decimal("990.00"),
+        currency: "RUB",
+      },
+    });
+    await prisma.workspace.delete({ where: { id: source.id } });
+    assert.equal(
+      (await prisma.billingPayment.findUniqueOrThrow({ where: { id: local.id } })).workspaceId,
+      null,
+    );
+
+    await confirmProviderPayment({
+      id: local.providerPaymentId!,
+      status: "succeeded",
+      amount: { value: "990.00", currency: "RUB" },
+      test: true,
+      metadata: {
+        paymentId: local.id,
+        workspaceId: source.id,
+        ownerUserId: ownerId,
+        targetPlan: "TEAM",
+      },
+    });
+    assert.equal(
+      (await prisma.billingPayment.findUniqueOrThrow({ where: { id: local.id } })).status,
+      "SUCCEEDED",
+    );
+    assert.equal(
+      (await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).plan,
+      "TEAM",
+    );
+  });
+
   it("rejects forged mismatched amount and does not change the plan", async () => {
     await prisma.workspace.update({
       where: { id: workspaceId },
@@ -750,6 +991,7 @@ describe("yookassa-billing.service", () => {
     const payment = await prisma.billingPayment.create({
       data: {
         workspaceId,
+        ownerUserId: ownerId,
         provider: "YOOKASSA",
         providerPaymentId: `yk_forged_${suffix}`,
         targetPlan: "TEAM",
@@ -770,6 +1012,7 @@ describe("yookassa-billing.service", () => {
             workspaceId,
             targetPlan: "TEAM",
             paymentId: payment.id,
+            ownerUserId: ownerId,
           },
         }),
       (error: unknown) => {
@@ -785,6 +1028,56 @@ describe("yookassa-billing.service", () => {
     );
   });
 
+  it("rejects currency and entitlement-owner metadata mismatches", async () => {
+    const local = await prisma.billingPayment.create({
+      data: {
+        workspaceId,
+        ownerUserId: ownerId,
+        providerPaymentId: `yk_currency_${suffix}`,
+        targetPlan: "TEAM",
+        amount: new Prisma.Decimal("990.00"),
+        currency: "RUB",
+      },
+    });
+    const base = {
+      id: local.providerPaymentId!,
+      status: "succeeded",
+      test: true,
+      metadata: {
+        workspaceId,
+        targetPlan: "TEAM",
+        paymentId: local.id,
+        ownerUserId: ownerId,
+      },
+    };
+
+    await assert.rejects(
+      () => confirmProviderPayment({ ...base, amount: { value: "990.00", currency: "USD" } }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.code, "PAYMENT_AMOUNT_MISMATCH");
+        return true;
+      },
+    );
+    await assert.rejects(
+      () =>
+        confirmProviderPayment({
+          ...base,
+          amount: { value: "990.00", currency: "RUB" },
+          metadata: { ...base.metadata, ownerUserId: adminId },
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.code, "PAYMENT_METADATA_MISMATCH");
+        return true;
+      },
+    );
+    assert.equal(
+      (await prisma.billingPayment.findUniqueOrThrow({ where: { id: local.id } })).status,
+      "PENDING",
+    );
+  });
+
   it("rejects wrong workspace metadata and does not change the plan", async () => {
     await prisma.workspace.update({
       where: { id: workspaceId },
@@ -793,6 +1086,7 @@ describe("yookassa-billing.service", () => {
     const payment = await prisma.billingPayment.create({
       data: {
         workspaceId,
+        ownerUserId: ownerId,
         provider: "YOOKASSA",
         providerPaymentId: `yk_meta_${suffix}`,
         targetPlan: "TEAM",
@@ -813,6 +1107,7 @@ describe("yookassa-billing.service", () => {
             workspaceId: "other-workspace",
             targetPlan: "TEAM",
             paymentId: payment.id,
+            ownerUserId: ownerId,
           },
         }),
       (error: unknown) => {
@@ -854,6 +1149,7 @@ describe("yookassa-billing.service", () => {
         workspaceId,
         targetPlan: "BUSINESS",
         paymentId: payment.id,
+        ownerUserId: ownerId,
       },
     });
 
@@ -893,7 +1189,9 @@ describe("yookassaRequest transport boundary", () => {
   });
 
   it("maps network failures to PAYMENT_PROVIDER_UNAVAILABLE", async () => {
+    let attempts = 0;
     globalThis.fetch = (async () => {
+      attempts += 1;
       throw new TypeError("fetch failed");
     }) as typeof fetch;
 
@@ -909,6 +1207,7 @@ describe("yookassaRequest transport boundary", () => {
         return true;
       },
     );
+    assert.equal(attempts, 2);
   });
 
   it("maps AbortError / timeout to PAYMENT_PROVIDER_UNAVAILABLE", async () => {
@@ -965,10 +1264,38 @@ describe("yookassaRequest transport boundary", () => {
         assert.ok(error instanceof AuthError);
         assert.equal(error.code, "YOOKASSA_ERROR");
         assert.equal(error.statusCode, 502);
-        assert.equal(error.message, "Invalid request");
+        assert.equal(error.message, "YooKassa request failed");
+        assert.ok(!String(error.message).includes("Invalid request"));
         assert.ok(!String(error.message).includes("secret_test"));
         return true;
       },
     );
+  });
+
+  it("retries a 5xx once with the exact same Idempotence-Key", async () => {
+    const keys: Array<string | null> = [];
+    globalThis.fetch = (async (_url, init) => {
+      keys.push(new Headers(init?.headers).get("Idempotence-Key"));
+      if (keys.length === 1) {
+        return new Response(JSON.stringify({ description: "temporary" }), { status: 503 });
+      }
+      return new Response(
+        JSON.stringify({
+          id: "yk_retry_success",
+          status: "pending",
+          amount: { value: "990.00", currency: "RUB" },
+          test: true,
+        }),
+        { status: 200 },
+      );
+    }) as typeof fetch;
+
+    await yookassaBillingGateway.request({
+      method: "POST",
+      path: "/payments",
+      idempotenceKey: "local-payment-id",
+      body: { amount: { value: "990.00", currency: "RUB" } },
+    });
+    assert.deepEqual(keys, ["local-payment-id", "local-payment-id"]);
   });
 });

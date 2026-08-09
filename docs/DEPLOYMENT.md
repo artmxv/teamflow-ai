@@ -4,13 +4,13 @@ Step-by-step reference for the **current** TeamFlow AI production setup after th
 
 **Current production**
 
-| Surface | URL / host |
-| ------- | ---------- |
-| Frontend | https://teamflow-ai-murex.vercel.app (Vercel, TanStack Start SSR) |
-| API + Socket.IO | https://teamflow-ai-api.onrender.com (Render) |
-| Database | Neon PostgreSQL |
-| Files | Private Supabase Storage |
-| Reminders | GitHub Actions → API |
+| Surface         | URL / host                                                        |
+| --------------- | ----------------------------------------------------------------- |
+| Frontend        | https://teamflow-ai-murex.vercel.app (Vercel, TanStack Start SSR) |
+| API + Socket.IO | https://teamflow-ai-api.onrender.com (Render)                     |
+| Database        | Neon PostgreSQL                                                   |
+| Files           | Private Supabase Storage                                          |
+| Reminders       | GitHub Actions → API                                              |
 
 **Temporary fallback (transitional only):** the previous Render frontend at https://teamflow-ai-web.onrender.com is kept as a fallback during the cutover period. It is not the primary production frontend.
 
@@ -51,23 +51,23 @@ Never commit `server/.env` or a filled root `.env` with secrets.
 
 ## 1. Required production env (summary)
 
-| Area | Required |
-| ---- | -------- |
-| Database | `DATABASE_URL` (Neon) |
-| Auth | `JWT_SECRET` (long random; not the dev default) |
-| Frontend links | `APP_URL` (primary production frontend URL) |
-| CORS | `CORS_ORIGIN` (allowed frontend origin(s)) |
-| Runtime | `NODE_ENV=production` |
-| Frontend build | `VITE_API_URL` (production API URL) |
-| Files | `FILE_STORAGE_DRIVER=supabase` + Supabase vars |
+| Area           | Required                                        |
+| -------------- | ----------------------------------------------- |
+| Database       | `DATABASE_URL` (Neon)                           |
+| Auth           | `JWT_SECRET` (long random; not the dev default) |
+| Frontend links | `APP_URL` (primary production frontend URL)     |
+| CORS           | `CORS_ORIGIN` (allowed frontend origin(s))      |
+| Runtime        | `NODE_ENV=production`                           |
+| Frontend build | `VITE_API_URL` (production API URL)             |
+| Files          | `FILE_STORAGE_DRIVER=supabase` + Supabase vars  |
 
 Optional but common:
 
-| Feature | Variables |
-| ------- | --------- |
-| Google sign-in | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (all three or none) |
-| Email invites | `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, `EMAIL_FROM` |
-| Deadline reminders | `TASK_REMINDER_CRON_SECRET` (+ GitHub Actions secret of the same name) |
+| Feature            | Variables                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------- |
+| Google sign-in     | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (all three or none) |
+| Email invites      | `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, `EMAIL_FROM`                               |
+| Deadline reminders | `TASK_REMINDER_CRON_SECRET` (+ GitHub Actions secret of the same name)                |
 
 ---
 
@@ -113,26 +113,30 @@ cp server/.env.example server/.env
 
 On Render, set the same variables in the service dashboard.
 
-| Variable | Required | Notes |
-| -------- | -------- | ----- |
-| `PORT` | No | Default `4000`; Render injects `PORT` automatically |
-| `NODE_ENV` | Yes (prod) | `production` |
-| `CORS_ORIGIN` | Yes (prod) | Exact frontend origin(s); no trailing slash; no localhost in production |
-| `DATABASE_URL` | Yes | Neon PostgreSQL connection string for Prisma |
-| `JWT_SECRET` | Yes | Long random string; must not be `dev-jwt-secret-change-in-production` |
-| `APP_URL` | Yes (prod) | Public frontend URL for invites and OAuth redirects |
-| `EMAIL_PROVIDER` | No | `console` (default) or `resend` |
-| `EMAIL_FROM` | If resend | Verified sender/domain in Resend |
-| `RESEND_API_KEY` | If resend | Resend API key |
-| `GOOGLE_CLIENT_ID` | Optional | All three Google vars together, or leave all empty |
-| `GOOGLE_CLIENT_SECRET` | Optional | Rotate if previously exposed during dev |
-| `GOOGLE_REDIRECT_URI` | Optional | Backend callback, e.g. `https://teamflow-ai-api.onrender.com/api/auth/google/callback` |
-| `FILE_STORAGE_DRIVER` | Prod: `supabase` | Durable uploads on Render |
-| `SUPABASE_URL` | If supabase | Project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | If supabase | Service role; never expose to the frontend |
-| `SUPABASE_STORAGE_BUCKET` | If supabase | Bucket name |
-| `TASK_REMINDER_CRON_SECRET` | For reminders | Bearer token for the internal reminders endpoint |
-| `WEB_CONCURRENCY` | Yes for presence | Keep `1` while presence is in-memory |
+| Variable                    | Required         | Notes                                                                                  |
+| --------------------------- | ---------------- | -------------------------------------------------------------------------------------- |
+| `PORT`                      | No               | Default `4000`; Render injects `PORT` automatically                                    |
+| `NODE_ENV`                  | Yes (prod)       | `production`                                                                           |
+| `CORS_ORIGIN`               | Yes (prod)       | Exact frontend origin(s); no trailing slash; no localhost in production                |
+| `DATABASE_URL`              | Yes              | Neon PostgreSQL connection string for Prisma                                           |
+| `JWT_SECRET`                | Yes              | Long random string; must not be `dev-jwt-secret-change-in-production`                  |
+| `APP_URL`                   | Yes (prod)       | Public frontend URL for invites and OAuth redirects                                    |
+| `EMAIL_PROVIDER`            | No               | `console` (default) or `resend`                                                        |
+| `EMAIL_FROM`                | If resend        | Verified sender/domain in Resend                                                       |
+| `RESEND_API_KEY`            | If resend        | Resend API key                                                                         |
+| `GOOGLE_CLIENT_ID`          | Optional         | All three Google vars together, or leave all empty                                     |
+| `GOOGLE_CLIENT_SECRET`      | Optional         | Rotate if previously exposed during dev                                                |
+| `GOOGLE_REDIRECT_URI`       | Optional         | Backend callback, e.g. `https://teamflow-ai-api.onrender.com/api/auth/google/callback` |
+| `FILE_STORAGE_DRIVER`       | Prod: `supabase` | Durable uploads on Render                                                              |
+| `SUPABASE_URL`              | If supabase      | Project URL                                                                            |
+| `SUPABASE_SERVICE_ROLE_KEY` | If supabase      | Service role; never expose to the frontend                                             |
+| `SUPABASE_STORAGE_BUCKET`   | If supabase      | Bucket name                                                                            |
+| `TASK_REMINDER_CRON_SECRET` | For reminders    | Bearer token for the internal reminders endpoint                                       |
+| `YOOKASSA_SHOP_ID`          | For billing      | YooKassa shop identifier; server only                                                  |
+| `YOOKASSA_SECRET_KEY`       | For billing      | YooKassa secret key; server only                                                       |
+| `YOOKASSA_RETURN_URL`       | Optional         | Defaults to `APP_URL/app/billing`                                                      |
+| `YOOKASSA_MODE`             | No               | `test` by default; set `live` explicitly for real payments                             |
+| `WEB_CONCURRENCY`           | Yes for presence | Keep `1` while presence is in-memory                                                   |
 
 **Current production values for frontend-facing URLs** (non-secret):
 
@@ -149,7 +153,15 @@ Why these values:
 - After the Render frontend is fully retired, remove its origin from `CORS_ORIGIN`.
 - Origins must not include a trailing slash.
 
-Do not document real values for `JWT_SECRET`, `DATABASE_URL`, Supabase service role, Resend, or cron secrets.
+Do not document real values for `JWT_SECRET`, `DATABASE_URL`, Supabase service role, Resend, YooKassa, or cron secrets.
+
+### YooKassa billing V1
+
+- Billing is a one-time plan activation without subscriptions or automatic renewal.
+- Keep `YOOKASSA_MODE=test` until live checkout and webhook delivery are intentionally enabled.
+- Configure the webhook URL as `https://<api-host>/api/billing/webhook` for `payment.succeeded` and `payment.canceled`.
+- The webhook body is untrusted. TeamFlow locates a local payment and performs an authenticated YooKassa Payment GET before applying any entitlement.
+- The frontend return URL never activates a plan by itself.
 
 Startup validation lives in `server/src/config/env.ts`. Misconfigured production or Resend settings fail fast at boot.
 
@@ -199,10 +211,10 @@ For local dev without Resend, use `EMAIL_PROVIDER=console` (invites are logged t
 
 Uploads (avatars, task attachments, project documents, chat files) are handled in `server/src/lib/file-storage/`.
 
-| `FILE_STORAGE_DRIVER` | Behavior |
-| --------------------- | -------- |
-| `local` (default) | Files on disk under `server/uploads/` (fine for local dev) |
-| `supabase` | Durable object storage via Supabase Storage (**required for production on Render**) |
+| `FILE_STORAGE_DRIVER` | Behavior                                                                            |
+| --------------------- | ----------------------------------------------------------------------------------- |
+| `local` (default)     | Files on disk under `server/uploads/` (fine for local dev)                          |
+| `supabase`            | Durable object storage via Supabase Storage (**required for production on Render**) |
 
 **Local disk (`FILE_STORAGE_DRIVER=local`):**
 
@@ -256,12 +268,12 @@ npm run db:seed
 
 ## 8. Render backend (Web Service)
 
-| Setting | Value |
-| ------- | ----- |
-| Root directory | `server` |
-| Build command | `npm install --include=dev && npx prisma generate && npm run build && npm run prisma:migrate:deploy` |
-| Start command | `npm run start` |
-| Instances / concurrency | One instance; `WEB_CONCURRENCY=1` |
+| Setting                 | Value                                                                                                |
+| ----------------------- | ---------------------------------------------------------------------------------------------------- |
+| Root directory          | `server`                                                                                             |
+| Build command           | `npm install --include=dev && npx prisma generate && npm run build && npm run prisma:migrate:deploy` |
+| Start command           | `npm run start`                                                                                      |
+| Instances / concurrency | One instance; `WEB_CONCURRENCY=1`                                                                    |
 
 **Non-secret environment variables** (set secret values only in the Render dashboard, never in git):
 
@@ -280,7 +292,7 @@ SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_STORAGE_BUCKET=teamflow-uploads
 ```
 
-Also configure in Render only (do not paste real values into docs or git): `DATABASE_URL`, `JWT_SECRET`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `TASK_REMINDER_CRON_SECRET`.
+Also configure in Render only (do not paste real values into docs or git): `DATABASE_URL`, `JWT_SECRET`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `TASK_REMINDER_CRON_SECRET`, `YOOKASSA_SHOP_ID`, and `YOOKASSA_SECRET_KEY`. Leave `YOOKASSA_MODE=test` unless live billing is deliberately enabled.
 
 Notes:
 
@@ -298,15 +310,15 @@ Notes:
 
 ### Current: Vercel (primary production frontend)
 
-| Setting | Value |
-| ------- | ----- |
-| Root Directory | `.` |
-| Framework Preset | `Other` |
-| Node.js Version | `22.x` |
-| Install Command | `npm install --include=dev` |
-| Build Command | `NITRO_PRESET=vercel npm run build` |
-| Output Directory | leave blank |
-| Production Branch | `main` |
+| Setting           | Value                               |
+| ----------------- | ----------------------------------- |
+| Root Directory    | `.`                                 |
+| Framework Preset  | `Other`                             |
+| Node.js Version   | `22.x`                              |
+| Install Command   | `npm install --include=dev`         |
+| Build Command     | `NITRO_PRESET=vercel npm run build` |
+| Output Directory  | leave blank                         |
+| Production Branch | `main`                              |
 
 **Environment variable** (Production and Preview):
 
@@ -330,10 +342,10 @@ The same repository supports two Nitro presets:
 npm run build
 ```
 
-| Detail | Value |
-| ------ | ----- |
-| Nitro preset | `node-server` |
-| Output | `dist/` |
+| Detail       | Value                   |
+| ------------ | ----------------------- |
+| Nitro preset | `node-server`           |
+| Output       | `dist/`                 |
 | Server entry | `dist/server/index.mjs` |
 
 **Vercel:**
@@ -342,10 +354,10 @@ npm run build
 NITRO_PRESET=vercel npm run build
 ```
 
-| Detail | Value |
-| ------ | ----- |
-| Nitro preset | `vercel` |
-| Output | `.vercel/output` (Vercel Build Output API) |
+| Detail       | Value                                      |
+| ------------ | ------------------------------------------ |
+| Nitro preset | `vercel`                                   |
+| Output       | `.vercel/output` (Vercel Build Output API) |
 
 Notes:
 
@@ -356,11 +368,11 @@ Notes:
 
 ### Temporary fallback: Render Web Service (frontend)
 
-| Setting | Value |
-| ------- | ----- |
-| Root directory | repository root |
-| Build command | `npm install --include=dev && npm run build` |
-| Start command | `node dist/server/index.mjs` |
+| Setting        | Value                                        |
+| -------------- | -------------------------------------------- |
+| Root directory | repository root                              |
+| Build command  | `npm install --include=dev && npm run build` |
+| Start command  | `node dist/server/index.mjs`                 |
 
 **Environment variable** (build-time):
 
@@ -457,7 +469,7 @@ Also keep checking:
 1. **Health:** `GET https://teamflow-ai-api.onrender.com/api/health` returns OK.
 2. **API URL:** browser network tab shows requests to `teamflow-ai-api.onrender.com`, not `localhost:4000`.
 3. **AI summary:** open AI Assistant / regenerate; summary reflects accessible projects and tasks (no external LLM).
-4. **Billing preview:** open `/app/billing`. Confirm current plan, usage, and real limits render. Paid plans show **Coming soon**. Plan-change controls are disabled. The UI must not show checkout or a working payment flow.
+4. **Billing:** open `/app/billing`. Confirm current plan, usage, limits, one-time activation wording, and the configured test/live mode. A paid upgrade must remain pending until backend YooKassa confirmation; a downgrade must apply without checkout.
 5. **RU/EN switch:** language toggle updates UI strings.
 
 Full manual QA: [QA_CHECKLIST.md](./QA_CHECKLIST.md).

@@ -68,7 +68,9 @@ describe("workspaces.service billing limits", () => {
       })
       .catch(() => undefined);
     await prisma.user
-      .deleteMany({ where: { email: { endsWith: `.${suffix}@workspace-limit-test.teamflow.local` } } })
+      .deleteMany({
+        where: { email: { endsWith: `.${suffix}@workspace-limit-test.teamflow.local` } },
+      })
       .catch(() => undefined);
   });
 
@@ -125,6 +127,58 @@ describe("workspaces.service billing limits", () => {
         return true;
       },
     );
+  });
+
+  it("allows five owned workspaces on Business and blocks the sixth", async () => {
+    await prisma.workspace.update({
+      where: { id: currentWorkspaceId },
+      data: { plan: "BUSINESS" },
+    });
+    for (let index = 2; index <= 5; index += 1) {
+      await createWorkspaceForUser({
+        userId: ownerId,
+        selectedWorkspaceId: currentWorkspaceId,
+        data: {
+          name: `Business ${index}`,
+          slug: `workspace-limit-extra-${suffix}-business-${index}`,
+        },
+      });
+    }
+
+    await assert.rejects(
+      () =>
+        createWorkspaceForUser({
+          userId: ownerId,
+          selectedWorkspaceId: currentWorkspaceId,
+          data: {
+            name: "Business overflow",
+            slug: `workspace-limit-extra-${suffix}-business-overflow`,
+          },
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.code, WORKSPACE_LIMIT_REACHED_CODE);
+        return true;
+      },
+    );
+  });
+
+  it("keeps Enterprise workspace creation unlimited", async () => {
+    await prisma.workspace.update({
+      where: { id: currentWorkspaceId },
+      data: { plan: "ENTERPRISE" },
+    });
+    for (let index = 0; index < 6; index += 1) {
+      const created = await createWorkspaceForUser({
+        userId: ownerId,
+        selectedWorkspaceId: currentWorkspaceId,
+        data: {
+          name: `Enterprise ${index}`,
+          slug: `workspace-limit-extra-${suffix}-enterprise-${index}`,
+        },
+      });
+      assert.equal(created.plan, "ENTERPRISE");
+    }
   });
 
   it("serializes concurrent creates so Team cannot exceed two workspaces", async () => {

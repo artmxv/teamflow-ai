@@ -2,16 +2,16 @@
 
 TeamFlow AI is a full-stack SaaS portfolio app for projects, tasks, team chat, notifications, and workspace briefings.
 
-It is built for product and engineering portfolio review: real auth, multi-workspace collaboration, durable file storage, Socket.IO chat, and honest limits around billing and AI. It is not an enterprise compliance product and does not claim SOC 2, SSO/SAML, native mobile apps, unlimited AI, or live payment processing.
+It is built for product and engineering portfolio review: real auth, multi-workspace collaboration, durable file storage, Socket.IO chat, and honest limits around billing and AI. It is not an enterprise compliance product and does not claim SOC 2, SSO/SAML, native mobile apps, or unlimited AI.
 
 Workspace briefings are built from projects, tasks, deadlines, and priorities the signed-in user can access. They are deterministic today and do **not** call an external LLM provider.
 
 ## Production deployment
 
-| Surface | URL |
-| ------- | --- |
+| Surface  | URL                                  |
+| -------- | ------------------------------------ |
 | Frontend | https://teamflow-ai-murex.vercel.app |
-| API | https://teamflow-ai-api.onrender.com |
+| API      | https://teamflow-ai-api.onrender.com |
 
 The app requires authentication. These URLs are the current production deployment, not a public unauthenticated demo. The API root may not serve a browser UI; use `/api/health` to check the API.
 
@@ -49,7 +49,7 @@ During the transitional period, the previous Render frontend remains available a
 
 ![Settings](docs/screenshots/settings.png)
 
-### Billing (read-only preview)
+### Billing
 
 ![Billing](docs/screenshots/billing.png)
 
@@ -74,14 +74,14 @@ Landing-page product previews may use illustrative mockups. In-app screens above
 - Roles, invitations, member management, and project membership
 - Enforced plan limits (active members + pending invitations count toward the seat limit):
 
-| Plan | Max members | Max owned workspaces |
-| ---- | ----------- | -------------------- |
-| FREE | 5 | 1 |
-| TEAM | 10 | 2 |
-| BUSINESS | 20 | 5 |
-| ENTERPRISE | Unlimited | Unlimited |
+| Plan       | Max members | Max owned workspaces |
+| ---------- | ----------- | -------------------- |
+| FREE       | 5           | 1                    |
+| TEAM       | 10          | 2                    |
+| BUSINESS   | 20          | 5                    |
+| ENTERPRISE | Unlimited   | Unlimited            |
 
-Online plan changes and a payment provider are **not** available. Billing is an honest read-only preview of the current plan, usage, and limits.
+Owners can activate paid plans through YooKassa. Billing V1 uses a one-time activation payment without subscriptions, expiration, or automatic renewal. Test mode is the default; live payments require an explicit backend environment setting. The backend verifies every successful payment against YooKassa before changing the owner-scoped plan.
 
 ### Team chat
 
@@ -147,19 +147,19 @@ Vercel hosts only the frontend SSR app. Express and Socket.IO stay on Render. Th
 
 ## Tech stack
 
-| Layer | Technologies |
-| ----- | ------------ |
+| Layer    | Technologies                                                                |
+| -------- | --------------------------------------------------------------------------- |
 | Frontend | TanStack Start, React 19, TypeScript, Vite, TanStack Router, TanStack Query |
-| UI | Tailwind CSS v4, shadcn/ui (Radix), Recharts, Sonner, `@dnd-kit` |
-| Forms | React Hook Form, Zod |
-| Backend | Node.js, Express, TypeScript, Zod |
-| Data | Prisma, PostgreSQL (Neon in production; Docker locally) |
-| Auth | JWT (`jsonwebtoken`), `bcryptjs`, Google OAuth (`google-auth-library`) |
-| Realtime | Socket.IO (server + client) |
-| Storage | Supabase Storage (`@supabase/supabase-js`), Multer |
-| Email | Resend (optional; console provider for local invites) |
-| Tests | Node.js built-in test runner (`npm test` in `server/`) |
-| CI | GitHub Actions deadline-reminder scheduler |
+| UI       | Tailwind CSS v4, shadcn/ui (Radix), Recharts, Sonner, `@dnd-kit`            |
+| Forms    | React Hook Form, Zod                                                        |
+| Backend  | Node.js, Express, TypeScript, Zod                                           |
+| Data     | Prisma, PostgreSQL (Neon in production; Docker locally)                     |
+| Auth     | JWT (`jsonwebtoken`), `bcryptjs`, Google OAuth (`google-auth-library`)      |
+| Realtime | Socket.IO (server + client)                                                 |
+| Storage  | Supabase Storage (`@supabase/supabase-js`), Multer                          |
+| Email    | Resend (optional; console provider for local invites)                       |
+| Tests    | Node.js built-in test runner (`npm test` in `server/`)                      |
+| CI       | GitHub Actions deadline-reminder scheduler                                  |
 
 ## Local development
 
@@ -234,18 +234,18 @@ Terminal 2 (frontend, repo root):
 npm run dev
 ```
 
-| Service | Local URL |
-| ------- | --------- |
-| Frontend | http://localhost:8080 |
-| API | http://localhost:4000 |
-| PostgreSQL | localhost:5433 |
+| Service    | Local URL             |
+| ---------- | --------------------- |
+| Frontend   | http://localhost:8080 |
+| API        | http://localhost:4000 |
+| PostgreSQL | localhost:5433        |
 
 ### Demo credentials (after seed)
 
-| Field | Value |
-| ----- | ----- |
-| Email | `alex@teamflow.ai` |
-| Password | `Password123!` |
+| Field    | Value              |
+| -------- | ------------------ |
+| Email    | `alex@teamflow.ai` |
+| Password | `Password123!`     |
 
 ## Environment variables
 
@@ -253,31 +253,35 @@ Safe templates: `server/.env.example` and root `.env.example`. Never commit fill
 
 ### Frontend (repo root)
 
-| Variable | Required | Description |
-| -------- | -------- | ----------- |
+| Variable       | Required   | Description                                                                                   |
+| -------------- | ---------- | --------------------------------------------------------------------------------------------- |
 | `VITE_API_URL` | No locally | API base URL. Defaults to `http://localhost:4000`. Required at **build time** for production. |
 
 ### Backend (`server/.env`)
 
-| Variable | Required | Description |
-| -------- | -------- | ----------- |
-| `DATABASE_URL` | Yes | PostgreSQL connection string for Prisma |
-| `JWT_SECRET` | Yes | Secret for signing JWTs (not the dev default in production) |
-| `PORT` | No | API port (default `4000`) |
-| `NODE_ENV` | No | `development`, `test`, or `production` |
-| `CORS_ORIGIN` | Yes in prod | Frontend origin(s), comma-separated, no trailing slash |
-| `APP_URL` | Yes in prod | Public frontend URL for invite links and post-OAuth redirects |
-| `GOOGLE_CLIENT_ID` | Optional* | Google OAuth client id |
-| `GOOGLE_CLIENT_SECRET` | Optional* | Google OAuth client secret |
-| `GOOGLE_REDIRECT_URI` | Optional* | Backend callback, e.g. `https://…/api/auth/google/callback` |
-| `FILE_STORAGE_DRIVER` | No | `local` (default) or `supabase` |
-| `SUPABASE_URL` | If supabase | Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | If supabase | Service role key (server only) |
-| `SUPABASE_STORAGE_BUCKET` | If supabase | Bucket name (example: `teamflow-uploads`) |
-| `EMAIL_PROVIDER` | No | `console` (default) or `resend` |
-| `EMAIL_FROM` | If resend | Verified sender |
-| `RESEND_API_KEY` | If resend | Resend API key |
-| `TASK_REMINDER_CRON_SECRET` | For scheduler | Bearer secret for `POST /api/internal/task-reminders/run` |
+| Variable                    | Required      | Description                                                   |
+| --------------------------- | ------------- | ------------------------------------------------------------- |
+| `DATABASE_URL`              | Yes           | PostgreSQL connection string for Prisma                       |
+| `JWT_SECRET`                | Yes           | Secret for signing JWTs (not the dev default in production)   |
+| `PORT`                      | No            | API port (default `4000`)                                     |
+| `NODE_ENV`                  | No            | `development`, `test`, or `production`                        |
+| `CORS_ORIGIN`               | Yes in prod   | Frontend origin(s), comma-separated, no trailing slash        |
+| `APP_URL`                   | Yes in prod   | Public frontend URL for invite links and post-OAuth redirects |
+| `GOOGLE_CLIENT_ID`          | Optional\*    | Google OAuth client id                                        |
+| `GOOGLE_CLIENT_SECRET`      | Optional\*    | Google OAuth client secret                                    |
+| `GOOGLE_REDIRECT_URI`       | Optional\*    | Backend callback, e.g. `https://…/api/auth/google/callback`   |
+| `FILE_STORAGE_DRIVER`       | No            | `local` (default) or `supabase`                               |
+| `SUPABASE_URL`              | If supabase   | Supabase project URL                                          |
+| `SUPABASE_SERVICE_ROLE_KEY` | If supabase   | Service role key (server only)                                |
+| `SUPABASE_STORAGE_BUCKET`   | If supabase   | Bucket name (example: `teamflow-uploads`)                     |
+| `EMAIL_PROVIDER`            | No            | `console` (default) or `resend`                               |
+| `EMAIL_FROM`                | If resend     | Verified sender                                               |
+| `RESEND_API_KEY`            | If resend     | Resend API key                                                |
+| `TASK_REMINDER_CRON_SECRET` | For scheduler | Bearer secret for `POST /api/internal/task-reminders/run`     |
+| `YOOKASSA_SHOP_ID`          | For billing   | YooKassa shop identifier; backend only                        |
+| `YOOKASSA_SECRET_KEY`       | For billing   | YooKassa secret key; backend only                             |
+| `YOOKASSA_RETURN_URL`       | Optional      | Billing return URL; defaults to `APP_URL/app/billing`         |
+| `YOOKASSA_MODE`             | No            | `test` (default) or explicit `live`                           |
 
 \* All three Google variables together, or leave all empty.
 
@@ -315,10 +319,10 @@ The frontend supports two Nitro presets so the same repo can deploy to Vercel an
 npm run build
 ```
 
-| Detail | Value |
-| ------ | ----- |
-| Nitro preset | `node-server` |
-| Output | `dist/` |
+| Detail       | Value                   |
+| ------------ | ----------------------- |
+| Nitro preset | `node-server`           |
+| Output       | `dist/`                 |
 | Server entry | `dist/server/index.mjs` |
 
 **Vercel:**
@@ -327,10 +331,10 @@ npm run build
 NITRO_PRESET=vercel npm run build
 ```
 
-| Detail | Value |
-| ------ | ----- |
-| Nitro preset | `vercel` |
-| Output | Vercel Build Output API under `.vercel/output` |
+| Detail       | Value                                          |
+| ------------ | ---------------------------------------------- |
+| Nitro preset | `vercel`                                       |
+| Output       | Vercel Build Output API under `.vercel/output` |
 
 Vercel is used only for the frontend SSR app. Express API and Socket.IO are not deployed on Vercel.
 
@@ -352,17 +356,17 @@ npm run start
 
 ## API surface (high level)
 
-| Area | Role |
-| ---- | ---- |
-| Auth | Register, login, logout, profile, Google OAuth, avatar |
-| Workspaces | List/switch workspaces, settings, members |
-| Projects / tasks | CRUD, board updates, attachments |
-| Team / invitations | Invites, accept flow, member management |
-| Chat | Conversations, messages, reactions, pins, unread, Socket.IO |
-| Notifications | List, mark read, deadline reminders (internal) |
-| Files | Authenticated upload/download via backend storage drivers |
-| AI summary | Deterministic `POST /api/ai/workspace-summary` |
-| Billing | Read-only summary; plan change returns not available |
+| Area               | Role                                                        |
+| ------------------ | ----------------------------------------------------------- |
+| Auth               | Register, login, logout, profile, Google OAuth, avatar      |
+| Workspaces         | List/switch workspaces, settings, members                   |
+| Projects / tasks   | CRUD, board updates, attachments                            |
+| Team / invitations | Invites, accept flow, member management                     |
+| Chat               | Conversations, messages, reactions, pins, unread, Socket.IO |
+| Notifications      | List, mark read, deadline reminders (internal)              |
+| Files              | Authenticated upload/download via backend storage drivers   |
+| AI summary         | Deterministic `POST /api/ai/workspace-summary`              |
+| Billing            | Owner-scoped plans; one-time YooKassa activation             |
 
 ## Testing
 
@@ -391,34 +395,34 @@ Manual post-deploy checks: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/QA
 
 ### Root (frontend)
 
-| Script | Description |
-| ------ | ----------- |
-| `npm run dev` | Vite / TanStack Start dev server (port 8080) |
-| `npm run build` | Production build (default Nitro `node-server`) |
-| `npm run preview` | Preview production build |
-| `npm run lint` | ESLint |
-| `npm run format` | Prettier |
+| Script            | Description                                    |
+| ----------------- | ---------------------------------------------- |
+| `npm run dev`     | Vite / TanStack Start dev server (port 8080)   |
+| `npm run build`   | Production build (default Nitro `node-server`) |
+| `npm run preview` | Preview production build                       |
+| `npm run lint`    | ESLint                                         |
+| `npm run format`  | Prettier                                       |
 
 For a Vercel-oriented build locally: `NITRO_PRESET=vercel npm run build`.
 
 ### `server/` (backend)
 
-| Script | Description |
-| ------ | ----------- |
-| `npm run dev` | API with hot reload |
-| `npm run build` | Compile TypeScript |
-| `npm run start` | Run compiled server |
-| `npm run typecheck` | Typecheck without emit |
-| `npm test` | Node test runner |
-| `npm run prisma:migrate` | Local `migrate dev` |
+| Script                          | Description                  |
+| ------------------------------- | ---------------------------- |
+| `npm run dev`                   | API with hot reload          |
+| `npm run build`                 | Compile TypeScript           |
+| `npm run start`                 | Run compiled server          |
+| `npm run typecheck`             | Typecheck without emit       |
+| `npm test`                      | Node test runner             |
+| `npm run prisma:migrate`        | Local `migrate dev`          |
 | `npm run prisma:migrate:deploy` | Apply migrations (prod / CI) |
-| `npm run prisma:generate` | Generate Prisma Client |
-| `npm run prisma:studio` | Prisma Studio |
-| `npm run db:seed` | Seed demo workspace |
+| `npm run prisma:generate`       | Generate Prisma Client       |
+| `npm run prisma:studio`         | Prisma Studio                |
+| `npm run db:seed`               | Seed demo workspace          |
 
 ## Current limitations
 
-- No online billing or payment provider; plan changes are disabled in UI and rejected by the API
+- Billing V1 is one-time plan activation; subscriptions, expiration, and automatic renewal are not implemented
 - Workspace briefings do not use an external LLM
 - Online presence is in-memory and single-instance (`WEB_CONCURRENCY=1`)
 - Backend on Render may cold-start after idle time
@@ -436,7 +440,7 @@ Near-term (no fixed dates):
 - Attachment loading experience
 - Responsive and localization polish
 - Optional external LLM provider behind the same briefing API shape
-- Real billing provider later
+- Subscription billing and automatic renewal later
 - Multi-instance-safe presence (shared store + Socket.IO adapter) later
 
 ## Portfolio note
@@ -448,7 +452,7 @@ This repository shows fullstack TypeScript product work:
 - Express REST API with validation and clear route layering
 - PostgreSQL modeling with Prisma
 - Durable private file storage via backend + Supabase
-- Honest scoping: deterministic AI, read-only billing, single-instance presence
+- Honest scoping: one-time YooKassa activation, no billing subscriptions, single-instance presence
 
 ## License
 
