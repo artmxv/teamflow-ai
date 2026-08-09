@@ -4,6 +4,15 @@ import { z } from "zod";
 import { getAiCopilotChatResponse } from "../services/ai-copilot.service.js";
 import { getWorkspaceAiSummary } from "../services/ai.service.js";
 import { resolveRequestWorkspaceContext } from "../lib/workspace-request.js";
+import {
+  aiCopilotRateLimiter,
+  type InMemoryAiCopilotRateLimiter,
+} from "../services/ai-copilot-rate-limit.service.js";
+import {
+  logAiCopilotOperationalEvent,
+  safelyLogAiCopilotOperationalEvent,
+  type AiCopilotOperationalLogger,
+} from "../services/ai-copilot-operations.js";
 
 export const AI_COPILOT_MESSAGE_MAX_CHARS = 2_000;
 export const AI_COPILOT_HISTORY_MAX_MESSAGES = 8;
@@ -70,30 +79,79 @@ export async function getWorkspaceAiSummaryController(
   }
 }
 
-export async function postAiCopilotChatController(req: Request, res: Response, next: NextFunction) {
-  const parsed = parseAiCopilotChatBody(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ message: "Invalid AI Copilot payload", issues: parsed.error.issues });
-    return;
-  }
+type AiCopilotControllerDependencies = {
+  resolveWorkspaceContext: typeof resolveRequestWorkspaceContext;
+  getChatResponse: typeof getAiCopilotChatResponse;
+  rateLimiter: InMemoryAiCopilotRateLimiter;
+  logEvent: AiCopilotOperationalLogger;
+  clockMs: () => number;
+};
 
-  try {
-    const context = await resolveRequestWorkspaceContext(req.userId!, req);
-    if (!context) {
-      res.status(403).json({ message: "Workspace not found" });
+const defaultAiCopilotControllerDependencies: AiCopilotControllerDependencies = {
+  resolveWorkspaceContext: resolveRequestWorkspaceContext,
+  getChatResponse: getAiCopilotChatResponse,
+  rateLimiter: aiCopilotRateLimiter,
+  logEvent: logAiCopilotOperationalEvent,
+  clockMs: () => Date.now(),
+};
+
+export function createPostAiCopilotChatController(
+  overrides: Partial<AiCopilotControllerDependencies> = {},
+) {
+  const dependencies = { ...defaultAiCopilotControllerDependencies, ...overrides };
+  return async function postAiCopilotChat(req: Request, res: Response, next: NextFunction) {
+    const startedAtMs = dependencies.clockMs();
+    const parsed = parseAiCopilotChatBody(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ message: "Invalid AI Copilot payload", issues: parsed.error.issues });
       return;
     }
 
-    const result = await getAiCopilotChatResponse({
-      workspaceId: context.workspaceId,
-      userId: req.userId!,
-      role: context.role,
-      message: parsed.data.message,
-      locale: parsed.data.locale,
-      history: parsed.data.history ?? [],
-    });
-    res.json({ data: result });
-  } catch (error) {
-    next(error);
-  }
+    try {
+      const context = await dependencies.resolveWorkspaceContext(req.userId!, req);
+      if (!context) {
+        res.status(403).json({ message: "Workspace not found" });
+        return;
+      }
+
+      const decision = dependencies.rateLimiter.consume(
+        req.userId!,
+        context.workspaceId,
+        dependencies.clockMs(),
+      );
+      if (!decision.allowed) {
+        safelyLogAiCopilotOperationalEvent(dependencies.logEvent, {
+          event: "ai_copilot_request",
+          provider: "not_called",
+          mode: "rate_limited",
+          latencyMs: Math.max(0, Math.round(dependencies.clockMs() - startedAtMs)),
+          reasonCode: "AI_COPILOT_RATE_LIMITED",
+        });
+        res.setHeader("Retry-After", String(decision.retryAfterSeconds));
+        res.status(429).json({
+          message:
+            parsed.data.locale === "ru"
+              ? "Слишком много запросов к Copilot. Повторите попытку позже."
+              : "Too many Copilot requests. Please try again later.",
+          code: "AI_COPILOT_RATE_LIMITED",
+          retryAfterSeconds: decision.retryAfterSeconds,
+        });
+        return;
+      }
+
+      const result = await dependencies.getChatResponse({
+        workspaceId: context.workspaceId,
+        userId: req.userId!,
+        role: context.role,
+        message: parsed.data.message,
+        locale: parsed.data.locale,
+        history: parsed.data.history ?? [],
+      });
+      res.json({ data: result });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
+
+export const postAiCopilotChatController = createPostAiCopilotChatController();

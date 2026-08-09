@@ -31,6 +31,9 @@ function buildSystemInstructions(locale: AiLocale): string {
     "You are read-only. Never claim that you created, edited, deleted, assigned, moved, or otherwise changed workspace data.",
     "Do not claim access to comments, chats, files, billing, credentials, member emails, or any data absent from the snapshot.",
     "When contextTruncated is true, disclose that the available snapshot is partial when that limitation affects the answer.",
+    "Keep the answer concise and use short paragraphs.",
+    'For lists, use simple lines beginning with "-". Usually include no more than 5–7 main items unless the question genuinely requires more detail.',
+    "Do not use Markdown tables, headings, bold markers, code fences, or other complex Markdown formatting.",
   ].join("\n");
 }
 
