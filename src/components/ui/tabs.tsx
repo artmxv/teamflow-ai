@@ -12,7 +12,7 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex h-auto min-h-10 w-full max-w-full items-center justify-start gap-1 overflow-x-auto rounded-lg border border-border bg-muted/55 p-1 text-muted-foreground sm:w-auto",
+      "inline-flex h-auto min-h-10 w-full max-w-full items-center justify-start gap-1 overflow-x-auto rounded-xl border border-border/80 bg-muted/50 p-1 text-muted-foreground sm:w-auto",
       className,
     )}
     {...props}
@@ -27,7 +27,7 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-transparent px-3 py-1.5 text-sm font-medium ring-offset-background cursor-pointer transition-all hover:bg-control-hover hover:text-control-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-45 disabled:cursor-not-allowed data-[state=active]:border-primary/25 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm dark:data-[state=active]:bg-secondary/80",
+      "inline-flex h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-lg border border-transparent px-3 py-1.5 text-sm font-medium ring-offset-background cursor-pointer transition-[color,background-color,background-image,box-shadow,border-color] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_oklch,var(--brand-ring)_30%,transparent)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-45 disabled:cursor-not-allowed",
       className,
     )}
     {...props}

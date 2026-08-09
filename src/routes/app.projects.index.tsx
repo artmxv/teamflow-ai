@@ -12,6 +12,7 @@ import { AvatarStack } from "@/components/app/Avatar";
 import { EmptyState } from "@/components/app/EmptyState";
 import { CREATE_ACTION_BUTTON_CLASSNAME, FilterBar } from "@/components/app/FilterBar";
 import { PageHeader } from "@/components/app/PageHeader";
+import { ProjectAccentSurface } from "@/components/app/ProjectAccentSurface";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
 import { members, projectStatusMeta, type Project, type ProjectStatus } from "@/lib/mock-data";
 import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
@@ -41,11 +42,19 @@ const initialsMap = Object.fromEntries(members.map((m) => [m.id, m.avatar]));
 
 const filters: { key: "all" | ProjectStatus; labelKey: TKey }[] = [
   { key: "all", labelKey: "projects.all" },
-  { key: "active", labelKey: "projects.active" },
   { key: "planning", labelKey: "projects.planning" },
+  { key: "active", labelKey: "projects.active" },
   { key: "on_hold", labelKey: "projects.onHold" },
   { key: "completed", labelKey: "projects.completed" },
 ];
+
+const PROJECT_FILTER_CLASS: Record<"all" | ProjectStatus, string> = {
+  all: "filter-chip-all",
+  active: "filter-chip-active",
+  planning: "filter-chip-planning",
+  on_hold: "filter-chip-on-hold",
+  completed: "filter-chip-completed",
+};
 
 type ProjectCard = Pick<
   Project,
@@ -138,12 +147,12 @@ function ProjectsIndexPage() {
             {filters.map((f) => (
               <button
                 key={f.key}
+                type="button"
                 onClick={() => setStatusFilter(f.key)}
+                data-active={filter === f.key ? "true" : "false"}
                 className={
-                  "h-10 rounded-lg border px-3 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 " +
-                  (filter === f.key
-                    ? "border-primary/30 bg-primary/12 text-primary shadow-sm"
-                    : "border-control-border bg-background/70 text-control-foreground hover:bg-control-hover")
+                  "filter-chip h-10 cursor-pointer rounded-lg px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_oklch,var(--brand-ring)_30%,transparent)] " +
+                  PROJECT_FILTER_CLASS[f.key]
                 }
               >
                 {t(f.labelKey)}
@@ -151,12 +160,15 @@ function ProjectsIndexPage() {
             ))}
           </div>
           <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Search
+              className="filter-search-icon absolute left-3 top-1/2 size-4 -translate-y-1/2"
+              aria-hidden="true"
+            />
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder={t("projects.searchProjects")}
-              className="border-control-border bg-background/70 pl-9"
+              className="filter-search-input pl-9"
             />
           </div>
         </div>
@@ -183,50 +195,58 @@ function ProjectsIndexPage() {
           />
         )
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((p) => {
             const meta = projectStatusMeta[p.status];
+            const description = displayProjectDescription(p.description, lang);
             return (
               <Link
                 key={p.id}
                 to="/app/projects/$projectId"
                 params={{ projectId: p.id }}
-                className="group rounded-2xl border border-border bg-card p-5 shadow-soft transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-card"
+                className="surface-lift group block h-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <div className="flex items-start justify-between">
-                  <div className={"h-2 w-12 rounded-full bg-gradient-to-r " + p.color} />
-                  <Badge variant="secondary" className={meta.className + " border-0"}>
-                    {projectStatusLabel(p.status, t)}
-                  </Badge>
-                </div>
-                <h3 className="mt-4 text-base font-semibold tracking-tight">
-                  {displayProjectName(p.name, lang)}
-                </h3>
-                <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
-                  {displayProjectDescription(p.description, lang)}
-                </p>
+                <ProjectAccentSurface gradient={p.color} className="h-full" contentClassName="p-5">
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    <div className="flex shrink-0 items-start justify-end">
+                      <Badge variant="secondary" className={meta.className + " border-0"}>
+                        {projectStatusLabel(p.status, t)}
+                      </Badge>
+                    </div>
+                    <h3 className="mt-3 line-clamp-2 min-h-[3rem] text-base font-semibold leading-6 tracking-tight">
+                      {displayProjectName(p.name, lang)}
+                    </h3>
+                    <p className="mt-1 line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-muted-foreground">
+                      {description || "\u00A0"}
+                    </p>
 
-                <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={"h-full rounded-full bg-gradient-to-r " + p.color}
-                    style={{ width: p.progress + "%" }}
-                  />
-                </div>
-                <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <ListTodo className="size-3" /> {p.openTasks} / {p.totalTasks}
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <Calendar className="size-3" /> {t("projects.due")} {p.dueDate}
-                  </span>
-                </div>
+                    <div className="mt-auto pt-5">
+                      <div className="h-2 overflow-hidden rounded-full bg-muted/80">
+                        <div
+                          className={
+                            "project-progress-fill h-full rounded-full bg-gradient-to-r " + p.color
+                          }
+                          style={{ width: p.progress + "%" }}
+                        />
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-1">
+                          <ListTodo className="size-3" /> {p.openTasks} / {p.totalTasks}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <Calendar className="size-3" /> {t("projects.due")} {p.dueDate}
+                        </span>
+                      </div>
 
-                <div className="mt-4 flex items-center justify-between">
-                  <AvatarStack ids={p.members} initialsMap={initialsMap} />
-                  <span className="text-xs text-muted-foreground">
-                    {t("projects.updated")} {p.updatedAt}
-                  </span>
-                </div>
+                      <div className="mt-4 flex items-center justify-between">
+                        <AvatarStack ids={p.members} initialsMap={initialsMap} />
+                        <span className="text-xs text-muted-foreground">
+                          {t("projects.updated")} {p.updatedAt}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </ProjectAccentSurface>
               </Link>
             );
           })}
@@ -246,7 +266,7 @@ function mapApiProjectToCard(project: ProjectApiItem): ProjectCard {
     openTasks: project.openTasks,
     totalTasks: project.totalTasks,
     members: [],
-    color: getProjectAccent(project).gradient,
+    color: project.color?.trim() || getProjectAccent(project).gradient,
     dueDate: formatDueDate(project.dueDate),
     updatedAt: formatUpdatedAt(project.updatedAt),
   };
@@ -266,9 +286,9 @@ function LoadingGrid() {
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {Array.from({ length: 6 }).map((_, index) => (
-        <div key={index} className="rounded-2xl border border-border bg-card p-5 shadow-soft">
-          <Skeleton className="h-2 w-12 rounded-full" />
-          <Skeleton className="mt-4 h-5 w-2/3" />
+        <div key={index} className="rounded-2xl border border-border/80 bg-card p-5 shadow-soft">
+          <Skeleton className="ml-auto h-5 w-16 rounded-full" />
+          <Skeleton className="mt-3 h-5 w-2/3" />
           <Skeleton className="mt-2 h-4 w-full" />
           <Skeleton className="mt-5 h-1.5 w-full rounded-full" />
           <Skeleton className="mt-4 h-4 w-1/2" />
@@ -296,7 +316,7 @@ function NoResultsState({
         {t("projects.noMatchHint")}
       </p>
       {hasActiveFilters && (
-        <Button variant="outline" onClick={onClearFilters} className="mt-5">
+        <Button variant="brandSoft" onClick={onClearFilters} className="mt-5">
           <RotateCcw className="size-4" /> {t("common.clearFilters")}
         </Button>
       )}

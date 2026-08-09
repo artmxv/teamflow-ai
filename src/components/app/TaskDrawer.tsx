@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -30,6 +31,8 @@ import {
 } from "@/components/ui/select";
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
 import { AssigneeMultiPicker } from "@/components/app/AssigneeMultiPicker";
+import { TaskStatusIndicator } from "@/components/app/TaskStatusIndicator";
+import { TaskPriorityIndicator } from "@/components/app/TaskPriorityIndicator";
 import { AuthenticatedImagePreview } from "@/components/app/files/AuthenticatedImagePreview";
 import { useAuthenticatedImageLightbox } from "@/components/app/files/AuthenticatedImageLightbox";
 import { FilePreparationStatus } from "@/components/app/files/FilePreparationStatus";
@@ -42,19 +45,13 @@ import {
 } from "@/hooks/use-authenticated-blob-url";
 import { useOnDemandFilePreparation } from "@/hooks/use-on-demand-file-preparation";
 import { fetchProjectMembers } from "@/lib/api/project-members";
+import { fetchProjects } from "@/lib/api/projects";
 import { fetchWorkspaceMembers } from "@/lib/api/workspace-members";
 import {
   enrichAssigneeOptionsWithAvatars,
   resolveEditAssigneeOptions,
   type AssigneeOption,
 } from "@/lib/assignee-options";
-import {
-  createTaskComment,
-  deleteTaskComment,
-  fetchTaskComments,
-  updateTaskComment,
-  type TaskCommentApiItem,
-} from "@/lib/api/task-comments";
 import { invalidateNotifications } from "@/lib/api/notifications";
 import {
   deleteTaskAttachment,
@@ -81,12 +78,11 @@ import {
   type Priority,
   type Task,
   type TaskStatus,
-  getProject,
   priorityMeta,
   statusColumns,
 } from "@/lib/mock-data";
+import { getProjectAccent } from "@/lib/project-color";
 import { EmptyState } from "@/components/app/EmptyState";
-import { UserAvatar } from "@/components/app/UserAvatar";
 import { friendlyUploadErrorMessage } from "@/lib/upload-errors";
 import { isUploadFileTooLarge } from "@/lib/upload-limits";
 import {
@@ -98,11 +94,11 @@ import {
   Check,
   Trash2,
   Pencil,
-  X,
   Download,
   ExternalLink,
   Loader2,
   Upload,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { combineLocalDateAndTime, formatDueDateTime, splitLocalDateTime } from "@/lib/due-datetime";
@@ -146,22 +142,25 @@ export function TaskDrawer({
   const { t, lang } = useI18n();
   const queryClient = useQueryClient();
   const { data: me } = useCurrentUser();
-  const currentUserId = me?.user.id;
   const [draftTitle, setDraftTitle] = useState("");
   const [draftAssigneeIds, setDraftAssigneeIds] = useState<string[]>([]);
   const [draftDueDate, setDraftDueDate] = useState("");
   const [draftDueTime, setDraftDueTime] = useState("");
   const [draftStatus, setDraftStatus] = useState<TaskStatus>("backlog");
   const [draftPriority, setDraftPriority] = useState<Priority>("medium");
-  const [commentBody, setCommentBody] = useState("");
   const [deleteTaskOpen, setDeleteTaskOpen] = useState(false);
   const [dueDateTimeError, setDueDateTimeError] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
   const [editingDescription, setEditingDescription] = useState(false);
   const [draftDescription, setDraftDescription] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const titleEditorRef = useRef<HTMLDivElement>(null);
+  const saveChangesButtonRef = useRef<HTMLButtonElement>(null);
+  const displayedTaskTitle = task ? displayTaskTitle(task.title, lang) : "";
 
   useLayoutEffect(() => {
-    if (!task) {
+    if (!task?.id) {
       setDraftTitle("");
       setDraftAssigneeIds([]);
       setDraftDueDate("");
@@ -169,6 +168,7 @@ export function TaskDrawer({
       setDraftStatus("backlog");
       setDraftPriority("medium");
       setDueDateTimeError(null);
+      setEditingTitle(false);
       setEditingDescription(false);
       setDraftDescription("");
       return;
@@ -181,6 +181,7 @@ export function TaskDrawer({
     setDraftStatus(task.status);
     setDraftPriority(task.priority);
     setDueDateTimeError(null);
+    setEditingTitle(false);
     setEditingDescription(false);
     setDraftDescription(displayTaskDescription(task.description, lang));
   }, [
@@ -196,58 +197,38 @@ export function TaskDrawer({
   ]);
 
   useEffect(() => {
-    setCommentBody("");
-  }, [task?.id]);
-
-  useEffect(() => {
     if (!task) {
       setDeleteTaskOpen(false);
     }
   }, [task]);
 
-  const commentsQuery = useQuery({
-    queryKey: ["task-comments", task?.id],
-    queryFn: () => fetchTaskComments(task!.id),
-    enabled: !!task?.id,
-  });
+  useEffect(() => {
+    if (editingTitle) {
+      titleInputRef.current?.focus();
+      titleInputRef.current?.select();
+    }
+  }, [editingTitle]);
 
-  const createCommentMutation = useMutation({
-    mutationFn: (body: string) => createTaskComment(task!.id, body),
-    onSuccess: async () => {
-      setCommentBody("");
-      await queryClient.invalidateQueries({ queryKey: ["task-comments", task!.id] });
-      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      invalidateNotifications(queryClient);
-      toast.success(t("comments.added"));
-    },
-    onError: () => {
-      toast.error(t("comments.saveFailed"));
-    },
-  });
+  useEffect(() => {
+    if (!editingTitle) return;
 
-  const updateCommentMutation = useMutation({
-    mutationFn: ({ commentId, body }: { commentId: string; body: string }) =>
-      updateTaskComment(task!.id, commentId, body),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["task-comments", task!.id] });
-      toast.success(t("comments.updated"));
-    },
-    onError: () => {
-      toast.error(t("comments.updateFailed"));
-    },
-  });
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (
+        titleEditorRef.current?.contains(target) ||
+        saveChangesButtonRef.current?.contains(target)
+      ) {
+        return;
+      }
 
-  const deleteCommentMutation = useMutation({
-    mutationFn: (commentId: string) => deleteTaskComment(task!.id, commentId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["task-comments", task!.id] });
-      await queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      toast.success(t("comments.deleted"));
-    },
-    onError: () => {
-      toast.error(t("comments.deleteFailed"));
-    },
-  });
+      setDraftTitle(displayedTaskTitle);
+      setEditingTitle(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    return () => document.removeEventListener("pointerdown", handlePointerDown, true);
+  }, [displayedTaskTitle, editingTitle]);
 
   const attachmentsQuery = useQuery({
     queryKey: ["task-attachments", task?.id],
@@ -291,6 +272,12 @@ export function TaskDrawer({
     enabled: !!task?.projectId,
   });
 
+  const projectsQuery = useQuery({
+    queryKey: ["projects"],
+    queryFn: fetchProjects,
+    enabled: !!task?.projectId,
+  });
+
   const workspaceMembersQuery = useQuery({
     queryKey: ["workspace-members"],
     queryFn: fetchWorkspaceMembers,
@@ -329,7 +316,6 @@ export function TaskDrawer({
   const canEditTask = !!onSaveChanges;
   const canEditAssignees = canEditTask;
   const canEditDescription = !!onSaveDescription;
-  const displayedTaskTitle = displayTaskTitle(task.title, lang);
   const initialDueParts = splitLocalDateTime(task.dueDate);
   const hasTitleChanges = draftTitle.trim() !== displayedTaskTitle.trim();
   const hasAssigneeChanges = !sameAssigneeIds(draftAssigneeIds, savedAssigneeIds);
@@ -344,13 +330,23 @@ export function TaskDrawer({
     hasStatusChanges ||
     hasPriorityChanges;
   const canSaveChanges = hasChanges && draftTitle.trim().length >= 2;
-  const project = getProject(task.projectId);
+  const apiProject = projectsQuery.data?.find((project) => project.id === task.projectId);
+  const projectName = apiProject?.name ?? task.labels[0] ?? "";
+  const projectAccent = getProjectAccent({
+    id: task.projectId,
+    name: projectName || "project",
+    color: apiProject?.color,
+  });
   const prio = priorityMeta[task.priority];
   const statusLabel = taskStatusLabel(task.status, t);
   const descriptionText = displayTaskDescription(task.description, lang).trim();
   const savedDescriptionText = descriptionText;
   const descriptionDraftNormalized = draftDescription.trim();
   const hasDescriptionChanges = descriptionDraftNormalized !== savedDescriptionText;
+  const selectedAssigneeOptions = resolvedAssigneeOptions.filter((option) =>
+    draftAssigneeIds.includes(option.id),
+  );
+  const showFooter = canEditTask || !!onDelete;
 
   async function handleSaveDescription() {
     if (!onSaveDescription || isSavingDescription) return;
@@ -367,6 +363,12 @@ export function TaskDrawer({
     if (!task) return;
     setDraftDescription(displayTaskDescription(task.description, lang));
     setEditingDescription(false);
+  }
+
+  function handleCancelTitleEdit() {
+    if (!task) return;
+    setDraftTitle(displayTaskTitle(task.title, lang));
+    setEditingTitle(false);
   }
 
   function handleSaveChanges() {
@@ -393,6 +395,7 @@ export function TaskDrawer({
       status: draftStatus,
       priority: draftPriority,
     });
+    setEditingTitle(false);
   }
 
   return (
@@ -400,58 +403,226 @@ export function TaskDrawer({
       <Sheet open={!!task} onOpenChange={onOpenChange}>
         <SheetContent
           side="right"
-          className="app-scrollbar w-full overflow-x-hidden overflow-y-auto sm:max-w-2xl"
+          className="flex h-full w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
         >
-          <SheetHeader className="space-y-1 border-b border-border pb-4">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="font-mono">{task.key}</span>
-              <span>·</span>
-              <span>{project?.name ? displayProjectName(project.name, lang) : ""}</span>
-            </div>
-            <SheetTitle className={canEditTask ? "sr-only" : "text-xl leading-snug"}>
-              {displayTaskTitle(canEditTask ? draftTitle || task.title : task.title, lang)}
-            </SheetTitle>
-            {canEditTask ? (
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="task-drawer-title"
-                  className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
-                >
-                  {t("tasks.taskTitle")}
-                </label>
-                <Input
-                  key={`${task.id}:${lang}`}
-                  id="task-drawer-title"
-                  value={draftTitle}
-                  disabled={isSaving}
-                  className="h-10 text-base font-semibold"
-                  onChange={(event) => setDraftTitle(event.target.value)}
-                />
+          <div className="app-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 pt-6 pb-4">
+            <SheetHeader className="space-y-2 border-b border-border pb-4 text-left">
+              <div className="flex items-center gap-2 pr-8 text-xs text-muted-foreground">
+                <span className="font-mono">{task.key}</span>
+                {projectName ? (
+                  <>
+                    <span>·</span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/35 px-2 py-0.5 font-medium text-foreground/75">
+                      <span
+                        className={cn("size-1.5 shrink-0 rounded-full", projectAccent.dot)}
+                        aria-hidden
+                      />
+                      {displayProjectName(projectName, lang)}
+                    </span>
+                  </>
+                ) : null}
               </div>
-            ) : null}
-            <SheetDescription className="sr-only">
-              {t("tasks.sheetDescription").replace("{key}", task.key)}
-            </SheetDescription>
-          </SheetHeader>
 
-          {canEditAssignees ? (
-            <section className="border-b border-border py-4">
-              <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                <UserIcon className="size-3.5" /> {t("tasks.assignees")}
-              </div>
-              <AssigneeMultiPicker
-                options={resolvedAssigneeOptions}
-                value={draftAssigneeIds}
-                disabled={isSaving}
-                isLoading={assigneeOptionsLoading}
-                onChange={setDraftAssigneeIds}
-              />
-            </section>
-          ) : null}
+              {editingTitle && canEditTask ? (
+                <div ref={titleEditorRef} className="space-y-1.5">
+                  <SheetTitle className="sr-only">{draftTitle || displayedTaskTitle}</SheetTitle>
+                  <Input
+                    ref={titleInputRef}
+                    key={`${task.id}:${lang}:edit`}
+                    id="task-drawer-title"
+                    value={draftTitle}
+                    disabled={isSaving}
+                    className="h-10 text-base font-semibold"
+                    aria-label={t("tasks.taskTitle")}
+                    onChange={(event) => setDraftTitle(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        handleCancelTitleEdit();
+                      }
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="inline-flex max-w-full items-center gap-2 pr-8">
+                  <SheetTitle className="min-w-0 text-xl leading-snug break-words [overflow-wrap:anywhere]">
+                    {displayTaskTitle(canEditTask ? draftTitle || task.title : task.title, lang)}
+                  </SheetTitle>
+                  {canEditTask ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 shrink-0 p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
+                      aria-label={t("tasks.editTitle")}
+                      disabled={isSaving}
+                      onClick={() => {
+                        setDraftTitle(displayTaskTitle(task.title, lang));
+                        setEditingTitle(true);
+                      }}
+                    >
+                      <Pencil className="size-3.5" aria-hidden />
+                    </Button>
+                  ) : null}
+                </div>
+              )}
 
-          <div className="grid gap-6 py-4 lg:grid-cols-[minmax(0,1fr)_240px]">
-            <div className="min-w-0 space-y-6">
-              <section className="min-w-0">
+              <SheetDescription className="sr-only">
+                {t("tasks.sheetDescription").replace("{key}", task.key)}
+              </SheetDescription>
+            </SheetHeader>
+
+            <div className="grid gap-5 py-5">
+              <aside className="grid w-full gap-3 sm:grid-cols-2">
+                <Field icon={CircleDot} label={t("tasks.status")} tone="status">
+                  {canEditTask ? (
+                    <Select
+                      key={`${task.id}-status`}
+                      value={draftStatus}
+                      disabled={isSaving}
+                      onValueChange={(value) => setDraftStatus(value as TaskStatus)}
+                    >
+                      <SelectTrigger className="h-10 w-full">
+                        <SelectValue placeholder={t("tasks.status")}>
+                          <TaskStatusIndicator status={draftStatus}>
+                            {taskStatusLabel(draftStatus, t)}
+                          </TaskStatusIndicator>
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {statusColumns.map((column) => (
+                          <SelectItem key={column.key} value={column.key}>
+                            <TaskStatusIndicator status={column.key}>
+                              {taskStatusLabel(column.key, t)}
+                            </TaskStatusIndicator>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Badge variant="secondary" className="border-0">
+                      <TaskStatusIndicator status={task.status}>{statusLabel}</TaskStatusIndicator>
+                    </Badge>
+                  )}
+                </Field>
+
+                <Field icon={Flag} label={t("tasks.priority")} tone="priority">
+                  {canEditTask ? (
+                    <Select
+                      key={`${task.id}-priority`}
+                      value={draftPriority}
+                      disabled={isSaving}
+                      onValueChange={(value) => setDraftPriority(value as Priority)}
+                    >
+                      <SelectTrigger className="h-10 w-full">
+                        <SelectValue placeholder="Select priority">
+                          <TaskPriorityIndicator priority={draftPriority}>
+                            {priorityLabel(draftPriority, t)}
+                          </TaskPriorityIndicator>
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(
+                          Object.entries(priorityMeta) as [
+                            Priority,
+                            (typeof priorityMeta)[Priority],
+                          ][]
+                        ).map(([key]) => (
+                          <SelectItem key={key} value={key}>
+                            <TaskPriorityIndicator priority={key}>
+                              {priorityLabel(key, t)}
+                            </TaskPriorityIndicator>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Badge variant="secondary" className={prio.className + " border-0"}>
+                      <TaskPriorityIndicator priority={task.priority}>
+                        {priorityLabel(task.priority, t)}
+                      </TaskPriorityIndicator>
+                    </Badge>
+                  )}
+                </Field>
+
+                <Field icon={UserIcon} label={t("tasks.assignees")} tone="assignee">
+                  {canEditAssignees ? (
+                    <Popover modal>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-10 w-full justify-between border-border bg-background px-3 hover:bg-muted/40"
+                          disabled={isSaving}
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <AssigneeAvatars
+                              assignees={selectedAssigneeOptions}
+                              showUnassignedLabel
+                              maxVisible={3}
+                            />
+                            {selectedAssigneeOptions.length > 0 ? (
+                              <span className="truncate text-xs text-muted-foreground">
+                                {selectedAssigneeOptions.length === 1
+                                  ? selectedAssigneeOptions[0]?.name
+                                  : `${selectedAssigneeOptions.length} ${t("tasks.assignees").toLowerCase()}`}
+                              </span>
+                            ) : null}
+                          </span>
+                          <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] p-2">
+                        <AssigneeMultiPicker
+                          compact
+                          options={resolvedAssigneeOptions}
+                          value={draftAssigneeIds}
+                          disabled={isSaving}
+                          isLoading={assigneeOptionsLoading}
+                          onChange={setDraftAssigneeIds}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  ) : (
+                    <AssigneeAvatars assignees={assignees} showUnassignedLabel />
+                  )}
+                </Field>
+
+                <Field icon={Calendar} label={t("tasks.dueDate")} tone="due">
+                  {canEditTask ? (
+                    <div className="grid w-full gap-2">
+                      <div className="grid gap-2 min-[420px]:grid-cols-2">
+                        <DeadlineDatePicker
+                          disabled={isSaving}
+                          value={draftDueDate}
+                          aria-label={t("tasks.dueDate")}
+                          onChange={(next) => {
+                            setDraftDueDate(next);
+                            setDueDateTimeError(null);
+                          }}
+                        />
+                        <DeadlineTimePicker
+                          disabled={isSaving}
+                          value={draftDueTime}
+                          aria-label={t("tasks.dueTime")}
+                          onChange={(next) => {
+                            setDraftDueTime(next);
+                            setDueDateTimeError(null);
+                          }}
+                        />
+                      </div>
+                      {dueDateTimeError ? (
+                        <p className="text-xs leading-4 text-destructive">{dueDateTimeError}</p>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <span className="text-sm">{formatDueDateTime(task.dueDate)}</span>
+                  )}
+                </Field>
+              </aside>
+
+              <section className="rounded-xl border border-border/80 bg-card/60 p-3.5">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     {t("tasks.description")}
@@ -460,8 +631,8 @@ export function TaskDrawer({
                     <Button
                       type="button"
                       variant="ghost"
-                      size="sm"
-                      className="h-8 shrink-0 gap-1.5 px-2 text-xs"
+                      size="icon"
+                      className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
                       aria-label={t("tasks.editDescription")}
                       onClick={() => {
                         setDraftDescription(displayTaskDescription(task.description, lang));
@@ -469,7 +640,6 @@ export function TaskDrawer({
                       }}
                     >
                       <Pencil className="size-3.5" aria-hidden />
-                      {t("common.edit")}
                     </Button>
                   ) : null}
                 </div>
@@ -534,7 +704,7 @@ export function TaskDrawer({
               </section>
 
               {task.checklist.length > 0 ? (
-                <section>
+                <section className="rounded-xl border border-border/80 bg-card/60 p-3.5">
                   <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     {t("tasks.sectionChecklist")}
                   </h3>
@@ -608,41 +778,6 @@ export function TaskDrawer({
                 }}
               />
 
-              <TaskCommentsSection
-                comments={commentsQuery.data ?? []}
-                currentUserId={currentUserId}
-                isLoading={commentsQuery.isLoading}
-                isError={commentsQuery.isError}
-                commentBody={commentBody}
-                onCommentBodyChange={setCommentBody}
-                isSubmitting={createCommentMutation.isPending}
-                onSubmit={() => {
-                  const trimmed = commentBody.trim();
-                  if (!trimmed || createCommentMutation.isPending) return;
-                  createCommentMutation.mutate(trimmed);
-                }}
-                onUpdateComment={(commentId, body) => {
-                  if (updateCommentMutation.isPending) {
-                    return Promise.reject(new Error("Update already in progress"));
-                  }
-                  return updateCommentMutation.mutateAsync({ commentId, body });
-                }}
-                onDeleteComment={(commentId) => {
-                  if (deleteCommentMutation.isPending) {
-                    return Promise.reject(new Error("Delete already in progress"));
-                  }
-                  return deleteCommentMutation.mutateAsync(commentId);
-                }}
-                updatingCommentId={
-                  updateCommentMutation.isPending
-                    ? (updateCommentMutation.variables?.commentId ?? null)
-                    : null
-                }
-                deletingCommentId={
-                  deleteCommentMutation.isPending ? (deleteCommentMutation.variables ?? null) : null
-                }
-              />
-
               {task.activity.length > 0 ? (
                 <section>
                   <ol className="space-y-2 border-l border-border pl-4">
@@ -657,122 +792,38 @@ export function TaskDrawer({
                 </section>
               ) : null}
             </div>
+          </div>
 
-            <aside className="w-full space-y-4 lg:w-[240px] lg:shrink-0 lg:sticky lg:top-4 lg:self-start">
-              <Field icon={CircleDot} label={t("tasks.status")}>
-                {canEditTask ? (
-                  <Select
-                    key={`${task.id}-status`}
-                    value={draftStatus}
-                    disabled={isSaving}
-                    onValueChange={(value) => setDraftStatus(value as TaskStatus)}
-                  >
-                    <SelectTrigger className="h-10 w-full">
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {statusColumns.map((column) => (
-                        <SelectItem key={column.key} value={column.key}>
-                          {taskStatusLabel(column.key, t)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Badge variant="secondary" className="border-0">
-                    {statusLabel}
-                  </Badge>
-                )}
-              </Field>
-              <Field icon={Flag} label={t("tasks.priority")}>
-                {canEditTask ? (
-                  <Select
-                    key={`${task.id}-priority`}
-                    value={draftPriority}
-                    disabled={isSaving}
-                    onValueChange={(value) => setDraftPriority(value as Priority)}
-                  >
-                    <SelectTrigger className="h-10 w-full">
-                      <SelectValue placeholder="Select priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(
-                        Object.entries(priorityMeta) as [
-                          Priority,
-                          (typeof priorityMeta)[Priority],
-                        ][]
-                      ).map(([key]) => (
-                        <SelectItem key={key} value={key}>
-                          {priorityLabel(key, t)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Badge variant="secondary" className={prio.className + " border-0"}>
-                    {priorityLabel(task.priority, t)}
-                  </Badge>
-                )}
-              </Field>
-              {!canEditAssignees ? (
-                <Field icon={UserIcon} label={t("tasks.assignees")}>
-                  <AssigneeAvatars assignees={assignees} showUnassignedLabel />
-                </Field>
-              ) : null}
-              <Field icon={Calendar} label={t("tasks.dueDate")}>
-                {canEditTask ? (
-                  <div className="grid w-full gap-2.5">
-                    <DeadlineDatePicker
-                      disabled={isSaving}
-                      value={draftDueDate}
-                      aria-label={t("tasks.dueDate")}
-                      onChange={(next) => {
-                        setDraftDueDate(next);
-                        setDueDateTimeError(null);
-                      }}
-                    />
-                    <DeadlineTimePicker
-                      disabled={isSaving}
-                      value={draftDueTime}
-                      aria-label={t("tasks.dueTime")}
-                      onChange={(next) => {
-                        setDraftDueTime(next);
-                        setDueDateTimeError(null);
-                      }}
-                    />
-                    {dueDateTimeError ? (
-                      <p className="text-xs leading-4 text-destructive">{dueDateTimeError}</p>
-                    ) : null}
-                  </div>
-                ) : (
-                  <span className="text-sm">{formatDueDateTime(task.dueDate)}</span>
-                )}
-              </Field>
-              {canEditTask && (
-                <Button
-                  type="button"
-                  variant="brand"
-                  className="h-10 w-full"
-                  disabled={!canSaveChanges || isSaving}
-                  onClick={handleSaveChanges}
-                >
-                  {isSaving ? t("settings.saving") : t("common.saveChanges")}
-                </Button>
-              )}
-              {onDelete && (
+          {showFooter ? (
+            <div className="sticky bottom-0 z-10 flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/85">
+              {onDelete ? (
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-10 w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  className="h-10 gap-2 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
                   disabled={isDeleting}
                   onClick={() => setDeleteTaskOpen(true)}
                 >
                   <Trash2 className="size-4" />
                   {isDeleting ? t("tasks.deleting") : t("tasks.deleteTask")}
                 </Button>
+              ) : (
+                <span />
               )}
-            </aside>
-          </div>
+              {canEditTask ? (
+                <Button
+                  ref={saveChangesButtonRef}
+                  type="button"
+                  variant="brand"
+                  className="h-10 min-w-[10.5rem]"
+                  disabled={!canSaveChanges || isSaving}
+                  onClick={handleSaveChanges}
+                >
+                  {isSaving ? t("settings.saving") : t("common.saveChanges")}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
         </SheetContent>
       </Sheet>
       <AlertDialog
@@ -811,304 +862,11 @@ export function TaskDrawer({
   );
 }
 
-function authorInitials(author: TaskCommentApiItem["author"]) {
-  if (author.avatar) return author.avatar;
-  return author.name
-    .split(" ")
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
-
-function formatCommentDate(value: string) {
+function formatAttachmentDate(value: string) {
   return new Date(value).toLocaleString(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
   });
-}
-
-function TaskCommentsSection({
-  comments,
-  currentUserId,
-  isLoading,
-  isError,
-  commentBody,
-  onCommentBodyChange,
-  isSubmitting,
-  onSubmit,
-  onUpdateComment,
-  onDeleteComment,
-  updatingCommentId,
-  deletingCommentId,
-}: {
-  comments: TaskCommentApiItem[];
-  currentUserId?: string;
-  isLoading: boolean;
-  isError: boolean;
-  commentBody: string;
-  onCommentBodyChange: (value: string) => void;
-  isSubmitting: boolean;
-  onSubmit: () => void;
-  onUpdateComment: (commentId: string, body: string) => Promise<unknown>;
-  onDeleteComment: (commentId: string) => Promise<unknown>;
-  updatingCommentId: string | null;
-  deletingCommentId: string | null;
-}) {
-  const { t } = useI18n();
-  const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
-  const isDeletingSelected = commentToDelete != null && deletingCommentId === commentToDelete;
-
-  const trimmedLength = commentBody.trim().length;
-  const canSubmit = trimmedLength > 0 && trimmedLength <= 1000 && !isSubmitting;
-
-  async function handleConfirmDelete() {
-    if (!commentToDelete || isDeletingSelected) return;
-    try {
-      await onDeleteComment(commentToDelete);
-      setCommentToDelete(null);
-    } catch {
-      // Toast is shown by the parent mutation; keep dialog open.
-    }
-  }
-
-  return (
-    <section>
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {t("tasks.sectionComments")}
-      </h3>
-      <div className="space-y-3">
-        {isLoading ? (
-          <p className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-            {t("comments.loading")}
-          </p>
-        ) : isError ? (
-          <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-4 text-center text-xs text-destructive">
-            {t("comments.error")}
-          </p>
-        ) : comments.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-            <p className="font-medium text-foreground">{t("comments.emptyTitle")}</p>
-            <p className="mt-1">{t("comments.emptyHint")}</p>
-          </div>
-        ) : (
-          <div className="app-scrollbar max-h-[min(50vh,16rem)] space-y-3 overflow-y-auto overscroll-contain pr-1">
-            {comments.map((comment) => (
-              <TaskCommentRow
-                key={comment.id}
-                comment={comment}
-                isOwn={!!currentUserId && comment.author.id === currentUserId}
-                isUpdating={updatingCommentId === comment.id}
-                isDeleting={deletingCommentId === comment.id}
-                onUpdate={onUpdateComment}
-                onRequestDelete={setCommentToDelete}
-              />
-            ))}
-          </div>
-        )}
-        <AlertDialog
-          open={commentToDelete != null}
-          onOpenChange={(open) => {
-            if (!open && !isDeletingSelected) {
-              setCommentToDelete(null);
-            }
-          }}
-        >
-          <AlertDialogContent className="max-w-sm gap-4">
-            <AlertDialogHeader>
-              <AlertDialogTitle>{t("comments.deleteTitle")}</AlertDialogTitle>
-              <AlertDialogDescription>{t("comments.deleteDescription")}</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeletingSelected}>
-                {t("common.cancel")}
-              </AlertDialogCancel>
-              <Button
-                type="button"
-                variant="destructive"
-                className="gap-2"
-                disabled={isDeletingSelected}
-                onClick={() => void handleConfirmDelete()}
-              >
-                <Trash2 className="size-4" />
-                {isDeletingSelected ? t("comments.deleting") : t("comments.deleteConfirm")}
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-        <Textarea
-          placeholder={t("tasks.commentPlaceholder")}
-          className="min-h-20 rounded-2xl"
-          value={commentBody}
-          maxLength={1000}
-          disabled={isSubmitting}
-          onChange={(event) => onCommentBodyChange(event.target.value)}
-          onKeyDown={(event) => {
-            if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && canSubmit) {
-              event.preventDefault();
-              onSubmit();
-            }
-          }}
-        />
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] tabular-nums text-muted-foreground">
-            {trimmedLength >= 900 ? `${trimmedLength}/1000` : null}
-          </span>
-          <Button type="button" size="sm" variant="brand" disabled={!canSubmit} onClick={onSubmit}>
-            {isSubmitting ? t("tasks.postingComment") : t("tasks.postComment")}
-          </Button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function TaskCommentRow({
-  comment,
-  isOwn,
-  isUpdating,
-  isDeleting,
-  onUpdate,
-  onRequestDelete,
-}: {
-  comment: TaskCommentApiItem;
-  isOwn: boolean;
-  isUpdating: boolean;
-  isDeleting: boolean;
-  onUpdate: (commentId: string, body: string) => Promise<unknown>;
-  onRequestDelete: (commentId: string) => void;
-}) {
-  const { t } = useI18n();
-  const [isEditing, setIsEditing] = useState(false);
-  const [editBody, setEditBody] = useState(comment.body);
-
-  useEffect(() => {
-    if (!isEditing) {
-      setEditBody(comment.body);
-    }
-  }, [comment.body, isEditing]);
-
-  const trimmedEdit = editBody.trim();
-  const canSaveEdit =
-    trimmedEdit.length > 0 &&
-    trimmedEdit.length <= 1000 &&
-    trimmedEdit !== comment.body &&
-    !isUpdating;
-
-  function startEditing() {
-    setEditBody(comment.body);
-    setIsEditing(true);
-  }
-
-  function cancelEditing() {
-    setEditBody(comment.body);
-    setIsEditing(false);
-  }
-
-  async function saveEditing() {
-    if (!canSaveEdit) return;
-    try {
-      await onUpdate(comment.id, trimmedEdit);
-      setIsEditing(false);
-    } catch {
-      // Toast is shown by the parent mutation; keep edit mode open.
-    }
-  }
-
-  function handleDelete() {
-    if (isDeleting) return;
-    onRequestDelete(comment.id);
-  }
-
-  return (
-    <div className="flex gap-2.5">
-      <UserAvatar
-        id={comment.author.id}
-        name={comment.author.name}
-        avatar={comment.author.avatar ?? authorInitials(comment.author)}
-        avatarUrl={comment.author.avatarUrl}
-        size="sm"
-      />
-      <div className="min-w-0 flex-1 rounded-xl border border-border bg-card px-2.5 py-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-              <span className="font-medium">{comment.author.name}</span>
-              <span className="text-muted-foreground">{formatCommentDate(comment.createdAt)}</span>
-            </div>
-          </div>
-          {isOwn && !isEditing && (
-            <div className="flex shrink-0 items-center gap-0.5">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-7 text-muted-foreground hover:text-foreground"
-                disabled={isUpdating || isDeleting}
-                aria-label={t("comments.editComment")}
-                onClick={startEditing}
-              >
-                <Pencil className="size-3.5" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-7 text-muted-foreground hover:text-destructive"
-                disabled={isUpdating || isDeleting}
-                aria-label={t("comments.deleteComment")}
-                onClick={handleDelete}
-              >
-                <Trash2 className="size-3.5" />
-              </Button>
-            </div>
-          )}
-        </div>
-        {isEditing ? (
-          <div className="mt-1.5 space-y-1.5">
-            <Textarea
-              value={editBody}
-              maxLength={1000}
-              disabled={isUpdating}
-              className="min-h-14 resize-none rounded-lg py-2 text-sm"
-              onChange={(event) => setEditBody(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  cancelEditing();
-                }
-              }}
-            />
-            <div className="flex items-center justify-end gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 px-2 text-xs"
-                disabled={isUpdating}
-                onClick={cancelEditing}
-              >
-                <X className="mr-1 size-3" />
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="brand"
-                className="h-7 px-2 text-xs"
-                disabled={!canSaveEdit}
-                onClick={saveEditing}
-              >
-                {isUpdating ? "Saving…" : "Save"}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <p className="mt-1 text-sm leading-snug text-foreground/90">{comment.body}</p>
-        )}
-      </div>
-    </div>
-  );
 }
 
 function TaskAttachmentsSection({
@@ -1151,17 +909,17 @@ function TaskAttachmentsSection({
   }
 
   return (
-    <section>
+    <section className="rounded-xl border border-border/80 bg-card/60 p-3.5">
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <Paperclip className="size-3.5" /> {t("tasks.sectionAttachments")}
         </h3>
-        {!isLoading && !isError && attachments.length > 0 ? (
+        {!isLoading && !isError ? (
           <Button
             type="button"
             size="sm"
             variant="outline"
-            className="h-8 gap-1.5 px-2.5 text-xs"
+            className="h-8 gap-1.5 border-primary/25 bg-primary/8 px-2.5 text-xs text-primary hover:bg-primary/14"
             disabled={isUploading}
             onClick={onPickFile}
           >
@@ -1204,23 +962,6 @@ function TaskAttachmentsSection({
             icon={Paperclip}
             title={t("tasks.attachmentsEmptyTitle")}
             description={t("tasks.attachmentsEmptyHint")}
-            primaryAction={
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8 gap-1.5 px-2.5 text-xs"
-                disabled={isUploading}
-                onClick={onPickFile}
-              >
-                {isUploading ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Upload className="size-3.5" />
-                )}
-                {isUploading ? t("tasks.uploading") : t("tasks.upload")}
-              </Button>
-            }
           />
         ) : (
           <div className="app-scrollbar max-h-[min(50vh,16rem)] space-y-2 overflow-y-auto overscroll-contain pr-1">
@@ -1380,7 +1121,7 @@ function TaskAttachmentRow({
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
           <span>{formatAttachmentSize(attachment.size)}</span>
           <span>·</span>
-          <span>{formatCommentDate(attachment.createdAt)}</span>
+          <span>{formatAttachmentDate(attachment.createdAt)}</span>
           <span>·</span>
           <span>{attachment.uploader.name}</span>
         </div>
@@ -1442,15 +1183,33 @@ function Field({
   icon: Icon,
   label,
   children,
+  tone,
+  className,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   children: React.ReactNode;
+  tone?: "status" | "priority" | "assignee" | "due";
+  className?: string;
 }) {
+  const iconTone =
+    tone === "status"
+      ? "bg-info/12 text-info"
+      : tone === "priority"
+        ? "bg-violet-500/12 text-violet-700 dark:text-violet-300"
+        : tone === "assignee"
+          ? "bg-[color-mix(in_oklch,oklch(0.55_0.14_265)_14%,transparent)] text-[oklch(0.48_0.14_265)] dark:bg-[color-mix(in_oklch,oklch(0.72_0.12_265)_18%,transparent)] dark:text-[oklch(0.78_0.1_265)]"
+          : tone === "due"
+            ? "bg-amber-500/15 text-amber-800 dark:text-amber-200"
+            : "bg-muted text-muted-foreground";
+
   return (
-    <div className="rounded-xl border border-border bg-card p-3">
+    <div className={cn("rounded-xl border border-border bg-card p-3", className)}>
       <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-        <Icon className="size-3.5" /> {label}
+        <span className={cn("grid size-7 place-items-center rounded-lg", iconTone)}>
+          <Icon className="size-3.5" />
+        </span>
+        {label}
       </div>
       <div className="mt-1.5">{children}</div>
     </div>

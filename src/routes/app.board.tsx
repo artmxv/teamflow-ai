@@ -18,7 +18,15 @@ import { invalidateNotifications } from "@/lib/api/notifications";
 import { invalidateWorkspaceContentQueries } from "@/lib/workspace-queries";
 import { AppShell } from "@/components/app/AppShell";
 import { ApiErrorState } from "@/components/app/ApiErrorState";
-import { CREATE_ACTION_BUTTON_CLASSNAME, FilterBar } from "@/components/app/FilterBar";
+import {
+  CREATE_ACTION_BUTTON_CLASSNAME,
+  FILTER_BAR_BOARD_CONTROLS_CLASSNAME,
+  FILTER_RESET_CLASSNAME,
+  FilterBar,
+  assigneeFilterSelectClassName,
+  filterSelectActiveAttr,
+  priorityFilterSelectClassName,
+} from "@/components/app/FilterBar";
 import { statusColumns, type Priority, type Task, type TaskStatus } from "@/lib/mock-data";
 import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
@@ -51,7 +59,7 @@ import {
   type TaskApiStatus,
 } from "@/lib/api/tasks";
 import { fetchProjects } from "@/lib/api/projects";
-import { taskStatusLabel, useI18n, type TKey } from "@/lib/i18n";
+import { priorityLabel, taskStatusLabel, useI18n, type TKey } from "@/lib/i18n";
 import { Filter, FolderKanban, ListTodo, Plus, RotateCcw } from "lucide-react";
 import { fetchWorkspaceMembers } from "@/lib/api/workspace-members";
 import {
@@ -61,6 +69,7 @@ import {
   taskHasAssignee,
   taskIsUnassigned,
 } from "@/lib/assignee-options";
+import { TaskPriorityIndicator } from "@/components/app/TaskPriorityIndicator";
 import { taskStatusColumnDotClass } from "@/lib/task-status-theme";
 
 export const Route = createFileRoute("/app/board")({
@@ -71,7 +80,6 @@ export const Route = createFileRoute("/app/board")({
 
 const apiStatusMap: Record<TaskApiStatus, TaskStatus> = {
   BACKLOG: "backlog",
-  TODO: "todo",
   IN_PROGRESS: "in_progress",
   REVIEW: "review",
   DONE: "done",
@@ -80,7 +88,6 @@ const apiStatusMap: Record<TaskApiStatus, TaskStatus> = {
 const apiPriorityMap: Record<TaskApiPriority, Priority> = {
   LOW: "low",
   MEDIUM: "medium",
-  HIGH: "high",
   URGENT: "urgent",
 };
 
@@ -112,9 +119,21 @@ function Board() {
     queryFn: fetchWorkspaceMembers,
   });
   const projectOptions = useMemo(
-    () => apiProjects.map((project) => ({ id: project.id, name: project.name })),
+    () =>
+      apiProjects.map((project) => ({
+        id: project.id,
+        name: project.name,
+        color: project.color,
+      })),
     [apiProjects],
   );
+  const projectColorById = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const project of apiProjects) {
+      map.set(project.id, project.color);
+    }
+    return map;
+  }, [apiProjects]);
   const hasAccessibleProjects = projectOptions.length > 0;
   const createTaskMutation = useMutation({
     mutationFn: createTask,
@@ -331,24 +350,41 @@ function Board() {
         <div className="flex items-center gap-2 text-sm font-medium text-foreground">
           <Filter className="size-4 text-muted-foreground" /> {t("board.filters")}
         </div>
-        <div className="grid w-full gap-2 sm:ml-auto sm:w-auto sm:grid-cols-[minmax(10rem,1fr)_minmax(10rem,1fr)_auto]">
+        <div className={FILTER_BAR_BOARD_CONTROLS_CLASSNAME}>
           <Select
             value={priority}
             onValueChange={(value) => setPriority(value as Priority | "all")}
           >
-            <SelectTrigger className="w-full min-w-[10rem] border-control-border bg-background/70">
-              <SelectValue placeholder={t("tasks.priority")} />
+            <SelectTrigger
+              data-filter-active={filterSelectActiveAttr(priority !== "all")}
+              className={priorityFilterSelectClassName(priority)}
+            >
+              <SelectValue placeholder={t("tasks.priority")}>
+                {priority === "all" ? (
+                  t("tasks.allPriorities")
+                ) : (
+                  <TaskPriorityIndicator priority={priority}>
+                    {priorityLabel(priority, t)}
+                  </TaskPriorityIndicator>
+                )}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{t("tasks.allPriorities")}</SelectItem>
-              <SelectItem value="low">{t("tasks.priorityLow")}</SelectItem>
-              <SelectItem value="medium">{t("tasks.priorityMedium")}</SelectItem>
-              <SelectItem value="high">{t("tasks.priorityHigh")}</SelectItem>
-              <SelectItem value="urgent">{t("tasks.priorityUrgent")}</SelectItem>
+              {(["low", "medium", "urgent"] as Priority[]).map((value) => (
+                <SelectItem key={value} value={value}>
+                  <TaskPriorityIndicator priority={value}>
+                    {priorityLabel(value, t)}
+                  </TaskPriorityIndicator>
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Select value={assignee} onValueChange={setAssignee}>
-            <SelectTrigger className="w-full min-w-[10rem] border-control-border bg-background/70">
+            <SelectTrigger
+              data-filter-active={filterSelectActiveAttr(assignee !== "all")}
+              className={assigneeFilterSelectClassName()}
+            >
               <SelectValue placeholder={t("tasks.assignee")} />
             </SelectTrigger>
             <SelectContent>
@@ -361,8 +397,8 @@ function Board() {
             </SelectContent>
           </Select>
           <Button
-            variant="outline"
-            className="h-10 w-full sm:w-auto"
+            variant="brandSoft"
+            className={FILTER_RESET_CLASSNAME}
             disabled={priority === "all" && assignee === "all"}
             onClick={() => {
               setPriority("all");
@@ -441,7 +477,7 @@ function Board() {
                       <NewTaskDialog {...newTaskDialogProps}>
                         <button
                           type="button"
-                          className="rounded-md p-1 text-muted-foreground hover:bg-card hover:text-foreground"
+                          className="rounded-md border border-transparent bg-transparent p-1 text-muted-foreground outline-none transition-[color,background-color,border-color,box-shadow] hover:border-primary/30 hover:bg-primary/8 hover:text-primary/80 focus-visible:border-primary/30 focus-visible:bg-primary/8 focus-visible:text-primary/80 focus-visible:ring-2 focus-visible:ring-primary/20"
                           aria-label={`${t("common.newTask")} — ${columnTitle}`}
                         >
                           <Plus className="size-3.5" />
@@ -459,6 +495,7 @@ function Board() {
                           key={task.id}
                           task={task}
                           draggable
+                          projectColor={projectColorById.get(task.projectId)}
                           assignees={resolveTaskAssignees(apiTasks, task.id)}
                           onOpen={handleOpenTask}
                           onStatusChange={(status) =>
@@ -474,16 +511,6 @@ function Board() {
                       )}
                     </>
                   )}
-                  {hasAccessibleProjects ? (
-                    <NewTaskDialog {...newTaskDialogProps}>
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-center gap-1 rounded-xl border border-dashed border-border py-2 text-xs text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
-                      >
-                        <Plus className="size-3.5" /> {t("board.addNewCard")}
-                      </button>
-                    </NewTaskDialog>
-                  ) : null}
                 </BoardColumn>
               );
             })}
@@ -493,6 +520,7 @@ function Board() {
               <TaskCard
                 task={activeDragTask}
                 dragOverlay
+                projectColor={projectColorById.get(activeDragTask.projectId)}
                 assignees={resolveTaskAssignees(apiTasks, activeDragTask.id)}
                 onOpen={() => {}}
               />

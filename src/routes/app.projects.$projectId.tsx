@@ -12,13 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -30,10 +23,12 @@ import {
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
+import { ProjectAccentSurface } from "@/components/app/ProjectAccentSurface";
+import { ProjectStatusSelect } from "@/components/app/ProjectStatusSelect";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
 import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
 import { projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
-import { projectApiStatusLabel, projectStatusLabel, useI18n, type TKey } from "@/lib/i18n";
+import { projectStatusLabel, useI18n, type TKey } from "@/lib/i18n";
 import {
   combineLocalDateAndTime,
   formatDueDateTime,
@@ -47,7 +42,7 @@ import { useAuthenticatedImageLightbox } from "@/components/app/files/Authentica
 import { FilePreparationStatus } from "@/components/app/files/FilePreparationStatus";
 import { DeadlineDatePicker } from "@/components/app/DeadlineDatePicker";
 import { DeadlineTimePicker } from "@/components/app/DeadlineTimePicker";
-import { deadlineStatusDateTimeRowClassName } from "@/components/app/deadline-field-styles";
+import { projectDeadlineStatusDateTimeRowClassName } from "@/components/app/deadline-field-styles";
 import {
   acquireAuthenticatedBlobUrl,
   getAuthenticatedBlobObjectUrl,
@@ -55,6 +50,8 @@ import {
 } from "@/hooks/use-authenticated-blob-url";
 import { useOnDemandFilePreparation } from "@/hooks/use-on-demand-file-preparation";
 import { resolveProjectGradient } from "@/lib/project-color";
+import { taskPriorityChipClass } from "@/lib/task-priority-theme";
+import { taskStatusChipClass } from "@/lib/task-status-theme";
 import {
   displayProjectDescription,
   displayProjectName,
@@ -143,9 +140,15 @@ const apiStatusMap: Record<ProjectApiStatus, ProjectStatus> = {
   COMPLETED: "completed",
 };
 
+const projectStatusToApi: Record<ProjectStatus, ProjectApiStatus> = {
+  active: "ACTIVE",
+  planning: "PLANNING",
+  on_hold: "ON_HOLD",
+  completed: "COMPLETED",
+};
+
 const apiTaskStatusMap: Record<TaskApiStatus, TaskStatus> = {
   BACKLOG: "backlog",
-  TODO: "todo",
   IN_PROGRESS: "in_progress",
   REVIEW: "review",
   DONE: "done",
@@ -154,13 +157,11 @@ const apiTaskStatusMap: Record<TaskApiStatus, TaskStatus> = {
 const apiTaskPriorityMap: Record<TaskApiPriority, Priority> = {
   LOW: "low",
   MEDIUM: "medium",
-  HIGH: "high",
   URGENT: "urgent",
 };
 
 const taskStatusLabelKey: Record<TaskApiStatus, TKey> = {
   BACKLOG: "board.backlog",
-  TODO: "board.todo",
   IN_PROGRESS: "board.inProgress",
   REVIEW: "board.review",
   DONE: "board.done",
@@ -169,23 +170,20 @@ const taskStatusLabelKey: Record<TaskApiStatus, TKey> = {
 const taskPriorityLabelKey: Record<TaskApiPriority, TKey> = {
   LOW: "tasks.priorityLow",
   MEDIUM: "tasks.priorityMedium",
-  HIGH: "tasks.priorityHigh",
   URGENT: "tasks.priorityUrgent",
 };
 
 const taskStatusTone: Record<TaskApiStatus, string> = {
-  BACKLOG: "bg-muted text-muted-foreground",
-  TODO: "bg-info/15 text-info",
-  IN_PROGRESS: "bg-primary/15 text-primary",
-  REVIEW: "bg-warning/20 text-warning-foreground",
-  DONE: "bg-success/15 text-success",
+  BACKLOG: taskStatusChipClass.backlog,
+  IN_PROGRESS: taskStatusChipClass.in_progress,
+  REVIEW: taskStatusChipClass.review,
+  DONE: taskStatusChipClass.done,
 };
 
 const taskPriorityTone: Record<TaskApiPriority, string> = {
-  LOW: "bg-muted text-muted-foreground",
-  MEDIUM: "bg-info/15 text-info",
-  HIGH: "bg-warning/20 text-warning-foreground",
-  URGENT: "bg-destructive/15 text-destructive",
+  LOW: taskPriorityChipClass.low,
+  MEDIUM: taskPriorityChipClass.medium,
+  URGENT: taskPriorityChipClass.urgent,
 };
 
 function ProjectDetailPage() {
@@ -490,11 +488,11 @@ function EditProjectDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="brandSoft" size="sm">
           {t("common.edit")}
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{t("projects.detail.editProject")}</DialogTitle>
           <DialogDescription>{t("projects.detail.editProjectDesc")}</DialogDescription>
@@ -537,28 +535,21 @@ function EditProjectDialog({
               placeholder={t("projects.new.description")}
             />
           </div>
-          <div className={deadlineStatusDateTimeRowClassName}>
+          <div className={projectDeadlineStatusDateTimeRowClassName}>
             <div className="flex min-w-0 flex-col gap-1.5">
               <Label className="block h-4 leading-none">{t("projects.detail.status")}</Label>
-              <Select
-                value={status}
-                onValueChange={(value) => setStatus(value as ProjectApiStatus)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t("projects.detail.status")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PLANNING">{projectApiStatusLabel("PLANNING", t)}</SelectItem>
-                  <SelectItem value="ACTIVE">{projectApiStatusLabel("ACTIVE", t)}</SelectItem>
-                  <SelectItem value="ON_HOLD">{projectApiStatusLabel("ON_HOLD", t)}</SelectItem>
-                  <SelectItem value="COMPLETED">{projectApiStatusLabel("COMPLETED", t)}</SelectItem>
-                </SelectContent>
-              </Select>
+              <ProjectStatusSelect
+                value={apiStatusMap[status]}
+                onValueChange={(next) => setStatus(projectStatusToApi[next])}
+                getLabel={(statusKey) => projectStatusLabel(statusKey, t)}
+                placeholder={t("projects.detail.status")}
+              />
             </div>
             <div className="flex min-w-0 flex-col gap-1.5">
               <Label className="block h-4 leading-none">{t("projects.detail.dueDate")}</Label>
               <DeadlineDatePicker
                 value={dueDate}
+                className="w-full min-w-0"
                 aria-label={t("projects.detail.dueDate")}
                 onChange={(next) => {
                   setDueDate(next);
@@ -572,6 +563,7 @@ function EditProjectDialog({
               </Label>
               <DeadlineTimePicker
                 value={dueTime}
+                className="w-full min-w-0"
                 aria-label={t("projects.detail.dueTime")}
                 onChange={(next) => {
                   setDueTime(next);
@@ -681,13 +673,16 @@ function ProjectDetails({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <ProjectAccentSurface
+            gradient={colorGradient}
+            className="h-auto flex-none"
+            contentClassName="flex-none p-5"
+          >
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <div className={"h-2 w-16 rounded-full bg-gradient-to-r " + colorGradient} />
-                <h2 className="mt-4 truncate text-xl font-semibold tracking-tight">
+                <h2 className="truncate text-xl font-semibold tracking-tight">
                   {localizedProjectName}
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -725,9 +720,13 @@ function ProjectDetails({
             {canManageMembers ? (
               <p className="mt-4 text-xs text-muted-foreground">{t("projects.detail.editHint")}</p>
             ) : null}
-          </div>
+          </ProjectAccentSurface>
 
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
+          <ProjectAccentSurface
+            gradient={colorGradient}
+            className="h-auto flex-none"
+            contentClassName="flex-none p-4"
+          >
             <div className="flex items-center justify-between gap-2">
               <div>
                 <h3 className="text-sm font-semibold">{t("projects.detail.taskProgress")}</h3>
@@ -743,129 +742,136 @@ function ProjectDetails({
                 {progress.total === 0 ? "0%" : `${progress.percent}%`}
               </span>
             </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+            <div className="mt-3 h-3 overflow-hidden rounded-full bg-muted/80">
               <div
-                className={"h-full rounded-full bg-gradient-to-r transition-all " + colorGradient}
+                className={
+                  "project-progress-fill h-full rounded-full bg-gradient-to-r transition-all " +
+                  colorGradient
+                }
                 style={{ width: `${progress.percent}%` }}
               />
             </div>
-          </div>
+          </ProjectAccentSurface>
 
           <ProjectMembersCard projectId={project.id} canManageMembers={canManageMembers} />
 
           <ProjectDocumentsCard projectId={project.id} />
         </div>
 
-        <div className="flex flex-col rounded-2xl border border-border bg-card p-5 shadow-soft lg:row-span-1">
-          <div className="flex shrink-0 items-start justify-between gap-2">
-            <div>
-              <h3 className="text-base font-semibold">{t("projects.detail.projectTasks")}</h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {projectTasks.length === 0
-                  ? t("projects.detail.createFirstTask")
-                  : projectTasks.length === 1
-                    ? t("projects.detail.taskCountOne")
-                    : t("projects.detail.taskCount").replace(
-                        "{count}",
-                        String(projectTasks.length),
-                      )}
-              </p>
+        <div className="min-h-0 w-full lg:self-stretch">
+          <div className="flex min-h-0 w-full flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-soft lg:h-full">
+            <div className="flex shrink-0 items-start justify-between gap-2 border-b border-border/70 bg-card px-5 py-4">
+              <div className="min-w-0">
+                <h3 className="text-base font-semibold">{t("projects.detail.projectTasks")}</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {projectTasks.length === 0
+                    ? t("projects.detail.createFirstTask")
+                    : projectTasks.length === 1
+                      ? t("projects.detail.taskCountOne")
+                      : t("projects.detail.taskCount").replace(
+                          "{count}",
+                          String(projectTasks.length),
+                        )}
+                </p>
+              </div>
+              {sortedTasks.length > 0 ? (
+                <NewTaskDialog
+                  isSubmitting={isCreatingTask}
+                  fixedProjectId={project.id}
+                  onSubmit={onCreateTask}
+                >
+                  <Button size="sm" variant="brand" className="h-8 shrink-0 gap-1">
+                    <Plus className="size-3.5" />
+                    {t("common.newTask")}
+                  </Button>
+                </NewTaskDialog>
+              ) : null}
             </div>
-            {sortedTasks.length > 0 ? (
-              <NewTaskDialog
-                isSubmitting={isCreatingTask}
-                fixedProjectId={project.id}
-                onSubmit={onCreateTask}
-              >
-                <Button size="sm" variant="brand" className="h-8 shrink-0 gap-1">
-                  <Plus className="size-3.5" />
-                  {t("common.newTask")}
-                </Button>
-              </NewTaskDialog>
-            ) : null}
-          </div>
-          <div className="mt-4 min-h-0 flex-1 overflow-hidden rounded-xl border border-border">
-            {sortedTasks.length === 0 ? (
-              <EmptyState
-                compact
-                className="border-0 bg-transparent shadow-none"
-                icon={ListTodo}
-                title={t("projects.detail.emptyTasksTitle")}
-                description={t("projects.detail.emptyTasksHint")}
-                primaryAction={
-                  <NewTaskDialog
-                    isSubmitting={isCreatingTask}
-                    fixedProjectId={project.id}
-                    onSubmit={onCreateTask}
-                  >
-                    <Button size="sm" variant="brand" className="h-8 gap-1">
-                      <Plus className="size-3.5" />
-                      {t("common.newTask")}
-                    </Button>
-                  </NewTaskDialog>
-                }
-              />
-            ) : (
-              <ul className="app-scrollbar max-h-[min(70vh,32rem)] divide-y divide-border overflow-y-auto overscroll-contain">
-                {sortedTasks.map((task) => (
-                  <li key={task.id}>
-                    <button
-                      type="button"
-                      className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40"
-                      onClick={() => onOpenTask(task)}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                            {task.key}
-                          </span>
-                          <span className="truncate text-sm font-medium">
-                            {displayTaskTitle(task.title, lang)}
-                          </span>
-                        </div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <Badge
-                            variant="secondary"
-                            className={taskStatusTone[task.status] + " border-0 capitalize"}
-                          >
-                            {t(taskStatusLabelKey[task.status])}
-                          </Badge>
-                          <Badge
-                            variant="secondary"
-                            className={taskPriorityTone[task.priority] + " border-0 capitalize"}
-                          >
-                            {t(taskPriorityLabelKey[task.priority])}
-                          </Badge>
-                          {task.dueDate ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                              <Calendar className="size-3" />
-                              {formatDueDateTimeShort(task.dueDate)}
+            <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              {sortedTasks.length === 0 ? (
+                <div className="p-5">
+                  <EmptyState
+                    compact
+                    className="border-0 bg-transparent shadow-none"
+                    icon={ListTodo}
+                    title={t("projects.detail.emptyTasksTitle")}
+                    description={t("projects.detail.emptyTasksHint")}
+                    primaryAction={
+                      <NewTaskDialog
+                        isSubmitting={isCreatingTask}
+                        fixedProjectId={project.id}
+                        onSubmit={onCreateTask}
+                      >
+                        <Button size="sm" variant="brand" className="h-8 gap-1">
+                          <Plus className="size-3.5" />
+                          {t("common.newTask")}
+                        </Button>
+                      </NewTaskDialog>
+                    }
+                  />
+                </div>
+              ) : (
+                <ul className="divide-y divide-border">
+                  {sortedTasks.map((task) => (
+                    <li key={task.id}>
+                      <button
+                        type="button"
+                        className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+                        onClick={() => onOpenTask(task)}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                              {task.key}
                             </span>
-                          ) : null}
+                            <span className="truncate text-sm font-medium">
+                              {displayTaskTitle(task.title, lang)}
+                            </span>
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <Badge
+                              variant="secondary"
+                              className={taskStatusTone[task.status] + " border-0 capitalize"}
+                            >
+                              {t(taskStatusLabelKey[task.status])}
+                            </Badge>
+                            <Badge
+                              variant="secondary"
+                              className={taskPriorityTone[task.priority] + " border-0 capitalize"}
+                            >
+                              {t(taskPriorityLabelKey[task.priority])}
+                            </Badge>
+                            {task.dueDate ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                                <Calendar className="size-3" />
+                                {formatDueDateTimeShort(task.dueDate)}
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1">
-                        <AssigneeAvatars
-                          assignees={
-                            task.assignees.length > 0
-                              ? task.assignees.map((assignee) => ({
-                                  id: assignee.id,
-                                  name: assignee.name,
-                                  email: assignee.email,
-                                  avatar: initialsFromName(assignee.name),
-                                  avatarUrl: assignee.avatarUrl ?? null,
-                                }))
-                              : []
-                          }
-                          showUnassignedLabel
-                          maxVisible={2}
-                        />
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <AssigneeAvatars
+                            assignees={
+                              task.assignees.length > 0
+                                ? task.assignees.map((assignee) => ({
+                                    id: assignee.id,
+                                    name: assignee.name,
+                                    email: assignee.email,
+                                    avatar: initialsFromName(assignee.name),
+                                    avatarUrl: assignee.avatarUrl ?? null,
+                                  }))
+                                : []
+                            }
+                            showUnassignedLabel
+                            maxVisible={2}
+                          />
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -1613,9 +1619,8 @@ function Stat({ label, value }: { label: string; value: ReactNode }) {
 function LoadingState() {
   return (
     <div className="grid gap-4 lg:grid-cols-3">
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-soft lg:col-span-2">
-        <Skeleton className="h-2 w-16 rounded-full" />
-        <Skeleton className="mt-4 h-6 w-2/3" />
+      <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-soft lg:col-span-2">
+        <Skeleton className="h-6 w-2/3" />
         <Skeleton className="mt-2 h-4 w-full" />
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -1630,7 +1635,7 @@ function LoadingState() {
             <Skeleton className="h-3 w-16" />
             <Skeleton className="h-3 w-10" />
           </div>
-          <Skeleton className="mt-2 h-1.5 w-full rounded-full" />
+          <Skeleton className="mt-2 h-2.5 w-full rounded-full" />
         </div>
       </div>
       <div className="rounded-2xl border border-border bg-card p-5 shadow-soft">
@@ -1663,9 +1668,8 @@ function NotFoundState() {
 
 const taskPriorityRank: Record<TaskApiPriority, number> = {
   URGENT: 0,
-  HIGH: 1,
-  MEDIUM: 2,
-  LOW: 3,
+  MEDIUM: 1,
+  LOW: 2,
 };
 
 function compareTaskDueDates(a: string | null, b: string | null) {

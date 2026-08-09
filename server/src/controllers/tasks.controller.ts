@@ -8,8 +8,8 @@ const createTaskSchema = z.object({
   projectId: z.string().min(1, "projectId is required"),
   title: z.string().trim().min(2, "title must be at least 2 characters"),
   description: z.string().max(500, "description must be at most 500 characters").optional(),
-  status: z.enum(["BACKLOG", "TODO", "IN_PROGRESS", "REVIEW", "DONE"]).optional(),
-  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
+  status: z.enum(["BACKLOG", "IN_PROGRESS", "REVIEW", "DONE"]).optional(),
+  priority: z.enum(["LOW", "MEDIUM", "URGENT"]).optional(),
   assigneeIds: z.array(z.string()).optional(),
   assigneeId: z.string().nullable().optional(),
   dueDate: z.string().datetime().nullable().optional(),
@@ -22,8 +22,8 @@ const updateTaskSchema = z.object({
     .max(500, "description must be at most 500 characters")
     .nullable()
     .optional(),
-  status: z.enum(["BACKLOG", "TODO", "IN_PROGRESS", "REVIEW", "DONE"]).optional(),
-  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
+  status: z.enum(["BACKLOG", "IN_PROGRESS", "REVIEW", "DONE"]).optional(),
+  priority: z.enum(["LOW", "MEDIUM", "URGENT"]).optional(),
   assigneeIds: z.array(z.string()).optional(),
   assigneeId: z.string().nullable().optional(),
   dueDate: z.string().datetime().nullable().optional(),

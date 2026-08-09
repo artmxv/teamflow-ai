@@ -1,4 +1,4 @@
-export type ChatConversationTypeValue = "WORKSPACE" | "DIRECT";
+export type ChatConversationTypeValue = "WORKSPACE" | "DIRECT" | "CHANNEL";
 
 export function buildWorkspaceGeneralIdentityKey(workspaceId: string): string {
   return `workspace:${workspaceId}:general`;
@@ -94,7 +94,12 @@ export function compareConversationsForSidebar(
   }
 
   if (a.type !== b.type) {
-    return a.type === "WORKSPACE" ? -1 : 1;
+    const typeRank: Record<ChatConversationTypeValue, number> = {
+      WORKSPACE: 0,
+      CHANNEL: 1,
+      DIRECT: 2,
+    };
+    return typeRank[a.type] - typeRank[b.type];
   }
 
   return a.id.localeCompare(b.id);

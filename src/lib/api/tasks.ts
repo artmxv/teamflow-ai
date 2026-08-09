@@ -2,8 +2,8 @@ import { apiRequest } from "./client";
 import type { Priority, TaskStatus } from "@/lib/mock-data";
 import type { ProjectApiStatus } from "./projects";
 
-export type TaskApiStatus = "BACKLOG" | "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE";
-export type TaskApiPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+export type TaskApiStatus = "BACKLOG" | "IN_PROGRESS" | "REVIEW" | "DONE";
+export type TaskApiPriority = "LOW" | "MEDIUM" | "URGENT";
 
 export type TaskAssigneeUser = {
   id: string;
@@ -46,7 +46,6 @@ export interface TasksApiResponse {
 
 export const taskStatusToApi = {
   backlog: "BACKLOG",
-  todo: "TODO",
   in_progress: "IN_PROGRESS",
   review: "REVIEW",
   done: "DONE",
@@ -55,7 +54,6 @@ export const taskStatusToApi = {
 export const taskPriorityToApi = {
   low: "LOW",
   medium: "MEDIUM",
-  high: "HIGH",
   urgent: "URGENT",
 } as const satisfies Record<Priority, TaskApiPriority>;
 

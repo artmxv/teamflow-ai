@@ -1,16 +1,7 @@
 import { useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import {
-  AlertCircle,
-  Briefcase,
-  Calendar,
-  ListTodo,
-  Mail,
-  MapPin,
-  Phone,
-  ZoomIn,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { AlertCircle, Briefcase, Calendar, Mail, MapPin, Phone, ZoomIn } from "lucide-react";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -25,7 +16,7 @@ import {
 } from "@/components/ui/sheet";
 import { fetchWorkspaceMemberProfile } from "@/lib/api/workspace-members";
 import type { TaskApiPriority, TaskApiStatus } from "@/lib/api/tasks";
-import type { ProjectApiStatus } from "@/lib/api/projects";
+import { fetchProjects, type ProjectApiStatus } from "@/lib/api/projects";
 import { displayProjectName, displayTaskTitle } from "@/lib/starter-content";
 import { formatDueDateTimeShort } from "@/lib/due-datetime";
 import {
@@ -37,6 +28,7 @@ import {
 import { resolveAvatarUrl } from "@/lib/avatar-url";
 import { workspaceRoleLabel } from "@/lib/auth/use-current-user";
 import { priorityMeta, projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
+import { getProjectAccent } from "@/lib/project-color";
 import { taskStatusChipClass } from "@/lib/task-status-theme";
 import type { DashboardTaskPriority, DashboardTaskStatus } from "@/lib/api/dashboard";
 import { cn } from "@/lib/utils";
@@ -52,7 +44,6 @@ const apiProjectStatusMap: Record<ProjectApiStatus, ProjectStatus> = {
 
 const apiTaskStatusChip: Record<TaskApiStatus, string> = {
   BACKLOG: taskStatusChipClass.backlog,
-  TODO: taskStatusChipClass.todo,
   IN_PROGRESS: taskStatusChipClass.in_progress,
   REVIEW: taskStatusChipClass.review,
   DONE: taskStatusChipClass.done,
@@ -61,7 +52,6 @@ const apiTaskStatusChip: Record<TaskApiStatus, string> = {
 const apiPriorityChip: Record<TaskApiPriority, string> = {
   LOW: priorityMeta.low.className,
   MEDIUM: priorityMeta.medium.className,
-  HIGH: priorityMeta.high.className,
   URGENT: priorityMeta.urgent.className,
 };
 
@@ -144,6 +134,20 @@ export function MemberProfileDrawer({
     enabled: open && !!memberId,
     retry: 1,
   });
+
+  const projectsQuery = useQuery({
+    queryKey: ["projects"],
+    queryFn: fetchProjects,
+    enabled: open && !!memberId,
+  });
+
+  const projectColorById = useMemo(() => {
+    const map = new Map<string, string | null | undefined>();
+    for (const project of projectsQuery.data ?? []) {
+      map.set(project.id, project.color);
+    }
+    return map;
+  }, [projectsQuery.data]);
 
   const profile = profileQuery.data;
   const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false);
@@ -260,6 +264,11 @@ export function MemberProfileDrawer({
                     {profile.projects.map((project) => {
                       const statusKey = apiProjectStatusMap[project.status];
                       const statusMeta = projectStatusMeta[statusKey];
+                      const projectAccent = getProjectAccent({
+                        id: project.id,
+                        name: project.name,
+                        color: projectColorById.get(project.id),
+                      });
                       return (
                         <li key={project.id}>
                           <button
@@ -273,7 +282,13 @@ export function MemberProfileDrawer({
                               });
                             }}
                           >
-                            <span className="min-w-0 truncate font-medium">{project.name}</span>
+                            <span className="inline-flex min-w-0 items-center gap-1.5">
+                              <span
+                                className={cn("size-2 shrink-0 rounded-full", projectAccent.dot)}
+                                aria-hidden
+                              />
+                              <span className="min-w-0 truncate font-medium">{project.name}</span>
+                            </span>
                             <Badge
                               variant="secondary"
                               className={cn(statusMeta.className, "shrink-0 border-0")}
@@ -298,55 +313,67 @@ export function MemberProfileDrawer({
                   </p>
                 ) : (
                   <ul className="space-y-2">
-                    {profile.tasks.map((task) => (
-                      <li key={task.id}>
-                        <button
-                          type="button"
-                          aria-label={`${t("team.openTask")}: ${displayTaskTitle(task.title, lang)}`}
-                          className="flex w-full flex-col gap-2 rounded-xl border border-border bg-card px-4 py-3 text-left text-sm transition hover:bg-muted/40 focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground/30 active:bg-muted/40"
-                          onClick={() => {
-                            void router.navigate({
-                              to: "/app/tasks",
-                              search: { taskId: task.id },
-                            });
-                          }}
-                        >
-                          <p className="font-medium leading-snug">
-                            <span className="font-mono text-xs font-normal text-muted-foreground">
-                              {task.key}
-                            </span>
-                            <span className="text-muted-foreground"> · </span>
-                            {displayTaskTitle(task.title, lang)}
-                          </p>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge
-                              variant="secondary"
-                              className={cn(apiTaskStatusChip[task.status], "border-0")}
-                            >
-                              {dashboardStatusLabel(task.status as DashboardTaskStatus, t)}
-                            </Badge>
-                            <Badge
-                              variant="secondary"
-                              className={cn(apiPriorityChip[task.priority], "border-0")}
-                            >
-                              {dashboardPriorityLabel(task.priority as DashboardTaskPriority, t)}
-                            </Badge>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                            <span className="inline-flex items-center gap-1">
-                              <ListTodo className="size-3.5" />
-                              {displayProjectName(task.projectName, lang)}
-                            </span>
-                            {task.dueDate && (
-                              <span className="inline-flex items-center gap-1">
-                                <Calendar className="size-3.5" />
-                                {formatDueDateTimeShort(task.dueDate)}
+                    {profile.tasks.map((task) => {
+                      const projectAccent = getProjectAccent({
+                        id: task.projectId,
+                        name: task.projectName,
+                        color: projectColorById.get(task.projectId),
+                      });
+                      return (
+                        <li key={task.id}>
+                          <button
+                            type="button"
+                            aria-label={`${t("team.openTask")}: ${displayTaskTitle(task.title, lang)}`}
+                            className="flex w-full flex-col gap-2 rounded-xl border border-border bg-card px-4 py-3 text-left text-sm transition hover:bg-muted/40 focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground/30 active:bg-muted/40"
+                            onClick={() => {
+                              void router.navigate({
+                                to: "/app/tasks",
+                                search: { taskId: task.id },
+                              });
+                            }}
+                          >
+                            <p className="font-medium leading-snug">
+                              <span className="font-mono text-xs font-normal text-muted-foreground">
+                                {task.key}
                               </span>
-                            )}
-                          </div>
-                        </button>
-                      </li>
-                    ))}
+                              <span className="text-muted-foreground"> · </span>
+                              {displayTaskTitle(task.title, lang)}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge
+                                variant="secondary"
+                                className={cn(apiTaskStatusChip[task.status], "border-0")}
+                              >
+                                {dashboardStatusLabel(task.status as DashboardTaskStatus, t)}
+                              </Badge>
+                              <Badge
+                                variant="secondary"
+                                className={cn(apiPriorityChip[task.priority], "border-0")}
+                              >
+                                {dashboardPriorityLabel(task.priority as DashboardTaskPriority, t)}
+                              </Badge>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                              <span className="inline-flex min-w-0 items-center gap-1.5">
+                                <span
+                                  className={cn("size-2 shrink-0 rounded-full", projectAccent.dot)}
+                                  aria-hidden
+                                />
+                                <span className="min-w-0 truncate">
+                                  {displayProjectName(task.projectName, lang)}
+                                </span>
+                              </span>
+                              {task.dueDate && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Calendar className="size-3.5" />
+                                  {formatDueDateTimeShort(task.dueDate)}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </section>

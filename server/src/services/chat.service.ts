@@ -256,7 +256,7 @@ export type ChatMessagesPage = {
 
 export type ChatConversationListItem = {
   id: string;
-  type: "WORKSPACE" | "DIRECT";
+  type: "WORKSPACE" | "DIRECT" | "CHANNEL";
   title: string | null;
   displayName: string;
   avatar: string | null;
@@ -629,7 +629,9 @@ export async function listChatConversations(
     const displayName =
       conversation.type === "WORKSPACE"
         ? conversation.title?.trim() || "General chat"
-        : other?.name ?? (conversation.title?.trim() || "Direct message");
+        : conversation.type === "CHANNEL"
+          ? conversation.title?.trim() || "Channel"
+          : other?.name ?? (conversation.title?.trim() || "Direct message");
 
     items.push({
       id: conversation.id,
@@ -677,6 +679,65 @@ export async function listChatConversations(
   );
 
   return items;
+}
+
+
+export async function createChannelConversation(input: {
+  workspaceId: string;
+  currentUserId: string;
+  title: string;
+  memberIds: string[];
+}): Promise<{ conversation: ChatConversationListItem } | "invalid_title" | "member_not_found"> {
+  const validatedTitle = validateChatConversationTitle(input.title);
+  if (!validatedTitle.ok) {
+    return "invalid_title";
+  }
+
+  const memberIds = Array.from(new Set([input.currentUserId, ...input.memberIds]));
+  const activeMembers = await prisma.workspaceMember.findMany({
+    where: {
+      workspaceId: input.workspaceId,
+      userId: { in: memberIds },
+      status: "ACTIVE",
+    },
+    select: { userId: true },
+  });
+
+  if (activeMembers.length !== memberIds.length) {
+    return "member_not_found";
+  }
+
+  const now = new Date();
+  const conversation = await prisma.$transaction(async (tx) => {
+    const created = await tx.chatConversation.create({
+      data: {
+        workspaceId: input.workspaceId,
+        type: "CHANNEL",
+        title: validatedTitle.title,
+        identityKey: `workspace:${input.workspaceId}:channel:${randomUUID()}`,
+      },
+      select: { id: true },
+    });
+
+    await tx.chatConversationMember.createMany({
+      data: memberIds.map((userId) => ({
+        conversationId: created.id,
+        userId,
+        lastReadAt: now,
+        isPinned: false,
+      })),
+    });
+
+    return created;
+  });
+
+  const conversations = await listChatConversations(input.workspaceId, input.currentUserId);
+  const createdConversation = conversations.find((item) => item.id === conversation.id);
+  if (!createdConversation) {
+    throw new Error("Created channel could not be loaded");
+  }
+
+  return { conversation: createdConversation };
 }
 
 export async function getOrCreateDirectConversation(

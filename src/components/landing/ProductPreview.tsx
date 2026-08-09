@@ -27,7 +27,7 @@ export function ProductPreview() {
 
   const columns: { titleKey: TKey; taskKeys: TKey[] }[] = [
     {
-      titleKey: "board.todo",
+      titleKey: "board.backlog",
       taskKeys: SAMPLE_TASKS.slice(0, 3),
     },
     {

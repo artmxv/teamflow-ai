@@ -1,5 +1,5 @@
-export type Priority = "low" | "medium" | "high" | "urgent";
-export type TaskStatus = "backlog" | "todo" | "in_progress" | "review" | "done";
+export type Priority = "low" | "medium" | "urgent";
+export type TaskStatus = "backlog" | "in_progress" | "review" | "done";
 export type ProjectStatus = "planning" | "active" | "on_hold" | "completed";
 export type Role = "Owner" | "Admin" | "Member";
 
@@ -198,8 +198,6 @@ const sampleTitles: Record<TaskStatus, string[]> = {
     "Define billing edge cases",
     "Audit accessibility on settings",
     "Spike: realtime presence",
-  ],
-  todo: [
     "Design empty states for projects",
     "Refactor auth middleware",
     "Add keyboard shortcuts overlay",
@@ -214,7 +212,7 @@ const sampleTitles: Record<TaskStatus, string[]> = {
 };
 
 const labelsPool = ["frontend", "backend", "design", "ai", "infra", "bug", "docs"];
-const priorities: Priority[] = ["low", "medium", "high", "urgent"];
+const priorities: Priority[] = ["low", "medium", "urgent"];
 
 let counter = 100;
 function makeTask(projectId: string, status: TaskStatus, title: string): Task {
@@ -369,10 +367,15 @@ export function getProject(id: string): Project | undefined {
 }
 
 export const priorityMeta: Record<Priority, { label: string; className: string }> = {
-  low: { label: "Low", className: "bg-muted text-muted-foreground" },
-  medium: { label: "Medium", className: "bg-info/15 text-info" },
-  high: { label: "High", className: "bg-warning/20 text-warning-foreground" },
-  urgent: { label: "Urgent", className: "bg-destructive/15 text-destructive" },
+  low: { label: "Low", className: "border border-border/60 bg-muted text-muted-foreground" },
+  medium: {
+    label: "Medium",
+    className: "border border-violet-500/25 bg-violet-500/12 text-violet-700 dark:text-violet-300",
+  },
+  urgent: {
+    label: "Urgent",
+    className: "border border-red-500/30 bg-red-500/12 text-red-700 dark:text-red-300",
+  },
 };
 
 export const projectStatusMeta: Record<ProjectStatus, { label: string; className: string }> = {
@@ -382,9 +385,16 @@ export const projectStatusMeta: Record<ProjectStatus, { label: string; className
   completed: { label: "Completed", className: "bg-muted text-muted-foreground" },
 };
 
+/** Solid dots aligned with Projects filter/card status semantics. */
+export const projectStatusDotClass: Record<ProjectStatus, string> = {
+  planning: "bg-info",
+  active: "bg-success",
+  on_hold: "bg-warning",
+  completed: "bg-violet-500",
+};
+
 export const statusColumns: { key: TaskStatus; title: string }[] = [
   { key: "backlog", title: "Backlog" },
-  { key: "todo", title: "Todo" },
   { key: "in_progress", title: "In Progress" },
   { key: "review", title: "Review" },
   { key: "done", title: "Done" },

@@ -7,7 +7,6 @@ export interface WorkspaceAiMetrics {
   openTasks: number;
   completedTasks: number;
   urgentTasks: number;
-  highPriorityTasks: number;
   reviewTasks: number;
   overdueTasks: number;
 }

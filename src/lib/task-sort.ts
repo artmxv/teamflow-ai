@@ -14,17 +14,15 @@ export interface TaskSortableRow {
 
 const STATUS_ORDER: Record<TaskStatus, number> = {
   backlog: 0,
-  todo: 1,
-  in_progress: 2,
-  review: 3,
-  done: 4,
+  in_progress: 1,
+  review: 2,
+  done: 3,
 };
 
 const PRIORITY_ORDER: Record<Priority, number> = {
   low: 0,
   medium: 1,
-  high: 2,
-  urgent: 3,
+  urgent: 2,
 };
 
 export function cycleTaskSort(current: TaskSortState, field: TaskSortField): TaskSortState {

@@ -4,10 +4,12 @@ import { Calendar, GripVertical, MessageSquare, Paperclip } from "lucide-react";
 import { type Task, priorityMeta, statusColumns, type TaskStatus } from "@/lib/mock-data";
 import { priorityLabel, taskStatusLabel, useI18n } from "@/lib/i18n";
 import { formatDueDateTimeShort } from "@/lib/due-datetime";
+import { getProjectAccent } from "@/lib/project-color";
 import { translateStarterProjectName, translateStarterTitle } from "@/lib/starter-content";
 import type { AssigneeOption } from "@/lib/assignee-options";
 import { cn } from "@/lib/utils";
 import { AssigneeAvatars } from "./AssigneeAvatars";
+import { TaskStatusIndicator } from "./TaskStatusIndicator";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -16,7 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { taskStatusColumnDotClass } from "@/lib/task-status-theme";
 
 export type TaskDragData = {
   type: "task";
@@ -27,6 +28,7 @@ export type TaskDragData = {
 export function TaskCard({
   task,
   assignees = [],
+  projectColor,
   onOpen,
   onStatusChange,
   isStatusUpdating,
@@ -35,6 +37,8 @@ export function TaskCard({
 }: {
   task: Task;
   assignees?: AssigneeOption[];
+  /** Stored project accent (`from-* to-*`) when known; otherwise hash fallback. */
+  projectColor?: string | null;
   onOpen: (task: Task) => void;
   onStatusChange?: (status: TaskStatus) => void;
   isStatusUpdating?: boolean;
@@ -84,14 +88,22 @@ export function TaskCard({
 
         {task.labels.length > 0 && (
           <div className="mt-2.5 flex flex-wrap gap-1">
-            {task.labels.map((l) => (
-              <span
-                key={l}
-                className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground"
-              >
-                {translateStarterProjectName(l, lang)}
-              </span>
-            ))}
+            {task.labels.map((l) => {
+              const accent = getProjectAccent({
+                id: task.projectId,
+                name: l,
+                color: projectColor,
+              });
+              return (
+                <span
+                  key={l}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-muted/35 px-1.5 py-0.5 text-[10px] font-medium text-foreground/80"
+                >
+                  <span className={cn("size-1.5 shrink-0 rounded-full", accent.dot)} aria-hidden />
+                  {translateStarterProjectName(l, lang)}
+                </span>
+              );
+            })}
           </div>
         )}
 
@@ -133,30 +145,18 @@ export function TaskCard({
             onValueChange={(value) => onStatusChange(value as TaskStatus)}
           >
             <SelectTrigger className="h-9 w-full text-xs">
-              <SelectValue placeholder="Status">
-                <span className="inline-flex min-w-0 items-center gap-2">
-                  <span
-                    className={
-                      "size-2 shrink-0 rounded-full " + taskStatusColumnDotClass[task.status]
-                    }
-                    aria-hidden
-                  />
-                  <span className="min-w-0">{taskStatusLabel(task.status, t)}</span>
-                </span>
+              <SelectValue placeholder={t("tasks.status")}>
+                <TaskStatusIndicator status={task.status}>
+                  {taskStatusLabel(task.status, t)}
+                </TaskStatusIndicator>
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {statusColumns.map((col) => (
                 <SelectItem key={col.key} value={col.key}>
-                  <span className="inline-flex items-center gap-2">
-                    <span
-                      className={
-                        "size-2 shrink-0 rounded-full " + taskStatusColumnDotClass[col.key]
-                      }
-                      aria-hidden
-                    />
+                  <TaskStatusIndicator status={col.key}>
                     {taskStatusLabel(col.key, t)}
-                  </span>
+                  </TaskStatusIndicator>
                 </SelectItem>
               ))}
             </SelectContent>

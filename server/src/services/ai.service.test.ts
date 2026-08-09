@@ -43,7 +43,7 @@ function makeTask(
     id: overrides.id ?? overrides.key,
     key: overrides.key,
     title: overrides.title,
-    status: overrides.status ?? "TODO",
+    status: overrides.status ?? "BACKLOG",
     priority: overrides.priority ?? "MEDIUM",
     dueDate: overrides.dueDate === undefined ? null : overrides.dueDate,
     updatedAt: overrides.updatedAt ?? FIXED_NOW,
@@ -74,7 +74,7 @@ describe("ai.service helpers", () => {
   it("does not mark non IN_PROGRESS as stale", () => {
     const oldUpdatedAt = new Date(FIXED_NOW.getTime() - 30 * DAY_MS);
     assert.equal(
-      isStaleInProgressTask({ status: "TODO", updatedAt: oldUpdatedAt }, FIXED_NOW),
+      isStaleInProgressTask({ status: "BACKLOG", updatedAt: oldUpdatedAt }, FIXED_NOW),
       false,
     );
   });
@@ -103,7 +103,7 @@ describe("buildWorkspaceAiSummaryFromData", () => {
     const task = makeTask({
       key: "TF-OVERDUE",
       title: "Fix billing",
-      status: "TODO",
+      status: "BACKLOG",
       dueDate: new Date(FIXED_NOW.getTime() - DAY_MS),
       assigneeId: "u1",
       assignee: { id: "u1", name: "Alex" },
@@ -138,7 +138,7 @@ describe("buildWorkspaceAiSummaryFromData", () => {
     const task = makeTask({
       key: "TF-UNASSIGNED",
       title: "Needs owner",
-      status: "TODO",
+      status: "BACKLOG",
       assigneeId: null,
       assignee: null,
       taskAssignees: [],
@@ -154,12 +154,12 @@ describe("buildWorkspaceAiSummaryFromData", () => {
     );
   });
 
-  it("flags HIGH/URGENT open tasks without due date", () => {
+  it("flags URGENT open tasks without due date", () => {
     const task = makeTask({
       key: "TF-NODUE",
       title: "Ship hotfix",
-      status: "TODO",
-      priority: "HIGH",
+      status: "BACKLOG",
+      priority: "URGENT",
       dueDate: null,
       assigneeId: "u1",
       assignee: { id: "u1", name: "Alex" },
@@ -239,7 +239,7 @@ describe("buildWorkspaceAiSummaryFromData", () => {
       makeTask({
         key: "TF-OD-1",
         title: "Overdue one",
-        status: "TODO",
+        status: "BACKLOG",
         priority: "MEDIUM",
         dueDate: new Date(FIXED_NOW.getTime() - DAY_MS),
         assigneeId: "u1",
@@ -248,7 +248,7 @@ describe("buildWorkspaceAiSummaryFromData", () => {
       makeTask({
         key: "TF-UR-1",
         title: "Urgent one",
-        status: "TODO",
+        status: "BACKLOG",
         priority: "URGENT",
         dueDate: new Date(FIXED_NOW.getTime() + DAY_MS),
         assigneeId: "u1",
@@ -267,14 +267,14 @@ describe("buildWorkspaceAiSummaryFromData", () => {
       makeTask({
         key: "TF-UA-1",
         title: "Unassigned one",
-        status: "TODO",
+        status: "BACKLOG",
         priority: "LOW",
       }),
       makeTask({
         key: "TF-ND-1",
         title: "No due one",
-        status: "TODO",
-        priority: "HIGH",
+        status: "BACKLOG",
+        priority: "URGENT",
         dueDate: null,
         assigneeId: "u1",
         assignee: { id: "u1", name: "Alex" },
@@ -283,7 +283,7 @@ describe("buildWorkspaceAiSummaryFromData", () => {
         makeTask({
           key: `TF-OD-EXTRA-${index}`,
           title: `Extra overdue ${index}`,
-          status: "TODO",
+          status: "BACKLOG",
           dueDate: new Date(FIXED_NOW.getTime() - DAY_MS),
           assigneeId: "u1",
           assignee: { id: "u1", name: "Alex" },
@@ -307,7 +307,7 @@ describe("buildWorkspaceAiSummaryFromData", () => {
     const task = makeTask({
       key: "TF-RU",
       title: "Срочно",
-      status: "TODO",
+      status: "BACKLOG",
       priority: "URGENT",
       dueDate: null,
     });
@@ -326,7 +326,6 @@ describe("buildWorkspaceAiSummaryFromData", () => {
       openTasks: 0,
       completedTasks: 1,
       urgentTasks: 0,
-      highPriorityTasks: 0,
       reviewTasks: 0,
       overdueTasks: 0,
     });
@@ -342,7 +341,6 @@ describe("buildWorkspaceAiSummaryFromData", () => {
       openTasks: 0,
       completedTasks: 1,
       urgentTasks: 0,
-      highPriorityTasks: 0,
       reviewTasks: 0,
       overdueTasks: 0,
     });
@@ -431,7 +429,7 @@ describe("getWorkspaceAiSummary ACL", () => {
         key: `OPEN-${suffix}`,
         projectId: openProject.id,
         title: "Open visible task",
-        status: "TODO",
+        status: "BACKLOG",
         priority: "MEDIUM",
         assigneeId: memberA.id,
         taskAssignees: { create: [{ userId: memberA.id }] },
@@ -443,7 +441,7 @@ describe("getWorkspaceAiSummary ACL", () => {
         key: `SECRET-${suffix}`,
         projectId: closedProject.id,
         title: "Hidden secret task",
-        status: "TODO",
+        status: "BACKLOG",
         priority: "URGENT",
         dueDate: new Date(FIXED_NOW.getTime() - DAY_MS),
         assigneeId: ownerA.id,
@@ -462,7 +460,7 @@ describe("getWorkspaceAiSummary ACL", () => {
             {
               key: `OTHER-WS-${suffix}`,
               title: "Foreign task",
-              status: "TODO",
+              status: "BACKLOG",
               priority: "URGENT",
               dueDate: new Date(FIXED_NOW.getTime() - DAY_MS),
             },

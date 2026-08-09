@@ -575,10 +575,18 @@ function SettingsPage() {
         className="w-full"
       >
         <TabsList>
-          <TabsTrigger value="workspace">{t("side.workspace")}</TabsTrigger>
-          <TabsTrigger value="profile">{t("settings.profileSettings")}</TabsTrigger>
-          <TabsTrigger value="appearance">{t("settings.appearanceSettings")}</TabsTrigger>
-          <TabsTrigger value="billing">{t("side.billing")}</TabsTrigger>
+          <TabsTrigger value="workspace" className="settings-tabs-trigger">
+            {t("side.workspace")}
+          </TabsTrigger>
+          <TabsTrigger value="profile" className="settings-tabs-trigger">
+            {t("settings.profileSettings")}
+          </TabsTrigger>
+          <TabsTrigger value="appearance" className="settings-tabs-trigger">
+            {t("settings.themeSettings")}
+          </TabsTrigger>
+          <TabsTrigger value="billing" className="settings-tabs-trigger">
+            {t("side.billing")}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="workspace" className="mt-5">
@@ -673,6 +681,7 @@ function SettingsPage() {
                 onCancel={handleWorkspaceCancel}
                 saveDisabled={!workspace || !workspaceForm || !workspaceHasUnsavedChanges}
                 cancelDisabled={!workspaceHasUnsavedChanges}
+                cancelVariant="brandSoft"
                 cancelLabel={t("settings.resetChanges")}
                 saveLabel={t("settings.saveWorkspace")}
                 savingLabel={t("settings.savingWorkspace")}
@@ -706,7 +715,7 @@ function SettingsPage() {
                   onChange={handleAvatarFileChange}
                 />
                 <Button
-                  variant="outline"
+                  variant="brandSoft"
                   size="sm"
                   type="button"
                   disabled={avatarBusy || isPending}
@@ -725,7 +734,7 @@ function SettingsPage() {
                 </Button>
                 {user?.avatarUrl ? (
                   <Button
-                    variant="outline"
+                    variant="dangerSoft"
                     size="sm"
                     type="button"
                     disabled={avatarBusy || isPending}
@@ -844,6 +853,7 @@ function SettingsPage() {
                 onCancel={handleProfileReset}
                 saveDisabled={!profileForm || !profileHasUnsavedChanges}
                 cancelDisabled={!profileHasUnsavedChanges}
+                cancelVariant="brandSoft"
                 cancelLabel={t("settings.resetChanges")}
               />
             </div>
@@ -1158,6 +1168,7 @@ function SaveBar({
   isSaving = false,
   saveDisabled = false,
   cancelDisabled = false,
+  cancelVariant = "outline",
   cancelLabel,
   saveLabel,
   savingLabel,
@@ -1167,6 +1178,7 @@ function SaveBar({
   isSaving?: boolean;
   saveDisabled?: boolean;
   cancelDisabled?: boolean;
+  cancelVariant?: "outline" | "brandSoft";
   cancelLabel?: string;
   saveLabel?: string;
   savingLabel?: string;
@@ -1175,7 +1187,7 @@ function SaveBar({
 
   return (
     <div className="mt-6 flex flex-wrap justify-end gap-2">
-      <Button variant="outline" onClick={onCancel} disabled={isSaving || cancelDisabled}>
+      <Button variant={cancelVariant} onClick={onCancel} disabled={isSaving || cancelDisabled}>
         {cancelLabel ?? t("common.cancel")}
       </Button>
       <Button variant="brand" onClick={onSave} disabled={isSaving || saveDisabled}>

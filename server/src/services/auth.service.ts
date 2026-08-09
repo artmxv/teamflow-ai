@@ -110,8 +110,8 @@ async function createStarterWorkspaceData(
     {
       title: "Create your first project",
       description: "Set up a project that reflects how your team plans and ships work.",
-      status: "TODO" as const,
-      priority: "HIGH" as const,
+      status: "BACKLOG" as const,
+      priority: "URGENT" as const,
     },
     {
       title: "Review the Kanban workflow",

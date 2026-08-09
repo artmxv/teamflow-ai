@@ -1,4 +1,4 @@
-import { ArrowLeft, MoreHorizontal, Pencil, Pin, PinOff, Users } from "lucide-react";
+import { ArrowLeft, Hash, MoreHorizontal, Pencil, Pin, PinOff, Users } from "lucide-react";
 
 import { ChatPinnedMessagesHeaderButton } from "@/components/app/chat/ChatMessagePins";
 import { ChatOnlineDot } from "@/components/app/chat/ChatOnlineDot";
@@ -65,16 +65,17 @@ export function ChatConversationHeader({
         </Button>
       ) : null}
 
-      {directParticipant ? (
-        <>
-          <span className="relative shrink-0">
+      {/* Title cluster: flex-1 so right actions never shift avatar/name alignment */}
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        {directParticipant ? (
+          <span className="relative flex size-8 shrink-0 items-center justify-center">
             <UserAvatar
               id={directParticipant.id}
               name={directParticipant.name}
               avatar={directParticipant.avatar}
               avatarUrl={directParticipant.avatarUrl}
-              size="sm"
-              className="shrink-0"
+              size="md"
+              className="size-8 shrink-0"
             />
             {showOnline ? (
               <ChatOnlineDot
@@ -83,50 +84,36 @@ export function ChatConversationHeader({
               />
             ) : null}
           </span>
-          <div className="min-w-0 flex-1">
-            <button
-              type="button"
-              className={cn(
-                "block max-w-full cursor-pointer truncate rounded-sm text-left text-sm font-semibold transition-colors",
-                "hover:text-foreground/80 hover:underline hover:underline-offset-2",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-              )}
-              aria-label={t("chat.openUserProfile").replace("{name}", directParticipant.name)}
-              onClick={() => onOpenProfile(directParticipant.id)}
-            >
-              {title}
-            </button>
-            <p className="h-4 truncate text-[11px] leading-4 text-muted-foreground">
-              {conversation.unreadCount > 0
-                ? conversation.unreadCount === 1
-                  ? t("chat.unreadOne")
-                  : t("chat.unreadMany").replace("{count}", String(conversation.unreadCount))
-                : showOnline
-                  ? t("chat.online")
-                  : "\u00a0"}
-            </p>
-          </div>
-        </>
-      ) : (
-        <>
+        ) : (
           <span
-            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary"
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-auxiliary/12 text-auxiliary"
             aria-hidden="true"
           >
-            <Users className="size-3.5 shrink-0" />
+            {conversation.type === "CHANNEL" ? (
+              <Hash className="size-3.5 shrink-0" />
+            ) : (
+              <Users className="size-3.5 shrink-0" />
+            )}
           </span>
-          <div className="flex min-w-0 flex-1 flex-col justify-center">
-            <h3 className="truncate text-sm font-semibold leading-5">{title}</h3>
-            <p className="mt-0.5 h-4 truncate text-[11px] leading-4 text-muted-foreground">
-              {conversation.unreadCount > 0
-                ? conversation.unreadCount === 1
-                  ? t("chat.unreadOne")
-                  : t("chat.unreadMany").replace("{count}", String(conversation.unreadCount))
-                : "\u00a0"}
-            </p>
-          </div>
-        </>
-      )}
+        )}
+
+        {directParticipant ? (
+          <button
+            type="button"
+            className={cn(
+              "min-w-0 truncate text-left text-sm font-semibold leading-5 transition-colors",
+              "hover:text-foreground/80 hover:underline hover:underline-offset-2",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+            )}
+            aria-label={t("chat.openUserProfile").replace("{name}", directParticipant.name)}
+            onClick={() => onOpenProfile(directParticipant.id)}
+          >
+            {title}
+          </button>
+        ) : (
+          <h3 className="min-w-0 truncate text-sm font-semibold leading-5">{title}</h3>
+        )}
+      </div>
 
       <ChatPinnedMessagesHeaderButton
         open={pinnedPanelOpen}

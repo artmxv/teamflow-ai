@@ -3,7 +3,13 @@ import type { QueryClient } from "@tanstack/react-query";
 import { isPreviewableImageMimeType } from "@/lib/files/image-preview";
 
 import { downloadBlobAsFile, fetchAuthenticatedBlob } from "./authenticated-blob";
-import { getSelectedWorkspaceId, apiRequest, buildAuthHeaders, ApiError, API_BASE_URL } from "./client";
+import {
+  getSelectedWorkspaceId,
+  apiRequest,
+  buildAuthHeaders,
+  ApiError,
+  API_BASE_URL,
+} from "./client";
 
 export const CHAT_MESSAGE_MAX_LENGTH = 2000;
 export const CHAT_MESSAGES_PAGE_SIZE = 30;
@@ -107,7 +113,7 @@ export type ChatMessagesPage = {
   pageInfo: ChatPageInfo;
 };
 
-export type ChatConversationType = "WORKSPACE" | "DIRECT";
+export type ChatConversationType = "WORKSPACE" | "DIRECT" | "CHANNEL";
 
 export type ChatConversation = {
   id: string;
@@ -260,6 +266,14 @@ export async function createDirectConversation(userId: string) {
   return response.data;
 }
 
+export async function createChannelConversation(input: { title: string; memberIds: string[] }) {
+  const response = await apiRequest<{ data: ChatConversation }>("/api/chat/conversations/channel", {
+    method: "POST",
+    body: input,
+  });
+  return response.data;
+}
+
 export async function setConversationPinned(conversationId: string, isPinned: boolean) {
   const response = await apiRequest<{ data: { id: string; isPinned: boolean } }>(
     `/api/chat/conversations/${conversationId}/pin`,
@@ -374,8 +388,7 @@ export async function sendChatMessage(
   conversationId: string,
   input: string | SendChatMessageInput,
 ) {
-  const payload: SendChatMessageInput =
-    typeof input === "string" ? { content: input } : input;
+  const payload: SendChatMessageInput = typeof input === "string" ? { content: input } : input;
 
   const files = payload.files ?? [];
   const taskIds = payload.taskIds ?? [];
@@ -646,6 +659,9 @@ export function conversationDisplayName(
 ): string {
   if (conversation.type === "WORKSPACE") {
     return conversation.title?.trim() || generalLabel;
+  }
+  if (conversation.type === "CHANNEL") {
+    return conversation.title?.trim() || conversation.displayName;
   }
   return conversation.otherParticipant?.name || conversation.displayName;
 }

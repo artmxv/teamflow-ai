@@ -52,15 +52,30 @@ function SidebarTip({
   label: string;
   children: ReactNode;
 }) {
-  if (!collapsed) {
-    return <>{children}</>;
-  }
-
   return (
     <Tooltip>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side="right">{label}</TooltipContent>
+      {collapsed ? <TooltipContent side="right">{label}</TooltipContent> : null}
     </Tooltip>
+  );
+}
+
+function SidebarSectionHeading({
+  collapsed,
+  children,
+}: {
+  collapsed: boolean;
+  children: ReactNode;
+}) {
+  if (collapsed) {
+    return <div className="h-6 shrink-0" aria-hidden />;
+  }
+
+  return (
+    <div className="app-sidebar__reveal flex h-6 shrink-0 items-center gap-2 overflow-hidden px-2.5 pb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-sidebar-foreground/70">
+      <span className="shrink-0">{children}</span>
+      <span className="h-px flex-1 bg-sidebar-border" aria-hidden />
+    </div>
   );
 }
 
@@ -132,18 +147,21 @@ function WorkspaceSwitcher({
   if (loading && !workspace) {
     return (
       <div
-        className={cn(
-          "flex w-full min-w-0 items-center rounded-xl border border-sidebar-border bg-card",
-          collapsed ? "justify-center p-2" : "gap-2 px-3 py-2",
-        )}
+        className="grid h-12 w-full min-w-0 grid-cols-[2rem_minmax(0,1fr)] items-center overflow-hidden rounded-xl border border-sidebar-border bg-card px-2"
         aria-hidden
       >
-        <Skeleton className="size-7 shrink-0 rounded-md" />
-        {!collapsed && (
-          <>
+        <span className="grid size-8 place-items-center">
+          <Skeleton className="size-7 shrink-0 rounded-md" />
+        </span>
+        {!collapsed ? (
+          <span className="app-sidebar__reveal flex min-w-0 items-center gap-2 pl-2.5">
             <Skeleton className="h-4 min-w-0 flex-1" />
-            <Skeleton className="size-4 shrink-0 rounded-sm" />
-          </>
+            <span className="grid size-4 shrink-0 place-items-center">
+              <Skeleton className="size-4 shrink-0 rounded-sm" />
+            </span>
+          </span>
+        ) : (
+          <span className="min-w-0" aria-hidden />
         )}
       </div>
     );
@@ -168,23 +186,20 @@ function WorkspaceSwitcher({
     <button
       type="button"
       title={displayName}
-      className={cn(
-        "flex w-full min-w-0 items-center rounded-xl border border-sidebar-border/80 bg-card text-left shadow-soft transition hover:border-border hover:bg-card outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring/40 focus-visible:ring-offset-0 data-[state=open]:border-border data-[state=open]:shadow-soft",
-        collapsed ? "justify-center p-2" : "gap-2.5 px-3 py-2.5",
-      )}
+      className="grid h-12 w-full min-w-0 grid-cols-[2rem_minmax(0,1fr)] items-center overflow-hidden rounded-xl border border-sidebar-border/80 bg-card px-2 text-left shadow-soft outline-none transition-colors hover:border-border hover:bg-card focus-visible:ring-2 focus-visible:ring-sidebar-ring/40 focus-visible:ring-offset-0 data-[state=open]:border-border data-[state=open]:shadow-soft"
     >
-      <WorkspaceAvatar
-        item={currentAccentSource}
-        initials={workspace.initials}
-        size={collapsed ? "size-6" : "size-7"}
-      />
-      {!collapsed && (
-        <>
+      <span className="grid size-8 place-items-center">
+        <WorkspaceAvatar item={currentAccentSource} initials={workspace.initials} size="size-7" />
+      </span>
+      {!collapsed ? (
+        <span className="app-sidebar__reveal flex min-w-0 items-center gap-2.5 overflow-hidden pl-2.5">
           <span className="min-w-0 flex-1 truncate text-sm font-medium leading-none">
             {displayName}
           </span>
           <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-        </>
+        </span>
+      ) : (
+        <span className="min-w-0" aria-hidden />
       )}
     </button>
   );
@@ -304,48 +319,44 @@ export function AppSidebar({
   return (
     <TooltipProvider delayDuration={0}>
       <aside
+        data-collapsed={collapsed}
         className={cn(
-          "sticky top-0 hidden h-svh shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-200 ease-linear md:flex",
+          "app-sidebar sticky top-0 hidden h-svh shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-300 ease-[cubic-bezier(.22,.8,.22,1)] md:flex",
           collapsed ? "w-16" : "w-64",
         )}
       >
-        <div
-          className={cn(
-            "flex shrink-0 items-center gap-2.5 border-b border-sidebar-border/70 py-4",
-            collapsed ? "flex-col justify-center gap-2 px-2" : "px-4",
-          )}
-        >
-          <div className="grid size-8 shrink-0 place-items-center">
+        <div className="relative h-16 shrink-0 overflow-hidden border-b border-sidebar-border/70">
+          <div className="app-sidebar__expanded-icon absolute left-4 top-4 grid size-8 place-items-center">
             <BrandMark className="size-7 rounded-[10px]" />
           </div>
-          {!collapsed && (
-            <div className="min-w-0 flex-1 leading-tight">
+          {!collapsed ? (
+            <div className="app-sidebar__reveal absolute inset-y-0 left-14 flex w-36 flex-col justify-center overflow-hidden leading-tight">
               <div className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-sidebar-foreground">
                 TeamFlow
                 <BrandAiBadge />
               </div>
               <div className="text-[11px] text-muted-foreground">{t("side.tagline")}</div>
             </div>
-          )}
+          ) : null}
           <button
             type="button"
             onClick={onToggleCollapsed}
             title={toggleLabel}
             aria-label={toggleLabel}
-            className={cn(
-              "grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground outline-none transition hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring/40",
-              collapsed ? "" : "ml-auto",
-            )}
+            className="absolute right-4 top-4 grid size-8 place-items-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring/40"
           >
-            {collapsed ? (
-              <PanelLeftOpen className="size-4" aria-hidden />
-            ) : (
-              <PanelLeftClose className="size-4" aria-hidden />
-            )}
+            <PanelLeftOpen
+              className="app-sidebar__collapse-only absolute inset-0 m-auto size-4"
+              aria-hidden
+            />
+            <PanelLeftClose
+              className="app-sidebar__expanded-icon absolute inset-0 m-auto size-4"
+              aria-hidden
+            />
           </button>
         </div>
 
-        <div className={cn("shrink-0 pt-3", collapsed ? "px-2" : "px-3")}>
+        <div className="shrink-0 px-2 pt-3">
           <WorkspaceSwitcher
             workspace={workspace}
             loading={workspaceLoading}
@@ -353,13 +364,11 @@ export function AppSidebar({
           />
         </div>
 
-        <nav className={cn("mt-5 flex min-h-0 flex-1 flex-col", collapsed ? "px-2" : "px-3")}>
+        <nav className="mt-5 flex min-h-0 flex-1 flex-col px-2">
           <div className="shrink-0">
-            {!collapsed && (
-              <div className="px-2.5 pb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80">
-                {t("side.workspace")}
-              </div>
-            )}
+            <SidebarSectionHeading collapsed={collapsed}>
+              {t("side.workspace")}
+            </SidebarSectionHeading>
             <ul className="space-y-0.5">
               {APP_NAV_ITEMS.map((item) => {
                 const active = isAppNavItemActive(pathname, item.to);
@@ -386,41 +395,44 @@ export function AppSidebar({
                             : undefined
                         }
                         className={cn(
-                          "group relative flex items-center rounded-lg text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-sidebar-ring/40",
-                          collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2",
+                          "group relative grid h-9 grid-cols-[2rem_minmax(0,1fr)] items-center overflow-hidden rounded-lg border-l-2 pl-1.5 pr-2 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-sidebar-ring/40",
                           active
-                            ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-                            : "text-sidebar-foreground/75 hover:bg-sidebar-accent/55 hover:text-sidebar-foreground",
-                          !collapsed &&
-                            active &&
-                            "border-l-2 border-l-primary pl-[calc(0.75rem-2px)]",
+                            ? "border-l-primary bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                            : "border-l-transparent text-sidebar-foreground/75 hover:bg-sidebar-accent/55 hover:text-sidebar-foreground",
                         )}
                       >
-                        <Icon
-                          className={cn(
-                            "size-4 shrink-0",
-                            active
-                              ? "text-primary"
-                              : "text-muted-foreground group-hover:text-sidebar-foreground",
-                          )}
-                        />
-                        {!collapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}
-                        {!collapsed && planBadge ? (
-                          <span className="shrink-0 text-[11px] font-normal text-muted-foreground">
-                            {planBadge}
+                        <span className="grid size-8 shrink-0 place-items-center">
+                          <Icon
+                            className={cn(
+                              "size-4 shrink-0",
+                              active
+                                ? "text-primary"
+                                : "text-muted-foreground group-hover:text-sidebar-foreground",
+                            )}
+                          />
+                        </span>
+                        {!collapsed ? (
+                          <span className="app-sidebar__reveal flex min-w-0 items-center gap-2 overflow-hidden">
+                            <span className="min-w-0 flex-1 truncate">{label}</span>
+                            {planBadge ? (
+                              <span className="shrink-0 text-[11px] font-normal text-muted-foreground">
+                                {planBadge}
+                              </span>
+                            ) : null}
+                            {showUnread ? (
+                              <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
+                                {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+                              </span>
+                            ) : null}
                           </span>
-                        ) : null}
+                        ) : (
+                          <span className="min-w-0" aria-hidden />
+                        )}
                         {showUnread ? (
                           <span
-                            className={cn(
-                              "inline-flex items-center justify-center rounded-full bg-primary font-semibold text-primary-foreground",
-                              collapsed
-                                ? "absolute top-1.5 right-1.5 size-2"
-                                : "h-5 min-w-5 px-1.5 text-[10px]",
-                            )}
-                          >
-                            {collapsed ? null : chatUnreadCount > 99 ? "99+" : chatUnreadCount}
-                          </span>
+                            className="app-sidebar__collapse-only absolute right-1.5 top-1.5 size-2 rounded-full bg-primary"
+                            aria-hidden
+                          />
                         ) : null}
                       </Link>
                     </SidebarTip>
@@ -430,28 +442,25 @@ export function AppSidebar({
             </ul>
           </div>
 
-          <div className="mt-7 flex min-h-0 flex-1 flex-col border-t border-sidebar-border/60 pb-3 pt-5">
-            {!collapsed && (
-              <div className="shrink-0 px-2.5 pb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80">
-                {t("side.projects")}
-              </div>
-            )}
-            {collapsed && <div className="shrink-0" aria-hidden />}
+          <div className="mt-7 flex min-h-0 flex-1 flex-col pb-3 pt-2">
+            <SidebarSectionHeading collapsed={collapsed}>
+              {t("side.projects")}
+            </SidebarSectionHeading>
             <ul className="app-scrollbar min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain">
-              {!collapsed && projectsLoading && (
-                <li className="px-3 py-1.5 text-xs text-muted-foreground">
+              {!collapsed && projectsLoading ? (
+                <li className="app-sidebar__reveal flex h-8 items-center px-3 text-xs text-muted-foreground">
                   {t("side.loadingProjects")}
                 </li>
-              )}
-              {!collapsed && !projectsLoading && projects.length === 0 && (
-                <li className="px-3 py-1.5 text-xs text-muted-foreground">
+              ) : null}
+              {!collapsed && !projectsLoading && projects.length === 0 ? (
+                <li className="app-sidebar__reveal flex h-8 items-center px-3 text-xs text-muted-foreground">
                   {t("side.noProjectsYet")}
                 </li>
-              )}
+              ) : null}
               {projects.map((project) => {
                 const projectActive = activeProjectId === project.id;
                 const projectLabel = displayProjectName(project.name, lang);
-                const { dot: accentDot, gradient: accentGradient } = getProjectAccent(project);
+                const { dot: accentDot } = getProjectAccent(project);
                 return (
                   <li key={project.id}>
                     <SidebarTip collapsed={collapsed} label={projectLabel}>
@@ -461,32 +470,33 @@ export function AppSidebar({
                         title={collapsed ? projectLabel : undefined}
                         aria-current={projectActive ? "page" : undefined}
                         className={cn(
-                          "flex w-full items-center rounded-lg text-left text-sm outline-none transition-colors hover:bg-sidebar-accent/55 focus-visible:ring-2 focus-visible:ring-sidebar-ring/40",
-                          collapsed ? "justify-center px-2 py-2" : "gap-2 px-3 py-1.5",
+                          "grid h-9 w-full grid-cols-[2rem_minmax(0,1fr)] items-center overflow-hidden rounded-lg border-l-2 pl-1.5 pr-2 text-left text-sm outline-none transition-colors hover:bg-sidebar-accent/55 focus-visible:ring-2 focus-visible:ring-sidebar-ring/40",
                           projectActive
-                            ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
-                            : "text-sidebar-foreground/75",
-                          !collapsed &&
-                            projectActive &&
-                            "border-l-2 border-l-primary pl-[calc(0.75rem-2px)]",
+                            ? "border-l-primary bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                            : "border-l-transparent text-sidebar-foreground/75",
                         )}
                       >
-                        {collapsed ? (
+                        <span
+                          className="relative grid size-8 shrink-0 place-items-center"
+                          aria-hidden
+                        >
                           <span
                             className={cn(
-                              "grid size-7 place-items-center rounded-md text-[10px] font-semibold",
-                              projectActive
-                                ? cn("bg-gradient-to-br text-white", accentGradient)
-                                : "border border-sidebar-border bg-card text-sidebar-foreground",
+                              "app-sidebar__collapse-only absolute size-3 rounded-full shadow-sm ring-2",
+                              accentDot,
+                              projectActive ? "ring-primary/25" : "ring-sidebar-border/70",
                             )}
-                          >
-                            {nameToInitials(project.name)}
+                          />
+                          <span className="app-sidebar__expanded-icon absolute grid size-5 place-items-center">
+                            <span className={cn("size-2 rounded-full", accentDot)} />
+                          </span>
+                        </span>
+                        {!collapsed ? (
+                          <span className="app-sidebar__reveal min-w-0 truncate">
+                            {projectLabel}
                           </span>
                         ) : (
-                          <>
-                            <span className={cn("size-2 shrink-0 rounded-full", accentDot)} />
-                            <span className="truncate">{projectLabel}</span>
-                          </>
+                          <span className="min-w-0" aria-hidden />
                         )}
                       </Link>
                     </SidebarTip>
@@ -499,13 +509,20 @@ export function AppSidebar({
                     <button
                       type="button"
                       title={collapsed ? t("common.newProject") : undefined}
-                      className={cn(
-                        "flex w-full items-center rounded-lg text-sm text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent/55 hover:text-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring/40",
-                        collapsed ? "justify-center px-2 py-2" : "gap-2 px-3 py-1.5",
-                      )}
+                      className="group grid h-9 w-full grid-cols-[2rem_minmax(0,1fr)] items-center overflow-hidden rounded-lg border border-transparent pl-[7px] pr-2 text-sm font-medium text-sidebar-foreground/78 outline-none transition-[color,background-color,border-color,box-shadow] hover:border-primary/20 hover:bg-primary/10 hover:text-primary hover:shadow-[0_0_18px_color-mix(in_oklch,var(--primary)_13%,transparent)] focus-visible:ring-2 focus-visible:ring-sidebar-ring/40"
                     >
-                      <Plus className={cn("shrink-0", collapsed ? "size-4" : "size-3.5")} />
-                      {!collapsed && t("common.newProject")}
+                      <span className="grid size-8 shrink-0 place-items-center">
+                        <span className="grid size-5 place-items-center rounded-md bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                          <Plus className="size-3.5 shrink-0" />
+                        </span>
+                      </span>
+                      {!collapsed ? (
+                        <span className="app-sidebar__reveal min-w-0 truncate text-left">
+                          {t("common.newProject")}
+                        </span>
+                      ) : (
+                        <span className="min-w-0" aria-hidden />
+                      )}
                     </button>
                   </NewProjectDialog>
                 </li>

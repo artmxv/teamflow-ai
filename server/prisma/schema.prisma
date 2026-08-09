@@ -52,7 +52,6 @@ enum ProjectStatus {
 
 enum TaskStatus {
   BACKLOG
-  TODO
   IN_PROGRESS
   REVIEW
   DONE
@@ -61,7 +60,6 @@ enum TaskStatus {
 enum TaskPriority {
   LOW
   MEDIUM
-  HIGH
   URGENT
 }
 
@@ -75,6 +73,7 @@ enum AiSummaryType {
 enum ChatConversationType {
   WORKSPACE
   DIRECT
+  CHANNEL
 }
 
 enum ChatMessageAttachmentType {

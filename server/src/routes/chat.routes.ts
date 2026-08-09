@@ -3,6 +3,7 @@ import { Router } from "express";
 import {
   addChatMessageReactionController,
   createConversationMessageController,
+  createChannelConversationController,
   createDirectConversationController,
   deleteConversationMessageController,
   downloadChatAttachmentController,
@@ -26,6 +27,7 @@ chatRouter.use(requireAuth);
 chatRouter.get("/conversations", getChatConversationsController);
 chatRouter.get("/unread-count", getChatUnreadCountController);
 chatRouter.post("/conversations/direct", createDirectConversationController);
+chatRouter.post("/conversations/channel", createChannelConversationController);
 chatRouter.patch("/conversations/:conversationId/pin", pinConversationController);
 chatRouter.patch("/conversations/:conversationId", renameConversationController);
 chatRouter.post("/conversations/:conversationId/read", markConversationReadController);

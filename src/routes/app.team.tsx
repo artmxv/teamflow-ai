@@ -567,9 +567,9 @@ function TeamPage() {
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
         {/* Desktop / tablet table */}
-        <div className="hidden md:block">
+        <div className="app-scrollbar hidden max-h-[min(60vh,36rem)] overflow-y-auto overscroll-contain md:block">
           <table className="w-full text-sm">
-            <thead className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">
+            <thead className="sticky top-0 z-10 bg-muted text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-5 py-3 text-left">{t("team.members")}</th>
                 <th className="px-5 py-3 text-left">{t("team.role")}</th>
@@ -637,7 +637,7 @@ function TeamPage() {
         </div>
 
         {/* Mobile cards */}
-        <div className="md:hidden">
+        <div className="app-scrollbar max-h-[min(60vh,36rem)] overflow-y-auto overscroll-contain md:hidden">
           {membersQuery.isLoading && <MembersCardsSkeleton />}
           {membersQuery.isError && (
             <div className="px-4 py-6">

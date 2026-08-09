@@ -264,6 +264,7 @@
 .dark[data-brand-theme="ocean"] {
   --brand-from: oklch(0.68 0.17 244);
   --brand-to: oklch(0.75 0.14 205);
+  --brand-ring: oklch(0.74 0.15 232);
   --primary: oklch(0.74 0.15 225);
   --ring: oklch(0.74 0.15 225);
   --accent: oklch(0.28 0.06 230);
@@ -277,6 +278,7 @@
 .dark[data-brand-theme="emerald"] {
   --brand-from: oklch(0.68 0.16 158);
   --brand-to: oklch(0.74 0.13 190);
+  --brand-ring: oklch(0.74 0.14 165);
   --primary: oklch(0.74 0.15 165);
   --ring: oklch(0.74 0.15 165);
   --accent: oklch(0.27 0.06 165);
@@ -290,6 +292,7 @@
 .dark[data-brand-theme="sunset"] {
   --brand-from: oklch(0.71 0.19 27);
   --brand-to: oklch(0.77 0.16 65);
+  --brand-ring: oklch(0.76 0.16 35);
   --primary: oklch(0.75 0.17 42);
   --ring: oklch(0.75 0.17 42);
   --accent: oklch(0.28 0.07 38);
@@ -315,6 +318,30 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-feature-settings: "cv11", "ss01", "ss03";
+  }
+
+  /*
+   * Radix Dialog/Select lock body scroll via react-remove-scroll and add
+   * margin/padding equal to the scrollbar width. With scrollbar-gutter: stable
+   * that space is already reserved, so the compensation shifts the page
+   * (and nested Select open/close used to fight Dialog's lock). Keep X stable.
+   */
+  html.app-scrollbar body[data-scroll-locked] {
+    margin-right: 0 !important;
+    padding-right: 0 !important;
+    --removed-body-scroll-bar-size: 0px !important;
+  }
+
+  html.app-scrollbar.with-scroll-bars-hidden {
+    padding-right: 0 !important;
+  }
+
+  html.app-scrollbar .right-scroll-bar-position {
+    right: 0 !important;
+  }
+
+  html.app-scrollbar .width-before-scroll-bar {
+    margin-right: 0 !important;
   }
 
   ::selection {
@@ -346,6 +373,112 @@
   }
   .shadow-glow {
     box-shadow: var(--brand-glow);
+  }
+
+  .surface-lift {
+    transition: transform 200ms cubic-bezier(.2,.8,.2,1), border-color 200ms ease, box-shadow 200ms ease;
+  }
+  .surface-lift:hover {
+    transform: translateY(-2px) scale(1.01);
+    border-color: color-mix(in oklch, var(--primary) 42%, var(--border));
+    box-shadow: 0 14px 34px -24px color-mix(in oklch, var(--primary) 50%, transparent);
+  }
+
+  /* Dashboard metric hover accents (same lift motion, semantic border/glow). */
+  .surface-lift-brand:hover {
+    border-color: color-mix(in oklch, var(--brand-ring) 48%, var(--border));
+    box-shadow: 0 14px 34px -24px color-mix(in oklch, var(--brand-ring) 52%, transparent);
+  }
+  .surface-lift-info:hover {
+    border-color: color-mix(in oklch, var(--info) 48%, var(--border));
+    box-shadow: 0 14px 34px -24px color-mix(in oklch, var(--info) 50%, transparent);
+  }
+  .surface-lift-success:hover {
+    border-color: color-mix(in oklch, var(--success) 48%, var(--border));
+    box-shadow: 0 14px 34px -24px color-mix(in oklch, var(--success) 50%, transparent);
+  }
+  .surface-lift-auxiliary:hover {
+    border-color: color-mix(in oklch, var(--auxiliary) 48%, var(--border));
+    box-shadow: 0 14px 34px -24px color-mix(in oklch, var(--auxiliary) 50%, transparent);
+  }
+  .surface-lift-urgent:hover {
+    border-color: color-mix(in oklch, oklch(0.6 0.22 25) 48%, var(--border));
+    box-shadow: 0 14px 34px -24px color-mix(in oklch, oklch(0.6 0.22 25) 50%, transparent);
+  }
+  .surface-lift-review:hover {
+    border-color: color-mix(in oklch, oklch(0.75 0.16 80) 48%, var(--border));
+    box-shadow: 0 14px 34px -24px color-mix(in oklch, oklch(0.75 0.16 80) 50%, transparent);
+  }
+  .surface-lift-muted:hover {
+    border-color: color-mix(in oklch, var(--muted-foreground) 35%, var(--border));
+    box-shadow: 0 14px 34px -24px color-mix(in oklch, var(--foreground) 18%, transparent);
+  }
+
+  /* Dashboard project cards: project-gradient border and glow on hover. */
+  .dashboard-project-card {
+    position: relative;
+    isolation: isolate;
+    padding: 1px;
+    background-color: color-mix(in oklch, var(--border) 60%, transparent);
+    transition: transform 180ms cubic-bezier(.2,.8,.2,1);
+  }
+
+  .dashboard-project-card::before,
+  .dashboard-project-card::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    background-image: linear-gradient(to right, var(--tw-gradient-stops));
+    opacity: 0;
+    transition: opacity 180ms ease;
+  }
+
+  .dashboard-project-card::before {
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+  }
+
+  .dashboard-project-card::after {
+    inset: -3px;
+    z-index: -1;
+    border-radius: calc(var(--radius) + 0.375rem);
+    filter: blur(10px);
+  }
+
+  .dashboard-project-card:hover {
+    transform: translateY(-2px);
+  }
+
+  .dashboard-project-card:hover::before {
+    opacity: 0.78;
+  }
+
+  .dashboard-project-card:hover::after {
+    opacity: 0.2;
+  }
+
+  .dark .dashboard-project-card:hover::before {
+    opacity: 0.9;
+  }
+
+  .dark .dashboard-project-card:hover::after {
+    opacity: 0.28;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .surface-lift,
+    .surface-lift:hover,
+    .dashboard-project-card,
+    .dashboard-project-card:hover {
+      transition-duration: 0.01ms !important;
+      transform: none !important;
+    }
+
+    .dashboard-project-card::before,
+    .dashboard-project-card::after {
+      transition-duration: 0.01ms !important;
+    }
   }
 
   /* Shared overlay-style scrollbar (page + panels + Kanban) */
@@ -414,26 +547,57 @@
   }
 }
 
-/* Semantic secondary actions derived from the active product theme. */
+/* Themed secondary actions: soft brand tint (weaker than primary CTA). */
 .button-brand-soft {
-  border: 1px solid color-mix(in oklch, var(--brand-ring) 34%, var(--control-border));
-  background-color: color-mix(in oklch, var(--brand-from) 8%, var(--control));
+  border: 1px solid color-mix(in oklch, var(--brand-ring) 14%, transparent);
+  background-color: color-mix(in oklch, var(--brand-from) 12%, var(--card));
   background-image: linear-gradient(
     135deg,
-    color-mix(in oklch, var(--brand-from) 22%, var(--control)),
-    color-mix(in oklch, var(--brand-to) 26%, var(--control))
+    color-mix(in oklch, var(--brand-from) 20%, var(--card)),
+    color-mix(in oklch, var(--brand-to) 24%, var(--card))
   );
-  color: color-mix(in oklch, var(--brand-ring) 82%, var(--control-foreground));
+  color: color-mix(in oklch, var(--brand-ring) 58%, var(--foreground));
   box-shadow: 0 1px 2px color-mix(in oklch, var(--brand-ring) 10%, transparent);
+  font-weight: 500;
 }
 
 .button-brand-soft:hover {
-  border-color: color-mix(in oklch, var(--brand-ring) 48%, var(--control-border));
+  border-color: color-mix(in oklch, var(--brand-ring) 24%, transparent);
+  background-color: color-mix(in oklch, var(--brand-from) 18%, var(--card));
   background-image: linear-gradient(
     135deg,
-    color-mix(in oklch, var(--brand-from) 30%, var(--control)),
-    color-mix(in oklch, var(--brand-to) 34%, var(--control))
+    color-mix(in oklch, var(--brand-from) 30%, var(--card)),
+    color-mix(in oklch, var(--brand-to) 34%, var(--card))
   );
+  box-shadow: 0 2px 8px -3px color-mix(in oklch, var(--brand-ring) 24%, transparent);
+}
+
+.button-brand-soft:disabled {
+  border-color: transparent;
+  opacity: 0.45;
+}
+
+.dark .button-brand-soft {
+  border-color: color-mix(in oklch, var(--brand-ring) 20%, transparent);
+  background-color: color-mix(in oklch, var(--brand-from) 18%, var(--card));
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--brand-from) 26%, var(--card)),
+    color-mix(in oklch, var(--brand-to) 30%, var(--card))
+  );
+  color: color-mix(in oklch, var(--brand-ring) 46%, white);
+  box-shadow: 0 1px 3px color-mix(in oklch, var(--brand-ring) 16%, transparent);
+}
+
+.dark .button-brand-soft:hover {
+  border-color: color-mix(in oklch, var(--brand-ring) 32%, transparent);
+  background-color: color-mix(in oklch, var(--brand-from) 24%, var(--card));
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--brand-from) 36%, var(--card)),
+    color-mix(in oklch, var(--brand-to) 40%, var(--card))
+  );
+  box-shadow: 0 2px 10px -3px color-mix(in oklch, var(--brand-ring) 28%, transparent);
 }
 
 .button-danger-soft {
@@ -445,6 +609,663 @@
 .button-danger-soft:hover {
   border-color: color-mix(in oklch, var(--destructive) 40%, transparent);
   background-color: color-mix(in oklch, var(--destructive) 16%, transparent);
+}
+
+/*
+  Project list filters — one visual system.
+  Active = solid filled plaque (no outline-as-primary).
+  "All" = cool neutral slate master (never brand / never green).
+  "Active" = vivid green semantic — deliberately far from "All".
+*/
+.filter-chip {
+  border: 1px solid transparent;
+  font-weight: 500;
+  box-shadow: none;
+  transition:
+    background-color 160ms ease,
+    background-image 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    opacity 160ms ease;
+}
+
+.filter-chip[data-active="true"] {
+  font-weight: 600;
+}
+
+/* All = indigo / deep blue master. */
+.filter-chip-all {
+  background-color: color-mix(in oklch, oklch(0.55 0.18 275) 16%, var(--control));
+  color: oklch(0.38 0.14 275);
+}
+
+.filter-chip-all:hover {
+  background-color: color-mix(in oklch, oklch(0.55 0.18 275) 24%, var(--control));
+  color: oklch(0.34 0.15 275);
+}
+
+.filter-chip-all[data-active="true"] {
+  background-color: oklch(0.48 0.19 275);
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.45 0.2 278),
+    oklch(0.52 0.17 265)
+  );
+  color: oklch(0.99 0.01 275);
+  box-shadow: 0 2px 10px -3px color-mix(in oklch, oklch(0.48 0.18 275) 42%, transparent);
+}
+
+.dark .filter-chip-all:not([data-active="true"]) {
+  background-color: color-mix(in oklch, oklch(0.68 0.14 275) 20%, var(--control));
+  color: oklch(0.88 0.08 275);
+}
+
+.dark .filter-chip-all[data-active="true"] {
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.5 0.19 278),
+    oklch(0.56 0.16 265)
+  );
+  color: oklch(0.99 0.01 275);
+  box-shadow: 0 2px 12px -3px color-mix(in oklch, oklch(0.52 0.17 275) 48%, transparent);
+}
+
+/* Active = green. */
+.filter-chip-active {
+  background-color: color-mix(in oklch, oklch(0.66 0.18 148) 16%, var(--control));
+  color: oklch(0.34 0.14 148);
+}
+
+.filter-chip-active:hover {
+  background-color: color-mix(in oklch, oklch(0.66 0.18 148) 24%, var(--control));
+  color: oklch(0.3 0.15 148);
+}
+
+.filter-chip-active[data-active="true"] {
+  background-color: oklch(0.54 0.17 148);
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.5 0.18 145),
+    oklch(0.6 0.15 165)
+  );
+  color: oklch(0.99 0.01 150);
+  box-shadow: 0 2px 12px -3px color-mix(in oklch, oklch(0.52 0.16 148) 48%, transparent);
+}
+
+.dark .filter-chip-active:not([data-active="true"]) {
+  background-color: color-mix(in oklch, oklch(0.72 0.16 148) 18%, var(--control));
+  color: oklch(0.88 0.1 148);
+}
+
+.dark .filter-chip-active[data-active="true"] {
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.52 0.17 145),
+    oklch(0.62 0.14 165)
+  );
+  color: oklch(0.99 0.01 150);
+}
+
+/* Planning = sky / blue. */
+.filter-chip-planning {
+  background-color: color-mix(in oklch, oklch(0.68 0.14 230) 16%, var(--control));
+  color: oklch(0.38 0.12 230);
+}
+
+.filter-chip-planning:hover {
+  background-color: color-mix(in oklch, oklch(0.68 0.14 230) 24%, var(--control));
+  color: oklch(0.34 0.13 230);
+}
+
+.filter-chip-planning[data-active="true"] {
+  background-color: oklch(0.58 0.14 230);
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.54 0.15 235),
+    oklch(0.62 0.12 215)
+  );
+  color: oklch(0.99 0.01 230);
+  box-shadow: 0 2px 10px -3px color-mix(in oklch, oklch(0.55 0.13 230) 42%, transparent);
+}
+
+.dark .filter-chip-planning:not([data-active="true"]) {
+  background-color: color-mix(in oklch, oklch(0.72 0.12 230) 18%, var(--control));
+  color: oklch(0.88 0.08 230);
+}
+
+.dark .filter-chip-planning[data-active="true"] {
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.56 0.14 235),
+    oklch(0.64 0.11 215)
+  );
+  color: oklch(0.99 0.01 230);
+}
+
+/* On hold = amber. */
+.filter-chip-on-hold {
+  background-color: color-mix(in oklch, oklch(0.78 0.14 78) 18%, var(--control));
+  color: oklch(0.48 0.12 60);
+}
+
+.filter-chip-on-hold:hover {
+  background-color: color-mix(in oklch, oklch(0.78 0.14 78) 28%, var(--control));
+  color: oklch(0.44 0.13 55);
+}
+
+.filter-chip-on-hold[data-active="true"] {
+  background-color: oklch(0.7 0.15 70);
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.66 0.16 60),
+    oklch(0.76 0.13 86)
+  );
+  color: oklch(0.99 0.02 95);
+  box-shadow: 0 2px 10px -3px color-mix(in oklch, oklch(0.7 0.14 70) 42%, transparent);
+}
+
+.dark .filter-chip-on-hold:not([data-active="true"]) {
+  background-color: color-mix(in oklch, oklch(0.78 0.12 78) 20%, var(--control));
+  color: oklch(0.93 0.08 90);
+}
+
+.dark .filter-chip-on-hold[data-active="true"] {
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.66 0.15 62),
+    oklch(0.76 0.13 88)
+  );
+  color: oklch(0.99 0.02 95);
+}
+
+/* Completed = violet / plum. */
+.filter-chip-completed {
+  background-color: color-mix(in oklch, oklch(0.58 0.16 310) 16%, var(--control));
+  color: oklch(0.4 0.14 310);
+}
+
+.filter-chip-completed:hover {
+  background-color: color-mix(in oklch, oklch(0.58 0.16 310) 24%, var(--control));
+  color: oklch(0.36 0.15 310);
+}
+
+.filter-chip-completed[data-active="true"] {
+  background-color: oklch(0.52 0.17 310);
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.48 0.18 305),
+    oklch(0.56 0.15 320)
+  );
+  color: oklch(0.99 0.01 310);
+  box-shadow: 0 2px 10px -3px color-mix(in oklch, oklch(0.5 0.16 310) 42%, transparent);
+}
+
+.dark .filter-chip-completed:not([data-active="true"]) {
+  background-color: color-mix(in oklch, oklch(0.7 0.14 310) 18%, var(--control));
+  color: oklch(0.9 0.08 310);
+}
+
+.dark .filter-chip-completed[data-active="true"] {
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.52 0.17 305),
+    oklch(0.6 0.14 320)
+  );
+  color: oklch(0.99 0.01 310);
+}
+
+/*
+  Tasks / Kanban filter selects — same filled language as project chips.
+  Idle = readable soft fill. Open / data-filter-active = solid bright plaque.
+  Category masters are semantic (not brand):
+  status = cool blue, priority = violet, assignee = teal.
+*/
+/*
+  Shared search field language (topbar global search + list filters + chat).
+  Uses the same control surface tokens as other inputs — no gray wash.
+  Brand accent only on hover/focus.
+*/
+.filter-search-input {
+  height: 2.5rem !important;
+  border: 1px solid var(--control-border) !important;
+  border-radius: 0.5rem !important;
+  background-color: var(--control) !important;
+  background-image: none !important;
+  box-shadow: none;
+  color: var(--control-foreground);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.filter-search-input::placeholder {
+  color: var(--muted-foreground);
+}
+
+.filter-search-input:hover {
+  background-color: var(--control-hover) !important;
+  border-color: color-mix(in oklch, var(--brand-ring) 28%, var(--control-border)) !important;
+}
+
+.filter-search-input:focus,
+.filter-search-input:focus-visible {
+  background-color: var(--control) !important;
+  border-color: color-mix(in oklch, var(--brand-ring) 48%, var(--control-border)) !important;
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--brand-ring) 28%, transparent);
+}
+
+.dark .filter-search-input {
+  background-color: var(--control) !important;
+  background-image: none !important;
+  color: var(--control-foreground);
+}
+
+.dark .filter-search-input:hover {
+  background-color: var(--control-hover) !important;
+}
+
+.filter-search-icon {
+  color: var(--muted-foreground);
+}
+
+.filter-select {
+  border: 1px solid transparent !important;
+  background-color: transparent;
+  box-shadow: none;
+  font-weight: 500;
+  transition:
+    background-color 160ms ease,
+    background-image 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    font-weight 160ms ease;
+}
+
+.filter-select:hover,
+.filter-select[data-state="open"],
+.filter-select[data-filter-active="true"] {
+  border-color: transparent !important;
+}
+
+/* Status master ("All statuses" / "Open"): cool blue-slate, never brand. */
+.filter-select-status-all {
+  background-color: color-mix(in oklch, oklch(0.58 0.11 240) 28%, var(--control)) !important;
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklch, oklch(0.6 0.11 240) 38%, var(--control)),
+    color-mix(in oklch, oklch(0.55 0.09 250) 26%, var(--control))
+  ) !important;
+  color: oklch(0.34 0.1 240) !important;
+  box-shadow: 0 1px 6px -2px color-mix(in oklch, oklch(0.5 0.1 240) 34%, transparent);
+  --tw-ring-color: color-mix(in oklch, oklch(0.55 0.11 240) 36%, transparent);
+}
+
+.filter-select-status-all:hover {
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklch, oklch(0.6 0.12 240) 38%, var(--control)),
+    color-mix(in oklch, oklch(0.55 0.1 250) 26%, var(--control))
+  ) !important;
+}
+
+.filter-select-status-all[data-state="open"],
+.filter-select-status-all[data-filter-active="true"] {
+  background-color: oklch(0.5 0.12 240) !important;
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.48 0.13 242),
+    oklch(0.54 0.11 230)
+  ) !important;
+  color: oklch(0.99 0.01 240) !important;
+  font-weight: 600;
+  box-shadow: 0 2px 10px -3px color-mix(in oklch, oklch(0.5 0.12 240) 42%, transparent);
+}
+
+.dark .filter-select-status-all:not([data-state="open"]):not([data-filter-active="true"]) {
+  color: oklch(0.88 0.06 240) !important;
+}
+
+.dark .filter-select-status-all[data-state="open"],
+.dark .filter-select-status-all[data-filter-active="true"] {
+  color: oklch(0.99 0.01 240) !important;
+}
+
+/* Priority master ("All priorities"): soft violet, never brand. */
+.filter-select-priority-all {
+  background-color: color-mix(in oklch, oklch(0.55 0.17 295) 28%, var(--control)) !important;
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklch, oklch(0.58 0.17 295) 38%, var(--control)),
+    color-mix(in oklch, oklch(0.5 0.15 310) 26%, var(--control))
+  ) !important;
+  color: oklch(0.36 0.14 295) !important;
+  box-shadow: 0 1px 6px -2px color-mix(in oklch, oklch(0.55 0.15 295) 34%, transparent);
+  --tw-ring-color: color-mix(in oklch, oklch(0.55 0.17 295) 36%, transparent);
+}
+
+.filter-select-priority-all:hover {
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklch, oklch(0.58 0.18 295) 38%, var(--control)),
+    color-mix(in oklch, oklch(0.5 0.16 310) 26%, var(--control))
+  ) !important;
+}
+
+.filter-select-priority-all[data-state="open"],
+.filter-select-priority-all[data-filter-active="true"] {
+  background-color: oklch(0.5 0.17 295) !important;
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.48 0.18 295),
+    oklch(0.54 0.15 310)
+  ) !important;
+  color: oklch(0.99 0.01 295) !important;
+  font-weight: 600;
+  box-shadow: 0 2px 10px -3px color-mix(in oklch, oklch(0.5 0.16 295) 42%, transparent);
+}
+
+.dark .filter-select-priority-all:not([data-state="open"]):not([data-filter-active="true"]) {
+  color: oklch(0.88 0.08 295) !important;
+}
+
+.dark .filter-select-priority-all[data-state="open"],
+.dark .filter-select-priority-all[data-filter-active="true"] {
+  color: oklch(0.99 0.01 295) !important;
+}
+
+/* Status family: slate / blue / amber / green */
+.filter-select-status-backlog {
+  background-color: color-mix(in oklch, oklch(0.5 0.015 260) 24%, var(--control)) !important;
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklch, oklch(0.5 0.015 260) 30%, var(--control)),
+    color-mix(in oklch, oklch(0.54 0.012 260) 22%, var(--control))
+  ) !important;
+  color: oklch(0.36 0.015 260) !important;
+  box-shadow: 0 1px 5px -2px color-mix(in oklch, oklch(0.4 0.015 260) 28%, transparent);
+  --tw-ring-color: color-mix(in oklch, oklch(0.45 0.015 260) 34%, transparent);
+}
+
+.filter-select-status-backlog[data-state="open"],
+.filter-select-status-backlog[data-filter-active="true"] {
+  background-color: oklch(0.46 0.015 260) !important;
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.44 0.015 260),
+    oklch(0.52 0.012 260)
+  ) !important;
+  color: oklch(0.98 0.005 260) !important;
+  font-weight: 600;
+  box-shadow: 0 2px 10px -3px color-mix(in oklch, oklch(0.4 0.015 260) 36%, transparent);
+}
+
+.dark .filter-select-status-backlog:not([data-state="open"]):not([data-filter-active="true"]) {
+  color: oklch(0.88 0.01 260) !important;
+}
+
+.filter-select-status-in-progress {
+  background-color: color-mix(in oklch, var(--info) 24%, var(--control)) !important;
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--info) 30%, var(--control)),
+    color-mix(in oklch, var(--info) 20%, var(--control))
+  ) !important;
+  color: color-mix(in oklch, var(--info) 78%, var(--foreground)) !important;
+  box-shadow: 0 1px 5px -2px color-mix(in oklch, var(--info) 32%, transparent);
+  --tw-ring-color: color-mix(in oklch, var(--info) 38%, transparent);
+}
+
+.filter-select-status-in-progress[data-state="open"],
+.filter-select-status-in-progress[data-filter-active="true"] {
+  background-color: var(--info) !important;
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--info) 92%, oklch(0.45 0.12 240)),
+    color-mix(in oklch, var(--info) 80%, oklch(0.55 0.1 220))
+  ) !important;
+  color: oklch(0.99 0.01 240) !important;
+  font-weight: 600;
+  box-shadow: 0 2px 10px -3px color-mix(in oklch, var(--info) 45%, transparent);
+}
+
+.filter-select-status-review {
+  background-color: color-mix(in oklch, oklch(0.72 0.13 75) 24%, var(--control)) !important;
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklch, oklch(0.72 0.13 75) 30%, var(--control)),
+    color-mix(in oklch, oklch(0.74 0.12 80) 20%, var(--control))
+  ) !important;
+  color: oklch(0.4 0.11 65) !important;
+  box-shadow: 0 1px 5px -2px color-mix(in oklch, oklch(0.7 0.13 70) 32%, transparent);
+  --tw-ring-color: color-mix(in oklch, oklch(0.7 0.13 70) 38%, transparent);
+}
+
+.filter-select-status-review[data-state="open"],
+.filter-select-status-review[data-filter-active="true"] {
+  background-color: oklch(0.66 0.15 70) !important;
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.62 0.16 62),
+    oklch(0.7 0.14 82)
+  ) !important;
+  color: oklch(0.99 0.02 90) !important;
+  font-weight: 600;
+  box-shadow: 0 2px 10px -3px color-mix(in oklch, oklch(0.64 0.14 70) 42%, transparent);
+}
+
+.dark .filter-select-status-review:not([data-state="open"]):not([data-filter-active="true"]) {
+  color: oklch(0.9 0.08 85) !important;
+}
+
+.filter-select-status-done {
+  background-color: color-mix(in oklch, var(--success) 24%, var(--control)) !important;
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--success) 30%, var(--control)),
+    color-mix(in oklch, var(--success) 20%, var(--control))
+  ) !important;
+  color: color-mix(in oklch, var(--success) 78%, var(--foreground)) !important;
+  box-shadow: 0 1px 5px -2px color-mix(in oklch, var(--success) 32%, transparent);
+  --tw-ring-color: color-mix(in oklch, var(--success) 38%, transparent);
+}
+
+.filter-select-status-done[data-state="open"],
+.filter-select-status-done[data-filter-active="true"] {
+  background-color: var(--success) !important;
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--success) 92%, oklch(0.45 0.12 150)),
+    color-mix(in oklch, var(--success) 80%, oklch(0.55 0.1 165))
+  ) !important;
+  color: oklch(0.99 0.01 150) !important;
+  font-weight: 600;
+  box-shadow: 0 2px 10px -3px color-mix(in oklch, var(--success) 45%, transparent);
+}
+
+/* Priority family: slate / violet / red (no orange) */
+.filter-select-priority-low {
+  background-color: color-mix(in oklch, oklch(0.5 0.015 260) 24%, var(--control)) !important;
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklch, oklch(0.5 0.015 260) 30%, var(--control)),
+    color-mix(in oklch, oklch(0.54 0.012 260) 22%, var(--control))
+  ) !important;
+  color: oklch(0.36 0.015 260) !important;
+  box-shadow: 0 1px 5px -2px color-mix(in oklch, oklch(0.4 0.015 260) 28%, transparent);
+  --tw-ring-color: color-mix(in oklch, oklch(0.45 0.015 260) 34%, transparent);
+}
+
+.filter-select-priority-low[data-state="open"],
+.filter-select-priority-low[data-filter-active="true"] {
+  background-color: oklch(0.46 0.015 260) !important;
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.44 0.015 260),
+    oklch(0.52 0.012 260)
+  ) !important;
+  color: oklch(0.98 0.005 260) !important;
+  font-weight: 600;
+}
+
+.dark .filter-select-priority-low:not([data-state="open"]):not([data-filter-active="true"]) {
+  color: oklch(0.88 0.01 260) !important;
+}
+
+.filter-select-priority-medium {
+  background-color: color-mix(in oklch, oklch(0.55 0.18 295) 24%, var(--control)) !important;
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklch, oklch(0.58 0.17 295) 30%, var(--control)),
+    color-mix(in oklch, oklch(0.5 0.16 310) 20%, var(--control))
+  ) !important;
+  color: oklch(0.4 0.15 295) !important;
+  box-shadow: 0 1px 5px -2px color-mix(in oklch, oklch(0.55 0.16 295) 32%, transparent);
+  --tw-ring-color: color-mix(in oklch, oklch(0.55 0.16 295) 38%, transparent);
+}
+
+.filter-select-priority-medium[data-state="open"],
+.filter-select-priority-medium[data-filter-active="true"] {
+  background-color: oklch(0.5 0.17 295) !important;
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.48 0.18 295),
+    oklch(0.54 0.15 310)
+  ) !important;
+  color: oklch(0.99 0.01 295) !important;
+  font-weight: 600;
+  box-shadow: 0 2px 10px -3px color-mix(in oklch, oklch(0.5 0.16 295) 42%, transparent);
+}
+
+.dark .filter-select-priority-medium:not([data-state="open"]):not([data-filter-active="true"]) {
+  color: oklch(0.88 0.09 295) !important;
+}
+
+.filter-select-priority-urgent {
+  background-color: color-mix(in oklch, oklch(0.55 0.2 25) 24%, var(--control)) !important;
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklch, oklch(0.58 0.19 25) 30%, var(--control)),
+    color-mix(in oklch, oklch(0.5 0.18 15) 20%, var(--control))
+  ) !important;
+  color: oklch(0.42 0.17 25) !important;
+  box-shadow: 0 1px 5px -2px color-mix(in oklch, oklch(0.55 0.18 25) 32%, transparent);
+  --tw-ring-color: color-mix(in oklch, oklch(0.55 0.18 25) 38%, transparent);
+}
+
+.filter-select-priority-urgent[data-state="open"],
+.filter-select-priority-urgent[data-filter-active="true"] {
+  background-color: oklch(0.52 0.2 25) !important;
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.5 0.21 22),
+    oklch(0.56 0.18 15)
+  ) !important;
+  color: oklch(0.99 0.01 25) !important;
+  font-weight: 600;
+  box-shadow: 0 2px 10px -3px color-mix(in oklch, oklch(0.52 0.19 25) 44%, transparent);
+}
+
+.dark .filter-select-priority-urgent:not([data-state="open"]):not([data-filter-active="true"]) {
+  color: oklch(0.88 0.09 25) !important;
+}
+
+/* Assignee = fixed teal family (theme-independent, not status/priority/brand) */
+.filter-select-assignee {
+  background-color: color-mix(in oklch, oklch(0.6 0.11 185) 28%, var(--control)) !important;
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklch, oklch(0.62 0.11 185) 38%, var(--control)),
+    color-mix(in oklch, oklch(0.55 0.1 195) 26%, var(--control))
+  ) !important;
+  color: oklch(0.34 0.1 185) !important;
+  box-shadow: 0 1px 6px -2px color-mix(in oklch, oklch(0.55 0.1 185) 34%, transparent);
+  --tw-ring-color: color-mix(in oklch, oklch(0.55 0.11 185) 36%, transparent);
+}
+
+.filter-select-assignee:hover {
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklch, oklch(0.62 0.12 185) 38%, var(--control)),
+    color-mix(in oklch, oklch(0.55 0.11 195) 26%, var(--control))
+  ) !important;
+}
+
+.filter-select-assignee[data-state="open"],
+.filter-select-assignee[data-filter-active="true"] {
+  background-color: oklch(0.52 0.11 185) !important;
+  background-image: linear-gradient(
+    135deg,
+    oklch(0.5 0.12 185),
+    oklch(0.56 0.1 195)
+  ) !important;
+  color: oklch(0.99 0.01 185) !important;
+  font-weight: 600;
+  box-shadow: 0 2px 10px -3px color-mix(in oklch, oklch(0.5 0.11 185) 42%, transparent);
+}
+
+.dark .filter-select-assignee:not([data-state="open"]):not([data-filter-active="true"]) {
+  color: oklch(0.88 0.06 185) !important;
+}
+
+.dark .filter-select-assignee[data-state="open"],
+.dark .filter-select-assignee[data-filter-active="true"] {
+  color: oklch(0.99 0.01 185) !important;
+}
+
+.filter-select .text-muted-foreground,
+.filter-select [data-slot="select-value"] {
+  color: inherit;
+}
+
+/* Progress fill inside project identity surfaces — brighter gradient read. */
+.project-progress-fill {
+  filter: saturate(1.28) brightness(1.08);
+  box-shadow: 0 0 12px -1px color-mix(in oklch, white 22%, transparent);
+}
+
+/* Settings tabs: active = solid theme-gradient segment (no layout shift). */
+.settings-tabs-trigger {
+  box-sizing: border-box;
+  height: 2rem;
+  border: 1px solid transparent;
+  padding: 0.375rem 0.75rem;
+  color: var(--muted-foreground);
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+  font-weight: 500;
+  transform: none;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    background-image 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+}
+
+.settings-tabs-trigger:hover {
+  background-color: color-mix(in oklch, var(--brand-from) 10%, transparent);
+  color: color-mix(in oklch, var(--brand-ring) 70%, var(--foreground));
+}
+
+.settings-tabs-trigger[data-state="active"] {
+  /* Same weight/padding/height/border-width as inactive — only paint changes. */
+  border-color: transparent;
+  background-color: var(--brand-from);
+  background-image: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+  color: var(--brand-foreground);
+  box-shadow: 0 2px 10px -3px color-mix(in oklch, var(--brand-ring) 45%, transparent);
+  font-weight: 500;
+  transform: none;
+}
+
+.dark .settings-tabs-trigger[data-state="active"] {
+  border-color: transparent;
+  background-image: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+  color: var(--brand-foreground);
+  box-shadow: 0 2px 12px -3px color-mix(in oklch, var(--brand-ring) 50%, transparent);
 }
 
 /*
@@ -602,6 +1423,75 @@
 
 .dark .toaster .app-toast.app-toast--destructive [data-icon] {
   color: var(--destructive) !important;
+}
+
+.app-sidebar__reveal {
+  opacity: 1;
+  visibility: visible;
+  max-width: 14rem;
+  overflow: hidden;
+  white-space: nowrap;
+  transform: translateX(0);
+  transition:
+    opacity 180ms cubic-bezier(0.22, 0.8, 0.22, 1) 140ms,
+    visibility 0ms linear 140ms,
+    max-width 260ms cubic-bezier(0.22, 0.8, 0.22, 1) 80ms,
+    transform 240ms cubic-bezier(0.22, 0.8, 0.22, 1) 80ms;
+}
+
+.app-sidebar__expanded-icon {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+  transition:
+    opacity 160ms ease 70ms,
+    transform 220ms cubic-bezier(0.22, 0.8, 0.22, 1) 60ms;
+}
+
+.app-sidebar__collapse-only {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.82);
+  transition:
+    opacity 150ms ease,
+    transform 220ms cubic-bezier(0.22, 0.8, 0.22, 1);
+}
+
+.app-sidebar[data-collapsed="true"] .app-sidebar__reveal {
+  opacity: 0;
+  visibility: hidden;
+  max-width: 0;
+  pointer-events: none;
+  transform: translateX(-0.25rem);
+  transition:
+    opacity 50ms ease 0ms,
+    visibility 0ms linear 50ms,
+    max-width 200ms cubic-bezier(0.22, 0.8, 0.22, 1) 0ms,
+    transform 180ms cubic-bezier(0.22, 0.8, 0.22, 1) 0ms;
+}
+
+.app-sidebar[data-collapsed="true"] .app-sidebar__expanded-icon {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.82);
+  transition-delay: 0ms;
+}
+
+.app-sidebar[data-collapsed="true"] .app-sidebar__collapse-only {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+  transition-delay: 90ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar,
+  .app-sidebar__reveal,
+  .app-sidebar__expanded-icon,
+  .app-sidebar__collapse-only {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
 }
 
 /* Brand mark: a single modern AI flash (theme tokens via --brand-from / --brand-to). */
