@@ -40,6 +40,10 @@ function consoleDeliveryMode(): "console" | "dev" {
   return nodeEnv === "production" ? "console" : "dev";
 }
 
+function isProductionRuntime(): boolean {
+  return (process.env.NODE_ENV?.trim() || env.NODE_ENV) === "production";
+}
+
 function formatRole(role: string): string {
   const normalized = role.trim().toUpperCase();
   if (normalized === "ADMIN") return "Admin";
@@ -132,6 +136,16 @@ function logConsoleInvite(
   if (warning) {
     console.warn(`[email] ${warning}`);
   }
+
+  if (isProductionRuntime()) {
+    console.info("[email] Workspace invite not sent", {
+      provider: "console",
+      mode,
+      reason: "EMAIL_PROVIDER_CONSOLE",
+    });
+    return;
+  }
+
   console.info(
     `[email] Workspace invite (${mode} fallback)`,
     JSON.stringify(
@@ -184,21 +198,27 @@ async function sendViaResend(
 
     if (error) {
       const warning = "Failed to send invitation email";
-      console.error("[email] Resend send failed", {
-        to: input.to,
-        message: error.message,
-        name: error.name,
-      });
+      console.error(
+        "[email] Resend send failed",
+        isProductionRuntime()
+          ? { provider: "resend", reason: "PROVIDER_REJECTED" }
+          : { to: input.to, message: error.message, name: error.name },
+      );
       return toResult("resend", false, warning);
     }
 
     return toResult("resend", true);
   } catch (error) {
     const warning = "Failed to send invitation email";
-    console.error("[email] Resend send error", {
-      to: input.to,
-      message: error instanceof Error ? error.message : "Unknown error",
-    });
+    console.error(
+      "[email] Resend send error",
+      isProductionRuntime()
+        ? { provider: "resend", reason: "PROVIDER_ERROR" }
+        : {
+            to: input.to,
+            message: error instanceof Error ? error.message : "Unknown error",
+          },
+    );
     return toResult("resend", false, warning);
   }
 }

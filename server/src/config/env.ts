@@ -123,10 +123,8 @@ function validateProductionConfig(): void {
     return;
   }
 
-  if (parsed.JWT_SECRET === DEV_JWT_SECRET) {
-    throw new Error(
-      `JWT_SECRET must not use the dev default "${DEV_JWT_SECRET}" in production. Set a long random secret.`,
-    );
+  if (parsed.JWT_SECRET === DEV_JWT_SECRET || parsed.JWT_SECRET.length < 32) {
+    throw new Error("JWT_SECRET must be a random value of at least 32 characters in production.");
   }
 
   if (!parsed.APP_URL?.trim()) {
@@ -143,6 +141,16 @@ function validateProductionConfig(): void {
     if (containsLocalhost(origin)) {
       throw new Error("CORS_ORIGIN must not include localhost or 127.0.0.1 in production.");
     }
+  }
+
+  if (parsed.GOOGLE_REDIRECT_URI && containsLocalhost(parsed.GOOGLE_REDIRECT_URI)) {
+    throw new Error("GOOGLE_REDIRECT_URI must not use localhost or 127.0.0.1 in production.");
+  }
+
+  if (!process.env.FILE_STORAGE_DRIVER?.trim()) {
+    throw new Error(
+      "FILE_STORAGE_DRIVER must be set explicitly in production; use supabase for durable Render storage.",
+    );
   }
 }
 

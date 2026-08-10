@@ -35,6 +35,11 @@ function normalizeOrigin(origin: string): string {
 
 export const app = express();
 
+if (env.NODE_ENV === "production") {
+  // Render terminates TLS at one trusted proxy hop; req.ip then represents the edge-derived client.
+  app.set("trust proxy", 1);
+}
+
 app.use(
   cors({
     origin(origin, callback) {

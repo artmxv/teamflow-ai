@@ -86,6 +86,10 @@ for (const tab of CATEGORY_TABS) {
   }
 }
 
+function isCategoryTabId(value: string): value is CategoryTabId {
+  return CATEGORY_TABS.some((tab) => tab.id === value);
+}
+
 function resolveTabIdFromLabel(label: string): CategoryTabId | null {
   return LABEL_TO_TAB_ID.get(label.trim().toLowerCase()) ?? null;
 }
@@ -163,9 +167,11 @@ export function ChatComposerEmojiPickerPanel({
       const rect = header.getBoundingClientRect();
       // Sticky headers sit at the top of the viewport while their section is active.
       if (rect.top <= viewportTop + 8) {
+        const dataTabId = header.dataset.emojiCategoryTab;
         const tabId =
-          header.dataset.emojiCategoryTab ??
-          resolveTabIdFromLabel(header.textContent?.trim() ?? "");
+          dataTabId && isCategoryTabId(dataTabId)
+            ? dataTabId
+            : resolveTabIdFromLabel(header.textContent?.trim() ?? "");
         if (tabId) {
           current = tabId;
         }

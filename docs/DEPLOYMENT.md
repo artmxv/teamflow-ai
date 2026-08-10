@@ -51,15 +51,15 @@ Never commit `server/.env` or a filled root `.env` with secrets.
 
 ## 1. Required production env (summary)
 
-| Area           | Required                                        |
-| -------------- | ----------------------------------------------- |
-| Database       | `DATABASE_URL` (Neon)                           |
-| Auth           | `JWT_SECRET` (long random; not the dev default) |
-| Frontend links | `APP_URL` (primary production frontend URL)     |
-| CORS           | `CORS_ORIGIN` (allowed frontend origin(s))      |
-| Runtime        | `NODE_ENV=production`                           |
-| Frontend build | `VITE_API_URL` (production API URL)             |
-| Files          | `FILE_STORAGE_DRIVER=supabase` + Supabase vars  |
+| Area           | Required                                       |
+| -------------- | ---------------------------------------------- |
+| Database       | `DATABASE_URL` (Neon)                          |
+| Auth           | `JWT_SECRET` (at least 32 random characters)   |
+| Frontend links | `APP_URL` (primary production frontend URL)    |
+| CORS           | `CORS_ORIGIN` (allowed frontend origin(s))     |
+| Runtime        | `NODE_ENV=production`                          |
+| Frontend build | `VITE_API_URL` (production API URL)            |
+| Files          | `FILE_STORAGE_DRIVER=supabase` + Supabase vars |
 
 Optional but common:
 
@@ -119,7 +119,7 @@ On Render, set the same variables in the service dashboard.
 | `NODE_ENV`                  | Yes (prod)       | `production`                                                                           |
 | `CORS_ORIGIN`               | Yes (prod)       | Exact frontend origin(s); no trailing slash; no localhost in production                |
 | `DATABASE_URL`              | Yes              | Neon PostgreSQL connection string for Prisma                                           |
-| `JWT_SECRET`                | Yes              | Long random string; must not be `dev-jwt-secret-change-in-production`                  |
+| `JWT_SECRET`                | Yes              | Random string of at least 32 characters                                                |
 | `APP_URL`                   | Yes (prod)       | Public frontend URL for invites and OAuth redirects                                    |
 | `EMAIL_PROVIDER`            | No               | `console` (default) or `resend`                                                        |
 | `EMAIL_FROM`                | If resend        | Verified sender/domain in Resend                                                       |
@@ -186,7 +186,7 @@ Startup validation lives in `server/src/config/env.ts`. Misconfigured production
    ```
 6. Ensure `APP_URL` is the primary production frontend URL (`https://teamflow-ai-murex.vercel.app`).
 
-Flow: browser → frontend “Continue with Google” → backend `/api/auth/google` → Google → backend `/api/auth/google/callback` → redirect to frontend (`APP_URL`) with session token handling.
+Flow: browser → frontend “Continue with Google” → backend `/api/auth/google` → Google → backend `/api/auth/google/callback` → frontend callback. The short-lived handoff uses a URL fragment, which the frontend removes before validating the session; JWTs are never returned in a query string.
 
 If Google env vars are all empty, the API starts normally and the sign-in page shows Google as unavailable when clicked.
 
@@ -268,12 +268,14 @@ npm run db:seed
 
 ## 8. Render backend (Web Service)
 
-| Setting                 | Value                                                                                                |
-| ----------------------- | ---------------------------------------------------------------------------------------------------- |
-| Root directory          | `server`                                                                                             |
-| Build command           | `npm install --include=dev && npx prisma generate && npm run build && npm run prisma:migrate:deploy` |
-| Start command           | `npm run start`                                                                                      |
-| Instances / concurrency | One instance; `WEB_CONCURRENCY=1`                                                                    |
+| Setting                 | Value                                                                                           |
+| ----------------------- | ----------------------------------------------------------------------------------------------- |
+| Root directory          | `server`                                                                                        |
+| Node.js Version         | `22.x`                                                                                          |
+| Build command           | `npm ci --include=dev && npx prisma generate && npm run build && npm run prisma:migrate:deploy` |
+| Start command           | `npm run start`                                                                                 |
+| Health Check Path       | `/api/health`                                                                                   |
+| Instances / concurrency | One instance; `WEB_CONCURRENCY=1`                                                               |
 
 **Non-secret environment variables** (set secret values only in the Render dashboard, never in git):
 
@@ -299,8 +301,8 @@ Notes:
 - Render usually sets `PORT` automatically; the app reads `PORT` from env (`server/src/config/env.ts`).
 - `npm run build` runs `tsc` and outputs `dist/server.js` (`server/tsconfig.json`).
 - `npm run start` runs `node dist/server.js`.
-- `--include=dev` keeps Prisma CLI available during build even when production install would omit `devDependencies`.
-- Older shorter build lines (`npm install && npm run build && …`) may fail if Prisma CLI is not installed. Prefer the command above.
+- `npm ci` enforces the committed lockfile; `--include=dev` keeps Prisma CLI available during build.
+- Configure Render's health check to call unauthenticated `GET /api/health`.
 - **Realtime chat (Socket.IO)** shares the same HTTP port as the REST API. Correct for a **single** backend instance. Do not scale to multiple instances until a shared Socket.IO adapter (for example Redis) is added.
 - **Online presence** is **in memory**. It is cleared on restart and rebuilt when clients reconnect. Horizontal scaling needs a shared presence store plus the Socket.IO Redis adapter. Redis is **not** implemented at this stage.
 
@@ -315,7 +317,7 @@ Notes:
 | Root Directory    | `.`                                 |
 | Framework Preset  | `Other`                             |
 | Node.js Version   | `22.x`                              |
-| Install Command   | `npm install --include=dev`         |
+| Install Command   | `npm ci --include=dev`              |
 | Build Command     | `NITRO_PRESET=vercel npm run build` |
 | Output Directory  | leave blank                         |
 | Production Branch | `main`                              |
@@ -368,11 +370,11 @@ Notes:
 
 ### Temporary fallback: Render Web Service (frontend)
 
-| Setting        | Value                                        |
-| -------------- | -------------------------------------------- |
-| Root directory | repository root                              |
-| Build command  | `npm install --include=dev && npm run build` |
-| Start command  | `node dist/server/index.mjs`                 |
+| Setting        | Value                                   |
+| -------------- | --------------------------------------- |
+| Root directory | repository root                         |
+| Build command  | `npm ci --include=dev && npm run build` |
+| Start command  | `node dist/server/index.mjs`            |
 
 **Environment variable** (build-time):
 
@@ -396,7 +398,7 @@ TanStack Start builds a Nitro `node-server` bundle; production start is `node di
 Provision PostgreSQL (Neon), then from `server/` (or via the Render build command):
 
 ```bash
-npm install --include=dev
+npm ci --include=dev
 npx prisma generate
 npm run prisma:migrate:deploy
 ```
@@ -413,7 +415,7 @@ npm run prisma:migrate:deploy
 
 ```bash
 cd server
-npm install --include=dev
+npm ci --include=dev
 npx prisma generate
 npm run prisma:migrate:deploy
 npm run build
@@ -425,7 +427,7 @@ NODE_ENV=production npm run start
 ```bash
 # from repository root
 echo 'VITE_API_URL=https://teamflow-ai-api.onrender.com' > .env
-npm install --include=dev
+npm ci --include=dev
 npm run build
 node dist/server/index.mjs
 ```
