@@ -8,7 +8,7 @@ import {
   useState,
   useSyncExternalStore,
   type FormEvent,
-  type KeyboardEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type UIEvent,
 } from "react";
 import { toast } from "sonner";
@@ -878,7 +878,7 @@ function ConversationMessagePane({
       clearActiveMessage();
     }
 
-    function handleKeyDown(event: KeyboardEvent) {
+    function handleKeyDown(event: globalThis.KeyboardEvent) {
       if (event.key === "Escape") {
         clearActiveMessage();
       }
@@ -1593,7 +1593,7 @@ function ConversationMessagePane({
     submitDraft();
   }
 
-  function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+  function handleComposerKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
     if (
       !shouldSubmitOnComposerKeyDown({
         key: event.key,

@@ -1,23 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { clearActiveWorkspaceId } from "@/lib/api/client";
 import { completeAuthWithToken, resetWorkspaceValidationSession } from "@/lib/auth/auth-cache";
 import { googleAuthErrorKey } from "@/lib/auth/google-auth";
+import {
+  consumeGoogleOAuthCallbackFragment,
+  type GoogleOAuthCallbackFragment,
+} from "@/lib/auth/oauth-callback";
 import { getSafeRedirectPath } from "@/lib/auth/safe-redirect";
 import { clearAuthToken } from "@/lib/auth/token";
 import { useI18n } from "@/lib/i18n";
 
 export type AuthCallbackSearch = {
-  token?: string;
   redirect?: string;
   error?: string;
 };
 
 export const Route = createFileRoute("/auth/callback")({
   validateSearch: (search: Record<string, unknown>): AuthCallbackSearch => ({
-    token: typeof search.token === "string" && search.token.length > 0 ? search.token : undefined,
     redirect:
       typeof search.redirect === "string" && search.redirect.length > 0
         ? search.redirect
@@ -30,37 +32,35 @@ export const Route = createFileRoute("/auth/callback")({
 
 type CallbackStatus = "loading" | "missing_token" | "error";
 
-function readTokenFromLocation(routeToken: string | undefined): string | undefined {
-  if (routeToken) {
-    return routeToken;
-  }
-  if (typeof window === "undefined") {
-    return undefined;
-  }
-  const raw = new URLSearchParams(window.location.search).get("token");
-  return raw && raw.length > 0 ? raw : undefined;
-}
-
 function AuthCallbackPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t } = useI18n();
-  const { token: routeToken, redirect: redirectPath, error } = Route.useSearch();
+  const { redirect: searchRedirectPath, error } = Route.useSearch();
   const [status, setStatus] = useState<CallbackStatus>("loading");
-  const destination = getSafeRedirectPath(redirectPath);
+  const [redirectPath, setRedirectPath] = useState(searchRedirectPath);
+  const fragmentRef = useRef<GoogleOAuthCallbackFragment | null>(null);
 
   useEffect(() => {
+    if (!fragmentRef.current) {
+      fragmentRef.current = consumeGoogleOAuthCallbackFragment();
+    }
+    const fragment = fragmentRef.current;
+    const callbackRedirectPath = fragment.redirect ?? searchRedirectPath;
+    const destination = getSafeRedirectPath(callbackRedirectPath);
+    setRedirectPath(callbackRedirectPath);
+
     if (error) {
       toast.error(t(googleAuthErrorKey(error)));
       void router.navigate({
         to: "/signin",
-        search: { error, redirect: redirectPath },
+        search: { error, redirect: callbackRedirectPath },
         replace: true,
       });
       return;
     }
 
-    const token = readTokenFromLocation(routeToken);
+    const token = fragment.token;
     if (!token) {
       setStatus("missing_token");
       return;
@@ -94,7 +94,7 @@ function AuthCallbackPage() {
     return () => {
       cancelled = true;
     };
-  }, [destination, error, queryClient, redirectPath, routeToken, router, t]);
+  }, [error, queryClient, router, searchRedirectPath, t]);
 
   if (status === "missing_token" || status === "error") {
     return (

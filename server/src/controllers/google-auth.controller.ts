@@ -3,6 +3,7 @@ import { OAuth2Client } from "google-auth-library";
 import jwt from "jsonwebtoken";
 
 import { appUrl, env } from "../config/env.js";
+import { buildGoogleOAuthCallbackUrl } from "../lib/google-oauth-redirect.js";
 import { getSafeRedirectPath } from "../lib/safe-redirect.js";
 import { findOrCreateGoogleUser, isGoogleOAuthConfigured } from "../services/auth.service.js";
 
@@ -52,11 +53,7 @@ function redirectToSignIn(res: Response, error: string, redirect?: string): void
 }
 
 function redirectToCallback(res: Response, token: string, redirect: string): void {
-  const params = new URLSearchParams({
-    token,
-    redirect: getSafeRedirectPath(redirect),
-  });
-  res.redirect(`${appUrl}/auth/callback?${params.toString()}`);
+  res.redirect(buildGoogleOAuthCallbackUrl(appUrl, token, redirect));
 }
 
 export function googleAuthStartController(req: Request, res: Response): void {

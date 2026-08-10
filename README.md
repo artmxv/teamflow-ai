@@ -159,11 +159,11 @@ Vercel hosts only the frontend SSR app. Express and Socket.IO stay on Render. Th
 | Storage  | Supabase Storage (`@supabase/supabase-js`), Multer                          |
 | Email    | Resend (optional; console provider for local invites)                       |
 | Tests    | Node.js built-in test runner (`npm test` in `server/`)                      |
-| CI       | GitHub Actions deadline-reminder scheduler                                  |
+| CI       | GitHub Actions typecheck, lint, build, migrations, tests, and reminders     |
 
 ## Local development
 
-**Prerequisites:** Node.js 20+, npm, Docker Desktop.
+**Prerequisites:** Node.js 22.x, npm, Docker Desktop. The supported runtime is pinned in `.nvmrc` and both package manifests.
 
 ### 1. Clone and install
 
@@ -259,29 +259,29 @@ Safe templates: `server/.env.example` and root `.env.example`. Never commit fill
 
 ### Backend (`server/.env`)
 
-| Variable                    | Required      | Description                                                   |
-| --------------------------- | ------------- | ------------------------------------------------------------- |
-| `DATABASE_URL`              | Yes           | PostgreSQL connection string for Prisma                       |
-| `JWT_SECRET`                | Yes           | Secret for signing JWTs (not the dev default in production)   |
-| `PORT`                      | No            | API port (default `4000`)                                     |
-| `NODE_ENV`                  | No            | `development`, `test`, or `production`                        |
-| `CORS_ORIGIN`               | Yes in prod   | Frontend origin(s), comma-separated, no trailing slash        |
-| `APP_URL`                   | Yes in prod   | Public frontend URL for invite links and post-OAuth redirects |
-| `GOOGLE_CLIENT_ID`          | Optional\*    | Google OAuth client id                                        |
-| `GOOGLE_CLIENT_SECRET`      | Optional\*    | Google OAuth client secret                                    |
-| `GOOGLE_REDIRECT_URI`       | Optional\*    | Backend callback, e.g. `https://…/api/auth/google/callback`   |
-| `FILE_STORAGE_DRIVER`       | No            | `local` (default) or `supabase`                               |
-| `SUPABASE_URL`              | If supabase   | Supabase project URL                                          |
-| `SUPABASE_SERVICE_ROLE_KEY` | If supabase   | Service role key (server only)                                |
-| `SUPABASE_STORAGE_BUCKET`   | If supabase   | Bucket name (example: `teamflow-uploads`)                     |
-| `EMAIL_PROVIDER`            | No            | `console` (default) or `resend`                               |
-| `EMAIL_FROM`                | If resend     | Verified sender                                               |
-| `RESEND_API_KEY`            | If resend     | Resend API key                                                |
-| `TASK_REMINDER_CRON_SECRET` | For scheduler | Bearer secret for `POST /api/internal/task-reminders/run`     |
-| `YOOKASSA_SHOP_ID`          | For billing   | YooKassa shop identifier; backend only                        |
-| `YOOKASSA_SECRET_KEY`       | For billing   | YooKassa secret key; backend only                             |
-| `YOOKASSA_RETURN_URL`       | Optional      | Billing return URL; defaults to `APP_URL/app/billing`         |
-| `YOOKASSA_MODE`             | No            | `test` (default) or explicit `live`                           |
+| Variable                    | Required      | Description                                                    |
+| --------------------------- | ------------- | -------------------------------------------------------------- |
+| `DATABASE_URL`              | Yes           | PostgreSQL connection string for Prisma                        |
+| `JWT_SECRET`                | Yes           | Signing secret; production requires at least 32 random chars   |
+| `PORT`                      | No            | API port (default `4000`)                                      |
+| `NODE_ENV`                  | No            | `development`, `test`, or `production`                         |
+| `CORS_ORIGIN`               | Yes in prod   | Frontend origin(s), comma-separated, no trailing slash         |
+| `APP_URL`                   | Yes in prod   | Public frontend URL for invite links and post-OAuth redirects  |
+| `GOOGLE_CLIENT_ID`          | Optional\*    | Google OAuth client id                                         |
+| `GOOGLE_CLIENT_SECRET`      | Optional\*    | Google OAuth client secret                                     |
+| `GOOGLE_REDIRECT_URI`       | Optional\*    | Backend callback, e.g. `https://…/api/auth/google/callback`    |
+| `FILE_STORAGE_DRIVER`       | Yes in prod   | Explicit in production; use `supabase` for durable Render data |
+| `SUPABASE_URL`              | If supabase   | Supabase project URL                                           |
+| `SUPABASE_SERVICE_ROLE_KEY` | If supabase   | Service role key (server only)                                 |
+| `SUPABASE_STORAGE_BUCKET`   | If supabase   | Bucket name (example: `teamflow-uploads`)                      |
+| `EMAIL_PROVIDER`            | No            | `console` (default) or `resend`                                |
+| `EMAIL_FROM`                | If resend     | Verified sender                                                |
+| `RESEND_API_KEY`            | If resend     | Resend API key                                                 |
+| `TASK_REMINDER_CRON_SECRET` | For scheduler | Bearer secret for `POST /api/internal/task-reminders/run`      |
+| `YOOKASSA_SHOP_ID`          | For billing   | YooKassa shop identifier; backend only                         |
+| `YOOKASSA_SECRET_KEY`       | For billing   | YooKassa secret key; backend only                              |
+| `YOOKASSA_RETURN_URL`       | Optional      | Billing return URL; defaults to `APP_URL/app/billing`          |
+| `YOOKASSA_MODE`             | No            | `test` (default) or explicit `live`                            |
 
 \* All three Google variables together, or leave all empty.
 
@@ -344,7 +344,7 @@ Backend (Root Directory = `server`):
 
 ```bash
 # Build
-npm install --include=dev && npx prisma generate && npm run build && npm run prisma:migrate:deploy
+npm ci --include=dev && npx prisma generate && npm run build && npm run prisma:migrate:deploy
 
 # Start
 npm run start
@@ -366,7 +366,7 @@ npm run start
 | Notifications      | List, mark read, deadline reminders (internal)              |
 | Files              | Authenticated upload/download via backend storage drivers   |
 | AI summary         | Deterministic `POST /api/ai/workspace-summary`              |
-| Billing            | Owner-scoped plans; one-time YooKassa activation             |
+| Billing            | Owner-scoped plans; one-time YooKassa activation            |
 
 ## Testing
 
@@ -380,14 +380,12 @@ npm test
 From repository root:
 
 ```bash
+npm run typecheck
+npm run lint
 npm run build
 ```
 
-The repository still has legacy full-lint baseline issues. During focused changes, run ESLint against the touched frontend files:
-
-```bash
-npx eslint <changed-file-1> <changed-file-2>
-```
+Pull requests and pushes to `main` run the same frontend gates plus backend Prisma generation, typecheck, build, fresh PostgreSQL migrations, and tests in `.github/workflows/ci.yml`.
 
 Manual post-deploy checks: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/QA_CHECKLIST.md](docs/QA_CHECKLIST.md).
 
@@ -395,13 +393,14 @@ Manual post-deploy checks: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/QA
 
 ### Root (frontend)
 
-| Script            | Description                                    |
-| ----------------- | ---------------------------------------------- |
-| `npm run dev`     | Vite / TanStack Start dev server (port 8080)   |
-| `npm run build`   | Production build (default Nitro `node-server`) |
-| `npm run preview` | Preview production build                       |
-| `npm run lint`    | ESLint                                         |
-| `npm run format`  | Prettier                                       |
+| Script              | Description                                    |
+| ------------------- | ---------------------------------------------- |
+| `npm run dev`       | Vite / TanStack Start dev server (port 8080)   |
+| `npm run build`     | Production build (default Nitro `node-server`) |
+| `npm run preview`   | Preview production build                       |
+| `npm run typecheck` | Typecheck without emit                         |
+| `npm run lint`      | ESLint                                         |
+| `npm run format`    | Prettier                                       |
 
 For a Vercel-oriented build locally: `NITRO_PRESET=vercel npm run build`.
 

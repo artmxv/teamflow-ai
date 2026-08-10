@@ -127,7 +127,7 @@ function WorkspaceSwitcher({
 
   const { data: workspaces = [], isLoading: workspacesLoading } = useQuery({
     queryKey: WORKSPACES_QUERY_KEY,
-    queryFn: fetchWorkspaces,
+    queryFn: () => fetchWorkspaces(),
     enabled: !!workspace,
   });
 
