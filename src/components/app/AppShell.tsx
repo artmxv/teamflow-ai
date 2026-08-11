@@ -1,10 +1,14 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { AppBootScreen } from "@/components/app/AppBootScreen";
 import { AuthenticatedImageLightboxProvider } from "@/components/app/files/AuthenticatedImageLightbox";
 import type { AuthWorkspace } from "@/lib/api/auth";
 import { nameToInitials, useCurrentUser } from "@/lib/auth/use-current-user";
+import {
+  hasBillingPaymentReturn,
+  syncBillingReturnPaymentIdFromUrl,
+} from "@/lib/billing/payment-return";
 import { useChatRealtime } from "@/lib/realtime/use-chat-realtime";
 import { useSidebarCollapsed } from "@/lib/sidebar-preference";
 import { AppPage } from "./AppPage";
@@ -30,6 +34,14 @@ export function authWorkspaceToShell(workspace: AuthWorkspace): Workspace {
 export function AppShell({ children }: { children: ReactNode }) {
   const { data: me, isPending, isFetching, isError, error, refetch } = useCurrentUser();
   const { collapsed: sidebarCollapsed, toggle: toggleSidebarCollapsed } = useSidebarCollapsed();
+  // Capture paymentId before workspace bootstrap can remount/replace the URL.
+  const [billingReturnActive] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    syncBillingReturnPaymentIdFromUrl();
+    return hasBillingPaymentReturn();
+  });
 
   const workspace = useMemo(
     () => (me?.workspace ? authWorkspaceToShell(me.workspace) : null),
@@ -43,7 +55,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   });
 
   const workspaceLoading = !workspace && (isPending || isFetching);
-  const isBootstrapping = (isPending || isFetching) && !me;
+  // Billing return must mount the page immediately so confirm-payment can start.
+  const isBootstrapping = !billingReturnActive && (isPending || isFetching) && !me;
 
   return (
     <AuthGuard>
