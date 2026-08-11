@@ -21,6 +21,16 @@ import {
   type BillingPlanUnavailableReason,
   type BillingSummary,
 } from "@/lib/api/billing";
+import {
+  BILLING_CONFIRM_POLL_INTERVAL_MS,
+  BILLING_CONFIRM_POLL_TIMEOUT_MS,
+  clearBillingReturnQueryParams,
+  clearPendingBillingPaymentId,
+  decideConfirmPaymentPoll,
+  parseBillingReturnSearch,
+  shouldRetryConfirmPaymentError,
+  syncBillingReturnPaymentIdFromUrl,
+} from "@/lib/billing/payment-return";
 import { Check, CreditCard, Info, Loader2 } from "lucide-react";
 import { assertBrowserOnline, friendlyApiErrorMessage } from "@/lib/api-error";
 import { ApiError } from "@/lib/api/client";
@@ -47,8 +57,6 @@ const PLAN_DESC_KEYS: Record<BillingPlanId, TKey> = {
   BUSINESS: "billing.planDesc.business",
   ENTERPRISE: "billing.planDesc.enterprise",
 };
-const PLAN_CONFIRMATION_TIMEOUT_MS = 60_000;
-
 const UNAVAILABLE_REASON_KEYS: Record<BillingPlanUnavailableReason, TKey> = {
   PAYMENT_PROVIDER_NOT_CONFIGURED: "billing.reason.paymentNotConfigured",
   WORKSPACE_LIMIT_EXCEEDED: "billing.reason.workspaceLimit",
@@ -127,20 +135,59 @@ function billingErrorMessage(
   return key ? t(key) : friendlyApiErrorMessage(error, t, "billing.loadErrorTitle");
 }
 
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const timeoutId = window.setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      window.clearTimeout(timeoutId);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
 function BillingPage() {
   const { t, lang } = useI18n();
   const queryClient = useQueryClient();
-  const returnHandledRef = useRef(false);
-  const [pendingPaymentId, setPendingPaymentId] = useState<string | null>(null);
-  const [confirmingPayment, setConfirmingPayment] = useState(false);
+  const returnBootstrapDoneRef = useRef(false);
+  const [pendingPaymentId, setPendingPaymentId] = useState<string | null>(() =>
+    syncBillingReturnPaymentIdFromUrl(),
+  );
+  const [confirmingPayment, setConfirmingPayment] = useState(() => Boolean(pendingPaymentId));
+  const [confirmError, setConfirmError] = useState<unknown>(null);
+  const [confirmAttempt, setConfirmAttempt] = useState(0);
 
   const summaryQuery = useQuery({
     queryKey: BILLING_SUMMARY_QUERY_KEY,
     queryFn: fetchBillingSummary,
-    refetchInterval: pendingPaymentId ? 5_000 : false,
   });
 
   const summary = summaryQuery.data;
+
+  async function refreshBillingQueries() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: BILLING_SUMMARY_QUERY_KEY }),
+      queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY }),
+      queryClient.invalidateQueries({ queryKey: WORKSPACES_QUERY_KEY }),
+    ]);
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: BILLING_SUMMARY_QUERY_KEY }),
+      queryClient.refetchQueries({ queryKey: AUTH_ME_QUERY_KEY }),
+      queryClient.refetchQueries({ queryKey: WORKSPACES_QUERY_KEY }),
+    ]);
+  }
+
   const planChangeMutation = useMutation({
     networkMode: "always",
     mutationFn: async (plan: BillingPlanId) => {
@@ -152,119 +199,151 @@ function BillingPage() {
         window.location.assign(result.confirmationUrl);
         return;
       }
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: BILLING_SUMMARY_QUERY_KEY }),
-        queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY }),
-        queryClient.invalidateQueries({ queryKey: WORKSPACES_QUERY_KEY }),
-      ]);
+      await refreshBillingQueries();
       toast.success(t("billing.changeConfirmed"));
     },
     onError: (error, plan) => toast.error(billingErrorMessage(error, t, plan)),
   });
 
   useEffect(() => {
-    if (returnHandledRef.current) {
+    if (returnBootstrapDoneRef.current) {
       return;
     }
-    returnHandledRef.current = true;
+    returnBootstrapDoneRef.current = true;
 
-    const params = new URLSearchParams(window.location.search);
-    const billingState = params.get("billing");
-    const paymentId = params.get("paymentId");
-    if (!billingState) {
-      return;
+    const parsed = parseBillingReturnSearch(window.location.search);
+    const paymentId = syncBillingReturnPaymentIdFromUrl();
+
+    if (parsed.kind !== "none") {
+      clearBillingReturnQueryParams();
     }
 
-    const cleanUrl = new URL(window.location.href);
-    cleanUrl.searchParams.delete("billing");
-    cleanUrl.searchParams.delete("paymentId");
-    cleanUrl.searchParams.delete("plan");
-    window.history.replaceState(window.history.state, "", cleanUrl);
-
-    if (billingState === "cancelled") {
+    if (parsed.kind === "cancelled") {
+      clearPendingBillingPaymentId();
+      setPendingPaymentId(null);
+      setConfirmingPayment(false);
       toast.info(t("billing.changeCancelled"));
       return;
     }
-    if (billingState !== "return" || !paymentId) {
+
+    if (parsed.kind === "other") {
       void queryClient.invalidateQueries({ queryKey: BILLING_SUMMARY_QUERY_KEY });
       return;
     }
 
-    setPendingPaymentId(paymentId);
-    setConfirmingPayment(true);
-    toast.info(t("billing.checkingPayment"));
+    if (!paymentId) {
+      return;
+    }
 
-    void (async () => {
-      try {
-        assertBrowserOnline();
-        const confirmation = await confirmBillingPayment(paymentId);
-        await queryClient.invalidateQueries({ queryKey: BILLING_SUMMARY_QUERY_KEY });
-        if (confirmation.status === "SUCCEEDED") {
-          setPendingPaymentId(null);
-          await Promise.all([
-            queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY }),
-            queryClient.invalidateQueries({ queryKey: WORKSPACES_QUERY_KEY }),
-          ]);
-          toast.success(t("billing.paymentSucceeded"));
-          return;
-        }
-        if (confirmation.status === "CANCELED") {
-          setPendingPaymentId(null);
-          toast.error(t("billing.paymentCanceled"));
-          return;
-        }
-        toast.info(t("billing.paymentPending"));
-      } catch (error) {
-        toast.error(billingErrorMessage(error, t));
-      } finally {
-        setConfirmingPayment(false);
-      }
-    })();
+    setPendingPaymentId(paymentId);
+    setConfirmError(null);
+    setConfirmingPayment(true);
   }, [queryClient, t]);
 
   useEffect(() => {
-    if (!pendingPaymentId || confirmingPayment) {
+    if (!pendingPaymentId) {
       return;
     }
 
-    const timeoutId = window.setTimeout(() => {
-      setPendingPaymentId(null);
-      toast.info(t("billing.changeStillProcessing"));
-    }, PLAN_CONFIRMATION_TIMEOUT_MS);
-    return () => window.clearTimeout(timeoutId);
-  }, [confirmingPayment, pendingPaymentId, t]);
-
-  useEffect(() => {
-    if (!pendingPaymentId || confirmingPayment || !summary) {
-      return;
-    }
+    const paymentId = pendingPaymentId;
+    const abort = new AbortController();
+    let timedOut = false;
 
     void (async () => {
-      try {
-        const confirmation = await confirmBillingPayment(pendingPaymentId);
-        if (confirmation.status === "SUCCEEDED") {
-          setPendingPaymentId(null);
-          await Promise.all([
-            queryClient.invalidateQueries({ queryKey: BILLING_SUMMARY_QUERY_KEY }),
-            queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY }),
-            queryClient.invalidateQueries({ queryKey: WORKSPACES_QUERY_KEY }),
-          ]);
-          toast.success(t("billing.paymentSucceeded"));
-        } else if (confirmation.status === "CANCELED") {
-          setPendingPaymentId(null);
-          toast.error(t("billing.paymentCanceled"));
+      setConfirmingPayment(true);
+      setConfirmError(null);
+      const startedAt = Date.now();
+
+      while (!abort.signal.aborted) {
+        try {
+          assertBrowserOnline();
+          const confirmation = await confirmBillingPayment(paymentId);
+          if (abort.signal.aborted) {
+            return;
+          }
+
+          const decision = decideConfirmPaymentPoll(confirmation);
+          if (decision.action === "succeeded") {
+            clearPendingBillingPaymentId();
+            setPendingPaymentId(null);
+            setConfirmingPayment(false);
+            setConfirmError(null);
+            await refreshBillingQueries();
+            if (!abort.signal.aborted) {
+              toast.success(t("billing.paymentSucceeded"));
+            }
+            return;
+          }
+          if (decision.action === "canceled") {
+            clearPendingBillingPaymentId();
+            setPendingPaymentId(null);
+            setConfirmingPayment(false);
+            setConfirmError(null);
+            toast.error(t("billing.paymentCanceled"));
+            return;
+          }
+
+          if (Date.now() - startedAt >= BILLING_CONFIRM_POLL_TIMEOUT_MS) {
+            timedOut = true;
+            break;
+          }
+          await sleep(BILLING_CONFIRM_POLL_INTERVAL_MS, abort.signal);
+        } catch (error) {
+          if (abort.signal.aborted || isAbortError(error)) {
+            return;
+          }
+          if (
+            shouldRetryConfirmPaymentError(error) &&
+            Date.now() - startedAt < BILLING_CONFIRM_POLL_TIMEOUT_MS
+          ) {
+            try {
+              await sleep(BILLING_CONFIRM_POLL_INTERVAL_MS, abort.signal);
+              continue;
+            } catch (sleepError) {
+              if (isAbortError(sleepError)) {
+                return;
+              }
+            }
+          }
+          setConfirmError(error);
+          setConfirmingPayment(false);
+          return;
         }
-      } catch {
-        // Keep polling via refetchInterval until timeout.
+      }
+
+      if (abort.signal.aborted) {
+        return;
+      }
+
+      if (timedOut) {
+        clearPendingBillingPaymentId();
+        setPendingPaymentId(null);
+        setConfirmingPayment(false);
+        toast.info(t("billing.changeStillProcessing"));
+        void queryClient.invalidateQueries({ queryKey: BILLING_SUMMARY_QUERY_KEY });
       }
     })();
-  }, [confirmingPayment, pendingPaymentId, queryClient, summary, t]);
+
+    return () => abort.abort();
+  }, [confirmAttempt, pendingPaymentId, queryClient, t]);
+
+  const retryConfirmPayment = () => {
+    const paymentId = pendingPaymentId ?? syncBillingReturnPaymentIdFromUrl();
+    if (!paymentId) {
+      void summaryQuery.refetch();
+      return;
+    }
+    setConfirmError(null);
+    setPendingPaymentId(paymentId);
+    setConfirmingPayment(true);
+    setConfirmAttempt((value) => value + 1);
+  };
 
   return (
     <AppShell>
       <PageHeader title={t("side.billing")} subtitle={t("billing.subtitle")} />
 
-      {confirmingPayment || pendingPaymentId ? (
+      {confirmingPayment && pendingPaymentId ? (
         <Alert className="mb-6 border-primary/25 bg-card shadow-soft ring-1 ring-primary/10">
           <Loader2 className="size-4 animate-spin text-primary" />
           <AlertTitle className="text-foreground">{t("billing.checkingPayment")}</AlertTitle>
@@ -272,6 +351,16 @@ function BillingPage() {
             {t("billing.paymentPending")}
           </AlertDescription>
         </Alert>
+      ) : null}
+
+      {confirmError ? (
+        <div className="mb-6">
+          <ApiErrorState
+            title={t("billing.error.paymentFailed")}
+            error={confirmError}
+            onRetry={retryConfirmPayment}
+          />
+        </div>
       ) : null}
 
       {summary ? (
@@ -298,14 +387,18 @@ function BillingPage() {
         </Alert>
       ) : null}
 
-      {summaryQuery.isLoading ? (
+      {confirmingPayment && !summary && !confirmError ? (
+        <BillingSkeleton />
+      ) : summaryQuery.isLoading && !confirmError ? (
         <BillingSkeleton />
       ) : summaryQuery.isError || !summary ? (
-        <ApiErrorState
-          title={t("billing.loadErrorTitle")}
-          error={summaryQuery.error}
-          onRetry={() => void summaryQuery.refetch()}
-        />
+        confirmError ? null : (
+          <ApiErrorState
+            title={t("billing.loadErrorTitle")}
+            error={summaryQuery.error}
+            onRetry={() => void summaryQuery.refetch()}
+          />
+        )
       ) : (
         <BillingContent
           summary={summary}
