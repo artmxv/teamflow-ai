@@ -34,7 +34,7 @@ export function upgradeGoogleAvatarPreviewUrl(url: string): string | null {
       return null;
     }
 
-    let href = url;
+    const href = url;
     const pathUpgraded = href.replace(/\/s\d+(?:-c)?\//i, "/s512-c/");
     const queryUpgraded = pathUpgraded.replace(/=s\d+(?:-c)?(?=$|[?#])/i, "=s512-c");
     if (queryUpgraded === url) {
