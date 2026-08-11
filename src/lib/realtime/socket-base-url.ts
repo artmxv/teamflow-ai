@@ -1,35 +1,59 @@
 /**
  * Resolve the Socket.IO server origin.
  *
- * HTTP API can be same-origin via Vercel `/api` rewrites, but WebSockets cannot.
- * Production therefore needs an explicit backend origin (`VITE_SOCKET_URL`).
+ * - Local Vite: API origin (usually http://localhost:4000), optional VITE_SOCKET_URL
+ * - Production same-origin (empty API base via Vercel rewrites): "" so the client
+ *   uses the current page origin + /socket.io (proxied by vercel.json)
+ * - Production with absolute API override: that origin (or VITE_SOCKET_URL)
  *
- * Returns `null` when production would otherwise fall back to the Vercel host
- * (which causes failed `wss://…vercel.app/socket.io` connections). Callers should
- * soft-fail: leave chat on HTTP polling, do not start a reconnect storm.
+ * When the HTTP API is same-origin, VITE_SOCKET_URL is intentionally ignored so
+ * the browser never opens a direct connection to onrender.com for realtime.
  */
 export function resolveSocketBaseUrl(options: {
   configuredSocketUrl?: string | null;
   apiBaseUrl: string;
   isDev: boolean;
-}): string | null {
-  const configured = options.configuredSocketUrl?.trim();
-  if (configured) {
-    return configured.replace(/\/+$/, "");
-  }
-
+}): string {
+  const configured = options.configuredSocketUrl?.trim().replace(/\/+$/, "") ?? "";
   const apiBase = options.apiBaseUrl.trim().replace(/\/+$/, "");
 
-  // Local Vite: sockets share the API origin (usually http://localhost:4000).
   if (options.isDev) {
-    return apiBase || "http://localhost:4000";
+    return configured || apiBase || "http://localhost:4000";
   }
 
-  // Absolute API override (e.g. direct Render URL) can also host Socket.IO.
-  if (apiBase) {
-    return apiBase;
+  // Same-origin production: Vercel rewrites /api and /socket.io to Render.
+  if (!apiBase) {
+    return "";
   }
 
-  // Same-origin production API: Vercel rewrites cover /api/* only, not /socket.io.
-  return null;
+  // Absolute API origin (special setups): prefer explicit socket URL, else API.
+  return configured || apiBase;
+}
+
+/**
+ * Socket.IO client transport policy.
+ *
+ * Production same-origin goes through Vercel HTTP rewrites, which are reliable
+ * for Engine.IO polling but not for a browser WebSocket upgrade to Render.
+ * Local / absolute-backend setups keep websocket + polling as usual.
+ */
+export function resolveSocketTransportOptions(options: {
+  isDev: boolean;
+  socketBaseUrl: string;
+}): {
+  transports: ("polling" | "websocket")[];
+  upgrade: boolean;
+} {
+  const sameOriginProduction = !options.isDev && options.socketBaseUrl === "";
+  if (sameOriginProduction) {
+    return {
+      transports: ["polling"],
+      upgrade: false,
+    };
+  }
+
+  return {
+    transports: ["websocket", "polling"],
+    upgrade: true,
+  };
 }
