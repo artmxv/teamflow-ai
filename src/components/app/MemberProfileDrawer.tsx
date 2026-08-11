@@ -25,7 +25,11 @@ import {
   projectApiStatusLabel,
   useI18n,
 } from "@/lib/i18n";
-import { resolveAvatarUrl, upgradeGoogleAvatarPreviewUrl } from "@/lib/avatar-url";
+import {
+  reportAvatarLoadFailure,
+  upgradeGoogleAvatarPreviewUrl,
+  useResolvedAvatarUrl,
+} from "@/lib/avatar-url";
 import { workspaceRoleLabel } from "@/lib/auth/use-current-user";
 import { priorityMeta, projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
 import { getProjectAccent } from "@/lib/project-color";
@@ -151,13 +155,19 @@ export function MemberProfileDrawer({
 
   const profile = profileQuery.data;
   const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false);
-  const avatarSrc = profile ? resolveAvatarUrl(profile.avatarUrl) : null;
+  const avatarSrc = useResolvedAvatarUrl(profile?.avatarUrl);
   const upgradedPreviewSrc = avatarSrc ? upgradeGoogleAvatarPreviewUrl(avatarSrc) : null;
   const [previewUpgradeFailed, setPreviewUpgradeFailed] = useState(false);
 
   useEffect(() => {
     setPreviewUpgradeFailed(false);
   }, [avatarSrc]);
+
+  useEffect(() => {
+    if (!avatarSrc && photoPreviewOpen) {
+      setPhotoPreviewOpen(false);
+    }
+  }, [avatarSrc, photoPreviewOpen]);
 
   const previewSrc =
     avatarSrc == null
@@ -413,7 +423,10 @@ export function MemberProfileDrawer({
               onError={() => {
                 if (upgradedPreviewSrc && previewSrc === upgradedPreviewSrc) {
                   setPreviewUpgradeFailed(true);
+                  return;
                 }
+                reportAvatarLoadFailure(avatarSrc);
+                setPhotoPreviewOpen(false);
               }}
             />
           ) : null}

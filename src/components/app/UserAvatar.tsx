@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/app/Avatar";
-import { resolveAvatarUrl } from "@/lib/avatar-url";
+import { reportAvatarLoadFailure, useResolvedAvatarUrl } from "@/lib/avatar-url";
 import { nameToInitials } from "@/lib/auth/use-current-user";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +29,7 @@ export function UserAvatar({
   size?: UserAvatarSize;
   className?: string;
 }) {
-  const src = resolveAvatarUrl(avatarUrl);
+  const src = useResolvedAvatarUrl(avatarUrl);
   const initials = avatar ?? nameToInitials(name);
   const [imageFailed, setImageFailed] = useState(false);
 
@@ -49,7 +49,10 @@ export function UserAvatar({
           sizeClasses[size],
           className,
         )}
-        onError={() => setImageFailed(true)}
+        onError={() => {
+          reportAvatarLoadFailure(src);
+          setImageFailed(true);
+        }}
       />
     );
   }
