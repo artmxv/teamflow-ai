@@ -51,12 +51,6 @@ export function projectDocumentDiskPath(projectId: string, filename: string) {
   return path.join(PROJECT_UPLOAD_ROOT, projectId, filename);
 }
 
-export function ensureProjectUploadDir(projectId: string) {
-  const dir = path.join(PROJECT_UPLOAD_ROOT, projectId);
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
 export function removeStoredProjectDocument(projectId: string, filename: string) {
   const filePath = projectDocumentDiskPath(projectId, filename);
   if (!fs.existsSync(filePath)) {

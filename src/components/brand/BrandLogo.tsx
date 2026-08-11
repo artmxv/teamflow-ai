@@ -55,13 +55,6 @@ export function BrandMark({ className }: { className?: string }) {
 }
 
 /**
- * @deprecated Prefer BrandMark. Kept for any stray imports during the logo transition.
- */
-export function TeamFlowMark({ className }: { className?: string }) {
-  return <BrandMark className={className} />;
-}
-
-/**
  * TeamFlow wordmark with a distinct AI accent.
  * Public surfaces may override via --public-wordmark / --public-ai*; app falls back to theme tokens.
  */

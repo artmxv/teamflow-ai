@@ -1,13 +1,7 @@
 /** Supported chat reaction emoji in display order (mirrors server whitelist). */
 export const CHAT_REACTION_EMOJI = ["👍", "❤️", "😂", "🎉", "👀"] as const;
 
-export type ChatReactionEmoji = (typeof CHAT_REACTION_EMOJI)[number];
-
 export const CHAT_REACTION_TOOLTIP_NAME_LIMIT = 5;
-
-export function isSupportedChatReactionEmoji(value: string): value is ChatReactionEmoji {
-  return (CHAT_REACTION_EMOJI as readonly string[]).includes(value);
-}
 
 export type ReactionAuthorLike = {
   id: string;

@@ -16,7 +16,7 @@ type Metrics = {
 };
 
 export function formatCount(
-  locale: AiLocale,
+  _locale: AiLocale,
   count: number,
   singular: string,
   plural: string,

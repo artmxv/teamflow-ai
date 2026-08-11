@@ -143,6 +143,3 @@ export function clearAuthenticatedBlobCache(): void {
   }
   blobUrlCache.clear();
 }
-
-export const AUTHENTICATED_BLOB_CACHE_MAX_ENTRIES = MAX_CACHE_ENTRIES;
-export const AUTHENTICATED_BLOB_CACHE_TTL_MS = CACHE_TTL_MS;

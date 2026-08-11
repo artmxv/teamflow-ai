@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { EmptyState } from "@/components/app/EmptyState";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,

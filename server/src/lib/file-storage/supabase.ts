@@ -23,11 +23,6 @@ function bucket() {
 /** Short-lived signed URL TTL for private file downloads (seconds). */
 export const SIGNED_URL_TTL_SECONDS = 120;
 
-export function buildSupabasePublicUrl(objectKey: string) {
-  const base = env.SUPABASE_URL!.replace(/\/$/, "");
-  return `${base}/storage/v1/object/public/${bucket()}/${objectKey}`;
-}
-
 export function resolveSupabaseObjectKeyFromPublicUrl(
   avatarUrl: string | null | undefined,
 ): string | null {
@@ -67,14 +62,6 @@ export async function uploadToSupabase(input: {
 
   if (error) {
     throw new Error(`Could not upload file to Supabase Storage: ${error.message}`);
-  }
-
-  if (env.NODE_ENV !== "production") {
-    console.log("[file-storage] Uploaded to Supabase Storage", {
-      bucket: bucket(),
-      storagePath: input.objectKey,
-      sizeBytes: input.buffer.length,
-    });
   }
 
   return input.objectKey;

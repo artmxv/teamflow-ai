@@ -117,16 +117,6 @@ export async function ensureValidSelectedWorkspace(
         ? storedId
         : workspaces[0].id;
 
-    if (import.meta.env.DEV && loginUser) {
-      console.debug("[workspace-restore]", {
-        userId: restoreUser?.id,
-        email: restoreUser?.email,
-        storedWorkspaceId: storedId,
-        availableWorkspaceIds: workspaces.map((workspace) => workspace.id),
-        chosenWorkspaceId: validId,
-      });
-    }
-
     if (getSelectedWorkspaceId() !== validId) {
       setSelectedWorkspaceId(validId, restoreUser?.id, restoreUser?.email);
     }
@@ -145,9 +135,6 @@ export async function ensureValidSelectedWorkspace(
 
   return workspaceValidationPromise;
 }
-
-/** @deprecated Use ensureValidSelectedWorkspace */
-export const restoreSelectedWorkspaceAfterAuth = ensureValidSelectedWorkspace;
 
 /** Seed header/sidebar immediately after login, then restore workspace and load /me. */
 export async function primeAuthMeAfterAuth(

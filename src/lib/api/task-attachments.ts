@@ -1,4 +1,4 @@
-import { API_BASE_URL, ApiError, apiRequest, apiUpload } from "./client";
+import { ApiError, apiRequest, apiUpload } from "./client";
 import { downloadBlobAsFile, fetchAuthenticatedBlob } from "./authenticated-blob";
 import {
   acquireAuthenticatedBlobUrl,
@@ -55,13 +55,6 @@ export async function deleteTaskAttachment(taskId: string, attachmentId: string)
     },
   );
   return response.data;
-}
-
-export function resolveTaskAttachmentUrl(downloadUrl: string) {
-  if (downloadUrl.startsWith("http://") || downloadUrl.startsWith("https://")) {
-    return downloadUrl;
-  }
-  return `${API_BASE_URL}${downloadUrl}`;
 }
 
 /**

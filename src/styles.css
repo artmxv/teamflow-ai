@@ -1398,9 +1398,6 @@ html.app-scrollbar.public-scrollbar::-webkit-scrollbar-thumb {
     animation: none;
   }
 
-  .landing-scene {
-    transition: none !important;
-  }
 }
 
 /* Focused public polish: scroll-responsive hero and denser product scenes. */
@@ -1656,147 +1653,6 @@ html.app-scrollbar.public-scrollbar::-webkit-scrollbar-thumb {
   }
 }
 
-/*
-  Public product object: the same Dashboard / AI / Kanban window is reused by
-  the hero, feature sections and auth. Depth is intentionally restrained.
-*/
-.public-dark .product-stage {
-  --product-rotate-x: 3.2deg;
-  --product-rotate-y: -6.2deg;
-  --product-rotate-z: 0.25deg;
-  --product-pointer-x: 0deg;
-  --product-pointer-y: 0deg;
-  --product-pointer-shift-x: 0px;
-  --product-pointer-shift-y: 0px;
-  isolation: isolate;
-  perspective: 1600px;
-  perspective-origin: 48% 42%;
-  transform-style: preserve-3d;
-  padding: clamp(0.6rem, 1.5vw, 1.25rem);
-}
-
-.public-dark .product-stage--auth {
-  --product-rotate-x: 1.5deg;
-  --product-rotate-y: -3.2deg;
-  --product-rotate-z: 0.1deg;
-  perspective: 1800px;
-  padding: 0.55rem;
-}
-
-.public-dark .product-stage--feature {
-  --product-rotate-x: 1.8deg;
-  --product-rotate-y: 3.6deg;
-  --product-rotate-z: -0.15deg;
-  perspective: 1800px;
-}
-
-.public-dark .product-stage__glow {
-  position: absolute;
-  z-index: -3;
-  inset: 10% 0 2%;
-  border-radius: 42%;
-  background:
-    radial-gradient(
-      circle at 38% 42%,
-      color-mix(in oklch, var(--brand-from) 42%, transparent),
-      transparent 58%
-    ),
-    radial-gradient(
-      circle at 72% 54%,
-      color-mix(in oklch, var(--brand-to) 30%, transparent),
-      transparent 54%
-    );
-  filter: blur(42px);
-  opacity: 0.72;
-  transform: translate3d(0, 12%, -80px) scale(0.94);
-}
-
-.public-dark .product-stage__plane {
-  position: absolute;
-  z-index: -2;
-  pointer-events: none;
-  border: 1px solid color-mix(in oklch, var(--primary) 18%, transparent);
-  border-radius: 2rem;
-  background: color-mix(in oklch, var(--card) 72%, transparent);
-  transform-style: preserve-3d;
-}
-
-.public-dark .product-stage__plane--rear {
-  inset: 5% 2% 3% 5%;
-  opacity: 0.46;
-  transform: translate3d(1.4rem, 1.1rem, -54px) rotateX(2deg) rotateY(-3deg);
-  box-shadow: 0 28px 80px -42px color-mix(in oklch, var(--brand-from) 46%, transparent);
-}
-
-.public-dark .product-stage__plane--near {
-  inset: 14% -0.5% -1% 16%;
-  opacity: 0.3;
-  transform: translate3d(-1.1rem, 1.75rem, -88px) rotateX(1deg) rotateY(4deg);
-}
-
-.public-dark .product-window {
-  z-index: 1;
-  overflow: visible;
-  transform-style: preserve-3d;
-  backface-visibility: hidden;
-  transform: rotateX(calc(var(--product-rotate-x) + var(--product-pointer-x)))
-    rotateY(calc(var(--product-rotate-y) + var(--product-pointer-y)))
-    rotateZ(var(--product-rotate-z))
-    translate3d(var(--product-pointer-shift-x), var(--product-pointer-shift-y), 0);
-  box-shadow:
-    0 2px 0 color-mix(in oklch, white 8%, transparent),
-    0 28px 70px -30px oklch(0.04 0.03 255 / 0.92),
-    0 56px 120px -54px color-mix(in oklch, var(--brand-from) 52%, transparent),
-    inset 0 1px color-mix(in oklch, white 9%, transparent);
-  animation: public-product-float 11.5s cubic-bezier(0.45, 0.05, 0.45, 0.95) infinite;
-  will-change: transform;
-}
-
-.public-dark .product-window--auth {
-  animation-duration: 15s;
-}
-
-.public-dark .product-window--feature {
-  animation: none;
-}
-
-.public-dark .product-window__edge {
-  position: absolute;
-  z-index: -1;
-  pointer-events: none;
-  inset: -1px;
-  border-radius: inherit;
-  background: linear-gradient(
-    128deg,
-    color-mix(in oklch, white 14%, transparent),
-    transparent 24%,
-    transparent 72%,
-    color-mix(in oklch, var(--primary) 18%, transparent)
-  );
-  transform: translateZ(-1px);
-}
-
-.public-dark .product-window__screen {
-  transform: translateZ(18px);
-  box-shadow:
-    inset 0 1px color-mix(in oklch, white 6%, transparent),
-    0 12px 26px -20px oklch(0.03 0.02 255 / 0.9);
-}
-
-.public-dark .product-window__chrome {
-  background: color-mix(in oklch, var(--muted) 72%, var(--background));
-}
-
-.public-dark .product-window__workspace {
-  background:
-    linear-gradient(135deg, color-mix(in oklch, var(--card) 34%, transparent), transparent 44%),
-    var(--background);
-}
-
-.public-dark .product-stage__progress {
-  transform: translateZ(24px);
-}
-
 .public-dark .public-final-cta {
   position: relative;
   isolation: isolate;
@@ -1822,40 +1678,6 @@ html.app-scrollbar.public-scrollbar::-webkit-scrollbar-thumb {
   border-radius: calc(1.5rem - 1px);
   box-shadow: inset 0 1px color-mix(in oklch, white 7%, transparent);
   pointer-events: none;
-}
-
-/* Soft opacity + depth transition inside one stable application window. */
-.landing-scene {
-  opacity: 0;
-  transform: translate3d(0, 0.65rem, -18px) scale(0.992);
-  transition:
-    opacity 900ms ease,
-    transform 1050ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  will-change: opacity, transform;
-}
-
-.landing-scene--active {
-  opacity: 1;
-  transform: translate3d(0, 0, 14px) scale(1);
-}
-
-@keyframes public-product-float {
-  0%,
-  100% {
-    transform: rotateX(calc(var(--product-rotate-x) + var(--product-pointer-x)))
-      rotateY(calc(var(--product-rotate-y) + var(--product-pointer-y)))
-      rotateZ(var(--product-rotate-z))
-      translate3d(var(--product-pointer-shift-x), var(--product-pointer-shift-y), 0);
-  }
-  48% {
-    transform: rotateX(calc(var(--product-rotate-x) + var(--product-pointer-x) - 0.7deg))
-      rotateY(calc(var(--product-rotate-y) + var(--product-pointer-y) + 1.1deg)) rotateZ(0deg)
-      translate3d(
-        var(--product-pointer-shift-x),
-        calc(var(--product-pointer-shift-y) - 0.45rem),
-        12px
-      );
-  }
 }
 
 .public-dark .public-section-glow {
@@ -2077,58 +1899,7 @@ html.app-scrollbar.public-scrollbar::-webkit-scrollbar-thumb {
   }
 }
 
-@media (max-width: 1100px) {
-  .public-dark .product-stage {
-    --product-rotate-x: 2deg;
-    --product-rotate-y: -3.5deg;
-    --product-rotate-z: 0.1deg;
-    perspective: 1900px;
-  }
-
-  .public-dark .product-stage--feature {
-    --product-rotate-y: 2deg;
-  }
-}
-
-@media (max-width: 639px) {
-  .public-dark .product-stage {
-    --product-rotate-x: 0.7deg;
-    --product-rotate-y: -1deg;
-    --product-rotate-z: 0deg;
-    padding-inline: 0;
-  }
-
-  .public-dark .product-stage__plane--near {
-    display: none;
-  }
-
-  .public-dark .product-stage__plane--rear {
-    inset: 4% 1% 2%;
-    transform: translate3d(0.4rem, 0.65rem, -42px);
-  }
-
-  .public-dark .product-window {
-    box-shadow:
-      0 20px 54px -32px oklch(0.04 0.03 255 / 0.9),
-      0 34px 80px -52px color-mix(in oklch, var(--brand-from) 45%, transparent),
-      inset 0 1px color-mix(in oklch, white 8%, transparent);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .public-dark .product-window {
-    animation: none !important;
-    transform: none;
-    will-change: auto;
-  }
-
-  .public-dark .product-stage__glow,
-  .public-dark .product-stage__plane,
-  .public-dark .product-window__screen,
-  .public-dark .product-stage__progress {
-    transform: none;
-  }
-
   .public-dark .auth-visual-orbit {
     animation: none;
     transform: translate(-50%, -50%);

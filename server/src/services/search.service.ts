@@ -4,8 +4,6 @@ import type { WorkspaceRole } from "./workspace-context.service.js";
 
 const MAX_PER_GROUP = 5;
 
-export type GlobalSearchResultType = "project" | "task" | "member";
-
 export interface GlobalSearchProjectResult {
   id: string;
   type: "project";

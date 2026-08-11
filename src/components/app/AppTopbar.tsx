@@ -51,7 +51,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
   const router = useRouter();
   const queryClient = useQueryClient();
   const hasToken = typeof window !== "undefined" && !!getAuthToken();
-  const { data: me, isPending, isError } = useCurrentUser();
+  const { data: me, isError } = useCurrentUser();
   const currentUser = me?.user;
   const showProfile = hasToken && !isError && !!currentUser;
   const showProfilePlaceholder = hasToken && !isError && !currentUser;

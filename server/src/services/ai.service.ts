@@ -243,7 +243,7 @@ function buildHighlights(
 }
 
 function buildRisks(
-  metrics: WorkspaceAiMetrics,
+  _metrics: WorkspaceAiMetrics,
   tasks: TaskWithRelations[],
   now: Date,
   locale: AiLocale,

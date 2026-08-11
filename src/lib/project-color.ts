@@ -187,12 +187,6 @@ const KNOWN_ACCENTS = [
   ...LEGACY_PROJECT_ACCENT_PALETTE,
 ] as const;
 
-/** Base gradients for new projects (backend rotation must match). */
-export const PROJECT_COLOR_ROTATION = PROJECT_ACCENT_PALETTE.map((accent) => accent.gradient);
-
-/** Extended gradients after base palette is exhausted (backend must match). */
-export const PROJECT_COLOR_EXTENDED = PROJECT_ACCENT_EXTENDED.map((accent) => accent.gradient);
-
 export type ProjectAccent = {
   dot: string;
   gradient: string;
@@ -258,30 +252,6 @@ export function getProjectAccent(
     return PROJECT_ACCENT_PALETTE[accentIndexForKey(accentKey(projectOrId.id, projectOrId.name))];
   }
   return PROJECT_ACCENT_PALETTE[accentIndexForKey(accentKey(projectOrId, projectName))];
-}
-
-export function getProjectAccentClasses(project: ProjectColorInput) {
-  const accent = getProjectAccent(project);
-  return {
-    dot: accent.dot,
-    strip: accent.strip,
-    progress: accent.progress,
-    gradient: accent.gradient,
-  };
-}
-
-export function getProjectAccentDotClass(
-  projectOrId?: ProjectColorInput | string | null,
-  projectName?: string | null,
-): string {
-  return getProjectAccent(projectOrId, projectName).dot;
-}
-
-export function getProjectAccentGradient(
-  projectOrId?: ProjectColorInput | string | null,
-  projectName?: string | null,
-): string {
-  return getProjectAccent(projectOrId, projectName).gradient;
 }
 
 /** Tailwind `from-* to-*` classes for card strip and progress bar (same palette as sidebar dot). */
