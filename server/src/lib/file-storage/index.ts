@@ -4,6 +4,7 @@ import {
   deleteFromSupabase,
   createSignedDownloadUrl,
   fetchObjectContent,
+  getSupabaseObjectAvailability,
   resolveSupabaseObjectKeyFromPublicUrl,
   uploadToSupabase,
 } from "./supabase.js";
@@ -25,6 +26,8 @@ export {
   shouldBufferUploadsInMemory,
   shouldUseSupabaseForProjectTaskUploads,
 } from "./driver.js";
+
+export { getSupabaseObjectAvailability } from "./supabase.js";
 
 export async function persistUploadedFile(input: StoredFilePayload) {
   await uploadToSupabase(input);

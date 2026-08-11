@@ -80,6 +80,39 @@ export async function uploadToSupabase(input: {
   return input.objectKey;
 }
 
+function isStorageNotFoundError(error: { message?: string; statusCode?: string | number }) {
+  const code = String(error.statusCode ?? "");
+  const message = (error.message ?? "").toLowerCase();
+  if (code === "404") {
+    return true;
+  }
+  // Supabase Storage often returns 400 with "Object not found" for missing keys.
+  return message.includes("not found") || message.includes("does not exist");
+}
+
+/**
+ * Distinguish missing objects from transient storage errors.
+ * Used before clearing stale avatarUrl rows (never wipe on unknown/error).
+ */
+export async function getSupabaseObjectAvailability(
+  objectKey: string,
+): Promise<"exists" | "missing" | "error"> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.storage
+    .from(bucket())
+    .createSignedUrl(objectKey, SIGNED_URL_TTL_SECONDS);
+
+  if (data?.signedUrl) {
+    return "exists";
+  }
+
+  if (error && isStorageNotFoundError(error)) {
+    return "missing";
+  }
+
+  return "error";
+}
+
 export async function createSignedDownloadUrl(
   objectKey: string,
   expiresInSeconds = SIGNED_URL_TTL_SECONDS,

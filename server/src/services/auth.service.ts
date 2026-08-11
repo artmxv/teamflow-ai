@@ -413,3 +413,40 @@ export async function removeUserAvatar(userId: string): Promise<PublicUser> {
     throw error;
   }
 }
+
+/**
+ * Clear uploaded-avatar references that point at a confirmed-missing file.
+ * Matches relative `/uploads/avatars/:filename` and absolute URLs ending with that path.
+ * Does not touch Google / external avatar URLs.
+ */
+export async function clearStaleUploadedAvatarReferences(filename: string): Promise<number> {
+  const safe = filename.trim();
+  if (
+    !safe ||
+    safe.includes("..") ||
+    safe.includes("/") ||
+    safe.includes("\\")
+  ) {
+    return 0;
+  }
+
+  const relativePath = `/uploads/avatars/${safe}`;
+  const result = await prisma.user.updateMany({
+    where: {
+      OR: [
+        { avatarUrl: relativePath },
+        { avatarUrl: { endsWith: relativePath } },
+      ],
+    },
+    data: { avatarUrl: null },
+  });
+
+  if (result.count > 0 && process.env.NODE_ENV !== "production") {
+    console.log("[avatar] Cleared stale avatarUrl references", {
+      filename: safe,
+      count: result.count,
+    });
+  }
+
+  return result.count;
+}
