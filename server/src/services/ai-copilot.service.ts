@@ -64,14 +64,11 @@ function providerFallbackReason(error: unknown): string {
 }
 
 function buildFallbackAnswer(summary: WorkspaceAiSummary, locale: AiLocale): string {
+  void locale;
   const risks = summary.risks.slice(0, 2).join(" ");
   const actions = summary.recommendedNextActions.slice(0, 2).join(" ");
   const parts = [summary.overview, risks, actions].filter((part) => part.trim().length > 0);
-  const prefix =
-    locale === "ru"
-      ? "Сейчас доступна проверенная локальная сводка по вашему рабочему пространству."
-      : "A verified local summary of your workspace is available right now.";
-  return [prefix, ...parts].join("\n\n");
+  return parts.join("\n\n");
 }
 
 function fallbackResponse(

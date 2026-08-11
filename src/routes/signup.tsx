@@ -110,7 +110,7 @@ function SignUp() {
       }
     >
       <form
-        className="space-y-4"
+        className="auth-form auth-signup-form flex flex-col"
         onSubmit={(e) => {
           e.preventDefault();
           const name = `${firstName.trim()} ${lastName.trim()}`.trim();
@@ -145,12 +145,12 @@ function SignUp() {
           onClick={() => startGoogleAuth(redirectPath)}
           disabled={registerMutation.isPending}
         />
-        <div className="relative my-2 text-center text-xs text-muted-foreground">
+        <div className="auth-divider relative my-2 text-center text-xs text-muted-foreground">
           <span className="relative z-10 bg-background px-2">{t("auth.orWithEmail")}</span>
           <span className="absolute inset-x-0 top-1/2 -z-0 h-px bg-border" />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
+        <div className="auth-name-grid grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="auth-field">
             <Label htmlFor="first">{t("auth.firstName")}</Label>
             <Input
               id="first"
@@ -161,7 +161,7 @@ function SignUp() {
               autoComplete="given-name"
             />
           </div>
-          <div className="space-y-1.5">
+          <div className="auth-field">
             <Label htmlFor="last">{t("auth.lastName")}</Label>
             <Input
               id="last"
@@ -173,11 +173,7 @@ function SignUp() {
             />
           </div>
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="ws">{t("auth.workspaceName")}</Label>
-          <Input id="ws" placeholder={t("auth.workspaceNamePlaceholder")} />
-        </div>
-        <div className="space-y-1.5">
+        <div className="auth-field">
           <Label htmlFor="email">{t("auth.email")}</Label>
           <Input
             id="email"
@@ -189,7 +185,7 @@ function SignUp() {
             autoComplete="email"
           />
         </div>
-        <div className="space-y-1.5">
+        <div className="auth-field">
           <Label htmlFor="password">{t("auth.password")}</Label>
           <Input
             id="password"
@@ -208,12 +204,14 @@ function SignUp() {
             autoComplete="new-password"
             aria-invalid={passwordError ? true : undefined}
           />
-          <p className="text-xs text-muted-foreground">{t("auth.password.helper")}</p>
+          <p className="auth-password-helper text-[11px] leading-relaxed text-muted-foreground">
+            {t("auth.password.helper")}
+          </p>
           {passwordError && (
             <p className="text-xs text-destructive">{t(passwordErrorKey(passwordError))}</p>
           )}
         </div>
-        <div className="space-y-1.5">
+        <div className="auth-field">
           <Label htmlFor="confirm-password">{t("auth.confirmPassword")}</Label>
           <Input
             id="confirm-password"
@@ -241,12 +239,14 @@ function SignUp() {
         <Button
           type="submit"
           variant="brand"
-          className="w-full"
+          className="public-primary-button mt-0.5 w-full"
           disabled={registerMutation.isPending}
         >
-          {registerMutation.isPending ? t("auth.creatingWorkspace") : t("auth.createWorkspace")}
+          {registerMutation.isPending ? t("auth.creatingAccount") : t("auth.createAccount")}
         </Button>
-        <p className="text-center text-xs text-muted-foreground">{t("auth.termsAgree")}</p>
+        <p className="text-center text-[11px] leading-relaxed text-muted-foreground/75">
+          {t("auth.termsAgree")}
+        </p>
       </form>
     </AuthShell>
   );

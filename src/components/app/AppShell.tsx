@@ -60,16 +60,16 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       ) : (
         <AuthenticatedImageLightboxProvider>
-          <div className="app-shell-enter flex min-h-screen w-full bg-background">
+          <div className="app-shell-enter flex h-svh min-h-0 w-full overflow-hidden bg-background">
             <AppSidebar
               workspace={workspace}
               workspaceLoading={workspaceLoading}
               collapsed={sidebarCollapsed}
               onToggleCollapsed={toggleSidebarCollapsed}
             />
-            <div className="flex min-w-0 flex-1 flex-col">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
               <AppTopbar workspaceRole={me?.workspace?.role ?? null} />
-              <main className="min-h-0 flex-1 overflow-x-hidden">
+              <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
                 <AppPage>{children}</AppPage>
               </main>
             </div>

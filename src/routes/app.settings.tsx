@@ -50,6 +50,7 @@ import {
   type LocationFormCountry,
   type PhoneCountryId,
 } from "@/lib/profile-contact";
+import { FILTER_RESET_CLASSNAME } from "@/components/app/FilterBar";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import {
   BILLING_SUMMARY_QUERY_KEY,
@@ -62,6 +63,7 @@ import { canEditWorkspaceSettings, useCurrentUser } from "@/lib/auth/use-current
 import { Skeleton } from "@/components/ui/skeleton";
 import { Check, Loader2, Moon, Palette, Sun } from "lucide-react";
 import { useTheme, type BrandTheme } from "@/lib/theme";
+import { cn } from "@/lib/utils";
 
 const SETTINGS_TABS = ["workspace", "profile", "appearance", "billing"] as const;
 
@@ -715,9 +717,10 @@ function SettingsPage() {
                   onChange={handleAvatarFileChange}
                 />
                 <Button
-                  variant="brandSoft"
+                  variant="outline"
                   size="sm"
                   type="button"
+                  className={cn(FILTER_RESET_CLASSNAME, "w-auto")}
                   disabled={avatarBusy || isPending}
                   onClick={() => avatarInputRef.current?.click()}
                 >
@@ -853,7 +856,8 @@ function SettingsPage() {
                 onCancel={handleProfileReset}
                 saveDisabled={!profileForm || !profileHasUnsavedChanges}
                 cancelDisabled={!profileHasUnsavedChanges}
-                cancelVariant="brandSoft"
+                cancelVariant="outline"
+                cancelClassName={cn(FILTER_RESET_CLASSNAME, "w-auto")}
                 cancelLabel={t("settings.resetChanges")}
               />
             </div>
@@ -1169,6 +1173,7 @@ function SaveBar({
   saveDisabled = false,
   cancelDisabled = false,
   cancelVariant = "outline",
+  cancelClassName,
   cancelLabel,
   saveLabel,
   savingLabel,
@@ -1179,6 +1184,7 @@ function SaveBar({
   saveDisabled?: boolean;
   cancelDisabled?: boolean;
   cancelVariant?: "outline" | "brandSoft";
+  cancelClassName?: string;
   cancelLabel?: string;
   saveLabel?: string;
   savingLabel?: string;
@@ -1187,7 +1193,12 @@ function SaveBar({
 
   return (
     <div className="mt-6 flex flex-wrap justify-end gap-2">
-      <Button variant={cancelVariant} onClick={onCancel} disabled={isSaving || cancelDisabled}>
+      <Button
+        variant={cancelVariant}
+        className={cancelClassName}
+        onClick={onCancel}
+        disabled={isSaving || cancelDisabled}
+      >
         {cancelLabel ?? t("common.cancel")}
       </Button>
       <Button variant="brand" onClick={onSave} disabled={isSaving || saveDisabled}>

@@ -131,7 +131,8 @@ describe("getAiCopilotChatResponse", () => {
     assert.equal(result.mode, "fallback");
     assert.equal(result.asOf, NOW.toISOString());
     assert.deepEqual(result.fallbackSummary, summary);
-    assert.match(result.answer, /verified local summary/i);
+    assert.match(result.answer, /2 projects and 3 open tasks/i);
+    assert.equal(/verified local summary/i.test(result.answer), false);
     assert.equal(contextRequested, false);
   });
 
@@ -161,7 +162,7 @@ describe("getAiCopilotChatResponse", () => {
     });
   }
 
-  it("keeps RU and EN fallback copy localized", async () => {
+  it("keeps RU and EN fallback copy localized without provider-unavailable preamble", async () => {
     const en = await getAiCopilotChatResponse(baseInput, dependencies(null));
     const ru = await getAiCopilotChatResponse(
       { ...baseInput, locale: "ru", message: "Что важно?" },
@@ -170,8 +171,10 @@ describe("getAiCopilotChatResponse", () => {
         getSummary: async () => ({ ...summary, overview: "Есть срочная задача." }),
       },
     );
-    assert.match(en.answer, /^A verified local summary/);
-    assert.match(ru.answer, /^Сейчас доступна проверенная локальная сводка/);
+    assert.match(en.answer, /^2 projects and 3 open tasks/);
+    assert.equal(/verified local summary/i.test(en.answer), false);
+    assert.match(ru.answer, /^Есть срочная задача/);
+    assert.equal(/проверенная локальная сводка/i.test(ru.answer), false);
   });
 
   it("does not hide workspace/context failures behind fallback", async () => {

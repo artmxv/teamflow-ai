@@ -168,6 +168,26 @@ function buildWeekBuckets(
   return buckets;
 }
 
+function formatCompactDayMonth(date: Date, locale: string) {
+  return date.toLocaleDateString(locale, { day: "numeric", month: "short" });
+}
+
+/** Short horizontal month-bucket labels: `12–17 июл.` or `30 июл.–4 авг.`. */
+function formatMonthBucketLabel(start: Date, endInclusive: Date, locale: string) {
+  const startDay = start.getDate();
+  const endDay = endInclusive.getDate();
+  const sameMonth =
+    start.getMonth() === endInclusive.getMonth() &&
+    start.getFullYear() === endInclusive.getFullYear();
+
+  if (sameMonth) {
+    const month = start.toLocaleDateString(locale, { month: "short" });
+    return `${startDay}–${endDay} ${month}`;
+  }
+
+  return `${formatCompactDayMonth(start, locale)}–${formatCompactDayMonth(endInclusive, locale)}`;
+}
+
 function buildMonthBuckets(
   now: Date,
   locale: string,
@@ -185,7 +205,7 @@ function buildMonthBuckets(
     const endLabel = addLocalDays(end, -1);
     buckets.push({
       key: `week-${index}`,
-      label: `${start.toLocaleDateString(locale, { day: "numeric", month: "short" })} – ${endLabel.toLocaleDateString(locale, { day: "numeric", month: "short" })}`,
+      label: formatMonthBucketLabel(start, endLabel, locale),
       startMs: start.getTime(),
       endMs: end.getTime(),
     });

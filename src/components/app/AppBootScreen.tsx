@@ -34,21 +34,16 @@ export function AppBootScreen({ variant = "shell" }: AppBootScreenProps) {
 
       <div className="app-boot__content flex w-full max-w-sm flex-col items-center text-center">
         <div className="app-boot__mark-frame" aria-hidden>
-          <BrandMark
-            className={cn(
-              "app-boot__mark",
-              isShell ? "size-16 rounded-[1.15rem]" : "size-12 rounded-[0.9rem]",
-            )}
-          />
+          <BrandMark className={cn("app-boot__mark", isShell ? "size-16" : "size-12")} />
         </div>
 
-        <div className="mt-7 flex items-center gap-2 tracking-tight" aria-hidden>
-          <span className="text-2xl font-semibold text-foreground">TeamFlow</span>
-          <BrandAiBadge className="px-1.5 py-0.5 text-sm" />
+        <div
+          className="mt-7 inline-flex items-baseline gap-1.5 text-2xl font-semibold leading-none tracking-tight"
+          aria-hidden
+        >
+          <span className="text-foreground">TeamFlow</span>
+          <BrandAiBadge className="text-2xl font-semibold" />
         </div>
-        <p className="mt-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-          {t("side.tagline")}
-        </p>
 
         {isShell ? (
           <div

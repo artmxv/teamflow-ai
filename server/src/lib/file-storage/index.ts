@@ -1,12 +1,7 @@
 import { avatarPublicPath, deleteLocalAvatarFile } from "../avatar-upload.js";
-import {
-  isSupabaseConfigured,
-  isSupabaseStorageEnabled,
-  shouldUseSupabaseForProjectTaskUploads,
-} from "./driver.js";
+import { isSupabaseConfigured, isSupabaseStorageEnabled } from "./driver.js";
 import {
   deleteFromSupabase,
-  buildSupabasePublicUrl,
   createSignedDownloadUrl,
   fetchObjectContent,
   resolveSupabaseObjectKeyFromPublicUrl,
@@ -14,11 +9,7 @@ import {
 } from "./supabase.js";
 import { deleteLocalStoredFile, readLocalStoredFile } from "./local.js";
 import type { FileStorageCategory, ResolvedStoredFile, StoredFilePayload } from "./types.js";
-import {
-  buildObjectKey,
-  isFullStorageObjectKey,
-  resolveStorageObjectKey,
-} from "./types.js";
+import { isFullStorageObjectKey, resolveStorageObjectKey } from "./types.js";
 
 export type { FileStorageCategory, ResolvedStoredFile, StoredFilePayload };
 export {
@@ -137,17 +128,28 @@ export async function resolveStoredFile(input: {
   };
 }
 
+/**
+ * Client-facing avatar URL. Always an app path (`/uploads/avatars/...`) so the API
+ * can serve local disk or private Supabase objects. Do not store `/object/public/`
+ * URLs — private buckets reject them with HTTP 400.
+ */
 export function resolveAvatarStorageUrl(filename: string) {
-  if (isSupabaseStorageEnabled()) {
-    return buildSupabasePublicUrl(buildObjectKey({
-      category: "avatar",
-      workspaceId: "_",
-      entityId: "_",
-      storedFilename: filename,
-    }));
+  return avatarPublicPath(filename);
+}
+
+function resolveSupabaseAvatarObjectKey(avatarUrl: string): string | null {
+  const fromPublicUrl = resolveSupabaseObjectKeyFromPublicUrl(avatarUrl);
+  if (fromPublicUrl) {
+    return fromPublicUrl;
   }
 
-  return avatarPublicPath(filename);
+  const localMatch = avatarUrl.trim().match(/\/uploads\/avatars\/([^/?#]+)$/i);
+  const filename = localMatch?.[1];
+  if (!filename || filename.includes("..")) {
+    return null;
+  }
+
+  return `avatars/${filename}`;
 }
 
 export async function deleteAvatarByUrl(avatarUrl: string | null | undefined) {
@@ -156,7 +158,7 @@ export async function deleteAvatarByUrl(avatarUrl: string | null | undefined) {
   }
 
   if (isSupabaseStorageEnabled()) {
-    const objectKey = resolveSupabaseObjectKeyFromPublicUrl(avatarUrl);
+    const objectKey = resolveSupabaseAvatarObjectKey(avatarUrl);
     if (objectKey) {
       await deleteFromSupabase({ objectKey });
     }

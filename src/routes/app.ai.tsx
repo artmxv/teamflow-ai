@@ -1,307 +1,418 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { toast } from "sonner";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { requireAuth } from "@/lib/auth/route-guards";
 import { useCurrentWorkspace } from "@/lib/auth/use-current-user";
 import { AppShell } from "@/components/app/AppShell";
-import { ApiErrorState } from "@/components/app/ApiErrorState";
-import { EmptyState } from "@/components/app/EmptyState";
+import { AiEntityResponse } from "@/components/app/AiEntityResponse";
 import { PageHeader } from "@/components/app/PageHeader";
 import { BrandMark } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  RefreshCw,
-  BarChart3,
-  ShieldAlert,
-  ListChecks,
-  ClipboardList,
-  Compass,
-  Copy,
-  FolderKanban,
-  Lightbulb,
+  ChartColumn,
   MessageSquareText,
   Send,
-  Sparkles,
+  Target,
+  CalendarClock,
   type LucideIcon,
 } from "lucide-react";
-import { useI18n, type TKey } from "@/lib/i18n";
-import { friendlyApiErrorMessage, isBrowserOffline } from "@/lib/api-error";
+import { useI18n, type Lang, type TKey } from "@/lib/i18n";
+import {
+  AI_ASK_SUGGESTION_KEYS,
+  parseAiAssistantAsk,
+  type AiAssistantSearch,
+} from "@/lib/ai-assistant-ask";
 import {
   fetchWorkspaceAiSummary,
   sendAiCopilotMessage,
   workspaceAiSummaryQueryKey,
   type AiCopilotChatResponse,
   type AiCopilotHistoryMessage,
-  type WorkspaceAiMetrics,
+  type WorkspaceAiSummary,
 } from "@/lib/api/ai";
+import { fetchProjects, type ProjectApiItem } from "@/lib/api/projects";
+import { fetchTasks, type TaskApiItem } from "@/lib/api/tasks";
+import { effectiveDueDate } from "@/lib/due-datetime";
+import { getProjectAccent } from "@/lib/project-color";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/ai")({
   beforeLoad: requireAuth,
+  validateSearch: (search: Record<string, unknown>): AiAssistantSearch => ({
+    ask: parseAiAssistantAsk(search.ask),
+  }),
   head: () => ({ meta: [{ title: "AI Assistant — TeamFlow AI" }] }),
   component: AssistantPage,
 });
 
-const SECTIONS = [
-  { id: "overview", labelKey: "ai.sectionOverview" as const, icon: Compass },
-  { id: "highlights", labelKey: "ai.highlights" as const, icon: Lightbulb },
-  { id: "risks", labelKey: "ai.risks" as const, icon: ShieldAlert },
-  { id: "actions", labelKey: "ai.actions" as const, icon: ListChecks },
-  { id: "standup", labelKey: "ai.standupSummary" as const, icon: ClipboardList },
-  { id: "metrics", labelKey: "ai.sectionMetrics" as const, icon: BarChart3 },
-] as const;
-
 function AssistantPage() {
   const { t, lang } = useI18n();
-  const queryClient = useQueryClient();
   const { data: currentWorkspace } = useCurrentWorkspace();
   const workspaceId = currentWorkspace?.id ?? null;
   const summaryQueryKey = workspaceId
     ? workspaceAiSummaryQueryKey(workspaceId, lang)
     : (["workspace-ai-summary", null, lang] as const);
 
-  const { data, error, isError, isLoading, isFetching, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     // When workspaceId is null the query stays disabled; null in the key never matches a real id.
     queryKey: summaryQueryKey,
     queryFn: () => fetchWorkspaceAiSummary(lang),
     enabled: Boolean(workspaceId),
   });
-
-  const isEmptyWorkspace =
-    !!data && data.metrics.totalProjects === 0 && data.metrics.totalTasks === 0;
-  const showSectionContent = !!data && !isEmptyWorkspace;
-  const navEnabled = !!data;
-
-  function scrollToSection(id: string) {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  async function handleRegenerate() {
-    if (!workspaceId) {
-      return;
-    }
-    // DevTools Offline / real offline: do not treat paused or cached refetch as success.
-    if (isBrowserOffline()) {
-      toast.error(t("common.offline"));
-      return;
-    }
-
-    const dataUpdatedAtBefore = queryClient.getQueryState(summaryQueryKey)?.dataUpdatedAt ?? 0;
-
-    try {
-      const result = await refetch();
-      if (isBrowserOffline() || result.isPaused) {
-        toast.error(t("common.offline"));
-        return;
-      }
-      if (result.error) {
-        throw result.error;
-      }
-      const dataUpdatedAtAfter = queryClient.getQueryState(summaryQueryKey)?.dataUpdatedAt ?? 0;
-      // Cached/paused resolve without a real network success must not show success toast.
-      if (dataUpdatedAtAfter <= dataUpdatedAtBefore) {
-        toast.error(t("common.offline"));
-        return;
-      }
-      toast.success(t("ai.summaryRefreshed"));
-    } catch (regenerateError) {
-      toast.error(friendlyApiErrorMessage(regenerateError, t, "ai.refreshError"));
-    }
-  }
+  const { data: projects = [] } = useQuery({
+    queryKey: ["projects"],
+    queryFn: fetchProjects,
+    enabled: Boolean(workspaceId),
+    staleTime: 30_000,
+  });
+  const { data: tasks = [] } = useQuery({
+    queryKey: ["tasks"],
+    queryFn: fetchTasks,
+    enabled: Boolean(workspaceId),
+    staleTime: 30_000,
+  });
 
   return (
     <AppShell>
-      <PageHeader title={t("ai.assistant")} subtitle={t("ai.groundedContext")} className="mb-4" />
+      <div className="flex min-h-0 flex-col xl:h-[calc(100svh-8.5rem)] xl:overflow-hidden">
+        <PageHeader
+          title={t("ai.assistant")}
+          subtitle={t("ai.groundedContext")}
+          className="mb-2 shrink-0 sm:mb-3"
+        />
 
-      <CopilotChat key={workspaceId ?? "no-workspace"} workspaceId={workspaceId} />
-
-      <nav
-        className="mb-3 mt-4 -mx-1 overflow-x-auto px-1 lg:hidden"
-        aria-label={t("ai.sectionsNavLabel")}
-      >
-        <ul className="flex w-max max-w-none gap-1.5 pb-1">
-          {SECTIONS.map((section) => (
-            <li key={section.id}>
-              <button
-                type="button"
-                onClick={() => scrollToSection(section.id)}
-                disabled={!navEnabled || (section.id !== "metrics" && isEmptyWorkspace)}
-                className="whitespace-nowrap rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-soft transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
-              >
-                {t(section.labelKey)}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </nav>
-
-      <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
-        <aside className="hidden flex-col rounded-2xl border border-border bg-card p-3 shadow-soft lg:flex">
-          <div className="border-b border-border/60 pb-3">
-            <div className="mb-2 flex items-center gap-1.5 px-2 pt-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/80">
-              <BarChart3 className="size-3" /> {t("ai.metricsTitle")}
-            </div>
-            {isLoading || !workspaceId ? (
-              <MetricsSkeleton />
-            ) : data ? (
-              <MetricsPanel metrics={data.metrics} />
-            ) : (
-              <p className="px-2 py-2 text-xs text-muted-foreground">{t("ai.metricsPending")}</p>
-            )}
-          </div>
-          <div className="mt-4 flex flex-col">
-            <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/80">
-              {t("ai.sectionsTitle")}
-            </div>
-            <ul className="space-y-0.5">
-              {SECTIONS.filter((section) => section.id !== "metrics").map((section) => {
-                const Icon = section.icon;
-                return (
-                  <li key={section.id}>
-                    <button
-                      type="button"
-                      onClick={() => scrollToSection(section.id)}
-                      disabled={!showSectionContent}
-                      className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground disabled:opacity-50"
-                    >
-                      <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-muted/80 text-muted-foreground">
-                        <Icon className="size-3.5" strokeWidth={2} aria-hidden />
-                      </span>
-                      <span className="min-w-0 truncate">{t(section.labelKey)}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        </aside>
-
-        <section className="flex flex-col rounded-2xl border border-border bg-card shadow-soft">
-          <div className="flex items-center gap-3 border-b border-border px-5 py-3">
-            <BrandMark className="size-9 rounded-xl" />
-            <div className="min-w-0">
-              <div className="text-sm font-semibold">{t("ai.assistant")}</div>
-              <div className="text-xs text-muted-foreground">{t("ai.groundedContext")}</div>
-            </div>
-            <Button
-              variant="brand"
-              size="sm"
-              className="ml-auto h-9 shrink-0 justify-center gap-1.5"
-              disabled={!workspaceId || isLoading || isFetching}
-              onClick={() => void handleRegenerate()}
-            >
-              <RefreshCw className={"size-3.5 " + (isFetching ? "animate-spin" : "")} />
-              {isFetching ? t("ai.regenerating") : t("ai.regenerate")}
-            </Button>
-          </div>
-
-          <div className="space-y-6 px-5 py-6">
-            {!workspaceId || isLoading ? (
-              <SummarySkeleton />
-            ) : isError ? (
-              <ApiErrorState
-                title={t("ai.errorTitle")}
-                error={error}
-                hintKey="board.errorHint"
-                onRetry={() => void refetch()}
-                isRetrying={isFetching}
-              />
-            ) : data ? (
-              isEmptyWorkspace ? (
-                <>
-                  <EmptyState
-                    icon={Compass}
-                    title={t("ai.emptyWorkspaceTitle")}
-                    description={t("ai.emptyWorkspaceHint")}
-                    primaryAction={
-                      <Button variant="brand" asChild>
-                        <Link to="/app/projects">
-                          <FolderKanban className="size-4" />
-                          {t("ai.goToProjects")}
-                        </Link>
-                      </Button>
-                    }
-                  />
-                  <div id="metrics" className="scroll-mt-20 lg:hidden">
-                    <SectionMarker icon={BarChart3} title={t("ai.metricsTitle")} />
-                    <MetricsPanel metrics={data.metrics} />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div id="overview" className="scroll-mt-20">
-                    <SectionMarker icon={Compass} title={t("ai.sectionOverview")} />
-                    <AssistantBubble content={data.overview} />
-                  </div>
-
-                  <div id="highlights" className="scroll-mt-20">
-                    <SectionBlock
-                      icon={Lightbulb}
-                      title={t("ai.highlights")}
-                      tone="ok"
-                      items={data.highlights}
-                    />
-                  </div>
-
-                  <div id="risks" className="scroll-mt-20">
-                    <SectionBlock
-                      icon={ShieldAlert}
-                      title={t("ai.risks")}
-                      tone="warn"
-                      items={data.risks}
-                    />
-                  </div>
-
-                  <div id="actions" className="scroll-mt-20">
-                    <SectionBlock
-                      icon={ListChecks}
-                      title={t("ai.nextActions")}
-                      tone="info"
-                      items={data.recommendedNextActions}
-                      ordered
-                    />
-                  </div>
-
-                  <div id="standup" className="scroll-mt-20">
-                    <StandupSummaryBlock
-                      summary={data.standupSummary}
-                      onCopy={() => copyStandupSummary(data.standupSummary, t)}
-                    />
-                  </div>
-
-                  <div id="metrics" className="scroll-mt-20 lg:hidden">
-                    <SectionMarker icon={BarChart3} title={t("ai.metricsTitle")} />
-                    <MetricsPanel metrics={data.metrics} />
-                  </div>
-                </>
-              )
-            ) : null}
-          </div>
-        </section>
+        <div className="grid min-h-0 min-w-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_20.5rem] xl:items-stretch xl:overflow-hidden xl:gap-4">
+          <CopilotChat workspaceId={workspaceId} projects={projects} tasks={tasks} />
+          <AiInsightRail
+            projects={projects}
+            summary={data ?? null}
+            isSummaryLoading={isLoading || !workspaceId}
+          />
+        </div>
       </div>
     </AppShell>
   );
 }
 
+const RAIL_ICON_STROKE = 1.75;
+
+function AiInsightRail({
+  projects,
+  summary,
+  isSummaryLoading,
+}: {
+  projects: ProjectApiItem[];
+  summary: WorkspaceAiSummary | null;
+  isSummaryLoading: boolean;
+}) {
+  const { t, lang } = useI18n();
+  const statusProjects = pickRailProjects(projects, 3);
+  const upcomingDeadlines = pickUpcomingProjectDeadlines(projects, 3);
+
+  return (
+    <aside className="grid min-w-0 content-start gap-3 sm:grid-cols-2 xl:flex xl:h-full xl:min-h-0 xl:grid-cols-1 xl:flex-col xl:gap-3 xl:overflow-hidden">
+      <section className="flex min-w-0 flex-col rounded-2xl border border-border bg-card p-4 shadow-soft xl:shrink-0">
+        <InsightRailTitle icon={Target} title={t("ai.insightFocus")} />
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <InsightMetric
+            value={isSummaryLoading ? 0 : (summary?.metrics.overdueTasks ?? 0)}
+            label={t("ai.focusOverdue")}
+            to="/app/tasks"
+            search={{ due: "overdue" }}
+            tone="text-destructive"
+          />
+          <InsightMetric
+            value={isSummaryLoading ? 0 : (summary?.metrics.openTasks ?? 0)}
+            label={t("ai.focusOpen")}
+            to="/app/tasks"
+            search={{ status: "open" }}
+            tone="text-info"
+          />
+          <InsightMetric
+            value={isSummaryLoading ? 0 : (summary?.metrics.urgentTasks ?? 0)}
+            label={t("ai.focusUrgent")}
+            to="/app/tasks"
+            search={{ priority: "urgent" }}
+            tone="text-amber-500 dark:text-amber-400"
+          />
+        </div>
+      </section>
+
+      <section className="flex min-w-0 flex-col rounded-2xl border border-border bg-card p-4 shadow-soft xl:shrink-0">
+        <InsightRailTitle
+          icon={CalendarClock}
+          title={t("ai.insightDeadlines")}
+          action={
+            <Link to="/app/projects" className="text-xs font-medium text-primary hover:underline">
+              {t("ai.insightAll")}
+            </Link>
+          }
+        />
+        <ul className="mt-3 space-y-0.5">
+          {upcomingDeadlines.map((project) => (
+            <UpcomingProjectDeadlineRow key={project.id} project={project} lang={lang} t={t} />
+          ))}
+          {upcomingDeadlines.length === 0 ? (
+            <li className="px-1 py-2 text-xs leading-relaxed text-muted-foreground">
+              {t("ai.insightNoDeadlines")}
+            </li>
+          ) : null}
+        </ul>
+      </section>
+
+      <section className="flex min-w-0 flex-col rounded-2xl border border-border bg-card p-4 shadow-soft sm:col-span-2 xl:col-span-1 xl:min-h-0 xl:flex-1">
+        <InsightRailTitle
+          icon={ChartColumn}
+          title={t("ai.insightProjects")}
+          action={
+            <Link to="/app/projects" className="text-xs font-medium text-primary hover:underline">
+              {t("ai.insightAll")}
+            </Link>
+          }
+        />
+        <ul className="mt-3 flex min-h-0 flex-1 flex-col justify-start gap-1">
+          {statusProjects.map((project) => (
+            <ProjectStatusRow key={project.id} project={project} t={t} />
+          ))}
+          {statusProjects.length === 0 ? (
+            <li className="px-1 py-2 text-xs leading-relaxed text-muted-foreground">
+              {t("ai.metricsPending")}
+            </li>
+          ) : null}
+        </ul>
+      </section>
+    </aside>
+  );
+}
+
+function InsightRailTitle({
+  icon: Icon,
+  title,
+  action,
+}: {
+  icon: LucideIcon;
+  title: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex shrink-0 items-center justify-between gap-2">
+      <div className="flex min-w-0 items-center gap-2">
+        <Icon
+          className="size-4 shrink-0 text-muted-foreground"
+          strokeWidth={RAIL_ICON_STROKE}
+          aria-hidden
+        />
+        <h2 className="min-w-0 text-sm font-semibold leading-none">{title}</h2>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function InsightMetric({
+  value,
+  label,
+  to,
+  search,
+  tone,
+}: {
+  value: number;
+  label: string;
+  to: "/app/tasks";
+  search: { due?: "overdue"; status?: "open"; priority?: "urgent" };
+  tone: string;
+}) {
+  return (
+    <Link
+      to={to}
+      search={search}
+      className="flex min-h-[4.5rem] min-w-0 flex-col items-center justify-center rounded-xl border border-border/70 bg-muted/35 px-1 py-2.5 text-center transition hover:bg-muted/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+    >
+      <span className={cn("block text-lg font-semibold tabular-nums leading-none", tone)}>
+        {value}
+      </span>
+      <span className="mt-1.5 block whitespace-normal text-[11px] leading-tight text-muted-foreground">
+        {label}
+      </span>
+    </Link>
+  );
+}
+
+function UpcomingProjectDeadlineRow({
+  project,
+  lang,
+  t,
+}: {
+  project: ProjectApiItem;
+  lang: Lang;
+  t: (key: TKey) => string;
+}) {
+  const accent = getProjectAccent(project);
+  const dueLabel = formatProjectDeadlineLabel(project.dueDate!, lang);
+  const dueTone = projectDeadlineTone(project.dueDate!);
+  const openLabel =
+    project.openTasks === 1
+      ? t("ai.insightOpenTasksOne")
+      : t("ai.insightOpenTasks").replace("{count}", String(project.openTasks));
+
+  return (
+    <li>
+      <Link
+        to="/app/projects/$projectId"
+        params={{ projectId: project.id }}
+        className="flex min-w-0 items-start gap-2 rounded-lg px-2 py-2 transition hover:bg-muted/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+      >
+        <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", accent.dot)} aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="flex min-w-0 items-baseline justify-between gap-2">
+            <span className="min-w-0 truncate text-xs font-medium">{project.name}</span>
+            <span
+              className={cn(
+                "shrink-0 text-[11px] font-medium tabular-nums",
+                dueTone === "destructive" && "text-destructive",
+                dueTone === "warning" && "text-amber-500 dark:text-amber-400",
+                dueTone === "muted" && "text-muted-foreground",
+              )}
+            >
+              {dueLabel}
+            </span>
+          </span>
+          <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+            {openLabel}
+          </span>
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+function ProjectStatusRow({ project, t }: { project: ProjectApiItem; t: (key: TKey) => string }) {
+  const accent = getProjectAccent(project);
+  const doneTasks = Math.max(0, project.totalTasks - project.openTasks);
+  const progress = Math.min(100, Math.max(0, project.progress));
+
+  return (
+    <li>
+      <Link
+        to="/app/projects/$projectId"
+        params={{ projectId: project.id }}
+        className="block min-w-0 rounded-lg px-2 py-2 transition hover:bg-muted/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <span className={cn("size-2 shrink-0 rounded-full", accent.dot)} aria-hidden />
+          <span className="min-w-0 flex-1 truncate text-xs font-medium">{project.name}</span>
+          <span className="shrink-0 text-[11px] font-medium tabular-nums text-muted-foreground">
+            {progress}%
+          </span>
+        </div>
+        <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-muted/80">
+          <div
+            className={cn(
+              "project-progress-fill h-full rounded-full bg-gradient-to-r",
+              accent.progress,
+            )}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <div className="mt-1 text-[11px] tabular-nums text-muted-foreground">
+          {t("ai.insightTaskRatio")
+            .replace("{done}", String(doneTasks))
+            .replace("{total}", String(project.totalTasks))}
+        </div>
+      </Link>
+    </li>
+  );
+}
+
+function pickRailProjects(projects: ProjectApiItem[], limit: number) {
+  return [...projects]
+    .filter((project) => project.status !== "COMPLETED")
+    .sort((a, b) => {
+      const activeRank = Number(b.status === "ACTIVE") - Number(a.status === "ACTIVE");
+      if (activeRank !== 0) return activeRank;
+      return b.updatedAt.localeCompare(a.updatedAt);
+    })
+    .slice(0, limit);
+}
+
+function pickUpcomingProjectDeadlines(projects: ProjectApiItem[], limit: number) {
+  return projects
+    .filter((project) => project.status !== "COMPLETED" && Boolean(project.dueDate))
+    .map((project) => ({
+      project,
+      dueMs: effectiveDueDate(project.dueDate!).getTime(),
+    }))
+    .filter((entry) => Number.isFinite(entry.dueMs))
+    .sort((a, b) => a.dueMs - b.dueMs)
+    .slice(0, limit)
+    .map((entry) => entry.project);
+}
+
+function formatProjectDeadlineLabel(value: string, lang: Lang) {
+  const date = effectiveDueDate(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString(lang === "ru" ? "ru-RU" : "en-US", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+function projectDeadlineTone(value: string): "destructive" | "warning" | "muted" {
+  const due = effectiveDueDate(value);
+  const now = Date.now();
+  if (due.getTime() < now) return "destructive";
+  const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+  if (due.getTime() - now <= threeDaysMs) return "warning";
+  return "muted";
+}
+
 const COPILOT_MESSAGE_MAX_CHARS = 2_000;
 const COPILOT_HISTORY_MAX_MESSAGES = 8;
 const COPILOT_HISTORY_CONTENT_MAX_CHARS = 4_000;
+const COPILOT_SUGGESTION_KEYS = [
+  "ai.suggestionSummary",
+  "ai.suggestionAttention",
+  "ai.suggestionDeadlines",
+  "ai.suggestionProjects",
+] as const;
 
 type CopilotUiMessage = AiCopilotHistoryMessage & {
   id: number;
   response?: AiCopilotChatResponse;
 };
 
-function CopilotChat({ workspaceId }: { workspaceId: string | null }) {
+function CopilotChat({
+  workspaceId,
+  projects,
+  tasks,
+}: {
+  workspaceId: string | null;
+  projects: ProjectApiItem[];
+  tasks: TaskApiItem[];
+}) {
   const { t, lang } = useI18n();
+  const { ask } = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
   const [messages, setMessages] = useState<CopilotUiMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nextMessageId = useRef(1);
+  const conversationEndRef = useRef<HTMLDivElement>(null);
+  const conversationMountedRef = useRef(false);
+  const messagesRef = useRef(messages);
+  const isSendingRef = useRef(isSending);
+  messagesRef.current = messages;
+  isSendingRef.current = isSending;
+
+  useEffect(() => {
+    if (!conversationMountedRef.current) {
+      conversationMountedRef.current = true;
+      return;
+    }
+    conversationEndRef.current?.scrollIntoView({ block: "nearest" });
+  }, [messages, isSending]);
 
   function createMessage(
     role: CopilotUiMessage["role"],
@@ -313,21 +424,24 @@ function CopilotChat({ workspaceId }: { workspaceId: string | null }) {
     return { id, role, content, response };
   }
 
-  async function sendMessage() {
-    const message = draft.trim();
-    if (!workspaceId || !message || isSending) return;
+  async function sendMessage(messageOverride?: string) {
+    const message = (messageOverride ?? draft).trim();
+    if (!workspaceId || !message || isSendingRef.current) return;
     if (message.length > COPILOT_MESSAGE_MAX_CHARS) {
       setError(t("ai.copilotTooLong"));
       return;
     }
 
-    const history = messages.slice(-COPILOT_HISTORY_MAX_MESSAGES).map(({ role, content }) => ({
-      role,
-      content: content.slice(0, COPILOT_HISTORY_CONTENT_MAX_CHARS),
-    }));
+    const history = messagesRef.current
+      .slice(-COPILOT_HISTORY_MAX_MESSAGES)
+      .map(({ role, content }) => ({
+        role,
+        content: content.slice(0, COPILOT_HISTORY_CONTENT_MAX_CHARS),
+      }));
     setMessages((current) => [...current, createMessage("user", message)]);
     setDraft("");
     setError(null);
+    isSendingRef.current = true;
     setIsSending(true);
 
     try {
@@ -336,9 +450,29 @@ function CopilotChat({ workspaceId }: { workspaceId: string | null }) {
     } catch {
       setError(t("ai.copilotError"));
     } finally {
+      isSendingRef.current = false;
       setIsSending(false);
     }
   }
+
+  useEffect(() => {
+    if (!ask || !workspaceId) return;
+
+    let cancelled = false;
+    const prompt = t(AI_ASK_SUGGESTION_KEYS[ask]).trim();
+    void navigate({ search: {}, replace: true });
+
+    queueMicrotask(() => {
+      if (cancelled || !prompt) return;
+      void sendMessage(prompt);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // One-shot deep-link from Dashboard quick questions.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional ask handoff
+  }, [ask, workspaceId, lang, t, navigate]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
@@ -347,12 +481,10 @@ function CopilotChat({ workspaceId }: { workspaceId: string | null }) {
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-soft">
-      <div className="flex items-start gap-3 border-b border-border px-5 py-4">
-        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-          <Sparkles className="size-4" aria-hidden />
-        </span>
-        <div>
+    <section className="flex min-h-[28rem] min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-soft xl:h-full xl:min-h-0">
+      <div className="flex shrink-0 items-start gap-3 border-b border-border px-4 py-3 sm:px-5 sm:py-3.5">
+        <BrandMark className="size-9 rounded-xl" />
+        <div className="min-w-0">
           <h2 className="text-sm font-semibold">{t("ai.copilotTitle")}</h2>
           <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
             {t("ai.copilotDescription")}
@@ -361,7 +493,7 @@ function CopilotChat({ workspaceId }: { workspaceId: string | null }) {
       </div>
 
       <div
-        className="max-h-[420px] min-h-40 space-y-4 overflow-y-auto px-5 py-5"
+        className="app-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5"
         aria-live="polite"
       >
         {messages.length === 0 ? (
@@ -379,26 +511,23 @@ function CopilotChat({ workspaceId }: { workspaceId: string | null }) {
                 <div className="px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   {message.role === "user" ? t("ai.copilotYou") : t("ai.copilotName")}
                 </div>
-                <div
-                  className={cn(
-                    "whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed",
-                    message.role === "user"
-                      ? "rounded-tr-md bg-primary text-primary-foreground"
-                      : "rounded-tl-md border border-border bg-muted/50 text-foreground",
-                  )}
-                >
-                  {message.content}
-                </div>
+                {message.role === "user" ? (
+                  <div className="whitespace-pre-wrap rounded-2xl rounded-tr-md bg-primary px-4 py-3 text-sm leading-relaxed text-primary-foreground">
+                    {message.content}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl rounded-tl-md border border-border bg-muted/45 px-4 py-3.5 text-foreground">
+                    <AiEntityResponse content={message.content} projects={projects} tasks={tasks} />
+                  </div>
+                )}
                 {message.response?.mode === "fallback" ? (
-                  <div className="px-1 text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{t("ai.copilotFallback")}</span>
-                    {" · "}
+                  <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
                     {t("ai.copilotFallbackHint")}
-                  </div>
+                  </p>
                 ) : message.response?.mode === "llm" && message.response.context.truncated ? (
-                  <div className="px-1 text-xs text-muted-foreground">
+                  <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
                     {t("ai.copilotContextPartial")}
-                  </div>
+                  </p>
                 ) : null}
               </div>
             </div>
@@ -411,9 +540,28 @@ function CopilotChat({ workspaceId }: { workspaceId: string | null }) {
             </div>
           </div>
         ) : null}
+        <div ref={conversationEndRef} aria-hidden />
       </div>
 
-      <div className="border-t border-border p-4">
+      <div className="shrink-0 border-t border-border p-3 sm:p-3.5">
+        <div className="mb-3 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          {COPILOT_SUGGESTION_KEYS.map((key) => {
+            const suggestion = t(key);
+            return (
+              <button
+                key={key}
+                type="button"
+                disabled={!workspaceId || isSending}
+                className="min-w-0 rounded-lg border border-border bg-background px-2.5 py-2 text-center text-xs font-medium leading-snug text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+                onClick={() => {
+                  if (!isSending) void sendMessage(suggestion);
+                }}
+              >
+                <span className="break-words whitespace-normal">{suggestion}</span>
+              </button>
+            );
+          })}
+        </div>
         <div className="flex items-end gap-2">
           <Textarea
             value={draft}
@@ -427,7 +575,7 @@ function CopilotChat({ workspaceId }: { workspaceId: string | null }) {
             maxLength={COPILOT_MESSAGE_MAX_CHARS}
             rows={2}
             disabled={!workspaceId || isSending}
-            className="max-h-40 min-h-20 resize-y"
+            className="min-h-14 max-h-36 resize-y"
           />
           <Button
             type="button"
@@ -447,189 +595,5 @@ function CopilotChat({ workspaceId }: { workspaceId: string | null }) {
         ) : null}
       </div>
     </section>
-  );
-}
-
-async function copyStandupSummary(text: string, t: (key: TKey) => string) {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast.success(t("ai.copied"));
-    return true;
-  } catch {
-    toast.error(t("ai.copyError"));
-    return false;
-  }
-}
-
-function StandupSummaryBlock({
-  summary,
-  onCopy,
-}: {
-  summary: string;
-  onCopy: () => Promise<boolean> | boolean | void;
-}) {
-  const { t } = useI18n();
-  const [copied, setCopied] = useState(false);
-
-  async function handleCopy() {
-    const result = await onCopy();
-    if (result === false) return;
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 2000);
-  }
-
-  return (
-    <>
-      <SectionMarker
-        icon={ClipboardList}
-        title={t("ai.standupSummary")}
-        trailing={
-          summary.trim() ? (
-            <Button
-              type="button"
-              variant="brand"
-              size="sm"
-              className="ml-auto h-8 gap-1.5 text-xs font-medium normal-case tracking-normal"
-              onClick={() => void handleCopy()}
-            >
-              <Copy className="size-3.5" />
-              {copied ? t("ai.copiedShort") : t("ai.copy")}
-            </Button>
-          ) : null
-        }
-      />
-      <AssistantBubble content={summary} emptyMessage={t("ai.standupEmpty")} />
-    </>
-  );
-}
-
-function SectionMarker({
-  icon: Icon,
-  title,
-  toneClass,
-  trailing,
-}: {
-  icon: LucideIcon;
-  title: string;
-  toneClass?: string;
-  trailing?: ReactNode;
-}) {
-  return (
-    <div className="mb-2.5 flex min-h-7 items-center gap-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-      <span
-        className={cn(
-          "grid size-7 shrink-0 place-items-center rounded-lg bg-muted/80",
-          toneClass ?? "text-muted-foreground",
-        )}
-      >
-        <Icon className="size-3.5" strokeWidth={2} aria-hidden />
-      </span>
-      <span className="leading-none">{title}</span>
-      {trailing}
-    </div>
-  );
-}
-
-function AssistantBubble({ content, emptyMessage }: { content: string; emptyMessage?: string }) {
-  const isEmpty = !content.trim();
-
-  return (
-    <div className="max-w-[95%] rounded-2xl rounded-tl-md border border-border bg-card px-4 py-3 text-sm">
-      {isEmpty && emptyMessage ? <p className="text-muted-foreground">{emptyMessage}</p> : content}
-    </div>
-  );
-}
-
-function SectionBlock({
-  icon,
-  title,
-  tone,
-  items,
-  ordered = false,
-}: {
-  icon: LucideIcon;
-  title: string;
-  tone: "warn" | "ok" | "info";
-  items: string[];
-  ordered?: boolean;
-}) {
-  const toneClass = {
-    warn: "text-warning-foreground",
-    ok: "text-success",
-    info: "text-info",
-  }[tone];
-
-  const ListTag = ordered ? "ol" : "ul";
-  const listClass = ordered ? "list-decimal pl-4" : "list-disc pl-4";
-
-  return (
-    <div>
-      <SectionMarker icon={icon} title={title} toneClass={toneClass} />
-      <div className="rounded-2xl border border-border bg-card px-4 py-3 text-sm">
-        <ListTag className={"space-y-2 " + listClass}>
-          {items.map((item, index) => (
-            <li key={`${title}-${index}`}>{item}</li>
-          ))}
-        </ListTag>
-      </div>
-    </div>
-  );
-}
-
-function MetricsPanel({ metrics }: { metrics: WorkspaceAiMetrics }) {
-  const { t } = useI18n();
-  const items = [
-    { label: t("ai.metricProjects"), value: metrics.totalProjects },
-    { label: t("ai.metricActiveProjects"), value: metrics.activeProjects },
-    { label: t("ai.metricTasks"), value: metrics.totalTasks },
-    { label: t("ai.metricOpenTasks"), value: metrics.openTasks },
-    { label: t("ai.metricDoneTasks"), value: metrics.completedTasks },
-    { label: t("ai.metricUrgentOpen"), value: metrics.urgentTasks },
-    { label: t("ai.metricInReview"), value: metrics.reviewTasks },
-    { label: t("ai.metricOverdue"), value: metrics.overdueTasks },
-  ];
-
-  return (
-    <ul className="space-y-1 px-1">
-      {items.map((item) => (
-        <li
-          key={item.label}
-          className="flex items-center justify-between rounded-lg px-2 py-1.5 text-xs hover:bg-secondary"
-        >
-          <span className="text-muted-foreground">{item.label}</span>
-          <span className="font-semibold tabular-nums">{item.value}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function SummarySkeleton() {
-  return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <Skeleton className="h-4 w-28" />
-        <Skeleton className="h-24 w-full max-w-[95%] rounded-2xl" />
-      </div>
-      {Array.from({ length: 3 }).map((_, index) => (
-        <div key={index} className="space-y-2">
-          <Skeleton className="h-4 w-36" />
-          <Skeleton className="h-28 w-full rounded-2xl" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function MetricsSkeleton() {
-  return (
-    <ul className="space-y-2 px-1">
-      {Array.from({ length: 6 }).map((_, index) => (
-        <li key={index} className="flex justify-between px-2 py-1">
-          <Skeleton className="h-3 w-20" />
-          <Skeleton className="h-3 w-6" />
-        </li>
-      ))}
-    </ul>
   );
 }

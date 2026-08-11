@@ -69,6 +69,7 @@ describe("GroqProvider", () => {
     assert.equal(body.model, "model-from-env");
     assert.equal(body.stream, false);
     assert.equal(body.max_completion_tokens, GROQ_MAX_COMPLETION_TOKENS_CAP);
+    assert.equal("reasoning_effort" in body, false);
     assert.deepEqual(body.messages, messages);
     assert.equal("tools" in body, false);
     assert.equal("functions" in body, false);
@@ -79,6 +80,24 @@ describe("GroqProvider", () => {
       completionTokens: 3,
       totalTokens: 13,
     });
+  });
+
+  it("uses low reasoning effort and a higher floor for gpt-oss models", async () => {
+    let capturedBody: Record<string, unknown> | null = null;
+    const fetchImpl = (async (_input: URL | RequestInfo, init?: RequestInit) => {
+      capturedBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return jsonResponse({ choices: [{ message: { content: "Ready" } }] });
+    }) as typeof fetch;
+
+    const result = await makeProvider(fetchImpl, {
+      model: "openai/gpt-oss-120b",
+      maxOutputTokens: 700,
+    }).chat({ messages });
+
+    assert.equal(result.content, "Ready");
+    assert.equal(capturedBody?.model, "openai/gpt-oss-120b");
+    assert.equal(capturedBody?.reasoning_effort, "low");
+    assert.equal(capturedBody?.max_completion_tokens, 2_048);
   });
 
   it("aborts on timeout without retrying", async () => {

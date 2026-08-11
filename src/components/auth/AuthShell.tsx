@@ -1,15 +1,8 @@
-import { type ReactNode } from "react";
-import { Bot, Check, KanbanSquare, ListTodo, MessageSquare } from "lucide-react";
+import type { ReactNode } from "react";
+import { ArrowRight, Check, FolderKanban, ListChecks } from "lucide-react";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { PublicPageShell } from "@/components/landing/PublicPageShell";
-import { LanguageSwitcher, useI18n, type TKey } from "@/lib/i18n";
-
-const AUTH_POINTS: TKey[] = [
-  "landing.features.projectsTitle",
-  "landing.features.kanbanTitle",
-  "landing.features.chatTitle",
-  "landing.features.briefingsTitle",
-];
+import { LanguageSwitcher, useI18n } from "@/lib/i18n";
 
 export function AuthShell({
   title,
@@ -25,75 +18,46 @@ export function AuthShell({
   const { t } = useI18n();
 
   return (
-    <PublicPageShell className="relative">
-      <div className="pointer-events-none absolute inset-0 public-ambient opacity-90" />
-      <div className="pointer-events-none absolute inset-0 bg-grid opacity-30" />
+    <PublicPageShell mode="auth">
+      <div className="auth-layout grid min-h-[100svh] lg:grid-cols-[54fr_46fr]">
+        <aside className="auth-story-panel relative hidden overflow-hidden lg:flex lg:flex-col">
+          <div className="auth-story-panel__grid" aria-hidden />
+          <div className="relative z-10 flex h-full flex-col px-10 py-8 xl:px-16 xl:py-10">
+            <BrandLogo className="w-fit" />
+            <div className="my-auto max-w-[560px] py-10">
+              <p className="public-eyebrow public-eyebrow--dark">TEAMFLOW AI / WORKSPACE</p>
+              <h2 className="auth-story-title mt-5 max-w-[540px] text-balance text-4xl font-semibold tracking-[-0.045em] text-white xl:text-[3.4rem]">
+                {t("auth.shell.leadTitle")}
+              </h2>
+              <p className="mt-5 max-w-lg text-base leading-relaxed text-white/58">{t("auth.shell.leadBody")}</p>
 
-      <div className="relative z-10 grid min-h-screen lg:grid-cols-2">
-        {/* Brand panel — desktop only; mobile shows the form first */}
-        <aside className="relative hidden overflow-hidden border-r border-border/60 lg:flex lg:flex-col lg:justify-center lg:px-10 lg:py-12 xl:px-14">
-          <div className="mx-auto w-full max-w-lg">
-            <BrandLogo />
-            <h2 className="public-heading mt-10 max-w-md text-balance text-3xl font-semibold tracking-tight xl:text-[2.1rem]">
-              {t("auth.shell.leadTitle")}
-            </h2>
-            <p className="public-body mt-3 max-w-md text-sm text-muted-foreground">
-              {t("auth.shell.leadBody")}
-            </p>
-            <ul className="mt-8 space-y-3 text-sm leading-[1.45]">
-              {AUTH_POINTS.map((key) => (
-                <li key={key} className="flex items-center gap-2.5 text-foreground/90">
-                  <span className="grid size-6 place-items-center rounded-md bg-accent text-accent-foreground">
-                    <Check className="size-3.5" aria-hidden />
-                  </span>
-                  {t(key)}
-                </li>
-              ))}
-            </ul>
-
-            <div className="mt-10 rounded-2xl border border-border bg-card/80 p-5 shadow-card">
-              <div className="mb-4 text-xs font-medium leading-[1.3] text-muted-foreground">
-                {t("landing.preview.windowTitle")}
+              <div className="auth-flow" aria-hidden>
+                <div className="auth-flow__node"><FolderKanban /><span><small>01</small>{t("auth.shell.flowProject")}</span></div>
+                <ArrowRight className="auth-flow__arrow" />
+                <div className="auth-flow__node"><ListChecks /><span><small>02</small>{t("auth.shell.flowTask")}</span></div>
+                <ArrowRight className="auth-flow__arrow" />
+                <div className="auth-flow__node"><Check /><span><small>03</small>{t("auth.shell.flowStatus")}</span></div>
               </div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <MiniTile icon={ListTodo} label={t("side.projects")} />
-                <MiniTile icon={KanbanSquare} label={t("side.kanban")} />
-                <MiniTile icon={MessageSquare} label={t("side.chat")} />
-                <MiniTile icon={Bot} label={t("side.assistant")} />
-              </div>
-              <p className="public-body mt-4 text-xs text-muted-foreground">
-                {t("auth.shell.previewHint")}
-              </p>
             </div>
+            <p className="text-xs text-white/32">© 2026 TeamFlow AI</p>
           </div>
         </aside>
 
-        {/* Form panel */}
-        <div className="flex items-center justify-center px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
-          <div className="w-full max-w-[420px]">
-            <div className="mb-5 flex items-center justify-between gap-3 lg:mb-6">
+        <main className="auth-form-panel flex min-h-[100svh] items-center justify-center px-4 py-6 sm:px-8 sm:py-10 lg:px-10">
+          <div className="auth-form-wrap w-full max-w-[410px]">
+            <div className="mb-8 flex items-center justify-between gap-3 lg:justify-end">
               <BrandLogo className="lg:hidden" />
-              <LanguageSwitcher className="ml-auto shrink-0" />
+              <LanguageSwitcher className="shrink-0" />
             </div>
-
-            <div className="rounded-2xl border border-border bg-card/85 p-5 shadow-card sm:p-7">
-              <h1 className="public-heading text-2xl font-semibold tracking-tight">{title}</h1>
-              <p className="public-body mt-1.5 text-sm text-muted-foreground">{subtitle}</p>
-              <div className="mt-6">{children}</div>
-              <div className="mt-5 text-sm leading-[1.45] text-muted-foreground">{footer}</div>
+            <div className="auth-card">
+              <h1 className="text-3xl font-semibold tracking-[-0.035em]">{title}</h1>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{subtitle}</p>
+              <div className="auth-card__body mt-7">{children}</div>
+              <div className="auth-card__footer mt-6 text-sm leading-relaxed text-muted-foreground">{footer}</div>
             </div>
           </div>
-        </div>
+        </main>
       </div>
     </PublicPageShell>
-  );
-}
-
-function MiniTile({ icon: Icon, label }: { icon: typeof ListTodo; label: string }) {
-  return (
-    <div className="rounded-xl border border-border bg-background/70 p-3">
-      <Icon className="size-4 text-primary" aria-hidden />
-      <div className="mt-2 truncate text-xs font-medium leading-[1.3]">{label}</div>
-    </div>
   );
 }

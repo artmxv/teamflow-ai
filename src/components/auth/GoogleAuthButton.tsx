@@ -49,8 +49,8 @@ export function GoogleAuthButton({
       disabled={isDisabled}
       aria-busy={loading || undefined}
       className={cn(
-        "inline-flex h-10 w-full items-center justify-center gap-2.5 rounded-md border border-[color-mix(in_oklch,oklch(0.72_0.06_250)_35%,transparent)] bg-[oklch(0.24_0.028_255)] px-4 text-sm font-medium leading-[1.3] text-[oklch(0.95_0.01_250)] outline-none transition-colors",
-        "hover:bg-[oklch(0.28_0.03_255)]",
+        "inline-flex h-10 w-full items-center justify-center gap-2.5 rounded-md border border-control-border bg-card px-4 text-sm font-medium leading-[1.3] text-foreground shadow-[0_1px_2px_rgba(31,29,25,0.04)] outline-none transition-[background-color,border-color,box-shadow]",
+        "hover:border-[color-mix(in_oklch,var(--control-border)_78%,var(--foreground))] hover:bg-control-hover hover:shadow-[0_2px_8px_rgba(31,29,25,0.06)]",
         "focus-visible:ring-2 focus-visible:ring-[color-mix(in_oklch,var(--brand-ring)_40%,transparent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]",
         "disabled:cursor-not-allowed disabled:opacity-55",
         className,

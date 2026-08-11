@@ -30,6 +30,7 @@ import {
 } from "@/lib/api/dashboard";
 import { fetchWorkspaceAiSummary, workspaceAiSummaryQueryKey } from "@/lib/api/ai";
 import { fetchTasks, type TaskApiItem } from "@/lib/api/tasks";
+import { AI_ASK_SUGGESTION_KEYS, type AiAssistantAsk } from "@/lib/ai-assistant-ask";
 import {
   buildTaskActivitySeries,
   computeTaskAnalyticsCounts,
@@ -42,8 +43,11 @@ import type { TasksSearch } from "@/routes/app.tasks";
 import type { ProjectsSearch } from "@/lib/project-status-url";
 import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
 import { getProjectAccent, resolveProjectGradient } from "@/lib/project-color";
+import { AiEntityResponse } from "@/components/app/AiEntityResponse";
 import { AssigneeAvatars } from "@/components/app/AssigneeAvatars";
 import { ProjectAccentSurface } from "@/components/app/ProjectAccentSurface";
+import { ProjectMemberStack } from "@/components/app/ProjectMemberStack";
+import { ProjectStatusIndicator } from "@/components/app/ProjectStatusIndicator";
 import { TaskStatusIndicator } from "@/components/app/TaskStatusIndicator";
 import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
@@ -472,13 +476,16 @@ function Dashboard() {
                       key={s.statusKey}
                       className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-xs"
                     >
-                      <TaskStatusIndicator
-                        status={recentStatusMeta[s.statusKey].status}
-                        className="gap-2 text-foreground/90"
-                        dotClassName="size-2.5"
-                      >
-                        {dashboardStatusLabel(s.statusKey, t)}
-                      </TaskStatusIndicator>
+                      <span className="inline-flex min-w-0 items-center gap-2 text-foreground/90">
+                        <span
+                          className="size-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: s.fill }}
+                          aria-hidden
+                        />
+                        <span className="min-w-0 truncate">
+                          {dashboardStatusLabel(s.statusKey, t)}
+                        </span>
+                      </span>
                       <span className="shrink-0 tabular-nums font-semibold text-muted-foreground">
                         {s.value}
                       </span>
@@ -491,7 +498,7 @@ function Dashboard() {
         </div>
 
         <div className="grid min-w-0 gap-4 xl:grid-cols-3">
-          <DashboardAiInsightsCard />
+          <DashboardAiInsightsCard projects={apiProjects} tasks={workspaceTasks} />
 
           <div className="flex min-w-0 flex-col gap-4 xl:col-span-2">
             <div className={sectionSurfaceClass}>
@@ -848,12 +855,11 @@ function DashboardProjectCard({
   t: (key: TKey) => string;
   lang: import("@/lib/i18n").Lang;
 }) {
-  const meta = projectStatusMeta[project.status];
   const cardBody = (
     <ProjectAccentSurface
       gradient={project.color}
-      className="z-1 h-full border-0"
-      contentClassName="p-4"
+      className="z-1 h-full border-border/50 shadow-none"
+      contentClassName="px-4 pb-4 pt-8"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -866,18 +872,24 @@ function DashboardProjectCard({
               .replace("{total}", String(project.totalTasks))}
           </div>
         </div>
-        <Badge variant="secondary" className={cn(meta.className, "shrink-0 border-0")}>
+        <ProjectStatusIndicator
+          status={project.status}
+          className="shrink-0 rounded-full border border-border bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground"
+        >
           {projectStatusLabel(project.status, t)}
-        </Badge>
+        </ProjectStatusIndicator>
       </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted/80">
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted/80">
         <div
           className={"project-progress-fill h-full rounded-full bg-gradient-to-r " + project.color}
           style={{ width: project.progress + "%" }}
         />
       </div>
-      <div className="mt-2.5 flex items-center justify-between gap-2">
-        <span className="text-xs tabular-nums text-muted-foreground">{project.progress}%</span>
+      <div className="mt-3 flex items-center gap-2">
+        {project.id ? <ProjectMemberStack projectId={project.id} max={3} /> : null}
+        <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+          {project.progress}%
+        </span>
       </div>
     </ProjectAccentSurface>
   );
@@ -893,7 +905,6 @@ function DashboardProjectCard({
       aria-label={`${t("dashboard.viewProject")}: ${translateStarterProjectName(project.name, lang)}`}
       className={cn(
         "dashboard-project-card group block min-w-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        project.color,
       )}
     >
       {cardBody}
@@ -901,7 +912,19 @@ function DashboardProjectCard({
   );
 }
 
-function DashboardAiInsightsCard() {
+const DASHBOARD_QUICK_ASKS = [
+  { ask: "summary", labelKey: AI_ASK_SUGGESTION_KEYS.summary },
+  { ask: "attention", labelKey: AI_ASK_SUGGESTION_KEYS.attention },
+  { ask: "deadlines", labelKey: AI_ASK_SUGGESTION_KEYS.deadlines },
+] as const satisfies ReadonlyArray<{ ask: AiAssistantAsk; labelKey: TKey }>;
+
+function DashboardAiInsightsCard({
+  projects,
+  tasks,
+}: {
+  projects: ProjectApiItem[];
+  tasks: TaskApiItem[];
+}) {
   const { t, lang } = useI18n();
   const { data: currentWorkspace } = useCurrentWorkspace();
   const workspaceId = currentWorkspace?.id ?? null;
@@ -920,14 +943,14 @@ function DashboardAiInsightsCard() {
   const previewRisks = data?.risks.slice(0, 2) ?? [];
   const previewActions = data?.recommendedNextActions.slice(0, 2) ?? [];
   const showSuccess = !!data && !isEmptyWorkspace;
+  const headline = data ? buildAiPreviewHeadline(data, t) : "";
 
   return (
     <div
       className={cn(
         sectionSurfaceClass,
-        "group xl:col-span-1 transition-[border-color,background-color,box-shadow] duration-200",
-        "hover:border-primary/30 hover:bg-primary/4 hover:shadow-[0_0_0_1px_color-mix(in_oklch,var(--brand-ring)_18%,transparent)]",
-        "dark:hover:bg-primary/7",
+        "group flex flex-col xl:col-span-1 transition-[border-color,background-color,box-shadow] duration-200",
+        "hover:border-primary/25 hover:shadow-[0_0_0_1px_color-mix(in_oklch,var(--brand-ring)_14%,transparent)]",
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -938,9 +961,6 @@ function DashboardAiInsightsCard() {
             </span>
             <span className="truncate">{t("dashboard.aiInsights")}</span>
           </div>
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            {t("dashboard.aiInsightsDescription")}
-          </p>
         </div>
         {showSuccess && isFetching ? (
           <RefreshCw
@@ -981,13 +1001,19 @@ function DashboardAiInsightsCard() {
         </div>
       ) : showSuccess ? (
         <>
-          <p className="mt-4 line-clamp-4 break-words text-sm leading-relaxed text-foreground/90">
-            {data.overview}
-          </p>
+          <div className="mt-4 min-w-0">
+            <AiEntityResponse
+              content={headline}
+              projects={projects}
+              tasks={tasks}
+              compact
+              className="text-sm font-medium leading-relaxed text-foreground"
+            />
+          </div>
 
           {previewRisks.length > 0 ? (
-            <div className="mt-4 min-w-0 rounded-xl border border-warning/25 bg-warning/10 px-3 py-2.5 dark:border-warning/35 dark:bg-warning/15">
-              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+            <div className="mt-4 min-w-0 rounded-xl border border-amber-500/25 bg-amber-500/[0.07] p-3 dark:border-amber-400/30 dark:bg-amber-400/[0.08]">
+              <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-foreground/85">
                 <AlertTriangle className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
                 {t("ai.risks")}
               </div>
@@ -995,9 +1021,9 @@ function DashboardAiInsightsCard() {
                 {previewRisks.map((risk, index) => (
                   <li
                     key={`risk-${index}`}
-                    className="line-clamp-2 break-words text-xs leading-relaxed text-foreground/85"
+                    className="min-w-0 text-muted-foreground [line-height:1.5]"
                   >
-                    {risk}
+                    <AiEntityResponse content={risk} projects={projects} tasks={tasks} compact />
                   </li>
                 ))}
               </ul>
@@ -1005,39 +1031,84 @@ function DashboardAiInsightsCard() {
           ) : null}
 
           {previewActions.length > 0 ? (
-            <div className="mt-4 min-w-0">
-              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-primary">
-                <ListChecks className="size-3.5 shrink-0" />
-                {t("ai.actions")}
+            <div className="mt-3.5 min-w-0 rounded-xl border border-border/80 bg-muted/35 p-3 dark:bg-muted/25">
+              <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-foreground/85">
+                <ListChecks className="size-3.5 shrink-0 text-primary" />
+                {t("dashboard.aiNextSteps")}
               </div>
               <ol className="list-decimal space-y-1.5 pl-4">
                 {previewActions.map((action, index) => (
                   <li
                     key={`action-${index}`}
-                    className="line-clamp-2 break-words text-xs text-muted-foreground"
+                    className="min-w-0 pl-1 text-muted-foreground [line-height:1.5]"
                   >
-                    {action}
+                    <AiEntityResponse content={action} projects={projects} tasks={tasks} compact />
                   </li>
                 ))}
               </ol>
             </div>
           ) : null}
 
-          <Button variant="brand" className="mt-4 w-full" asChild>
-            <Link to="/app/ai">{t("dashboard.openFullBriefing")}</Link>
-          </Button>
+          <div className="mt-auto flex min-w-0 flex-col pt-5">
+            <div className="min-w-0">
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {t("dashboard.quickQuestions")}
+              </div>
+              <div className="flex min-w-0 flex-wrap gap-2">
+                {DASHBOARD_QUICK_ASKS.map(({ ask, labelKey }) => (
+                  <Link
+                    key={ask}
+                    to="/app/ai"
+                    search={{ ask }}
+                    className="rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-medium leading-snug text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+                  >
+                    {t(labelKey)}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            <Button
+              variant="outline"
+              className="mt-3 w-full border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
+              asChild
+            >
+              <Link to="/app/ai">{t("dashboard.openAiAssistant")}</Link>
+            </Button>
+          </div>
         </>
       ) : null}
     </div>
   );
 }
 
+function buildAiPreviewHeadline(
+  summary: NonNullable<Awaited<ReturnType<typeof fetchWorkspaceAiSummary>>>,
+  t: (key: TKey) => string,
+) {
+  const highlight = summary.highlights.find((item) => item.trim().length > 0)?.trim();
+  if (highlight) return highlight;
+
+  if (summary.metrics.overdueTasks > 0) {
+    return t("dashboard.aiPreviewOverdue").replace("{count}", String(summary.metrics.overdueTasks));
+  }
+
+  if (summary.metrics.urgentTasks > 0) {
+    return t("dashboard.aiPreviewUrgent").replace("{count}", String(summary.metrics.urgentTasks));
+  }
+
+  const overview = summary.overview.trim();
+  if (!overview) return t("dashboard.aiInsightsDescription");
+  const firstSentence = overview.split(/(?<=[.!?…])\s+/)[0]?.trim();
+  return firstSentence || overview;
+}
+
 function AiInsightsSkeleton() {
   return (
     <div className="mt-4 space-y-3">
-      <Skeleton className="h-16 w-full rounded-lg" />
       <Skeleton className="h-10 w-full rounded-lg" />
-      <Skeleton className="h-10 w-4/5 rounded-lg" />
+      <Skeleton className="h-8 w-full rounded-lg" />
+      <Skeleton className="h-8 w-4/5 rounded-lg" />
       <Skeleton className="h-9 w-full rounded-md" />
     </div>
   );
@@ -1063,12 +1134,11 @@ function StatCardSkeletons() {
   return (
     <div className="grid gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
       {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} className={cn(cardLinkClass, "pointer-events-none")}>
-          <div className="flex items-start justify-between gap-3">
-            <Skeleton className="size-7 rounded-lg sm:size-9 sm:rounded-xl" />
-            <Skeleton className="mt-1 h-3 w-16" />
+        <div key={index} className={cn(cardLinkClass, "pointer-events-none", metricCardStackClass)}>
+          <div className={metricIconValueColumnClass}>
+            <Skeleton className="size-7 shrink-0 rounded-lg sm:size-9 sm:rounded-xl" />
+            <Skeleton className="mt-1.5 h-6 w-12 sm:mt-4 sm:h-9 sm:w-16" />
           </div>
-          <Skeleton className="mt-1.5 h-6 w-12 sm:mt-4 sm:h-9 sm:w-16" />
           <Skeleton className="mt-1 h-3 w-24" />
         </div>
       ))}
@@ -1112,6 +1182,24 @@ const cardLinkClass =
 
 const analyticsCardLinkClass =
   "surface-lift min-w-0 rounded-2xl border border-border/60 bg-card/60 p-2.5 shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-4";
+
+/** Content stack: icon + value share one column axis; label follows the same left edge. */
+const metricCardStackClass = "flex flex-col items-start text-left";
+
+/** Icon and value in one centered column so any digit count sits under the icon. */
+const metricIconValueColumnClass = "inline-flex max-w-full flex-col items-center";
+
+/**
+ * Tabular lining nums keep every value on a stable digit grid (no jump by digit count).
+ * Override body font-feature-settings so tnum actually applies.
+ */
+const metricValueClass =
+  "text-center font-semibold leading-none tracking-tight tabular-nums [font-feature-settings:'tnum'_1,'lnum'_1,'cv11'_1,'ss01'_1,'ss03'_1]";
+
+const metricLabelClass = "max-w-full self-start text-left";
+
+const metricIconClass =
+  "grid size-7 shrink-0 place-items-center rounded-lg transition sm:size-9 sm:rounded-xl";
 
 type AnalyticsMetricTone = "urgent" | "review" | "priorityUrgent" | "muted";
 
@@ -1206,8 +1294,7 @@ function TaskActivityChartSection({
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <span className="size-2 shrink-0 rounded-sm bg-primary" />{" "}
-              {t("dashboard.createdTasks")}
+              <span className="size-2 shrink-0 rounded-sm bg-info" /> {t("dashboard.createdTasks")}
             </span>
             <span className="flex items-center gap-1.5">
               <span className="size-2 shrink-0 rounded-sm bg-success" /> {t("dashboard.doneTasks")}
@@ -1228,8 +1315,8 @@ function TaskActivityChartSection({
       ) : (
         <ChartContainer
           config={{
-            created: { label: t("dashboard.createdTasks"), color: "var(--primary)" },
-            done: { label: t("dashboard.doneTasks"), color: "var(--success)" },
+            created: { label: t("dashboard.createdTasks"), color: "var(--color-info)" },
+            done: { label: t("dashboard.doneTasks"), color: "var(--color-success)" },
           }}
           className="aspect-auto h-56 w-full min-w-0 sm:h-64 [&_.recharts-cartesian-grid_line]:stroke-border/80"
         >
@@ -1237,7 +1324,12 @@ function TaskActivityChartSection({
             data={chartData}
             barGap={4}
             barCategoryGap="18%"
-            margin={{ top: 8, right: 4, left: -18, bottom: period === "month" ? 8 : 0 }}
+            margin={{
+              top: 8,
+              right: 4,
+              left: -18,
+              bottom: period === "year" ? 4 : 2,
+            }}
           >
             <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/60" />
             <XAxis
@@ -1245,21 +1337,31 @@ function TaskActivityChartSection({
               tickLine={false}
               axisLine={false}
               interval={0}
-              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-              angle={period === "month" ? -18 : 0}
-              textAnchor={period === "month" ? "end" : "middle"}
-              height={period === "month" ? 52 : 32}
+              minTickGap={4}
+              angle={0}
+              textAnchor="middle"
+              height={period === "month" ? 40 : period === "year" ? 36 : 28}
+              tickMargin={6}
+              tick={{
+                fill: "var(--muted-foreground)",
+                fontSize: period === "year" ? 9 : period === "month" ? 10 : 11,
+              }}
             />
             <YAxis
               allowDecimals={false}
               width={36}
               tickLine={false}
               axisLine={false}
-              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+              tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
             />
             <ChartTooltip content={<ChartTooltipContent nameKey="dataKey" />} />
-            <Bar dataKey="created" fill="var(--color-created)" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="done" fill="var(--color-done)" radius={[4, 4, 0, 0]} />
+            <Bar
+              dataKey="created"
+              fill="var(--color-created)"
+              radius={[4, 4, 0, 0]}
+              maxBarSize={28}
+            />
+            <Bar dataKey="done" fill="var(--color-done)" radius={[4, 4, 0, 0]} maxBarSize={28} />
           </BarChart>
         </ChartContainer>
       )}
@@ -1291,27 +1393,25 @@ function AnalyticsMetricCard({
       to={to}
       search={search}
       aria-label={ariaLabel}
-      className={cn("group block", analyticsCardLinkClass, toneStyles.lift)}
+      className={cn("group", metricCardStackClass, analyticsCardLinkClass, toneStyles.lift)}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div
-          className={cn(
-            "grid size-7 place-items-center rounded-lg transition sm:size-9 sm:rounded-xl",
-            toneStyles.icon,
-          )}
-        >
+      <div className={metricIconValueColumnClass}>
+        <div className={cn(metricIconClass, toneStyles.icon)}>
           <Icon className="size-3.5 sm:size-4" />
         </div>
+        <div
+          className={cn(
+            metricValueClass,
+            "mt-1.5 text-xl sm:mt-3.5 sm:text-[1.75rem]",
+            toneStyles.value,
+          )}
+        >
+          {value}
+        </div>
       </div>
-      <div
-        className={cn(
-          "mt-1.5 text-xl font-semibold tracking-tight tabular-nums sm:mt-3.5 sm:text-[1.75rem]",
-          toneStyles.value,
-        )}
-      >
-        {value}
+      <div className={cn(metricLabelClass, "mt-0.5 text-xs leading-snug text-muted-foreground")}>
+        {label}
       </div>
-      <div className="mt-0.5 text-xs leading-snug text-muted-foreground">{label}</div>
     </Link>
   );
 }
@@ -1320,9 +1420,11 @@ function AnalyticsCardsSkeleton() {
   return (
     <div className="grid gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
       {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} className={cn(analyticsCardLinkClass, "pointer-events-none")}>
-          <Skeleton className="size-7 rounded-lg sm:size-9 sm:rounded-xl" />
-          <Skeleton className="mt-1.5 h-6 w-10 sm:mt-3 sm:h-8 sm:w-12" />
+        <div key={index} className={cn(analyticsCardLinkClass, "pointer-events-none", metricCardStackClass)}>
+          <div className={metricIconValueColumnClass}>
+            <Skeleton className="size-7 shrink-0 rounded-lg sm:size-9 sm:rounded-xl" />
+            <Skeleton className="mt-1.5 h-6 w-10 sm:mt-3 sm:h-8 sm:w-12" />
+          </div>
           <Skeleton className="mt-1 h-3 w-28 sm:mt-2" />
         </div>
       ))}
@@ -1374,25 +1476,23 @@ function StatCard({
   const accentStyles = statAccentClass[accent];
   const content = (
     <>
-      <div className="flex items-start justify-between gap-3">
-        <div
-          className={cn(
-            "grid size-7 place-items-center rounded-lg transition sm:size-9 sm:rounded-xl",
-            accentStyles.icon,
-          )}
-        >
+      <div className={metricIconValueColumnClass}>
+        <div className={cn(metricIconClass, accentStyles.icon)}>
           <Icon className="size-3.5 sm:size-4" />
         </div>
+        <div className={cn(metricValueClass, "mt-1.5 text-xl sm:mt-4 sm:text-3xl")}>{value}</div>
       </div>
-      <div className="mt-1.5 text-xl font-semibold tracking-tight tabular-nums sm:mt-4 sm:text-3xl">
-        {value}
-      </div>
-      <div className="mt-0.5 text-xs font-medium leading-snug text-foreground/80 sm:mt-1 sm:font-normal sm:text-muted-foreground">
+      <div
+        className={cn(
+          metricLabelClass,
+          "mt-0.5 text-xs font-medium leading-snug text-foreground/80 sm:mt-1 sm:font-normal sm:text-muted-foreground",
+        )}
+      >
         {label}
       </div>
     </>
   );
-  const className = cn("group block", cardLinkClass, accentStyles.lift);
+  const className = cn("group", metricCardStackClass, cardLinkClass, accentStyles.lift);
 
   if (target.to === "/app/tasks") {
     return (

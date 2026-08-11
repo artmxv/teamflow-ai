@@ -1,4 +1,4 @@
-import { AlertTriangle, Bell, ChevronDown, Clock, HelpCircle, Loader2 } from "lucide-react";
+import { AlertTriangle, Bell, ChevronDown, Clock, Loader2 } from "lucide-react";
 import { useRouterState } from "@tanstack/react-router";
 import { GlobalSearch } from "@/components/app/GlobalSearch";
 import { MobileNav } from "@/components/app/MobileNav";
@@ -10,13 +10,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -63,7 +56,6 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
   const showProfile = hasToken && !isError && !!currentUser;
   const showProfilePlaceholder = hasToken && !isError && !currentUser;
   const profileRoleLabel = workspaceRole ? workspaceRoleLabel(workspaceRole, t) : t("role.member");
-  const [helpOpen, setHelpOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const notificationsQuery = useQuery({
@@ -175,15 +167,6 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
       <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1.5">
         <LanguageSwitcher />
         <ThemeToggle />
-        <button
-          type="button"
-          onClick={() => setHelpOpen(true)}
-          title={t("top.help")}
-          aria-label={t("top.help")}
-          className="hidden size-9 place-items-center rounded-lg text-muted-foreground outline-none transition hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35 sm:grid"
-        >
-          <HelpCircle className="size-4" aria-hidden />
-        </button>
         <DropdownMenu
           modal={false}
           open={notificationsOpen}
@@ -428,18 +411,6 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
           </DropdownMenu>
         )}
       </div>
-
-      <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>TeamFlow {t("top.help")}</DialogTitle>
-            <DialogDescription>{t("top.helpDescription")}</DialogDescription>
-          </DialogHeader>
-          <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
-            {t("top.helpTip")}
-          </div>
-        </DialogContent>
-      </Dialog>
     </header>
   );
 }

@@ -157,6 +157,7 @@ export function TaskDrawer({
   const titleInputRef = useRef<HTMLInputElement>(null);
   const titleEditorRef = useRef<HTMLDivElement>(null);
   const saveChangesButtonRef = useRef<HTMLButtonElement>(null);
+  const drawerBodyRef = useRef<HTMLDivElement>(null);
   const displayedTaskTitle = task ? displayTaskTitle(task.title, lang) : "";
 
   useLayoutEffect(() => {
@@ -337,7 +338,6 @@ export function TaskDrawer({
     name: projectName || "project",
     color: apiProject?.color,
   });
-  const prio = priorityMeta[task.priority];
   const statusLabel = taskStatusLabel(task.status, t);
   const descriptionText = displayTaskDescription(task.description, lang).trim();
   const savedDescriptionText = descriptionText;
@@ -403,9 +403,18 @@ export function TaskDrawer({
       <Sheet open={!!task} onOpenChange={onOpenChange}>
         <SheetContent
           side="right"
-          className="flex h-full w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
+          className="flex h-full w-full min-w-0 max-w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
+          onOpenAutoFocus={(event) => {
+            // Avoid autofocus on the close (X) button so it does not look hovered on open.
+            event.preventDefault();
+            drawerBodyRef.current?.focus({ preventScroll: true });
+          }}
         >
-          <div className="app-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 pt-6 pb-4">
+          <div
+            ref={drawerBodyRef}
+            tabIndex={-1}
+            className="app-scrollbar min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pt-5 pb-4 sm:px-6 sm:pt-6 outline-none"
+          >
             <SheetHeader className="space-y-2 border-b border-border pb-4 text-left">
               <div className="flex items-center gap-2 pr-8 text-xs text-muted-foreground">
                 <span className="font-mono">{task.key}</span>
@@ -473,9 +482,9 @@ export function TaskDrawer({
               </SheetDescription>
             </SheetHeader>
 
-            <div className="grid gap-5 py-5">
-              <aside className="grid w-full gap-3 sm:grid-cols-2">
-                <Field icon={CircleDot} label={t("tasks.status")} tone="status">
+            <div className="grid min-w-0 gap-5 py-5">
+              <aside className="grid min-w-0 w-full gap-3 sm:grid-cols-2">
+                <Field icon={CircleDot} label={t("tasks.status")}>
                   {canEditTask ? (
                     <Select
                       key={`${task.id}-status`}
@@ -507,7 +516,7 @@ export function TaskDrawer({
                   )}
                 </Field>
 
-                <Field icon={Flag} label={t("tasks.priority")} tone="priority">
+                <Field icon={Flag} label={t("tasks.priority")}>
                   {canEditTask ? (
                     <Select
                       key={`${task.id}-priority`}
@@ -538,7 +547,7 @@ export function TaskDrawer({
                       </SelectContent>
                     </Select>
                   ) : (
-                    <Badge variant="secondary" className={prio.className + " border-0"}>
+                    <Badge variant="secondary" className="border border-border bg-muted/45">
                       <TaskPriorityIndicator priority={task.priority}>
                         {priorityLabel(task.priority, t)}
                       </TaskPriorityIndicator>
@@ -546,7 +555,7 @@ export function TaskDrawer({
                   )}
                 </Field>
 
-                <Field icon={UserIcon} label={t("tasks.assignees")} tone="assignee">
+                <Field icon={UserIcon} label={t("tasks.assignees")}>
                   {canEditAssignees ? (
                     <Popover modal>
                       <PopoverTrigger asChild>
@@ -589,7 +598,7 @@ export function TaskDrawer({
                   )}
                 </Field>
 
-                <Field icon={Calendar} label={t("tasks.dueDate")} tone="due">
+                <Field icon={Calendar} label={t("tasks.dueDate")}>
                   {canEditTask ? (
                     <div className="grid w-full gap-2">
                       <div className="grid gap-2 min-[420px]:grid-cols-2">
@@ -622,7 +631,7 @@ export function TaskDrawer({
                 </Field>
               </aside>
 
-              <section className="rounded-xl border border-border/80 bg-card/60 p-3.5">
+              <section className="min-w-0 max-w-full overflow-hidden rounded-xl border border-border/80 bg-card/60 p-3.5">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     {t("tasks.description")}
@@ -653,7 +662,7 @@ export function TaskDrawer({
                       rows={5}
                       aria-label={t("tasks.description")}
                       placeholder={t("tasks.descriptionPlaceholder")}
-                      className="min-h-[7.5rem] max-w-full resize-y break-words text-sm leading-relaxed [overflow-wrap:anywhere]"
+                      className="min-h-[7.5rem] w-full min-w-0 max-w-full resize-y whitespace-pre-wrap break-words text-sm leading-relaxed [overflow-wrap:anywhere]"
                       onChange={(event) => setDraftDescription(event.target.value)}
                       onKeyDown={(event) => {
                         if (event.key === "Escape") {
@@ -693,7 +702,7 @@ export function TaskDrawer({
                     </div>
                   </div>
                 ) : descriptionText ? (
-                  <p className="max-w-full break-words text-sm leading-relaxed text-foreground/90 [overflow-wrap:anywhere]">
+                  <p className="max-w-full whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90 [overflow-wrap:anywhere]">
                     {descriptionText}
                   </p>
                 ) : (
@@ -795,7 +804,7 @@ export function TaskDrawer({
           </div>
 
           {showFooter ? (
-            <div className="sticky bottom-0 z-10 flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border bg-background/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/85">
+            <div className="sticky bottom-0 z-10 flex w-full min-w-0 shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:px-6">
               {onDelete ? (
                 <Button
                   type="button"
@@ -909,7 +918,7 @@ function TaskAttachmentsSection({
   }
 
   return (
-    <section className="rounded-xl border border-border/80 bg-card/60 p-3.5">
+    <section className="min-w-0 max-w-full overflow-hidden rounded-xl border border-border/80 bg-card/60 p-3.5">
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <Paperclip className="size-3.5" /> {t("tasks.sectionAttachments")}
@@ -1114,7 +1123,7 @@ function TaskAttachmentRow({
   }
 
   return (
-    <div className="flex items-start gap-2.5 rounded-xl border border-border bg-card px-2.5 py-2">
+    <div className="flex min-w-0 max-w-full items-start gap-2.5 overflow-hidden rounded-xl border border-border bg-card px-2.5 py-2">
       <TaskAttachmentPreview attachment={attachment} onDownload={() => onDownload()} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{attachment.originalName}</div>
@@ -1183,32 +1192,17 @@ function Field({
   icon: Icon,
   label,
   children,
-  tone,
   className,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   children: React.ReactNode;
-  tone?: "status" | "priority" | "assignee" | "due";
   className?: string;
 }) {
-  const iconTone =
-    tone === "status"
-      ? "bg-info/12 text-info"
-      : tone === "priority"
-        ? "bg-violet-500/12 text-violet-700 dark:text-violet-300"
-        : tone === "assignee"
-          ? "bg-[color-mix(in_oklch,oklch(0.55_0.14_265)_14%,transparent)] text-[oklch(0.48_0.14_265)] dark:bg-[color-mix(in_oklch,oklch(0.72_0.12_265)_18%,transparent)] dark:text-[oklch(0.78_0.1_265)]"
-          : tone === "due"
-            ? "bg-amber-500/15 text-amber-800 dark:text-amber-200"
-            : "bg-muted text-muted-foreground";
-
   return (
-    <div className={cn("rounded-xl border border-border bg-card p-3", className)}>
+    <div className={cn("min-w-0 rounded-xl border border-border bg-card p-3", className)}>
       <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-        <span className={cn("grid size-7 place-items-center rounded-lg", iconTone)}>
-          <Icon className="size-3.5" />
-        </span>
+        <Icon className="size-3.5 shrink-0 text-muted-foreground" />
         {label}
       </div>
       <div className="mt-1.5">{children}</div>

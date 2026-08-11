@@ -6,15 +6,23 @@ import { AppShell } from "@/components/app/AppShell";
 import { ApiErrorState } from "@/components/app/ApiErrorState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AvatarStack } from "@/components/app/Avatar";
 import { EmptyState } from "@/components/app/EmptyState";
-import { CREATE_ACTION_BUTTON_CLASSNAME, FilterBar } from "@/components/app/FilterBar";
+import {
+  CREATE_ACTION_BUTTON_CLASSNAME,
+  FILTER_RESET_CLASSNAME,
+  FILTER_SELECT_BASE_CLASSNAME,
+  FILTER_SELECT_WIDTH_STATUS_CLASSNAME,
+  FilterBar,
+  FilterTriggerLabel,
+  filterSelectActiveAttr,
+} from "@/components/app/FilterBar";
 import { PageHeader } from "@/components/app/PageHeader";
 import { ProjectAccentSurface } from "@/components/app/ProjectAccentSurface";
+import { ProjectMemberStack } from "@/components/app/ProjectMemberStack";
+import { ProjectStatusIndicator } from "@/components/app/ProjectStatusIndicator";
 import { NewProjectDialog } from "@/components/app/QuickActionDialogs";
-import { members, projectStatusMeta, type Project, type ProjectStatus } from "@/lib/mock-data";
+import { type Project, type ProjectStatus } from "@/lib/mock-data";
 import { fetchProjects, type ProjectApiItem, type ProjectApiStatus } from "@/lib/api/projects";
 import { getProjectAccent } from "@/lib/project-color";
 import { isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user";
@@ -26,8 +34,16 @@ import {
   projectsUrlStatusFromFilter,
   type ProjectsSearch,
 } from "@/lib/project-status-url";
-import { Plus, Search, Calendar, ListTodo, FolderKanban, RotateCcw } from "lucide-react";
+import { Plus, Search, Calendar, ListTodo, FolderKanban, RotateCcw, CircleDot } from "lucide-react";
 import { displayProjectDescription, displayProjectName } from "@/lib/starter-content";
+import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/app/projects/")({
   beforeLoad: requireAuth,
@@ -38,8 +54,6 @@ export const Route = createFileRoute("/app/projects/")({
   component: ProjectsIndexPage,
 });
 
-const initialsMap = Object.fromEntries(members.map((m) => [m.id, m.avatar]));
-
 const filters: { key: "all" | ProjectStatus; labelKey: TKey }[] = [
   { key: "all", labelKey: "projects.all" },
   { key: "planning", labelKey: "projects.planning" },
@@ -47,14 +61,6 @@ const filters: { key: "all" | ProjectStatus; labelKey: TKey }[] = [
   { key: "on_hold", labelKey: "projects.onHold" },
   { key: "completed", labelKey: "projects.completed" },
 ];
-
-const PROJECT_FILTER_CLASS: Record<"all" | ProjectStatus, string> = {
-  all: "filter-chip-all",
-  active: "filter-chip-active",
-  planning: "filter-chip-planning",
-  on_hold: "filter-chip-on-hold",
-  completed: "filter-chip-completed",
-};
 
 type ProjectCard = Pick<
   Project,
@@ -143,23 +149,50 @@ function ProjectsIndexPage() {
 
       <FilterBar>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap gap-1.5">
-            {filters.map((f) => (
-              <button
-                key={f.key}
-                type="button"
-                onClick={() => setStatusFilter(f.key)}
-                data-active={filter === f.key ? "true" : "false"}
-                className={
-                  "filter-chip h-10 cursor-pointer rounded-lg px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_oklch,var(--brand-ring)_30%,transparent)] " +
-                  PROJECT_FILTER_CLASS[f.key]
-                }
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+            <Select
+              value={filter}
+              onValueChange={(value) => setStatusFilter(value as typeof filter)}
+            >
+              <SelectTrigger
+                data-filter-active={filterSelectActiveAttr(filter !== "all")}
+                className={cn(FILTER_SELECT_BASE_CLASSNAME, FILTER_SELECT_WIDTH_STATUS_CLASSNAME)}
               >
-                {t(f.labelKey)}
-              </button>
-            ))}
+                <SelectValue>
+                  <FilterTriggerLabel icon={CircleDot}>
+                    {t(filters.find((item) => item.key === filter)?.labelKey ?? "projects.all")}
+                  </FilterTriggerLabel>
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="min-w-[12rem]">
+                {filters.map((option) => (
+                  <SelectItem key={option.key} value={option.key}>
+                    {option.key === "all" ? (
+                      t(option.labelKey)
+                    ) : (
+                      <ProjectStatusIndicator status={option.key}>
+                        {t(option.labelKey)}
+                      </ProjectStatusIndicator>
+                    )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              variant="outline"
+              className={FILTER_RESET_CLASSNAME}
+              disabled={!hasActiveFilters}
+              onClick={() => {
+                setStatusFilter("all");
+                setQ("");
+              }}
+            >
+              <RotateCcw className="size-4" />
+              {t("common.resetFilters")}
+            </Button>
           </div>
-          <div className="relative w-full sm:w-72">
+          <div className="relative w-full min-w-0 sm:w-72">
             <Search
               className="filter-search-icon absolute left-3 top-1/2 size-4 -translate-y-1/2"
               aria-hidden="true"
@@ -186,42 +219,48 @@ function ProjectsIndexPage() {
         isTrulyEmpty ? (
           <ProjectsEmptyState canManageProjects={canManageProjects} />
         ) : (
-          <NoResultsState
-            hasActiveFilters={hasActiveFilters}
-            onClearFilters={() => {
-              setStatusFilter("all");
-              setQ("");
-            }}
-          />
+          <NoResultsState />
         )
       ) : (
         <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((p) => {
-            const meta = projectStatusMeta[p.status];
             const description = displayProjectDescription(p.description, lang);
             return (
               <Link
                 key={p.id}
                 to="/app/projects/$projectId"
                 params={{ projectId: p.id }}
-                className="surface-lift group block h-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="group block h-full min-w-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <ProjectAccentSurface gradient={p.color} className="h-full" contentClassName="p-5">
+                <ProjectAccentSurface
+                  gradient={p.color}
+                  className="h-full min-h-[16.25rem] group-hover:-translate-y-0.5 group-hover:border-border group-hover:shadow-card"
+                  contentClassName="px-5 pb-5 pt-9"
+                >
                   <div className="flex min-h-0 flex-1 flex-col">
-                    <div className="flex shrink-0 items-start justify-end">
-                      <Badge variant="secondary" className={meta.className + " border-0"}>
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="line-clamp-2 min-h-6 min-w-0 flex-1 break-words text-base font-semibold leading-6 tracking-tight [overflow-wrap:anywhere]">
+                        {displayProjectName(p.name, lang)}
+                      </h3>
+                      <ProjectStatusIndicator
+                        status={p.status}
+                        className="mt-0.5 shrink-0 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground"
+                      >
                         {projectStatusLabel(p.status, t)}
-                      </Badge>
+                      </ProjectStatusIndicator>
                     </div>
-                    <h3 className="mt-3 line-clamp-2 min-h-[3rem] text-base font-semibold leading-6 tracking-tight">
-                      {displayProjectName(p.name, lang)}
-                    </h3>
-                    <p className="mt-1 line-clamp-2 min-h-[2.5rem] text-sm leading-5 text-muted-foreground">
+                    <p className="mt-1.5 line-clamp-3 min-h-[3.75rem] min-w-0 break-words text-sm leading-5 text-muted-foreground [overflow-wrap:anywhere]">
                       {description || "\u00A0"}
                     </p>
 
-                    <div className="mt-auto pt-5">
-                      <div className="h-2 overflow-hidden rounded-full bg-muted/80">
+                    <div className="mt-auto pt-4">
+                      <div className="mb-2.5 flex min-w-0 items-center gap-3">
+                        <ProjectMemberStack projectId={p.id} />
+                        <span className="ml-auto shrink-0 text-base font-semibold tabular-nums">
+                          {p.progress}%
+                        </span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-muted/80">
                         <div
                           className={
                             "project-progress-fill h-full rounded-full bg-gradient-to-r " + p.color
@@ -235,13 +274,6 @@ function ProjectsIndexPage() {
                         </span>
                         <span className="inline-flex items-center gap-1">
                           <Calendar className="size-3" /> {t("projects.due")} {p.dueDate}
-                        </span>
-                      </div>
-
-                      <div className="mt-4 flex items-center justify-between">
-                        <AvatarStack ids={p.members} initialsMap={initialsMap} />
-                        <span className="text-xs text-muted-foreground">
-                          {t("projects.updated")} {p.updatedAt}
                         </span>
                       </div>
                     </div>
@@ -298,28 +330,17 @@ function LoadingGrid() {
   );
 }
 
-function NoResultsState({
-  hasActiveFilters,
-  onClearFilters,
-}: {
-  hasActiveFilters: boolean;
-  onClearFilters: () => void;
-}) {
+function NoResultsState() {
   const { t } = useI18n();
   return (
-    <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
-      <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-muted text-muted-foreground">
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-6 py-12 text-center sm:px-10">
+      <div className="grid size-12 place-items-center rounded-2xl bg-muted text-muted-foreground">
         <Search className="size-5" />
       </div>
       <h3 className="mt-4 text-base font-semibold">{t("projects.noMatchTitle")}</h3>
-      <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+      <p className="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">
         {t("projects.noMatchHint")}
       </p>
-      {hasActiveFilters && (
-        <Button variant="brandSoft" onClick={onClearFilters} className="mt-5">
-          <RotateCcw className="size-4" /> {t("common.clearFilters")}
-        </Button>
-      )}
     </div>
   );
 }

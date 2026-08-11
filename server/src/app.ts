@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { env } from "./config/env.js";
+import { serveAvatarFileController } from "./controllers/avatar-file.controller.js";
 import { errorMiddleware } from "./middleware/error.middleware.js";
 import { notFoundMiddleware } from "./middleware/not-found.middleware.js";
 import { aiRouter } from "./routes/ai.routes.js";
@@ -73,6 +74,9 @@ app.use(
     crossOriginResourcePolicy: { policy: "cross-origin" },
   }),
 );
+app.get("/uploads/avatars/:filename", (req, res, next) => {
+  void serveAvatarFileController(req, res, next);
+});
 app.use("/uploads", express.static(uploadsRoot));
 app.use("/api/billing/webhook", billingWebhookRouter);
 app.use(express.json());

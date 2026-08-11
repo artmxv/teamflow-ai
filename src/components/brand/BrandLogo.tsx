@@ -15,14 +15,14 @@ type BrandAiBadgeProps = {
 };
 
 /**
- * Theme-aware "AI" chip used next to the TeamFlow wordmark in app chrome and boot.
- * Uses active theme primary tokens (default / ocean / emerald / sunset × light / dark).
+ * Theme-aware "AI" word used next to the TeamFlow wordmark in app chrome and boot.
+ * Same size/weight/baseline as TeamFlow; only color differs (theme primary).
  */
 export function BrandAiBadge({ className }: BrandAiBadgeProps) {
   return (
     <span
       className={cn(
-        "rounded-md bg-primary/14 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary",
+        "leading-[1.2] tracking-tight text-[color:var(--public-ai,var(--primary))]",
         className,
       )}
     >
@@ -32,14 +32,14 @@ export function BrandAiBadge({ className }: BrandAiBadgeProps) {
 }
 
 /**
- * Compact AI flash mark (restored from backup/yookassa-ui-wip-2026-08-07).
+ * Primary application mark: theme-aware spark (same identity as AI Copilot).
  * Colors come from --brand-from / --brand-to of the active product theme.
  */
 export function BrandMark({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "brand-mark relative inline-flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-xl",
+        "brand-mark relative inline-flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl",
         className,
       )}
       aria-hidden
@@ -47,11 +47,18 @@ export function BrandMark({ className }: { className?: string }) {
       <span className="brand-mark__glow" />
       <span className="brand-mark__shine" />
       <Sparkles
-        className="brand-mark__icon relative z-10 size-[58%] text-white"
-        strokeWidth={2.35}
+        className="brand-mark__icon relative z-10 size-[68%] text-white"
+        strokeWidth={2.25}
       />
     </span>
   );
+}
+
+/**
+ * @deprecated Prefer BrandMark. Kept for any stray imports during the logo transition.
+ */
+export function TeamFlowMark({ className }: { className?: string }) {
+  return <BrandMark className={className} />;
 }
 
 /**
@@ -64,35 +71,33 @@ export function BrandLogo({
   asLink = true,
   size = "md",
 }: BrandLogoProps) {
-  const markSize = size === "sm" ? "size-7 rounded-[10px]" : "size-8 rounded-xl";
-  const textSize = size === "sm" ? "text-sm" : "text-base";
+  const markSize = size === "sm" ? "size-8" : "size-9";
+  const textSize = size === "sm" ? "text-[15px]" : "text-lg";
 
   const content = (
     <>
-      <BrandMark className={cn("shrink-0", markSize)} />
+      <BrandMark className={cn("shrink-0 self-center", markSize)} />
       <span
         className={cn(
-          "whitespace-nowrap font-semibold tracking-tight leading-[1.2]",
+          "inline-flex items-baseline gap-1.5 whitespace-nowrap font-semibold tracking-tight leading-none",
           textSize,
           wordmarkClassName,
         )}
       >
-        <span className="text-[color:var(--public-wordmark,var(--foreground))]">TeamFlow</span>{" "}
-        <span className="rounded-[0.35em] bg-[color:var(--public-ai-surface,color-mix(in_oklch,var(--primary)_16%,transparent))] px-[0.3em] py-[0.08em] text-[color:var(--public-ai,var(--primary))]">
-          AI
-        </span>
+        <span className="text-[color:var(--public-wordmark,var(--foreground))]">TeamFlow</span>
+        <BrandAiBadge />
       </span>
     </>
   );
 
   if (!asLink) {
     return (
-      <span className={cn("inline-flex min-w-0 items-center gap-2.5", className)}>{content}</span>
+      <span className={cn("inline-flex min-w-0 items-center gap-2", className)}>{content}</span>
     );
   }
 
   return (
-    <Link to="/" className={cn("inline-flex min-w-0 items-center gap-2.5", className)}>
+    <Link to="/" className={cn("inline-flex min-w-0 items-center gap-2", className)}>
       {content}
     </Link>
   );

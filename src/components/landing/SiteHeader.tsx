@@ -7,9 +7,9 @@ import { LanguageSwitcher, useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
-  { href: "#features", labelKey: "nav.features" as const },
-  { href: "#preview", labelKey: "nav.product" as const },
-  { href: "#pricing", labelKey: "nav.pricing" as const },
+  { href: "#ai", labelKey: "nav.aiCopilot" as const },
+  { href: "#product", labelKey: "nav.product" as const },
+  { href: "#collaboration", labelKey: "nav.howItWorks" as const },
 ];
 
 export function SiteHeader() {
@@ -36,7 +36,7 @@ export function SiteHeader() {
   }, [open]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/70 bg-[color-mix(in_oklch,var(--background)_88%,transparent)] backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-border bg-[color-mix(in_oklch,var(--background)_92%,transparent)] backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:gap-6 sm:px-6">
         <BrandLogo className="shrink-0" />
 
@@ -52,21 +52,21 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
+        <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
           <LanguageSwitcher className="shrink-0" />
           <Link
             to="/signin"
-            className="hidden shrink-0 text-sm font-medium text-muted-foreground outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:inline"
+            className="hidden shrink-0 px-1 text-sm font-medium text-muted-foreground outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:inline"
           >
             {t("nav.signin")}
           </Link>
-          <Button asChild size="sm" variant="brand" className="hidden shrink-0 sm:inline-flex">
+          <Button asChild size="sm" variant="brand" className="public-primary-button hidden shrink-0 sm:inline-flex">
             <Link to="/signup">
               {t("nav.start")}
               <ArrowRight className="size-3.5" />
             </Link>
           </Button>
-          <Button asChild size="sm" variant="brand" className="shrink-0 sm:hidden">
+          <Button asChild size="sm" variant="brand" className="public-primary-button shrink-0 sm:hidden">
             <Link to="/signup">{t("landing.cta.createAccountShort")}</Link>
           </Button>
           <button

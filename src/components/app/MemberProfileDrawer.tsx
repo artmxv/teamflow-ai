@@ -1,6 +1,6 @@
 import { useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Briefcase, Calendar, Mail, MapPin, Phone, ZoomIn } from "lucide-react";
 import { UserAvatar } from "@/components/app/UserAvatar";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ import {
   projectApiStatusLabel,
   useI18n,
 } from "@/lib/i18n";
-import { resolveAvatarUrl } from "@/lib/avatar-url";
+import { resolveAvatarUrl, upgradeGoogleAvatarPreviewUrl } from "@/lib/avatar-url";
 import { workspaceRoleLabel } from "@/lib/auth/use-current-user";
 import { priorityMeta, projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
 import { getProjectAccent } from "@/lib/project-color";
@@ -151,7 +151,21 @@ export function MemberProfileDrawer({
 
   const profile = profileQuery.data;
   const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false);
-  const previewSrc = profile ? resolveAvatarUrl(profile.avatarUrl) : null;
+  const avatarSrc = profile ? resolveAvatarUrl(profile.avatarUrl) : null;
+  const upgradedPreviewSrc = avatarSrc ? upgradeGoogleAvatarPreviewUrl(avatarSrc) : null;
+  const [previewUpgradeFailed, setPreviewUpgradeFailed] = useState(false);
+
+  useEffect(() => {
+    setPreviewUpgradeFailed(false);
+  }, [avatarSrc]);
+
+  const previewSrc =
+    avatarSrc == null
+      ? null
+      : previewUpgradeFailed || !upgradedPreviewSrc
+        ? avatarSrc
+        : upgradedPreviewSrc;
+
   const joinedLabel = profile ? formatJoinedDate(profile.joinedAt, lang as Lang) : null;
   const locationLabel = profile?.contact.location
     ? displayLocationFromStored(profile.contact.location, lang as Lang)
@@ -195,7 +209,7 @@ export function MemberProfileDrawer({
                     avatarUrl={profile.avatarUrl}
                     size="lg"
                   />
-                  {previewSrc ? (
+                  {avatarSrc ? (
                     <Button
                       type="button"
                       variant="secondary"
@@ -384,7 +398,7 @@ export function MemberProfileDrawer({
 
       <Dialog open={photoPreviewOpen} onOpenChange={setPhotoPreviewOpen}>
         <DialogContent
-          className="max-w-lg border-0 bg-transparent p-2 shadow-none sm:max-w-xl"
+          className="w-[min(90vw,640px)] max-w-[min(90vw,640px)] gap-0 border-0 bg-transparent p-2 shadow-none"
           closeClassName="right-2 top-2 text-white hover:bg-white/15 focus:outline-none focus-visible:outline-none focus-visible:ring-0 active:ring-0"
           onCloseAutoFocus={(event) => event.preventDefault()}
         >
@@ -392,9 +406,15 @@ export function MemberProfileDrawer({
           <DialogDescription className="sr-only">{profile?.name}</DialogDescription>
           {previewSrc ? (
             <img
+              key={previewSrc}
               src={previewSrc}
               alt={profile?.name ?? ""}
-              className="max-h-[80vh] w-full rounded-xl object-contain"
+              className="mx-auto h-auto max-h-[80vh] w-full max-w-[min(90vw,640px)] rounded-xl object-contain"
+              onError={() => {
+                if (upgradedPreviewSrc && previewSrc === upgradedPreviewSrc) {
+                  setPreviewUpgradeFailed(true);
+                }
+              }}
             />
           ) : null}
         </DialogContent>
