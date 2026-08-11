@@ -1,4 +1,4 @@
-import type { AvailableProjectMember, ProjectMemberApiItem } from "@/lib/api/project-members";
+import type { ProjectMemberApiItem } from "@/lib/api/project-members";
 import type { TaskApiItem } from "@/lib/api/tasks";
 import type { WorkspaceMemberItem } from "@/lib/api/workspace-members";
 
@@ -98,12 +98,6 @@ export function buildAssigneeOptionsFromWorkspaceMembers(
   return buildAssigneeOptionsFromUsers(members);
 }
 
-export function buildAssigneeOptionsFromAvailableProjectMembers(
-  members: AvailableProjectMember[],
-): AssigneeOption[] {
-  return buildAssigneeOptionsFromUsers(members);
-}
-
 /** Options for create/edit pickers: project members when present, otherwise workspace members. */
 export function resolveEditAssigneeOptions(
   projectMembers: ProjectMemberApiItem[] | undefined,
@@ -178,41 +172,6 @@ export function resolveTaskAssignees(apiTasks: TaskApiItem[], taskId: string): A
   }
 
   return taskAssigneeUsers(task).map((assignee) => toOption(assignee));
-}
-
-export function resolveTaskAssigneeIds(apiTasks: TaskApiItem[], taskId: string): string[] {
-  const task = apiTasks.find((item) => item.id === taskId);
-  if (!task) {
-    return [];
-  }
-
-  return taskAssigneeIds(task);
-}
-
-/** @deprecated Use resolveTaskAssignees instead. */
-export function resolveTaskAssignee(
-  assigneeId: string | null,
-  apiTasks: TaskApiItem[],
-  taskId?: string,
-): AssigneeOption | null {
-  if (taskId) {
-    const assignees = resolveTaskAssignees(apiTasks, taskId);
-    if (assignees.length > 0) {
-      return assignees[0];
-    }
-  }
-
-  if (!assigneeId) return null;
-
-  for (const task of apiTasks) {
-    for (const assignee of taskAssigneeUsers(task)) {
-      if (assignee.id === assigneeId) {
-        return toOption(assignee);
-      }
-    }
-  }
-
-  return null;
 }
 
 export function taskHasAssignee(

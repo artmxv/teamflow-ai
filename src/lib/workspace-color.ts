@@ -68,11 +68,3 @@ function accentIndexForKey(key: string): number {
 export function getWorkspaceAccent(workspace?: WorkspaceColorInput | null): WorkspaceAccent {
   return WORKSPACE_ACCENT_PALETTE[accentIndexForKey(accentKey(workspace))];
 }
-
-export function getWorkspaceAccentClasses(workspace: WorkspaceColorInput) {
-  const accent = getWorkspaceAccent(workspace);
-  return {
-    dot: accent.dot,
-    gradient: accent.gradient,
-  };
-}

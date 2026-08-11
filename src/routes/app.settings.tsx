@@ -6,14 +6,6 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/app/AppShell";
 import { PageHeader } from "@/components/app/PageHeader";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -180,23 +172,19 @@ function teamSizeRecommendation(
     .replace("{plan}", recommendedLabel);
 }
 
-function workspaceFormFromWorkspace(
-  workspace: {
-    name: string;
-    slug: string;
-    industry?: string | null;
-    teamSize?: string | null;
-  },
-  lang: Lang,
-): WorkspaceFormState {
+function workspaceFormFromWorkspace(workspace: {
+  name: string;
+  slug: string;
+  industry?: string | null;
+  teamSize?: string | null;
+}): WorkspaceFormState {
   return {
-    name: workspaceSettingsDisplayName(workspace.name, lang),
+    name: workspaceSettingsDisplayName(workspace.name),
     slug: workspace.slug,
     industry: workspace.industry ?? "",
     teamSize: normalizeTeamSizeValue(workspace.teamSize ?? ""),
   };
 }
-
 function workspaceBaselineFromWorkspace(workspace: {
   name: string;
   slug: string;
@@ -211,20 +199,19 @@ function workspaceBaselineFromWorkspace(workspace: {
   };
 }
 
-function workspaceFormDisplayName(name: string, lang: Lang): string {
-  return isPersonalWorkspaceName(name) ? displayWorkspaceName(name, lang) : name.trim();
+function workspaceFormDisplayName(name: string): string {
+  return isPersonalWorkspaceName(name) ? displayWorkspaceName(name) : name.trim();
 }
 
 function isWorkspaceFormDirty(
   form: WorkspaceFormState | null,
   baseline: WorkspaceFormState | null,
-  lang: Lang,
 ): boolean {
   if (!form || !baseline) {
     return false;
   }
   return (
-    form.name.trim() !== workspaceFormDisplayName(baseline.name, lang) ||
+    form.name.trim() !== workspaceFormDisplayName(baseline.name) ||
     form.slug.trim() !== baseline.slug.trim() ||
     form.industry.trim() !== baseline.industry.trim() ||
     form.teamSize.trim() !== baseline.teamSize.trim()
@@ -370,7 +357,7 @@ function SettingsPage() {
       setWorkspaceBaseline(null);
       return;
     }
-    setWorkspaceForm(workspaceFormFromWorkspace(workspace, lang));
+    setWorkspaceForm(workspaceFormFromWorkspace(workspace));
     setWorkspaceBaseline(workspaceBaselineFromWorkspace(workspace));
   }, [workspace, lang]);
 
@@ -450,7 +437,7 @@ function SettingsPage() {
     },
     onSuccess: async (updated) => {
       await queryClient.invalidateQueries({ queryKey: AUTH_ME_QUERY_KEY });
-      setWorkspaceForm(workspaceFormFromWorkspace(updated, lang));
+      setWorkspaceForm(workspaceFormFromWorkspace(updated));
       setWorkspaceBaseline(workspaceBaselineFromWorkspace(updated));
       toast.success(t("settings.workspaceUpdated"));
     },
@@ -540,7 +527,7 @@ function SettingsPage() {
       return;
     }
     workspaceMutation.mutate({
-      name: resolveWorkspaceNameForSave(workspace.name, workspaceForm.name, lang),
+      name: resolveWorkspaceNameForSave(workspace.name, workspaceForm.name),
       slug,
       industry: workspaceForm.industry.trim(),
       teamSize: workspaceForm.teamSize.trim(),
@@ -554,7 +541,7 @@ function SettingsPage() {
     setWorkspaceForm({ ...workspaceBaseline });
   };
 
-  const workspaceHasUnsavedChanges = isWorkspaceFormDirty(workspaceForm, workspaceBaseline, lang);
+  const workspaceHasUnsavedChanges = isWorkspaceFormDirty(workspaceForm, workspaceBaseline);
   const workspaceFieldsDisabled = !workspace || workspaceMutation.isPending || !canEditWorkspace;
   const workspaceSlugPreview = workspaceForm?.slug?.trim()
     ? workspaceUrlFromSlug(workspaceForm.slug.trim())

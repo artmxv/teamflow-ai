@@ -20,7 +20,7 @@ import {
   ListChecks,
   RefreshCw,
 } from "lucide-react";
-import { members, projectStatusMeta, type ProjectStatus, type TaskStatus } from "@/lib/mock-data";
+import { type ProjectStatus, type TaskStatus } from "@/lib/mock-data";
 import {
   fetchDashboardSummary,
   mapTaskStatusCountsForChart,
@@ -85,8 +85,6 @@ export const Route = createFileRoute("/app/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — TeamFlow AI" }] }),
   component: Dashboard,
 });
-
-const initialsMap = Object.fromEntries(members.map((m) => [m.id, m.avatar]));
 
 const recentStatusMeta: Record<
   DashboardTaskStatus,

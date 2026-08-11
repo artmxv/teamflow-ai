@@ -96,10 +96,6 @@ const getProjectSchema = (t: Translate) =>
     }),
   );
 
-export type NewProjectFormValues = z.infer<ReturnType<typeof getProjectSchema>> & {
-  memberUserIds: string[];
-};
-
 type ProjectFormValues = z.infer<ReturnType<typeof getProjectSchema>>;
 
 const projectStatusToApi: Record<ProjectStatus, ProjectApiStatus> = {

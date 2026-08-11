@@ -2539,12 +2539,6 @@ const projectApiStatusKeys: Record<ProjectApiStatus, TKey> = {
   COMPLETED: "projects.statusCompleted",
 };
 
-const mockTeamRoleKeys = {
-  Owner: "role.owner",
-  Admin: "role.admin",
-  Member: "role.member",
-} as const satisfies Record<string, TKey>;
-
 export function priorityLabel(priority: Priority, t: (k: TKey) => string) {
   return t(priorityKeys[priority]);
 }
@@ -2567,10 +2561,6 @@ export function projectStatusLabel(status: ProjectStatus, t: (k: TKey) => string
 
 export function projectApiStatusLabel(status: ProjectApiStatus, t: (k: TKey) => string) {
   return t(projectApiStatusKeys[status]);
-}
-
-export function mockTeamRoleLabel(role: keyof typeof mockTeamRoleKeys, t: (k: TKey) => string) {
-  return t(mockTeamRoleKeys[role]);
 }
 
 const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void; t: (k: TKey) => string }>({

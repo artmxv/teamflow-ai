@@ -48,19 +48,6 @@ export const FILTER_SELECT_PRIORITY_CLASSNAME: Record<Priority, string> = {
 /** Assignee filter: fixed teal family (not brand, not status/priority). */
 export const FILTER_SELECT_ASSIGNEE_CLASSNAME = "filter-select-assignee";
 
-/**
- * @deprecated Brand master retired. Prefer FILTER_SELECT_STATUS_ALL_CLASSNAME.
- */
-export const FILTER_SELECT_MASTER_CLASSNAME = FILTER_SELECT_STATUS_ALL_CLASSNAME;
-
-/**
- * @deprecated Prefer dynamic FILTER_SELECT_* helpers. Kept for any stray imports.
- */
-export const FILTER_STATUS_CLASSNAME = FILTER_SELECT_STATUS_ALL_CLASSNAME;
-/** @deprecated Prefer FILTER_SELECT_PRIORITY_ALL_CLASSNAME */
-export const FILTER_PRIORITY_CLASSNAME = FILTER_SELECT_PRIORITY_ALL_CLASSNAME;
-/** @deprecated Prefer FILTER_SELECT_ASSIGNEE_CLASSNAME */
-export const FILTER_ASSIGNEE_CLASSNAME = FILTER_SELECT_ASSIGNEE_CLASSNAME;
 /** Reset uses neutral outline surface — theme-aware, not semantic fill. */
 export const FILTER_RESET_CLASSNAME =
   "h-10 w-full shrink-0 rounded-xl border border-border bg-card px-3.5 font-medium text-muted-foreground shadow-none hover:bg-muted hover:text-foreground sm:w-auto";

@@ -14,11 +14,6 @@ interface WorkspaceSettingsResponse {
   };
 }
 
-export async function fetchWorkspaceSettings(): Promise<AuthWorkspace> {
-  const response = await apiRequest<WorkspaceSettingsResponse>("/api/workspace/settings");
-  return response.data.workspace;
-}
-
 export async function updateWorkspace(input: UpdateWorkspaceInput): Promise<AuthWorkspace> {
   const response = await apiRequest<WorkspaceSettingsResponse>("/api/workspace/settings", {
     method: "PATCH",

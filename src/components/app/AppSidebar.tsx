@@ -8,7 +8,7 @@ import { displayWorkspaceName } from "@/lib/workspace-display";
 import { displayProjectName } from "@/lib/starter-content";
 import { nameToInitials, isWorkspaceManager, useCurrentUser } from "@/lib/auth/use-current-user";
 import { toast } from "sonner";
-import { ApiError, setSelectedWorkspaceId } from "@/lib/api/client";
+import { setSelectedWorkspaceId } from "@/lib/api/client";
 import { fetchWorkspaces, switchWorkspace } from "@/lib/api/workspaces";
 import { invalidateWorkspaceScopedQueries, WORKSPACES_QUERY_KEY } from "@/lib/workspace-queries";
 import { getWorkspaceAccent, type WorkspaceColorInput } from "@/lib/workspace-color";
@@ -135,7 +135,7 @@ function WorkspaceSwitcher({
   loading: boolean;
   collapsed: boolean;
 }) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -194,7 +194,7 @@ function WorkspaceSwitcher({
     slug: workspace.slug,
   };
 
-  const displayName = displayWorkspaceName(workspace.name, lang);
+  const displayName = displayWorkspaceName(workspace.name);
 
   const trigger = (
     <button
@@ -262,7 +262,7 @@ function WorkspaceSwitcher({
           >
             <WorkspaceAvatar item={item} initials={nameToInitials(item.name)} />
             <span className="min-w-0 flex-1 truncate text-sm">
-              {displayWorkspaceName(item.name, lang)}
+              {displayWorkspaceName(item.name)}
             </span>
           </DropdownMenuItem>
         ))}

@@ -19,14 +19,6 @@ export const CHAT_MAX_FILE_ATTACHMENTS = 5;
 export const CHAT_MESSAGES_FALLBACK_POLL_MS = 20_000;
 export const CHAT_CONVERSATIONS_FALLBACK_POLL_MS = 25_000;
 
-/** @deprecated Prefer CHAT_MESSAGES_FALLBACK_POLL_MS with socket-aware intervals */
-export const CHAT_MESSAGES_POLL_MS = CHAT_MESSAGES_FALLBACK_POLL_MS;
-/** @deprecated Prefer CHAT_CONVERSATIONS_FALLBACK_POLL_MS with socket-aware intervals */
-export const CHAT_CONVERSATIONS_POLL_MS = CHAT_CONVERSATIONS_FALLBACK_POLL_MS;
-
-/** @deprecated Use CHAT_MESSAGES_FALLBACK_POLL_MS */
-export const CHAT_POLL_MS = CHAT_MESSAGES_FALLBACK_POLL_MS;
-
 export type ChatSender = {
   id: string;
   name: string;
@@ -183,10 +175,6 @@ export function getChatConversationsQueryKey() {
 
 export function getChatMessagesQueryKey(conversationId: string | null | undefined) {
   return chatMessagesQueryKey(getSelectedWorkspaceId(), conversationId);
-}
-
-export function getChatPinnedMessagesQueryKey(conversationId: string | null | undefined) {
-  return chatPinnedMessagesQueryKey(getSelectedWorkspaceId(), conversationId);
 }
 
 export function normalizeChatMessage(message: ChatMessage): ChatMessage {
@@ -525,13 +513,6 @@ export function isChatImagePreviewAttachment(
 
 export async function fetchChatAttachmentBlob(downloadUrl: string): Promise<Blob> {
   return fetchAuthenticatedBlob(downloadUrl);
-}
-
-export async function openChatAttachmentFile(downloadUrl: string) {
-  const blob = await fetchChatAttachmentBlob(downloadUrl);
-  const objectUrl = URL.createObjectURL(blob);
-  window.open(objectUrl, "_blank", "noopener,noreferrer");
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
 }
 
 export async function downloadChatAttachmentFile(downloadUrl: string, originalName: string) {

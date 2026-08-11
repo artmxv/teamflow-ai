@@ -4,7 +4,6 @@ import {
   deleteFromSupabase,
   createSignedDownloadUrl,
   fetchObjectContent,
-  getSupabaseObjectAvailability,
   resolveSupabaseObjectKeyFromPublicUrl,
   uploadToSupabase,
 } from "./supabase.js";

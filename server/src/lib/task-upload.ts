@@ -55,12 +55,6 @@ export function taskAttachmentDiskPath(taskId: string, filename: string) {
   return path.join(TASK_UPLOAD_ROOT, taskId, filename);
 }
 
-export function ensureTaskUploadDir(taskId: string) {
-  const dir = path.join(TASK_UPLOAD_ROOT, taskId);
-  fs.mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
 export function removeStoredTaskAttachment(taskId: string, filename: string) {
   const filePath = taskAttachmentDiskPath(taskId, filename);
   if (!fs.existsSync(filePath)) {

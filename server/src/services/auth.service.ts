@@ -441,12 +441,5 @@ export async function clearStaleUploadedAvatarReferences(filename: string): Prom
     data: { avatarUrl: null },
   });
 
-  if (result.count > 0 && process.env.NODE_ENV !== "production") {
-    console.log("[avatar] Cleared stale avatarUrl references", {
-      filename: safe,
-      count: result.count,
-    });
-  }
-
   return result.count;
 }

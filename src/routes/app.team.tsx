@@ -160,7 +160,7 @@ function TeamPage() {
   const { data: me } = useCurrentUser();
   const { data: workspace } = useCurrentWorkspace();
   const workspaceName = workspace?.name
-    ? displayWorkspaceName(workspace.name, lang)
+    ? displayWorkspaceName(workspace.name)
     : t("team.workspaceFallback");
   const canManageTeam = canManageWorkspaceTeam(me?.workspace?.role);
   const currentUserId = me?.user.id ?? "";

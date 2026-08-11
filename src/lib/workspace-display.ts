@@ -1,5 +1,3 @@
-import type { Lang } from "@/lib/i18n";
-
 /** Stored in DB for new signups (backend does not know UI locale). */
 export const PERSONAL_WORKSPACE_NAME = "Workspace";
 
@@ -23,33 +21,26 @@ export function isPersonalWorkspaceName(name: string): boolean {
 }
 
 /** Short title for sidebar and compact UI. */
-export function personalWorkspaceDisplayName(_locale: Lang): string {
+export function personalWorkspaceDisplayName(): string {
   return "Workspace";
 }
 
-export function displayWorkspaceName(name: string, locale: Lang): string {
+export function displayWorkspaceName(name: string): string {
   if (isPersonalWorkspaceName(name)) {
-    return personalWorkspaceDisplayName(locale);
+    return personalWorkspaceDisplayName();
   }
   return name;
 }
 
 /** Name shown in workspace settings input for default/personal workspaces. */
-export function workspaceSettingsDisplayName(name: string, locale: Lang): string {
-  return displayWorkspaceName(name, locale);
+export function workspaceSettingsDisplayName(name: string): string {
+  return displayWorkspaceName(name);
 }
 
 /** Keep raw DB name when user did not customize a personal workspace. */
-export function resolveWorkspaceNameForSave(
-  rawDbName: string,
-  formName: string,
-  locale: Lang,
-): string {
+export function resolveWorkspaceNameForSave(rawDbName: string, formName: string): string {
   const trimmed = formName.trim();
-  if (
-    isPersonalWorkspaceName(rawDbName) &&
-    trimmed === workspaceSettingsDisplayName(rawDbName, locale)
-  ) {
+  if (isPersonalWorkspaceName(rawDbName) && trimmed === workspaceSettingsDisplayName(rawDbName)) {
     return rawDbName.trim();
   }
   return trimmed;
