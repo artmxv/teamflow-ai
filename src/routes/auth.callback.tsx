@@ -68,20 +68,16 @@ function AuthCallbackPage() {
 
     let cancelled = false;
 
-    void (async () => {
-      try {
-        await completeAuthWithToken(queryClient, token);
-        if (cancelled) {
-          return;
-        }
-
+    try {
+      // Save token + clear stale session immediately; user/workspace bootstrap
+      // continues in AppShell / useCurrentUser after navigation.
+      completeAuthWithToken(queryClient, token);
+      if (!cancelled) {
         toast.success(t("auth.signedInWithGoogle"));
         void router.navigate({ href: destination, replace: true });
-      } catch {
-        if (cancelled) {
-          return;
-        }
-
+      }
+    } catch {
+      if (!cancelled) {
         clearAuthToken();
         clearActiveWorkspaceId();
         resetWorkspaceValidationSession();
@@ -89,7 +85,7 @@ function AuthCallbackPage() {
         setStatus("error");
         toast.error(t("auth.googleSignInFailed"));
       }
-    })();
+    }
 
     return () => {
       cancelled = true;

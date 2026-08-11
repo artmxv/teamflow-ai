@@ -9,6 +9,7 @@ import {
   setWorkspaceStorageUser,
 } from "@/lib/api/client";
 import { fetchWorkspaces, switchWorkspace } from "@/lib/api/workspaces";
+import { shouldIdentifyUserBeforeWorkspaceRestore } from "@/lib/auth/auth-bootstrap";
 import { getAuthToken, setAuthToken } from "@/lib/auth/token";
 import { WORKSPACES_QUERY_KEY } from "@/lib/workspace-queries";
 
@@ -87,7 +88,7 @@ export async function ensureValidSelectedWorkspace(
   }
 
   workspaceValidationPromise = (async () => {
-    const restoreUser = resolveRestoreUser(queryClient, loginUser);
+    let restoreUser = resolveRestoreUser(queryClient, loginUser);
 
     if (restoreUser) {
       setWorkspaceStorageUser(restoreUser.id, restoreUser.email);
@@ -97,6 +98,18 @@ export async function ensureValidSelectedWorkspace(
     // Fresh login: ignore stale active workspace from a previous session/user.
     if (loginUser) {
       clearActiveWorkspaceId();
+    }
+
+    if (
+      shouldIdentifyUserBeforeWorkspaceRestore({
+        hasRestoreUser: Boolean(restoreUser),
+        hasActiveWorkspaceId: Boolean(getSelectedWorkspaceId()),
+      })
+    ) {
+      const me = await getMe();
+      restoreUser = { id: me.user.id, email: me.user.email };
+      setWorkspaceStorageUser(restoreUser.id, restoreUser.email);
+      migrateLegacyWorkspaceKey(restoreUser.id, restoreUser.email);
     }
 
     const workspaces = await fetchWorkspaces({ skipWorkspaceHeader: true });
@@ -158,15 +171,16 @@ export async function primeAuthMeAfterAuth(
   await ensureValidSelectedWorkspace(queryClient, user);
 }
 
-/** Store JWT, load /me, and restore user-scoped workspace (OAuth callback and similar flows). */
-export async function completeAuthWithToken(
-  queryClient: QueryClient,
-  token: string,
-): Promise<AuthUser> {
+/**
+ * Persist a fresh OAuth/JWT session and clear stale auth/workspace client state.
+ * Does not await /me or workspace bootstrap — AppShell + useCurrentUser do that
+ * after navigation so /auth/callback is not blocked on sequential API calls.
+ */
+export function completeAuthWithToken(queryClient: QueryClient, token: string): void {
   resetWorkspaceValidationSession();
   clearActiveWorkspaceId();
+  setWorkspaceStorageUser(null, null);
+  // Drop previous-user caches so protected UI cannot flash stale data.
+  queryClient.clear();
   setAuthToken(token);
-  const me = await getMe();
-  await primeAuthMeAfterAuth(queryClient, me.user);
-  return me.user;
 }
