@@ -1,16 +1,13 @@
+import { resolveApiBaseUrl } from "@/lib/api/api-base-url";
 import { getAuthToken } from "@/lib/auth/token";
 
-const LOCAL_API_URL = "http://localhost:4000";
-const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
+export { resolveApiBaseUrl } from "@/lib/api/api-base-url";
 
-if (import.meta.env.PROD && !configuredApiUrl) {
-  console.warn(
-    "[TeamFlow] VITE_API_URL is not set. API requests will use http://localhost:4000 and fail in production. Set VITE_API_URL before `npm run build`.",
-  );
-}
-
-/** Production: set VITE_API_URL at build time (see docs/DEPLOYMENT.md). Local dev falls back to localhost. */
-export const API_BASE_URL = configuredApiUrl || LOCAL_API_URL;
+/** Same-origin in production; localhost in Vite dev; VITE_API_URL optional override. */
+export const API_BASE_URL = resolveApiBaseUrl({
+  configuredUrl: import.meta.env.VITE_API_URL,
+  isDev: import.meta.env.DEV,
+});
 
 /** @deprecated Legacy global key — migrated to user-scoped keys on login. */
 export const SELECTED_WORKSPACE_STORAGE_KEY = "teamflow.currentWorkspaceId";
