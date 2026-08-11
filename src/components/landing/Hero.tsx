@@ -1,49 +1,88 @@
+import { useEffect, useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
-import { AnimatedProductVisual } from "@/components/landing/AnimatedProductVisual";
+import { DashboardScene } from "@/components/landing/scenes/DashboardScene";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 
 export function Hero() {
   const { t } = useI18n();
+  const heroRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero) return;
+
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let frame = 0;
+
+    const update = () => {
+      frame = 0;
+      if (reducedMotion.matches) {
+        hero.style.setProperty("--hero-scroll-progress", "0");
+        return;
+      }
+
+      const distance = Math.min(640, window.innerHeight * 0.72);
+      const progress = Math.min(1, Math.max(0, -hero.getBoundingClientRect().top / distance));
+      hero.style.setProperty("--hero-scroll-progress", progress.toFixed(3));
+    };
+
+    const scheduleUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+    reducedMotion.addEventListener("change", scheduleUpdate);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+      reducedMotion.removeEventListener("change", scheduleUpdate);
+    };
+  }, []);
 
   return (
-    <section className="relative overflow-hidden border-b border-border/45">
-      <div className="pointer-events-none absolute inset-0 -z-10 public-ambient" />
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-grid opacity-40" />
-
-      <div className="mx-auto grid min-h-[calc(100svh-4rem)] max-w-7xl items-center gap-12 px-4 py-14 sm:px-6 sm:py-16 lg:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)] lg:gap-8 lg:py-12">
-        <div className="min-w-0 text-left">
-          <div className="public-animate-in inline-flex max-w-full text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-            <span className="min-w-0 break-words">{t("landing.hero.badge")}</span>
+    <section ref={heroRef} className="public-hero relative overflow-hidden border-b border-border">
+      <div className="public-hairline-grid pointer-events-none absolute inset-0" aria-hidden />
+      <div className="relative mx-auto max-w-[1280px] px-4 pb-12 pt-16 sm:px-6 sm:pb-16 sm:pt-20 lg:pb-20 lg:pt-24">
+        <div className="mx-auto max-w-[860px] text-center">
+          <div className="public-hero-scroll public-hero-scroll--eyebrow">
+            <div className="public-animate-in text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-700">
+              {t("landing.hero.badge")}
+            </div>
           </div>
-
-          <h1 className="public-animate-in public-animate-in-delay-1 public-hero-title mt-6 max-w-xl text-balance text-4xl font-semibold tracking-[-0.035em] sm:text-5xl lg:text-[3.65rem] lg:leading-[1.01]">
-            {t("landing.hero.title")}
-          </h1>
-
-          <p className="public-animate-in public-animate-in-delay-2 public-body mt-5 max-w-xl text-base text-muted-foreground sm:text-lg">
-            {t("landing.hero.subtitle")}
-          </p>
-
-          <div className="public-animate-in public-animate-in-delay-3 mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-            <Button asChild size="lg" variant="brand">
-              <Link to="/signup">
-                {t("nav.start")} <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link to="/signin">{t("nav.signin")}</Link>
-            </Button>
+          <div className="public-hero-scroll public-hero-scroll--headline">
+            <h1 className="public-animate-in public-animate-in-delay-1 public-hero-title mx-auto mt-5 max-w-[840px] text-balance text-4xl font-semibold tracking-[-0.055em] sm:text-6xl lg:text-[4.65rem]">
+              {t("landing.hero.title")}
+            </h1>
           </div>
-
-          <div className="public-animate-in public-animate-in-delay-3 mt-4 text-xs text-muted-foreground">
-            {t("landing.hero.planNote")}
+          <div className="public-hero-scroll public-hero-scroll--support">
+            <p className="public-animate-in public-animate-in-delay-2 public-body mx-auto mt-6 max-w-[720px] text-base text-muted-foreground sm:text-lg">
+              {t("landing.hero.subtitle")}
+            </p>
+          </div>
+          <div className="public-hero-scroll public-hero-scroll--actions">
+            <div className="public-animate-in public-animate-in-delay-3 mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+              <Button asChild size="lg" variant="brand" className="public-primary-button">
+                <Link to="/signup">
+                  {t("nav.start")} <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline" className="public-secondary-button">
+                <Link to="/signin">{t("nav.signin")}</Link>
+              </Button>
+            </div>
           </div>
         </div>
-
-        <div className="public-animate-in public-animate-in-delay-2 min-w-0 lg:-mr-8 xl:-mr-12">
-          <AnimatedProductVisual variant="hero" scene="dashboard" />
+        <div className="public-hero-scene-scroll">
+          <div className="public-animate-in public-animate-in-delay-3 mx-auto mt-12 w-full max-w-[1240px] sm:mt-16">
+            <DashboardScene />
+          </div>
         </div>
       </div>
     </section>

@@ -1,64 +1,17 @@
 import { Link } from "@tanstack/react-router";
-import {
-  ArrowRight,
-  Check,
-  FolderKanban,
-  ListChecks,
-  MessageSquare,
-  Sparkles,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
-import { AnimatedProductVisual } from "@/components/landing/AnimatedProductVisual";
+import { ArrowRight } from "lucide-react";
+import { AiCopilotScene } from "@/components/landing/scenes/AiCopilotScene";
+import { CollaborationScene } from "@/components/landing/scenes/CollaborationScene";
+import { WorkflowScene } from "@/components/landing/scenes/WorkflowScene";
 import { Button } from "@/components/ui/button";
-import { useI18n, type TKey } from "@/lib/i18n";
-
-type ProductCapability = {
-  icon: LucideIcon;
-  titleKey: TKey;
-  bodyKey: TKey;
-};
-
-const AI_POINTS: TKey[] = [
-  "landing.ai.pointAttention",
-  "landing.ai.pointDeadlines",
-  "landing.ai.pointLinks",
-  "landing.ai.pointReadonly",
-];
-
-const PRODUCT_CAPABILITIES: ProductCapability[] = [
-  {
-    icon: FolderKanban,
-    titleKey: "landing.grid.projectsTitle",
-    bodyKey: "landing.grid.projectsBody",
-  },
-  {
-    icon: ListChecks,
-    titleKey: "landing.grid.tasksTitle",
-    bodyKey: "landing.grid.tasksBody",
-  },
-  {
-    icon: Users,
-    titleKey: "landing.grid.teamTitle",
-    bodyKey: "landing.grid.teamBody",
-  },
-  {
-    icon: MessageSquare,
-    titleKey: "landing.grid.chatTitle",
-    bodyKey: "landing.grid.chatBody",
-  },
-  {
-    icon: Sparkles,
-    titleKey: "landing.grid.aiTitle",
-    bodyKey: "landing.grid.aiBody",
-  },
-];
+import { useI18n } from "@/lib/i18n";
 
 export function Features() {
   return (
     <>
       <AiCopilotSection />
-      <ProductSection />
+      <WorkflowSection />
+      <CollaborationSection />
     </>
   );
 }
@@ -67,89 +20,60 @@ function AiCopilotSection() {
   const { t } = useI18n();
 
   return (
-    <section
-      id="ai"
-      className="relative scroll-mt-16 overflow-hidden border-b border-border/55 bg-muted/15 py-16 sm:py-20 lg:flex lg:min-h-[76svh] lg:items-center"
-    >
-      <div className="pointer-events-none absolute inset-0 public-section-glow public-section-glow--ai" />
-      <div className="relative mx-auto grid w-full max-w-7xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] lg:gap-14">
-        <div className="min-w-0">
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-            {t("landing.ai.eyebrow")}
+    <section id="ai" className="public-ai-section scroll-mt-16 border-b border-white/10">
+      <div className="mx-auto max-w-[1280px] px-4 py-20 sm:px-6 sm:py-24 lg:py-28">
+        <div className="grid items-end gap-6 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-16">
+          <div>
+            <p className="public-eyebrow public-eyebrow--dark">{t("landing.ai.eyebrow")}</p>
+            <h2 className="public-section-title mt-4 max-w-xl text-balance text-white">
+              {t("landing.ai.title")}
+            </h2>
           </div>
-          <h2 className="public-heading mt-3 max-w-xl text-balance text-3xl font-semibold tracking-[-0.025em] sm:text-4xl lg:text-[2.7rem] lg:leading-[1.08]">
-            {t("landing.ai.title")}
-          </h2>
-          <p className="public-body mt-4 max-w-xl text-base text-muted-foreground sm:text-lg">
-            {t("landing.ai.subtitle")}
-          </p>
-
-          <ul className="mt-7 grid gap-x-6 gap-y-3 text-sm leading-[1.55] sm:grid-cols-2 lg:grid-cols-1">
-            {AI_POINTS.map((key) => (
-              <li key={key} className="flex min-w-0 items-start gap-2.5">
-                <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/12 text-primary">
-                  <Check className="size-3.5" aria-hidden />
-                </span>
-                <span className="min-w-0 break-words">{t(key)}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="lg:pb-1">
+            <p className="public-body max-w-2xl text-white/62">{t("landing.ai.subtitle")}</p>
+            <p className="mt-4 text-xs font-medium uppercase tracking-[0.14em] text-violet-300/80">
+              {t("landing.ai.pointReadonly")}
+            </p>
+          </div>
         </div>
-
-        <div className="min-w-0 lg:-mr-4">
-          <AnimatedProductVisual variant="feature" scene="ai" />
-        </div>
+        <div className="mt-10 sm:mt-14"><AiCopilotScene /></div>
       </div>
     </section>
   );
 }
 
-function ProductSection() {
+function WorkflowSection() {
   const { t } = useI18n();
 
   return (
-    <section
-      id="product"
-      className="relative scroll-mt-16 overflow-hidden py-16 sm:py-20 lg:flex lg:min-h-[82svh] lg:items-center"
-    >
-      <span id="features" className="pointer-events-none absolute -top-16" aria-hidden />
-      <div className="pointer-events-none absolute inset-0 public-section-glow public-section-glow--product" />
-
-      <div className="relative mx-auto grid w-full max-w-7xl items-center gap-11 px-4 sm:px-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-12">
-        <div className="min-w-0 lg:order-2">
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-            {t("landing.grid.eyebrow")}
-          </div>
-          <h2 className="public-heading mt-3 max-w-xl text-balance text-3xl font-semibold tracking-[-0.025em] sm:text-4xl lg:text-[2.7rem] lg:leading-[1.08]">
-            {t("landing.product.title")}
-          </h2>
-          <p className="public-body mt-4 max-w-xl text-muted-foreground">
-            {t("landing.product.subtitle")}
-          </p>
-
-          <div className="mt-7 grid gap-2 sm:grid-cols-2">
-            {PRODUCT_CAPABILITIES.map(({ icon: Icon, titleKey, bodyKey }) => (
-              <div
-                key={titleKey}
-                className="public-capability group flex min-w-0 items-start gap-3 rounded-xl border border-border/80 bg-card/55 px-3.5 py-3 transition duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-card/80"
-              >
-                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground transition duration-300 group-hover:bg-primary/15 group-hover:text-primary">
-                  <Icon className="size-4" aria-hidden />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-semibold leading-[1.35]">{t(titleKey)}</span>
-                  <span className="mt-0.5 block text-xs leading-[1.45] text-muted-foreground">
-                    {t(bodyKey)}
-                  </span>
-                </span>
-              </div>
-            ))}
-          </div>
+    <section id="product" className="scroll-mt-16 border-b border-border">
+      <span id="features" className="pointer-events-none absolute -mt-16" aria-hidden />
+      <div className="mx-auto max-w-[1280px] px-4 py-20 sm:px-6 sm:py-24 lg:py-28">
+        <div className="max-w-[760px]">
+          <p className="public-eyebrow">{t("landing.workflow.eyebrow")}</p>
+          <h2 className="public-section-title mt-4 text-balance">{t("landing.workflow.title")}</h2>
+          <p className="public-body mt-5 max-w-2xl text-muted-foreground">{t("landing.workflow.subtitle")}</p>
         </div>
+        <div className="mt-10 sm:mt-14"><WorkflowScene /></div>
+      </div>
+    </section>
+  );
+}
 
-        <div className="min-w-0 lg:order-1 lg:-ml-4">
-          <AnimatedProductVisual variant="feature" scene="dashboard" />
+function CollaborationSection() {
+  const { t } = useI18n();
+
+  return (
+    <section id="collaboration" className="public-collaboration-section scroll-mt-16 border-b border-border">
+      <div className="mx-auto max-w-[1280px] px-4 py-20 sm:px-6 sm:py-24 lg:py-28">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:items-end lg:gap-16">
+          <div>
+            <p className="public-eyebrow">{t("landing.collaboration.eyebrow")}</p>
+            <h2 className="public-section-title mt-4 text-balance">{t("landing.collaboration.title")}</h2>
+          </div>
+          <p className="public-body max-w-2xl text-muted-foreground">{t("landing.collaboration.subtitle")}</p>
         </div>
+        <div className="mt-10 sm:mt-14"><CollaborationScene /></div>
       </div>
     </section>
   );
@@ -159,24 +83,16 @@ export function FinalCta() {
   const { t } = useI18n();
 
   return (
-    <section className="border-t border-border/55 px-4 py-14 sm:px-6 sm:py-16">
-      <div className="public-final-cta mx-auto max-w-5xl overflow-hidden rounded-3xl border border-border bg-card/80 px-5 py-10 text-center shadow-card sm:px-10 sm:py-12">
-        <h2 className="public-heading mx-auto max-w-2xl text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-          {t("landing.cta.title")}
-        </h2>
-        <p className="public-body mx-auto mt-3 max-w-xl text-muted-foreground">
-          {t("landing.cta.subtitle")}
-        </p>
-        <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-          <Button asChild size="lg" variant="brand">
-            <Link to="/signup">
-              {t("nav.start")} <ArrowRight className="size-4" />
-            </Link>
-          </Button>
-          <Button asChild size="lg" variant="outline">
-            <Link to="/signin">{t("nav.signin")}</Link>
-          </Button>
+    <section className="public-final-cta border-b border-border">
+      <div className="mx-auto flex max-w-[1100px] flex-col items-start gap-8 px-4 py-20 sm:px-6 sm:py-24 lg:flex-row lg:items-end lg:justify-between lg:py-28">
+        <div>
+          <p className="public-eyebrow">TEAMFLOW AI</p>
+          <h2 className="public-section-title mt-4 max-w-[720px] text-balance">{t("landing.cta.title")}</h2>
+          <p className="public-body mt-5 max-w-xl text-muted-foreground">{t("landing.cta.subtitle")}</p>
         </div>
+        <Button asChild size="lg" variant="brand" className="public-primary-button shrink-0">
+          <Link to="/signup">{t("nav.start")}<ArrowRight className="size-4" /></Link>
+        </Button>
       </div>
     </section>
   );

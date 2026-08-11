@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-/** Scopes dark public marketing tokens so `/app` themes stay untouched. */
+/** Scopes the public marketing palette so `/app` themes stay untouched. */
 export function PublicPageShell({
   children,
   className,
@@ -24,7 +24,7 @@ export function PublicPageShell({
   return (
     <div
       className={cn(
-        "public-dark min-h-screen text-foreground",
+        "public-site min-h-screen text-foreground",
         mode === "auth" && "public-auth-page",
         className,
       )}

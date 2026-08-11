@@ -84,7 +84,6 @@ function SignIn() {
 
   return (
     <AuthShell
-      visual="ambient"
       title={t("auth.signInTitle")}
       subtitle={t("auth.signInSubtitle")}
       footer={
@@ -101,7 +100,7 @@ function SignIn() {
       }
     >
       <form
-        className="auth-signin-form flex flex-col gap-3.5"
+        className="auth-form auth-signin-form flex flex-col"
         onSubmit={(e) => {
           e.preventDefault();
           loginMutation.mutate({ email: email.trim(), password });
@@ -112,11 +111,11 @@ function SignIn() {
           onClick={() => startGoogleAuth(redirectPath)}
           disabled={loginMutation.isPending}
         />
-        <div className="relative my-2 text-center text-xs text-muted-foreground">
+        <div className="auth-divider relative my-2 text-center text-xs text-muted-foreground">
           <span className="relative z-10 bg-background px-2">{t("auth.orWithEmail")}</span>
           <span className="absolute inset-x-0 top-1/2 -z-0 h-px bg-border" />
         </div>
-        <div className="space-y-1.5">
+        <div className="auth-field">
           <Label htmlFor="email">{t("auth.email")}</Label>
           <Input
             id="email"
@@ -128,7 +127,7 @@ function SignIn() {
             autoComplete="email"
           />
         </div>
-        <div className="space-y-1.5">
+        <div className="auth-field">
           <div className="flex items-center justify-between gap-2">
             <Label htmlFor="password">{t("auth.password")}</Label>
             <Link
@@ -148,7 +147,7 @@ function SignIn() {
             autoComplete="current-password"
           />
         </div>
-        <Button type="submit" variant="brand" className="w-full" disabled={loginMutation.isPending}>
+        <Button type="submit" variant="brand" className="public-primary-button w-full" disabled={loginMutation.isPending}>
           {loginMutation.isPending ? t("auth.signingIn") : t("auth.signIn")}
         </Button>
       </form>
