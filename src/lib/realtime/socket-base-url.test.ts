@@ -63,4 +63,26 @@ describe("resolveSocketBaseUrl", () => {
       null,
     );
   });
+
+  it("prefers VITE_SOCKET_URL over absolute API base in production", () => {
+    assert.equal(
+      resolveSocketBaseUrl({
+        configuredSocketUrl: "https://teamflow-ai-api.onrender.com",
+        apiBaseUrl: "https://should-not-be-used.example.com",
+        isDev: false,
+      }),
+      "https://teamflow-ai-api.onrender.com",
+    );
+  });
+
+  it("never falls back to an empty same-origin host when socket URL is set", () => {
+    assert.equal(
+      resolveSocketBaseUrl({
+        configuredSocketUrl: "https://teamflow-ai-api.onrender.com/",
+        apiBaseUrl: "",
+        isDev: false,
+      }),
+      "https://teamflow-ai-api.onrender.com",
+    );
+  });
 });

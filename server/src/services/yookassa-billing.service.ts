@@ -519,24 +519,26 @@ export async function createBillingPlanChangeSession(input: {
     throw new AuthError("This is already the current plan", 409, "PLAN_ALREADY_CURRENT");
   }
 
-  // Downgrades are entitlement changes, not new purchases. Existing data is preserved;
+  // Free downgrade is an entitlement change, not a purchase. Existing data is preserved;
   // plan limits only block subsequent workspace/member growth.
-  if (compareBillingPlans(input.targetPlan, currentPlan) < 0) {
+  // Any paid target (upgrade or paid→paid change) requires YooKassa SUCCEEDED first.
+  if (input.targetPlan === "FREE") {
+    if (compareBillingPlans(input.targetPlan, currentPlan) >= 0) {
+      throw new AuthError("This is already the current plan", 409, "PLAN_ALREADY_CURRENT");
+    }
+
     await prisma.$transaction(async (tx) => {
       await lockWorkspaceBillingUsage(tx, input.workspaceId);
       await lockUserWorkspaceUsage(tx, input.userId);
 
       const ownerPlan = await resolveOwnerBillingPlan(input.userId, tx);
-      if (ownerPlan === input.targetPlan) {
+      if (ownerPlan === "FREE") {
         throw new AuthError("This is already the current plan", 409, "PLAN_ALREADY_CURRENT");
       }
-      if (compareBillingPlans(input.targetPlan, ownerPlan) >= 0) {
-        throw new AuthError("Plan change must be confirmed again", 409, "PLAN_CHANGE_CONFLICT");
-      }
 
-      await setOwnedWorkspacesPlan(input.userId, input.targetPlan, tx);
+      await setOwnedWorkspacesPlan(input.userId, "FREE", tx);
     });
-    return { flow: "APPLIED", currentPlan: input.targetPlan };
+    return { flow: "APPLIED", currentPlan: "FREE" };
   }
 
   if (!isPaidSelfServicePlan(input.targetPlan)) {
@@ -587,15 +589,16 @@ export async function createBillingPlanChangeSession(input: {
         },
       },
     });
-    const confirmation = await confirmProviderPayment(providerPayment, payment.id);
-    if (!confirmation) {
-      throw new AuthError("Billing payment not found", 404, "PAYMENT_NOT_FOUND");
-    }
-    if (confirmation.status === "SUCCEEDED") {
-      return { flow: "APPLIED", currentPlan: confirmation.currentPlan };
-    }
-    if (confirmation.status === "CANCELED") {
-      throw new AuthError("Payment was canceled", 409, "PAYMENT_CANCELED");
+
+    // Link provider id only. Never activate a paid plan from create-session alone —
+    // even if the POST body claims "succeeded". Activation is confirm-payment / webhook
+    // after authoritative provider verification.
+    assertYooKassaPaymentMode(providerPayment);
+    if (providerPayment.id) {
+      await prisma.billingPayment.update({
+        where: { id: payment.id },
+        data: { providerPaymentId: providerPayment.id },
+      });
     }
   } catch (error) {
     if (error instanceof AuthError && error.code !== "PAYMENT_PROVIDER_UNAVAILABLE") {

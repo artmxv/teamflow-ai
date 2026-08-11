@@ -195,6 +195,8 @@ function BillingPage() {
       return createBillingPlanChange(plan);
     },
     onSuccess: async (result) => {
+      // Paid targets always return PAYMENT and must not touch currentPlan here.
+      // APPLIED is only Free downgrade (or rare server entitlement sync).
       if (result.flow === "PAYMENT") {
         window.location.assign(result.confirmationUrl);
         return;

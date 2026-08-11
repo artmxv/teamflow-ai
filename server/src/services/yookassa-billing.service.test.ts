@@ -262,7 +262,7 @@ describe("yookassa-billing.service", () => {
     assert.equal(workspace.plan, "FREE");
   });
 
-  it("applies an authoritative immediately succeeded create response without requiring a redirect", async () => {
+  it("does not activate a paid plan from create even when provider returns succeeded", async () => {
     await prisma.workspace.update({
       where: { id: workspaceId },
       data: { plan: "FREE" },
@@ -277,6 +277,10 @@ describe("yookassa-billing.service", () => {
         amount: { value: "990.00", currency: "RUB" },
         test: true,
         metadata,
+        confirmation: {
+          type: "redirect",
+          confirmation_url: `https://yoomoney.ru/checkout/payments/v2/contract?orderId=yk_${suffix}_immediate_success`,
+        },
       };
     };
 
@@ -287,14 +291,64 @@ describe("yookassa-billing.service", () => {
       targetPlan: "TEAM",
     });
 
-    assert.deepEqual(result, { flow: "APPLIED", currentPlan: "TEAM" });
+    assert.equal(result.flow, "PAYMENT");
+    if (result.flow !== "PAYMENT") return;
+    assert.match(result.confirmationUrl, /yoomoney\.ru/);
     const payment = await prisma.billingPayment.findFirstOrThrow({
       where: { ownerUserId: ownerId },
       orderBy: { createdAt: "desc" },
     });
-    assert.equal(payment.status, "SUCCEEDED");
-    assert.equal(payment.completedAt instanceof Date, true);
+    assert.equal(payment.status, "PENDING");
+    assert.equal(payment.providerPaymentId, `yk_${suffix}_immediate_success`);
+    assert.equal(
+      (await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).plan,
+      "FREE",
+    );
     assert.equal(yookassaRequests.length, 1);
+  });
+
+  it("rejects paid create without confirmation URL and leaves plan unchanged", async () => {
+    await prisma.workspace.update({
+      where: { id: workspaceId },
+      data: { plan: "FREE" },
+    });
+    yookassaBillingGateway.request = async (input) => {
+      yookassaRequests.push(input);
+      const metadata = (input.body?.metadata ?? {}) as Record<string, string>;
+      return {
+        id: `yk_${suffix}_no_redirect`,
+        status: "succeeded",
+        paid: true,
+        amount: { value: "990.00", currency: "RUB" },
+        test: true,
+        metadata,
+      };
+    };
+
+    await assert.rejects(
+      () =>
+        createBillingPlanChangeSession({
+          userId: ownerId,
+          workspaceId,
+          role: "OWNER",
+          targetPlan: "TEAM",
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof AuthError);
+        assert.equal(error.code, "YOOKASSA_ERROR");
+        return true;
+      },
+    );
+
+    assert.equal(
+      (await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).plan,
+      "FREE",
+    );
+    const payment = await prisma.billingPayment.findFirstOrThrow({
+      where: { ownerUserId: ownerId },
+      orderBy: { createdAt: "desc" },
+    });
+    assert.equal(payment.status, "CANCELED");
   });
 
   it("rejects ADMIN plan changes before contacting YooKassa", async () => {
@@ -391,7 +445,7 @@ describe("yookassa-billing.service", () => {
     });
   });
 
-  it("applies Enterprise -> Business without contacting YooKassa", async () => {
+  it("requires YooKassa payment for Enterprise -> Business (paid target)", async () => {
     await prisma.workspace.update({
       where: { id: workspaceId },
       data: { plan: "ENTERPRISE" },
@@ -404,15 +458,19 @@ describe("yookassa-billing.service", () => {
       targetPlan: "BUSINESS",
     });
 
-    assert.deepEqual(result, { flow: "APPLIED", currentPlan: "BUSINESS" });
-    assert.equal(yookassaRequests.length, 0);
+    assert.equal(result.flow, "PAYMENT");
+    assert.equal(yookassaRequests.length, 1);
+    assert.deepEqual(yookassaRequests[0]?.body?.amount, {
+      value: "2490.00",
+      currency: "RUB",
+    });
     assert.equal(
       (await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).plan,
-      "BUSINESS",
+      "ENTERPRISE",
     );
   });
 
-  it("allows Enterprise -> Team when usage fits Team limits", async () => {
+  it("requires YooKassa payment for Enterprise -> Team (paid target)", async () => {
     await prisma.workspace.update({
       where: { id: workspaceId },
       data: { plan: "ENTERPRISE" },
@@ -425,8 +483,12 @@ describe("yookassa-billing.service", () => {
       targetPlan: "TEAM",
     });
 
-    assert.deepEqual(result, { flow: "APPLIED", currentPlan: "TEAM" });
-    assert.equal(yookassaRequests.length, 0);
+    assert.equal(result.flow, "PAYMENT");
+    assert.equal(yookassaRequests.length, 1);
+    assert.equal(
+      (await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).plan,
+      "ENTERPRISE",
+    );
   });
 
   it("allows Enterprise -> Free even when owner has more than one workspace", async () => {
@@ -474,7 +536,7 @@ describe("yookassa-billing.service", () => {
     });
   });
 
-  it("applies Business -> Team without payment even when seats exceed Team limits", async () => {
+  it("requires YooKassa for Business -> Team and does not activate on create", async () => {
     await addActiveMembers(8);
 
     const result = await createBillingPlanChangeSession({
@@ -484,8 +546,12 @@ describe("yookassa-billing.service", () => {
       targetPlan: "TEAM",
     });
 
-    assert.deepEqual(result, { flow: "APPLIED", currentPlan: "TEAM" });
-    assert.equal(yookassaRequests.length, 0);
+    assert.equal(result.flow, "PAYMENT");
+    assert.equal(yookassaRequests.length, 1);
+    assert.equal(
+      (await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).plan,
+      "BUSINESS",
+    );
   });
 
   it("applies Free even when active members exceed Free seat limit", async () => {
@@ -1163,6 +1229,95 @@ describe("yookassa-billing.service", () => {
     assert.equal(
       (await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).plan,
       "FREE",
+    );
+  });
+
+  it("keeps plan unchanged while payment stays PENDING", async () => {
+    await prisma.workspace.update({
+      where: { id: workspaceId },
+      data: { plan: "FREE" },
+    });
+
+    const created = await createBillingPlanChangeSession({
+      userId: ownerId,
+      workspaceId,
+      role: "OWNER",
+      targetPlan: "TEAM",
+    });
+    assert.equal(created.flow, "PAYMENT");
+    if (created.flow !== "PAYMENT") return;
+
+    const pending = await confirmBillingPayment({
+      userId: ownerId,
+      workspaceId,
+      role: "OWNER",
+      paymentId: created.paymentId,
+    });
+    assert.equal(pending.status, "PENDING");
+    assert.equal(pending.currentPlan, "FREE");
+    assert.equal(
+      (await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).plan,
+      "FREE",
+    );
+  });
+
+  it("activates a paid plan exactly once on SUCCEEDED and stays idempotent on reconfirm", async () => {
+    await prisma.workspace.update({
+      where: { id: workspaceId },
+      data: { plan: "FREE" },
+    });
+
+    const created = await createBillingPlanChangeSession({
+      userId: ownerId,
+      workspaceId,
+      role: "OWNER",
+      targetPlan: "TEAM",
+    });
+    assert.equal(created.flow, "PAYMENT");
+    if (created.flow !== "PAYMENT") return;
+
+    const payment = await prisma.billingPayment.findUniqueOrThrow({
+      where: { id: created.paymentId },
+    });
+    const providerId = payment.providerPaymentId!;
+    providerPayments.set(providerId, {
+      id: providerId,
+      status: "succeeded",
+      amount: { value: "990.00", currency: "RUB" },
+      test: true,
+      metadata: {
+        workspaceId,
+        targetPlan: "TEAM",
+        paymentId: payment.id,
+        ownerUserId: ownerId,
+      },
+    });
+
+    const first = await confirmBillingPayment({
+      userId: ownerId,
+      workspaceId,
+      role: "OWNER",
+      paymentId: created.paymentId,
+    });
+    assert.equal(first.status, "SUCCEEDED");
+    assert.equal(first.currentPlan, "TEAM");
+    assert.equal(
+      (await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).plan,
+      "TEAM",
+    );
+
+    const second = await confirmBillingPayment({
+      userId: ownerId,
+      workspaceId,
+      role: "OWNER",
+      paymentId: created.paymentId,
+    });
+    assert.equal(second.status, "SUCCEEDED");
+    assert.equal(second.currentPlan, "TEAM");
+    assert.equal(await prisma.billingPayment.count({ where: { id: payment.id } }), 1);
+    assert.equal(
+      (await prisma.billingPayment.findUniqueOrThrow({ where: { id: payment.id } })).status,
+      "SUCCEEDED",
     );
   });
 });
