@@ -4,9 +4,8 @@ import { FolderKanban, ListTodo, Search, User, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { getAuthToken } from "@/lib/auth/token";
-import { nameToInitials } from "@/lib/auth/use-current-user";
-import { resolveAvatarUrl } from "@/lib/avatar-url";
 import { searchWorkspace, type GlobalSearchResult } from "@/lib/api/search";
+import { UserAvatar } from "@/components/app/UserAvatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProjectAccent } from "@/lib/project-color";
 import { fetchProjects, type ProjectApiItem } from "@/lib/api/projects";
@@ -61,16 +60,14 @@ function SearchResultButton({
       onMouseDown={(event) => event.preventDefault()}
       onClick={() => onSelect(result)}
     >
-      {result.type === "member" && resolveAvatarUrl(result.avatarUrl) ? (
-        <img
-          src={resolveAvatarUrl(result.avatarUrl)!}
-          alt=""
-          className="mt-0.5 size-7 shrink-0 rounded-full object-cover"
+      {result.type === "member" ? (
+        <UserAvatar
+          id={result.id}
+          name={result.title}
+          avatarUrl={result.avatarUrl}
+          size="sm"
+          className="mt-0.5"
         />
-      ) : result.type === "member" ? (
-        <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-gradient-brand text-[10px] font-semibold text-white">
-          {nameToInitials(result.title)}
-        </span>
       ) : (
         <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md border border-border/70 bg-muted/45 text-muted-foreground">
           <Icon className="size-3.5" />

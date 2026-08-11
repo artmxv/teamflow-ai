@@ -1,26 +1,13 @@
 import { API_BASE_URL } from "@/lib/api/client";
+import { resolveAvatarUrlWithBase } from "@/lib/avatar-url-resolve";
 
 /**
  * Resolve avatar URL for <img src>.
  * Rewrites broken Supabase `/object/public/…/avatars/…` URLs (private bucket → 400)
- * to the API path that streams the file via signed download.
+ * and absolute app `/uploads/avatars/…` hosts to the canonical API uploads path.
  */
 export function resolveAvatarUrl(url: string | null | undefined): string | null {
-  if (!url) {
-    return null;
-  }
-
-  const supabaseAvatarMatch = url.match(
-    /\/storage\/v1\/object\/public\/[^/]+\/avatars\/([^/?#]+)/i,
-  );
-  if (supabaseAvatarMatch?.[1]) {
-    return `${API_BASE_URL}/uploads/avatars/${supabaseAvatarMatch[1]}`;
-  }
-
-  if (url.startsWith("http://") || url.startsWith("https://")) {
-    return url;
-  }
-  return `${API_BASE_URL}${url}`;
+  return resolveAvatarUrlWithBase(url, API_BASE_URL);
 }
 
 /**
