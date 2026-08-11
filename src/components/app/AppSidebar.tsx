@@ -1,7 +1,7 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, PanelLeftClose, PanelLeftOpen, ChevronDown, Check, Trash2 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { displayWorkspaceName } from "@/lib/workspace-display";
@@ -52,10 +52,24 @@ function SidebarTip({
   label: string;
   children: ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  useEffect(() => {
+    setOpen(false);
+  }, [collapsed, label, pathname]);
+
+  // Avoid mounting tip portals in expanded mode (prevents leaked labels over the page).
+  if (!collapsed) {
+    return children;
+  }
+
   return (
-    <Tooltip>
+    <Tooltip open={open} onOpenChange={setOpen} delayDuration={200}>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      {collapsed ? <TooltipContent side="right">{label}</TooltipContent> : null}
+      <TooltipContent side="right" sideOffset={8} className="pointer-events-none">
+        {label}
+      </TooltipContent>
     </Tooltip>
   );
 }
@@ -317,27 +331,28 @@ export function AppSidebar({
   const toggleLabel = collapsed ? t("side.expandSidebar") : t("side.collapseSidebar");
 
   return (
-    <TooltipProvider delayDuration={0}>
+    <TooltipProvider delayDuration={200}>
       <aside
         data-collapsed={collapsed}
         className={cn(
-          "app-sidebar sticky top-0 hidden h-svh shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-300 ease-[cubic-bezier(.22,.8,.22,1)] md:flex",
+          "app-sidebar sticky top-0 hidden h-svh shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-[250ms] ease-in-out md:flex",
           collapsed ? "w-16" : "w-64",
         )}
       >
         <div className="relative h-16 shrink-0 overflow-hidden border-b border-sidebar-border/70">
-          <div className="app-sidebar__expanded-icon absolute left-4 top-4 grid size-8 place-items-center">
+          {/* Keep BrandMark mounted; CSS fades it in collapsed mode (no remount/flash). */}
+          <div className="app-sidebar__brand-mark absolute left-4 top-1/2 grid size-8 -translate-y-1/2 place-items-center">
             <BrandMark className="size-7 rounded-[10px]" />
           </div>
-          {!collapsed ? (
-            <div className="app-sidebar__reveal absolute inset-y-0 left-14 flex w-36 flex-col justify-center overflow-hidden leading-tight">
-              <div className="flex items-center gap-1.5 text-sm font-semibold tracking-tight text-sidebar-foreground">
-                TeamFlow
-                <BrandAiBadge />
-              </div>
-              <div className="text-[11px] text-muted-foreground">{t("side.tagline")}</div>
+          <div
+            className="app-sidebar__reveal absolute inset-y-0 left-14 flex w-36 items-center overflow-hidden leading-none"
+            aria-hidden={collapsed}
+          >
+            <div className="inline-flex items-baseline gap-1.5 text-sm font-semibold tracking-tight text-sidebar-foreground">
+              <span>TeamFlow</span>
+              <BrandAiBadge />
             </div>
-          ) : null}
+          </div>
           <button
             type="button"
             onClick={onToggleCollapsed}

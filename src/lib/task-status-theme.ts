@@ -26,9 +26,9 @@ export const taskStatusChipClass: Record<TaskStatus, string> = {
  * Uses design tokens (--color-*) aligned with Kanban column dots and chip hues.
  */
 export const taskStatusChartFill: Record<TaskStatus, string> = {
-  backlog: "var(--color-muted-foreground)",
+  backlog: "#94a3b8",
   in_progress: "var(--color-info)",
-  review: "var(--color-warning)",
+  review: "#f59e0b",
   done: "var(--color-success)",
 };
 

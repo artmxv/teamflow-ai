@@ -24,10 +24,11 @@ import { UserAvatar } from "@/components/app/UserAvatar";
 import { EmptyState } from "@/components/app/EmptyState";
 import { PageHeader } from "@/components/app/PageHeader";
 import { ProjectAccentSurface } from "@/components/app/ProjectAccentSurface";
+import { ProjectMemberStack } from "@/components/app/ProjectMemberStack";
 import { ProjectStatusSelect } from "@/components/app/ProjectStatusSelect";
 import { TaskDrawer } from "@/components/app/TaskDrawer";
 import { NewTaskDialog, type TaskFormValues } from "@/components/app/QuickActionDialogs";
-import { projectStatusMeta, type ProjectStatus } from "@/lib/mock-data";
+import { type ProjectStatus } from "@/lib/mock-data";
 import { projectStatusLabel, useI18n, type TKey } from "@/lib/i18n";
 import {
   combineLocalDateAndTime,
@@ -660,7 +661,6 @@ function ProjectDetails({
 }) {
   const { t, lang } = useI18n();
   const statusKey = apiStatusMap[project.status];
-  const statusMeta = projectStatusMeta[statusKey];
   const statusLabel = projectStatusLabel(statusKey, t);
   const due = formatDueDateTime(project.dueDate);
   const progress = calculateTaskProgress(projectTasks);
@@ -678,20 +678,26 @@ function ProjectDetails({
           <ProjectAccentSurface
             gradient={colorGradient}
             className="h-auto flex-none"
-            contentClassName="flex-none p-5"
+            contentClassName="flex-none px-5 pb-5 pt-8"
           >
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start justify-between gap-4 pt-1">
               <div className="min-w-0">
-                <h2 className="truncate text-xl font-semibold tracking-tight">
+                <h2 className="break-words text-xl font-semibold tracking-tight [overflow-wrap:anywhere]">
                   {localizedProjectName}
                 </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-1 break-words text-sm leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
                   {localizedProjectDescription ?? t("projects.detail.noDescription")}
                 </p>
               </div>
-              <Badge variant="secondary" className={statusMeta.className + " border-0 shrink-0"}>
-                {statusLabel}
-              </Badge>
+              <div className="flex shrink-0 items-center gap-2">
+                <ProjectMemberStack projectId={project.id} max={3} />
+                <Badge
+                  variant="secondary"
+                  className="border border-border bg-muted/40 text-muted-foreground"
+                >
+                  {statusLabel}
+                </Badge>
+              </div>
             </div>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -726,6 +732,7 @@ function ProjectDetails({
             gradient={colorGradient}
             className="h-auto flex-none"
             contentClassName="flex-none p-4"
+            showFlag={false}
           >
             <div className="flex items-center justify-between gap-2">
               <div>
@@ -742,7 +749,7 @@ function ProjectDetails({
                 {progress.total === 0 ? "0%" : `${progress.percent}%`}
               </span>
             </div>
-            <div className="mt-3 h-3 overflow-hidden rounded-full bg-muted/80">
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted/80">
               <div
                 className={
                   "project-progress-fill h-full rounded-full bg-gradient-to-r transition-all " +
@@ -759,7 +766,7 @@ function ProjectDetails({
         </div>
 
         <div className="min-h-0 w-full lg:self-stretch">
-          <div className="flex min-h-0 w-full flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-soft lg:h-full">
+          <div className="flex min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-soft lg:h-full">
             <div className="flex shrink-0 items-start justify-between gap-2 border-b border-border/70 bg-card px-5 py-4">
               <div className="min-w-0">
                 <h3 className="text-base font-semibold">{t("projects.detail.projectTasks")}</h3>

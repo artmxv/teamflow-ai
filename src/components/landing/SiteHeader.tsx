@@ -8,8 +8,8 @@ import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
   { href: "#features", labelKey: "nav.features" as const },
-  { href: "#preview", labelKey: "nav.product" as const },
-  { href: "#pricing", labelKey: "nav.pricing" as const },
+  { href: "#ai", labelKey: "nav.aiCopilot" as const },
+  { href: "#product", labelKey: "nav.product" as const },
 ];
 
 export function SiteHeader() {
@@ -52,11 +52,11 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
+        <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
           <LanguageSwitcher className="shrink-0" />
           <Link
             to="/signin"
-            className="hidden shrink-0 text-sm font-medium text-muted-foreground outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:inline"
+            className="hidden shrink-0 px-1 text-sm font-medium text-muted-foreground outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:inline"
           >
             {t("nav.signin")}
           </Link>

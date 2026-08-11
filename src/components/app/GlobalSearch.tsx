@@ -1,13 +1,15 @@
 import { useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { FolderKanban, ListTodo, Search, User } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { FolderKanban, ListTodo, Search, User, X } from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { getAuthToken } from "@/lib/auth/token";
 import { nameToInitials } from "@/lib/auth/use-current-user";
 import { resolveAvatarUrl } from "@/lib/avatar-url";
 import { searchWorkspace, type GlobalSearchResult } from "@/lib/api/search";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getProjectAccent } from "@/lib/project-color";
+import { fetchProjects, type ProjectApiItem } from "@/lib/api/projects";
 
 const SEARCH_DEBOUNCE_MS = 280;
 const GLOBAL_SEARCH_QUERY_KEY = "global-search";
@@ -38,14 +40,17 @@ function parseTaskHref(href: string): { taskId: string } | null {
 
 function SearchResultButton({
   result,
+  project,
   label,
   onSelect,
 }: {
   result: GlobalSearchResult;
+  project?: ProjectApiItem;
   label: string;
   onSelect: (result: GlobalSearchResult) => void;
 }) {
   const Icon = result.type === "project" ? FolderKanban : result.type === "task" ? ListTodo : User;
+  const projectAccent = project ? getProjectAccent(project) : null;
 
   return (
     <button
@@ -67,19 +72,34 @@ function SearchResultButton({
           {nameToInitials(result.title)}
         </span>
       ) : (
-        <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-muted/70 text-muted-foreground">
+        <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md border border-border/70 bg-muted/45 text-muted-foreground">
           <Icon className="size-3.5" />
         </span>
       )}
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium leading-snug text-foreground">
-          {result.title}
+        <span className="flex min-w-0 items-center gap-1.5 font-medium leading-snug text-foreground">
+          {result.type === "project" && projectAccent ? (
+            <span className={`size-2 shrink-0 rounded-full ${projectAccent.dot}`} aria-hidden />
+          ) : null}
+          <span className="truncate">{result.title}</span>
         </span>
         {(result.subtitle || result.projectName) && (
-          <span className="block truncate text-xs text-muted-foreground">
-            {result.type === "task" && result.projectName
-              ? `${result.subtitle ?? ""}${result.subtitle ? " · " : ""}${result.projectName}`
-              : (result.subtitle ?? result.projectName)}
+          <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+            {result.type === "task" && result.projectName ? (
+              <>
+                {result.subtitle ? <span className="shrink-0">{result.subtitle}</span> : null}
+                {result.subtitle ? <span className="shrink-0 opacity-60">·</span> : null}
+                {projectAccent ? (
+                  <span
+                    className={`size-1.5 shrink-0 rounded-full ${projectAccent.dot}`}
+                    aria-hidden
+                  />
+                ) : null}
+                <span className="truncate">{result.projectName}</span>
+              </>
+            ) : (
+              <span className="truncate">{result.subtitle ?? result.projectName}</span>
+            )}
           </span>
         )}
       </span>
@@ -87,14 +107,32 @@ function SearchResultButton({
   );
 }
 
+function resolveResultProject(
+  result: GlobalSearchResult,
+  projectById?: ReadonlyMap<string, ProjectApiItem>,
+  projectByName?: ReadonlyMap<string, ProjectApiItem>,
+) {
+  if (result.type === "project") {
+    return projectById?.get(result.id);
+  }
+  if (result.type === "task" && result.projectName) {
+    return projectByName?.get(result.projectName);
+  }
+  return undefined;
+}
+
 function SearchGroup({
   title,
   results,
+  projectById,
+  projectByName,
   openLabel,
   onSelect,
 }: {
   title: string;
   results: GlobalSearchResult[];
+  projectById?: ReadonlyMap<string, ProjectApiItem>;
+  projectByName?: ReadonlyMap<string, ProjectApiItem>;
   openLabel: string;
   onSelect: (result: GlobalSearchResult) => void;
 }) {
@@ -110,7 +148,12 @@ function SearchGroup({
       <ul className="space-y-0.5">
         {results.map((result) => (
           <li key={`${result.type}-${result.id}`}>
-            <SearchResultButton result={result} label={openLabel} onSelect={onSelect} />
+            <SearchResultButton
+              result={result}
+              project={resolveResultProject(result, projectById, projectByName)}
+              label={openLabel}
+              onSelect={onSelect}
+            />
           </li>
         ))}
       </ul>
@@ -149,6 +192,20 @@ export function GlobalSearch() {
   const debouncedTrimmed = debouncedQuery.trim();
   const showPanel = open && trimmedQuery.length >= 2;
   const hasToken = typeof window !== "undefined" && !!getAuthToken();
+  const { data: accessibleProjects = [] } = useQuery({
+    queryKey: ["projects"],
+    queryFn: fetchProjects,
+    enabled: hasToken,
+    staleTime: 30_000,
+  });
+  const projectById = useMemo(
+    () => new Map(accessibleProjects.map((project) => [project.id, project])),
+    [accessibleProjects],
+  );
+  const projectByName = useMemo(
+    () => new Map(accessibleProjects.map((project) => [project.name, project])),
+    [accessibleProjects],
+  );
 
   const searchQuery = useQuery({
     queryKey: [GLOBAL_SEARCH_QUERY_KEY, debouncedTrimmed],
@@ -242,7 +299,7 @@ export function GlobalSearch() {
         aria-autocomplete="list"
         value={query}
         placeholder={t("top.search")}
-        className="filter-search-input w-full pl-9 pr-12 text-sm outline-none transition"
+        className="filter-search-input w-full appearance-none pl-9 pr-10 text-sm outline-none transition [&::-webkit-search-cancel-button]:appearance-none"
         onChange={(event) => {
           setQuery(event.target.value);
           if (!open) {
@@ -252,11 +309,26 @@ export function GlobalSearch() {
         onFocus={() => setOpen(true)}
       />
 
+      {query ? (
+        <button
+          type="button"
+          aria-label={t("top.searchClear")}
+          className="absolute right-2 top-1/2 z-10 grid size-7 -translate-y-1/2 place-items-center rounded-md text-muted-foreground outline-none transition hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35"
+          onClick={() => {
+            setQuery("");
+            setOpen(false);
+            inputRef.current?.focus();
+          }}
+        >
+          <X className="size-3.5" aria-hidden />
+        </button>
+      ) : null}
+
       {showPanel && (
         <div
           id={listboxId}
           role="listbox"
-          className="absolute left-0 right-0 top-[calc(100%+0.375rem)] z-50 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-lg"
+          className="absolute left-0 right-0 top-[calc(100%+0.375rem)] z-50 min-w-0 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-lg"
         >
           {isLoading && <SearchDropdownSkeleton />}
           {hasError && (
@@ -274,12 +346,16 @@ export function GlobalSearch() {
               <SearchGroup
                 title={t("top.searchProjects")}
                 results={data.projects}
+                projectById={projectById}
+                projectByName={projectByName}
                 openLabel={t("top.searchOpenResult")}
                 onSelect={handleSelect}
               />
               <SearchGroup
                 title={t("top.searchTasks")}
                 results={data.tasks}
+                projectById={projectById}
+                projectByName={projectByName}
                 openLabel={t("top.searchOpenResult")}
                 onSelect={handleSelect}
               />

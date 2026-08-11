@@ -12,6 +12,8 @@ import {
   CREATE_ACTION_BUTTON_CLASSNAME,
   FILTER_BAR_TASKS_CONTROLS_CLASSNAME,
   FILTER_RESET_CLASSNAME,
+  AssigneeFilterOption,
+  FilterTriggerLabel,
   FilterBar,
   assigneeFilterSelectClassName,
   filterSelectActiveAttr,
@@ -54,7 +56,6 @@ import { translateStarterProjectName, translateStarterTitle } from "@/lib/starte
 import {
   Search,
   Plus,
-  MessageSquare,
   Paperclip,
   Calendar,
   ListTodo,
@@ -62,6 +63,9 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  CircleDot,
+  Flag,
+  Users,
 } from "lucide-react";
 import { fetchWorkspaceMembers } from "@/lib/api/workspace-members";
 import {
@@ -548,16 +552,12 @@ function TasksPage() {
                 className={statusFilterSelectClassName(status)}
               >
                 <SelectValue>
-                  {status === "all" || status === "open" ? (
-                    getStatusFilterTriggerLabel(status, t)
-                  ) : (
-                    <TaskStatusIndicator status={status}>
-                      {getStatusFilterTriggerLabel(status, t)}
-                    </TaskStatusIndicator>
-                  )}
+                  <FilterTriggerLabel icon={CircleDot}>
+                    {getStatusFilterTriggerLabel(status, t)}
+                  </FilterTriggerLabel>
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="min-w-[12rem]">
                 <SelectItem value="all">{t("tasks.allStatus")}</SelectItem>
                 <SelectItem value="open">{t("tasks.openStatus")}</SelectItem>
                 {(Object.keys(statusMeta) as TaskStatus[]).map((s) => (
@@ -578,16 +578,12 @@ function TasksPage() {
                 className={priorityFilterSelectClassName(priority)}
               >
                 <SelectValue>
-                  {priority === "all" ? (
-                    getPriorityFilterTriggerLabel(priority, t)
-                  ) : (
-                    <TaskPriorityIndicator priority={priority}>
-                      {getPriorityFilterTriggerLabel(priority, t)}
-                    </TaskPriorityIndicator>
-                  )}
+                  <FilterTriggerLabel icon={Flag}>
+                    {getPriorityFilterTriggerLabel(priority, t)}
+                  </FilterTriggerLabel>
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="min-w-[12rem]">
                 <SelectItem value="all">{t("tasks.allPriorities")}</SelectItem>
                 {(["low", "medium", "urgent"] as Priority[]).map((p) => (
                   <SelectItem key={p} value={p}>
@@ -604,21 +600,23 @@ function TasksPage() {
                 className={assigneeFilterSelectClassName()}
               >
                 <SelectValue>
-                  {getAssigneeFilterTriggerLabel(assigneeFilter, assigneeOptions, t)}
+                  <FilterTriggerLabel icon={Users}>
+                    {getAssigneeFilterTriggerLabel(assigneeFilter, assigneeOptions, t)}
+                  </FilterTriggerLabel>
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="min-w-[14rem]">
                 <SelectItem value="all">{t("tasks.allAssignees")}</SelectItem>
                 <SelectItem value="unassigned">{t("tasks.noAssignees")}</SelectItem>
                 {assigneeOptions.map((option) => (
                   <SelectItem key={option.id} value={option.id}>
-                    {option.name}
+                    <AssigneeFilterOption option={option} />
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Button
-              variant="brandSoft"
+              variant="outline"
               className={FILTER_RESET_CLASSNAME}
               disabled={!hasActiveFilters}
               onClick={clearFilters}
@@ -661,7 +659,7 @@ function TasksPage() {
             onSort={handleSort}
             className="justify-center"
           />
-          <div className="text-center">{t("common.activity")}</div>
+          <div className="text-center">{t("tasks.sectionAttachments")}</div>
         </div>
         {isLoading ? (
           <LoadingRows />
@@ -682,7 +680,7 @@ function TasksPage() {
               hasAccessibleProjects={hasAccessibleProjects}
             />
           ) : (
-            <NoResultsState onResetFilters={clearFilters} />
+            <NoResultsState />
           )
         ) : (
           <ul className="divide-y divide-border">
@@ -758,15 +756,9 @@ function TasksPage() {
                   <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
                     <Calendar className="size-3.5" /> {formatDueDateTimeShort(task.dueDate)}
                   </div>
-                  <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1">
-                      <MessageSquare className="size-3.5" />
-                      {task.commentsCount}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <Paperclip className="size-3.5" />
-                      {task.attachmentsCount}
-                    </span>
+                  <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                    <Paperclip className="size-3.5" />
+                    {task.attachmentsCount}
                   </div>
                 </li>
               );
@@ -918,20 +910,18 @@ function TasksEmptyState({
   );
 }
 
-function NoResultsState({ onResetFilters }: { onResetFilters: () => void }) {
+function NoResultsState() {
   const { t } = useI18n();
   return (
-    <EmptyState
-      className="border-0 bg-transparent shadow-none"
-      icon={Search}
-      title={t("tasks.noMatchTitle")}
-      description={t("tasks.noMatchHint")}
-      primaryAction={
-        <Button variant="brandSoft" onClick={onResetFilters}>
-          <RotateCcw className="size-4" /> {t("common.resetFilters")}
-        </Button>
-      }
-    />
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-6 py-12 text-center sm:px-10">
+      <div className="grid size-12 place-items-center rounded-2xl bg-muted text-muted-foreground">
+        <Search className="size-5" />
+      </div>
+      <h3 className="mt-4 text-base font-semibold">{t("tasks.noMatchTitle")}</h3>
+      <p className="mx-auto mt-1.5 max-w-sm text-sm text-muted-foreground">
+        {t("tasks.noMatchHint")}
+      </p>
+    </div>
   );
 }
 

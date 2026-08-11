@@ -84,6 +84,7 @@ function SignIn() {
 
   return (
     <AuthShell
+      visual="ambient"
       title={t("auth.signInTitle")}
       subtitle={t("auth.signInSubtitle")}
       footer={
@@ -100,7 +101,7 @@ function SignIn() {
       }
     >
       <form
-        className="space-y-4"
+        className="auth-signin-form flex flex-col gap-3.5"
         onSubmit={(e) => {
           e.preventDefault();
           loginMutation.mutate({ email: email.trim(), password });

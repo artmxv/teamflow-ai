@@ -22,6 +22,8 @@ import {
   CREATE_ACTION_BUTTON_CLASSNAME,
   FILTER_BAR_BOARD_CONTROLS_CLASSNAME,
   FILTER_RESET_CLASSNAME,
+  AssigneeFilterOption,
+  FilterTriggerLabel,
   FilterBar,
   assigneeFilterSelectClassName,
   filterSelectActiveAttr,
@@ -60,7 +62,7 @@ import {
 } from "@/lib/api/tasks";
 import { fetchProjects } from "@/lib/api/projects";
 import { priorityLabel, taskStatusLabel, useI18n, type TKey } from "@/lib/i18n";
-import { Filter, FolderKanban, ListTodo, Plus, RotateCcw } from "lucide-react";
+import { Filter, Flag, FolderKanban, ListTodo, Plus, RotateCcw, Users } from "lucide-react";
 import { fetchWorkspaceMembers } from "@/lib/api/workspace-members";
 import {
   buildAssigneeOptionsFromWorkspaceMembers,
@@ -360,16 +362,12 @@ function Board() {
               className={priorityFilterSelectClassName(priority)}
             >
               <SelectValue placeholder={t("tasks.priority")}>
-                {priority === "all" ? (
-                  t("tasks.allPriorities")
-                ) : (
-                  <TaskPriorityIndicator priority={priority}>
-                    {priorityLabel(priority, t)}
-                  </TaskPriorityIndicator>
-                )}
+                <FilterTriggerLabel icon={Flag}>
+                  {priority === "all" ? t("tasks.allPriorities") : priorityLabel(priority, t)}
+                </FilterTriggerLabel>
               </SelectValue>
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="min-w-[12rem]">
               <SelectItem value="all">{t("tasks.allPriorities")}</SelectItem>
               {(["low", "medium", "urgent"] as Priority[]).map((value) => (
                 <SelectItem key={value} value={value}>
@@ -385,19 +383,26 @@ function Board() {
               data-filter-active={filterSelectActiveAttr(assignee !== "all")}
               className={assigneeFilterSelectClassName()}
             >
-              <SelectValue placeholder={t("tasks.assignee")} />
+              <SelectValue placeholder={t("tasks.assignee")}>
+                <FilterTriggerLabel icon={Users}>
+                  {assignee === "all"
+                    ? t("tasks.allAssignees")
+                    : (assigneeOptions.find((option) => option.id === assignee)?.name ??
+                      t("tasks.assignee"))}
+                </FilterTriggerLabel>
+              </SelectValue>
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="min-w-[14rem]">
               <SelectItem value="all">{t("tasks.allAssignees")}</SelectItem>
               {assigneeOptions.map((option) => (
                 <SelectItem key={option.id} value={option.id}>
-                  {option.name}
+                  <AssigneeFilterOption option={option} />
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Button
-            variant="brandSoft"
+            variant="outline"
             className={FILTER_RESET_CLASSNAME}
             disabled={priority === "all" && assignee === "all"}
             onClick={() => {

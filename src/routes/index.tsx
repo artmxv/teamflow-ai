@@ -1,9 +1,7 @@
 import { useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Features } from "@/components/landing/Features";
+import { Features, FinalCta } from "@/components/landing/Features";
 import { Hero } from "@/components/landing/Hero";
-import { Pricing } from "@/components/landing/Pricing";
-import { ProductPreview } from "@/components/landing/ProductPreview";
 import { PublicPageShell } from "@/components/landing/PublicPageShell";
 import { SiteFooter } from "@/components/landing/SiteFooter";
 import { SiteHeader } from "@/components/landing/SiteHeader";
@@ -12,17 +10,20 @@ import { useI18n } from "@/lib/i18n";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "TeamFlow AI — Team. Projects. Results." },
+      { title: "TeamFlow AI — Project management workspace with AI Copilot" },
       {
         name: "description",
         content:
-          "TeamFlow AI brings projects, tasks, deadlines, team chat, and grounded workspace briefings into one calm workspace for product teams.",
+          "TeamFlow AI brings projects, tasks, team chat, workspace summaries, and a contextual AI Copilot into one focused workspace.",
       },
-      { property: "og:title", content: "TeamFlow AI — Team. Projects. Results." },
+      {
+        property: "og:title",
+        content: "TeamFlow AI — Project management workspace with AI Copilot",
+      },
       {
         property: "og:description",
         content:
-          "Plan projects, manage tasks on a Kanban board, collaborate in team chat, and review briefings grounded in your workspace data.",
+          "Plan projects, coordinate tasks and team chat, and ask a contextual AI Copilot about the work you can access.",
       },
     ],
   }),
@@ -35,8 +36,8 @@ function Landing() {
   useEffect(() => {
     document.title =
       lang === "ru"
-        ? "TeamFlow AI — Команда. Проекты. Результат."
-        : "TeamFlow AI — Team. Projects. Results.";
+        ? "TeamFlow AI — Проекты и AI в одном пространстве"
+        : "TeamFlow AI — Projects and AI in one workspace";
   }, [lang]);
 
   return (
@@ -45,8 +46,7 @@ function Landing() {
       <main>
         <Hero />
         <Features />
-        <ProductPreview />
-        <Pricing />
+        <FinalCta />
       </main>
       <SiteFooter />
     </PublicPageShell>

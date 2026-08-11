@@ -79,6 +79,10 @@ function providerHttpError(status: number): AiProviderError {
   );
 }
 
+function isGptOssModel(model: string): boolean {
+  return /(^|\/)gpt-oss/i.test(model);
+}
+
 function readCompletion(payload: unknown): string | null {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     return null;
@@ -100,6 +104,20 @@ function readCompletion(payload: unknown): string | null {
     return null;
   }
   return content.trim();
+}
+
+function emptyCompletionReason(payload: unknown): string {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return "AI provider returned an empty completion";
+  }
+  const response = payload as GroqChatCompletionResponse & {
+    choices?: Array<{ finish_reason?: unknown }>;
+  };
+  const finishReason = response.choices?.[0]?.finish_reason;
+  if (finishReason === "length") {
+    return "AI provider exhausted the completion token budget before producing an answer";
+  }
+  return "AI provider returned an empty completion";
 }
 
 export class GroqProvider implements AiProvider {
@@ -127,18 +145,27 @@ export class GroqProvider implements AiProvider {
       GROQ_MAX_COMPLETION_TOKENS_CAP,
       GROQ_MAX_COMPLETION_TOKENS_CAP,
     );
+    // Reasoning models (gpt-oss) spend completion budget on hidden chain-of-thought.
+    // Keep extra headroom so visible answers are not truncated to empty content.
+    const reasoningFloor = isGptOssModel(model) ? 2_048 : configuredMax;
+    const effectiveConfiguredMax = Math.max(configuredMax, reasoningFloor);
     const maxCompletionTokens = safePositiveInteger(
-      input.maxCompletionTokens ?? configuredMax,
-      configuredMax,
-      configuredMax,
+      input.maxCompletionTokens ?? effectiveConfiguredMax,
+      effectiveConfiguredMax,
+      GROQ_MAX_COMPLETION_TOKENS_CAP,
     );
-    const body = JSON.stringify({
+    const bodyPayload: Record<string, unknown> = {
       model,
       messages: input.messages,
       max_completion_tokens: maxCompletionTokens,
       stream: false,
-    });
-    const requestTimeoutMs = safePositiveInteger(this.config.requestTimeoutMs, 12_000, 60_000);
+    };
+    // Low effort keeps gpt-oss from burning the whole budget before writing content.
+    if (isGptOssModel(model)) {
+      bodyPayload.reasoning_effort = "low";
+    }
+    const body = JSON.stringify(bodyPayload);
+    const requestTimeoutMs = safePositiveInteger(this.config.requestTimeoutMs, 20_000, 60_000);
     const deadlineAt = Date.now() + requestTimeoutMs;
 
     let lastTransientError: AiProviderError | null = null;
@@ -203,7 +230,7 @@ export class GroqProvider implements AiProvider {
       if (!content) {
         throw new AiProviderError(
           "AI_PROVIDER_INVALID_RESPONSE",
-          "AI provider returned an empty completion",
+          emptyCompletionReason(payload),
           false,
         );
       }

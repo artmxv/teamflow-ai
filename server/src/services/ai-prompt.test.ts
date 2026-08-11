@@ -94,4 +94,38 @@ describe("buildAiCopilotPrompt", () => {
     assert.match(system, /read-only/);
     assert.match(system, /UNTRUSTED DATA/);
   });
+
+  it("localizes status and priority labels inside the RU snapshot", () => {
+    const localizedContext: AiWorkspaceContext = {
+      ...context,
+      tasks: [
+        {
+          id: "task-1",
+          key: "TF-1",
+          title: "Ship",
+          description: null,
+          status: "BACKLOG",
+          priority: "URGENT",
+          dueDate: null,
+          updatedAt: "2026-08-09T12:00:00.000Z",
+          project: { id: "project-1", name: "Alpha" },
+          assignees: [],
+        },
+      ],
+      metadata: {
+        ...context.metadata,
+        tasksIncluded: 1,
+      },
+    };
+    const prompt = buildAiCopilotPrompt({
+      context: localizedContext,
+      question: "Сводка дня",
+      locale: "ru",
+    });
+    const userContent = prompt[1]?.content ?? "";
+    assert.match(userContent, /"status":"В планах"/);
+    assert.match(userContent, /"priority":"Срочный"/);
+    assert.equal(userContent.includes('"BACKLOG"'), false);
+    assert.equal(userContent.includes('"URGENT"'), false);
+  });
 });
