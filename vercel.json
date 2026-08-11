@@ -8,6 +8,10 @@
     {
       "source": "/uploads/:path*",
       "destination": "https://teamflow-ai-api.onrender.com/uploads/:path*"
+    },
+    {
+      "source": "/socket.io/:path*",
+      "destination": "https://teamflow-ai-api.onrender.com/socket.io/:path*"
     }
   ],
   "headers": [
