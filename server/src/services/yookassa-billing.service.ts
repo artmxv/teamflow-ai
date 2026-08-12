@@ -441,6 +441,14 @@ export async function confirmBillingPayment(input: {
     };
   }
 
+  if (payment.status === "CANCELED") {
+    return {
+      paymentId: payment.id,
+      status: "CANCELED",
+      currentPlan: await resolveOwnerBillingPlan(payment.ownerUserId),
+    };
+  }
+
   if (!payment.providerPaymentId) {
     throw new AuthError("Payment is not linked to YooKassa yet", 409, "PAYMENT_NOT_READY");
   }

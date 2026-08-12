@@ -4923,11 +4923,11 @@ html.app-scrollbar.public-scrollbar::-webkit-scrollbar-thumb {
   max-width: 100%;
   color: #55535e;
   opacity: 0;
-  animation: chat-draft-type 2.8s steps(34, end) 550ms both paused;
+  animation: chat-cycle-draft 9s steps(24, end) infinite both paused;
 }
 
 .chat-composer__placeholder {
-  animation: chat-placeholder-cycle 3.6s ease 300ms both paused;
+  animation: chat-cycle-placeholder 9s ease-in-out infinite both paused;
 }
 
 .collaboration-scene.is-scene-active .chat-composer__draft,
@@ -4935,30 +4935,83 @@ html.app-scrollbar.public-scrollbar::-webkit-scrollbar-thumb {
   animation-play-state: running;
 }
 
-@keyframes chat-draft-type {
-  0% { opacity: 1; clip-path: inset(0 100% 0 0); }
-  78% { opacity: 1; clip-path: inset(0 0 0 0); }
-  100% { opacity: 0; clip-path: inset(0 0 0 0); }
+@keyframes chat-cycle-draft {
+  0%, 2% { opacity: 0; clip-path: inset(0 100% 0 0); }
+  3% { opacity: 1; clip-path: inset(0 100% 0 0); }
+  12% { opacity: 1; clip-path: inset(0 0 0 0); }
+  15%, 100% { opacity: 0; clip-path: inset(0 0 0 0); }
 }
 
-@keyframes chat-placeholder-cycle {
-  0%, 8% { opacity: 1; }
-  15%, 88% { opacity: 0; }
-  100% { opacity: 1; }
+@keyframes chat-cycle-placeholder {
+  0%, 2% { opacity: 1; }
+  3%, 15% { opacity: 0; }
+  18%, 100% { opacity: 1; }
 }
 
-.collaboration-scene.is-scene-active .chat-thread__messages > :nth-child(1) { animation-delay: 3.25s; }
-.collaboration-scene.is-scene-active .chat-thread__messages > :nth-child(3) { animation-delay: 5.1s; }
-.collaboration-scene.is-scene-active .chat-thread__messages > :nth-child(4) { animation-delay: 6.05s; }
-.collaboration-scene.is-scene-active .chat-thread__messages > :nth-child(5) { animation-delay: 6.85s; }
-.collaboration-scene.is-scene-active .chat-thread__messages > :nth-child(6) { animation-delay: 7.55s; }
+@keyframes chat-cycle-first-message {
+  0%, 13% { opacity: 0; transform: translateY(0.3rem); }
+  17%, 88% { opacity: 1; transform: translateY(0); }
+  96%, 100% { opacity: 0; transform: translateY(-0.15rem); }
+}
+
+@keyframes chat-cycle-reply {
+  0%, 30% { opacity: 0; transform: translateY(0.3rem); }
+  35%, 88% { opacity: 1; transform: translateY(0); }
+  96%, 100% { opacity: 0; transform: translateY(-0.15rem); }
+}
+
+@keyframes chat-cycle-task {
+  0%, 40% { opacity: 0; transform: translateY(0.3rem); }
+  45%, 88% { opacity: 1; transform: translateY(0); }
+  96%, 100% { opacity: 0; transform: translateY(-0.15rem); }
+}
+
+@keyframes chat-cycle-file {
+  0%, 50% { opacity: 0; transform: translateY(0.3rem); }
+  55%, 88% { opacity: 1; transform: translateY(0); }
+  96%, 100% { opacity: 0; transform: translateY(-0.15rem); }
+}
+
+@keyframes chat-cycle-final-message {
+  0%, 60% { opacity: 0; transform: translateY(0.3rem); }
+  65%, 88% { opacity: 1; transform: translateY(0); }
+  96%, 100% { opacity: 0; transform: translateY(-0.15rem); }
+}
+
+@keyframes chat-cycle-typing {
+  0%, 17% { opacity: 0; max-height: 0; transform: translateY(0.2rem); }
+  20%, 27% { opacity: 1; max-height: 3rem; transform: translateY(0); }
+  31%, 100% { opacity: 0; max-height: 0; transform: translateY(-0.15rem); }
+}
+
+.collaboration-scene.is-scene-active .chat-thread__messages > :nth-child(1) {
+  animation: chat-cycle-first-message 9s ease-in-out infinite both;
+}
+
+.collaboration-scene.is-scene-active .chat-thread__messages > :nth-child(3) {
+  animation: chat-cycle-reply 9s ease-in-out infinite both;
+}
+
+.collaboration-scene.is-scene-active .chat-thread__messages > :nth-child(4) {
+  animation: chat-cycle-task 9s ease-in-out infinite both;
+}
+
+.collaboration-scene.is-scene-active .chat-thread__messages > :nth-child(5) {
+  animation: chat-cycle-file 9s ease-in-out infinite both;
+}
+
+.collaboration-scene.is-scene-active .chat-thread__messages > :nth-child(6) {
+  animation: chat-cycle-final-message 9s ease-in-out infinite both;
+}
 
 .collaboration-scene.is-scene-active .chat-thread__messages > .chat-typing {
-  animation: chat-typing-live 1.85s ease-in-out 3.55s both;
+  overflow: hidden;
+  animation: chat-cycle-typing 9s ease-in-out infinite both;
 }
 
 .collaboration-scene.is-scene-active .chat-reaction {
-  animation-delay: 5.75s;
+  opacity: 1;
+  animation: none;
 }
 
 .chat-pins {
@@ -4975,8 +5028,170 @@ html.app-scrollbar.public-scrollbar::-webkit-scrollbar-thumb {
 }
 
 @media (max-width: 639px) {
+  .public-hero-title {
+    font-size: clamp(2.25rem, 10.5vw, 3rem);
+    line-height: 1.04;
+  }
+
+  .public-section-title {
+    font-size: clamp(2rem, 9.2vw, 2.5rem);
+    line-height: 1.05;
+  }
+
+  .public-product-frame__chrome {
+    height: 2rem;
+    padding-inline: 0.7rem;
+  }
+
+  .public-product-frame__traffic i {
+    width: 0.48rem;
+    height: 0.48rem;
+  }
+
   .dashboard-scene__shell {
+    min-height: 0;
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-scene__sidebar {
+    display: none;
+  }
+
+  .dashboard-scene__content {
+    padding: 0.7rem;
+  }
+
+  .dashboard-scene__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+
+  .dashboard-scene__metrics .dashboard-metric:nth-child(n+3) {
+    display: grid;
+  }
+
+  .dashboard-metric {
+    min-height: 4.5rem;
+    padding: 0.55rem;
+  }
+
+  .dashboard-metric__icon {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+
+  .dashboard-metric > strong {
+    margin-top: 0.3rem;
+    font-size: 1rem;
+  }
+
+  .dashboard-metric > span:last-child {
+    margin-top: 0.18rem;
+    font-size: 0.5rem;
+  }
+
+  .dashboard-scene__main-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .dashboard-panel {
+    padding: 0.75rem;
+  }
+
+  .dashboard-panel--activity,
+  .dashboard-panel--insight,
+  .dashboard-panel--projects {
+    grid-column: 1;
+  }
+
+  .dashboard-panel--status,
+  .dashboard-panel--deadlines {
+    display: none;
+  }
+
+  .dashboard-periods span {
+    display: none;
+  }
+
+  .dashboard-bar-chart {
+    height: 92px;
+  }
+
+  .ai-copilot-scene__layout {
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ai-conversation {
+    min-width: 0;
+    border-right: 0;
+    border-bottom: 1px solid #35363d;
+  }
+
+  .ai-conversation__context {
+    min-height: 3.8rem;
+    padding: 0.75rem;
+  }
+
+  .ai-question {
+    max-width: calc(100% - 1.5rem);
+    margin: 1rem 0.75rem 0.75rem auto;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .ai-answer {
+    margin-inline: 0.75rem;
+  }
+
+  .ai-answer__summary {
+    padding: 0.75rem;
+  }
+
+  .ai-answer__summary > p,
+  .ai-answer__summary li {
+    overflow-wrap: anywhere;
+  }
+
+  .ai-suggestions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 0.8rem 0.75rem 0.5rem;
+  }
+
+  .ai-suggestions span {
+    min-height: 2.35rem;
+    white-space: normal;
+    line-height: 1.3;
+  }
+
+  .ai-composer-preview {
+    margin: 0 0.75rem 0.75rem;
+  }
+
+  .ai-insight-rail {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+
+  .ai-rail-card,
+  .ai-rail-card--projects {
+    min-width: 0;
+    min-height: 0;
+    padding: 0.7rem;
+  }
+
+  .ai-focus-grid small {
+    white-space: normal;
+    line-height: 1.2;
+  }
+
+  .ai-project-progress > div:nth-child(n+5) {
+    display: none;
   }
 
   .workflow-drag-demo {

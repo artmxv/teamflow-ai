@@ -153,6 +153,7 @@ export const Route = createFileRoute("/app/chat")({
 const NEAR_BOTTOM_PX = 80;
 const COMPOSER_COUNTER_SOFT_LIMIT = 1800;
 const COMPOSER_MAX_HEIGHT_PX = 160;
+const REALTIME_STATUS_GRACE_MS = 1_800;
 
 function formatChatTimestamp(iso: string, lang: Lang) {
   const date = new Date(iso);
@@ -470,7 +471,7 @@ function WorkspaceChatPage() {
                     onChange={(event) => setConversationFilter(event.target.value)}
                     placeholder={t("chat.searchConversations")}
                     aria-label={t("chat.searchConversations")}
-                    className="filter-search-input w-full pl-9 text-sm"
+                    className="filter-search-input w-full pl-9 text-base md:text-sm"
                   />
                 </div>
                 <Button
@@ -594,6 +595,29 @@ function WorkspaceChatPage() {
 
 function ChatRealtimeStatus({ status }: { status: ReturnType<typeof getChatSocketStatus> }) {
   const { t } = useI18n();
+  const warningStartedAtRef = useRef<number | null>(null);
+  const [visibleStatus, setVisibleStatus] = useState<
+    "connecting" | "reconnecting" | "disconnected" | null
+  >(null);
+
+  useEffect(() => {
+    if (status === "connected" || status === "idle") {
+      warningStartedAtRef.current = null;
+      setVisibleStatus(null);
+      return;
+    }
+
+    const startedAt = warningStartedAtRef.current ?? Date.now();
+    warningStartedAtRef.current = startedAt;
+    const remaining = Math.max(0, REALTIME_STATUS_GRACE_MS - (Date.now() - startedAt));
+    const reveal = () => setVisibleStatus(status);
+    if (remaining === 0) {
+      reveal();
+      return;
+    }
+    const timeoutId = window.setTimeout(reveal, remaining);
+    return () => window.clearTimeout(timeoutId);
+  }, [status]);
 
   if (status === "connected") {
     // Connection is healthy: keep status for assistive tech only (no visible "Online").
@@ -605,11 +629,11 @@ function ChatRealtimeStatus({ status }: { status: ReturnType<typeof getChatSocke
   }
 
   const label =
-    status === "connecting"
+    visibleStatus === "connecting"
       ? t("chat.realtimeConnecting")
-      : status === "reconnecting"
+      : visibleStatus === "reconnecting"
         ? t("chat.realtimeReconnecting")
-        : status === "disconnected"
+        : visibleStatus === "disconnected"
           ? t("chat.realtimeDisconnected")
           : null;
 

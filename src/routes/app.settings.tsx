@@ -53,7 +53,7 @@ import {
 import { updateWorkspace } from "@/lib/api/workspace";
 import { canEditWorkspaceSettings, useCurrentUser } from "@/lib/auth/use-current-user";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Check, Loader2, Moon, Palette, Sun } from "lucide-react";
+import { Check, ChevronDown, Loader2, Moon, Palette, Sun } from "lucide-react";
 import { useTheme, type BrandTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
@@ -563,20 +563,26 @@ function SettingsPage() {
         }}
         className="w-full"
       >
-        <TabsList>
-          <TabsTrigger value="workspace" className="settings-tabs-trigger">
-            {t("side.workspace")}
-          </TabsTrigger>
-          <TabsTrigger value="profile" className="settings-tabs-trigger">
-            {t("settings.profileSettings")}
-          </TabsTrigger>
-          <TabsTrigger value="appearance" className="settings-tabs-trigger">
-            {t("settings.themeSettings")}
-          </TabsTrigger>
-          <TabsTrigger value="billing" className="settings-tabs-trigger">
-            {t("side.billing")}
-          </TabsTrigger>
-        </TabsList>
+        <div className="relative min-w-0">
+          <TabsList className="settings-tabs-list w-full scroll-px-4 pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:pr-1">
+            <TabsTrigger value="workspace" className="settings-tabs-trigger">
+              {t("side.workspace")}
+            </TabsTrigger>
+            <TabsTrigger value="profile" className="settings-tabs-trigger">
+              {t("settings.profileSettings")}
+            </TabsTrigger>
+            <TabsTrigger value="appearance" className="settings-tabs-trigger">
+              {t("settings.themeSettings")}
+            </TabsTrigger>
+            <TabsTrigger value="billing" className="settings-tabs-trigger">
+              {t("side.billing")}
+            </TabsTrigger>
+          </TabsList>
+          <span
+            className="pointer-events-none absolute inset-y-px right-px w-10 rounded-r-xl bg-gradient-to-l from-muted/95 to-transparent sm:hidden"
+            aria-hidden
+          />
+        </div>
 
         <TabsContent value="workspace" className="mt-5">
           <Card
@@ -1152,30 +1158,72 @@ function ProfileLocationField({
   onChange: (country: LocationFormCountry, other: string) => void;
 }) {
   const { t, lang } = useI18n();
+  const label = t("settings.country");
 
   return (
-    <Field label={t("settings.country")} htmlFor="settings-profile-country">
-      <Select
-        value={country}
-        onValueChange={(value) => onChange(value as LocationFormCountry, other)}
-        disabled={disabled}
+    <div className="space-y-1.5">
+      <Label
+        id="settings-profile-country-mobile-label"
+        htmlFor="settings-profile-country-mobile"
+        className="md:hidden"
       >
-        <SelectTrigger id="settings-profile-country">
-          <SelectValue placeholder={t("settings.country")}>
-            {country !== LOCATION_UNSET ? locationCountryLabel(country, lang as Lang) : null}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={LOCATION_UNSET}>—</SelectItem>
+        {label}
+      </Label>
+      <Label
+        id="settings-profile-country-desktop-label"
+        htmlFor="settings-profile-country-desktop"
+        className="hidden md:block"
+      >
+        {label}
+      </Label>
+      <div className="relative md:hidden">
+        <select
+          id="settings-profile-country-mobile"
+          aria-labelledby="settings-profile-country-mobile-label"
+          value={country}
+          onChange={(event) => onChange(event.target.value as LocationFormCountry, other)}
+          disabled={disabled}
+          className="h-10 w-full appearance-none rounded-md border border-control-border bg-control py-1 pl-3 pr-9 text-base text-control-foreground shadow-sm transition-colors hover:bg-control-hover focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          <option value={LOCATION_UNSET}>—</option>
           {LOCATION_COUNTRY_OPTIONS.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
+            <option key={option.value} value={option.value}>
               {locationCountryLabel(option.value, lang as Lang)}
-            </SelectItem>
+            </option>
           ))}
-        </SelectContent>
-      </Select>
+        </select>
+        <ChevronDown
+          className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 opacity-70"
+          aria-hidden
+        />
+      </div>
+      <div className="hidden md:block">
+        <Select
+          value={country}
+          onValueChange={(value) => onChange(value as LocationFormCountry, other)}
+          disabled={disabled}
+        >
+          <SelectTrigger
+            id="settings-profile-country-desktop"
+            aria-labelledby="settings-profile-country-desktop-label"
+          >
+            <SelectValue placeholder={label}>
+              {country !== LOCATION_UNSET ? locationCountryLabel(country, lang as Lang) : null}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent className="max-h-[min(18rem,calc(100dvh-2rem))]">
+            <SelectItem value={LOCATION_UNSET}>—</SelectItem>
+            {LOCATION_COUNTRY_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {locationCountryLabel(option.value, lang as Lang)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       {country === "OTHER" ? (
         <Input
+          id="settings-profile-country-other"
           className="mt-2"
           aria-label={t("settings.other")}
           value={other}
@@ -1184,7 +1232,7 @@ function ProfileLocationField({
           placeholder={t("settings.other")}
         />
       ) : null}
-    </Field>
+    </div>
   );
 }
 function SaveBar({

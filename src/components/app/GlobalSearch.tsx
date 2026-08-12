@@ -522,7 +522,7 @@ export function GlobalSearch() {
               aria-autocomplete="list"
               value={query}
               placeholder={t("top.search")}
-              className="filter-search-input h-11 w-full appearance-none pl-9 pr-10 text-sm outline-none transition [&::-webkit-search-cancel-button]:appearance-none"
+              className="filter-search-input h-11 w-full appearance-none pl-9 pr-10 text-base outline-none transition md:text-sm [&::-webkit-search-cancel-button]:appearance-none"
               onChange={(event) => handleQueryChange(event.target.value)}
               onKeyDown={handleSearchInputKeyDown}
             />

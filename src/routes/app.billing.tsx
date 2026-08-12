@@ -22,13 +22,10 @@ import {
   type BillingSummary,
 } from "@/lib/api/billing";
 import {
-  BILLING_CONFIRM_POLL_INTERVAL_MS,
-  BILLING_CONFIRM_POLL_TIMEOUT_MS,
   clearBillingReturnQueryParams,
   clearPendingBillingPaymentId,
-  decideConfirmPaymentPoll,
+  decideBillingReturnConfirmation,
   parseBillingReturnSearch,
-  shouldRetryConfirmPaymentError,
   syncBillingReturnPaymentIdFromUrl,
 } from "@/lib/billing/payment-return";
 import { Check, CreditCard, Info, Loader2 } from "lucide-react";
@@ -135,28 +132,6 @@ function billingErrorMessage(
   return key ? t(key) : friendlyApiErrorMessage(error, t, "billing.loadErrorTitle");
 }
 
-function sleep(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal.aborted) {
-      reject(new DOMException("Aborted", "AbortError"));
-      return;
-    }
-    const timeoutId = window.setTimeout(() => {
-      signal.removeEventListener("abort", onAbort);
-      resolve();
-    }, ms);
-    const onAbort = () => {
-      window.clearTimeout(timeoutId);
-      reject(new DOMException("Aborted", "AbortError"));
-    };
-    signal.addEventListener("abort", onAbort, { once: true });
-  });
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === "AbortError";
-}
-
 function BillingPage() {
   const { t, lang } = useI18n();
   const queryClient = useQueryClient();
@@ -164,7 +139,6 @@ function BillingPage() {
   const [pendingPaymentId, setPendingPaymentId] = useState<string | null>(() =>
     syncBillingReturnPaymentIdFromUrl(),
   );
-  const [confirmingPayment, setConfirmingPayment] = useState(() => Boolean(pendingPaymentId));
   const [confirmError, setConfirmError] = useState<unknown>(null);
   const [confirmAttempt, setConfirmAttempt] = useState(0);
 
@@ -223,7 +197,6 @@ function BillingPage() {
     if (parsed.kind === "cancelled") {
       clearPendingBillingPaymentId();
       setPendingPaymentId(null);
-      setConfirmingPayment(false);
       toast.info(t("billing.changeCancelled"));
       return;
     }
@@ -239,7 +212,6 @@ function BillingPage() {
 
     setPendingPaymentId(paymentId);
     setConfirmError(null);
-    setConfirmingPayment(true);
   }, [queryClient, t]);
 
   useEffect(() => {
@@ -249,80 +221,40 @@ function BillingPage() {
 
     const paymentId = pendingPaymentId;
     const abort = new AbortController();
-    let timedOut = false;
 
     void (async () => {
-      setConfirmingPayment(true);
       setConfirmError(null);
-      const startedAt = Date.now();
-
-      while (!abort.signal.aborted) {
-        try {
-          assertBrowserOnline();
-          const confirmation = await confirmBillingPayment(paymentId);
-          if (abort.signal.aborted) {
-            return;
-          }
-
-          const decision = decideConfirmPaymentPoll(confirmation);
-          if (decision.action === "succeeded") {
-            clearPendingBillingPaymentId();
-            setPendingPaymentId(null);
-            setConfirmingPayment(false);
-            setConfirmError(null);
-            await refreshBillingQueries();
-            if (!abort.signal.aborted) {
-              toast.success(t("billing.paymentSucceeded"));
-            }
-            return;
-          }
-          if (decision.action === "canceled") {
-            clearPendingBillingPaymentId();
-            setPendingPaymentId(null);
-            setConfirmingPayment(false);
-            setConfirmError(null);
-            toast.error(t("billing.paymentCanceled"));
-            return;
-          }
-
-          if (Date.now() - startedAt >= BILLING_CONFIRM_POLL_TIMEOUT_MS) {
-            timedOut = true;
-            break;
-          }
-          await sleep(BILLING_CONFIRM_POLL_INTERVAL_MS, abort.signal);
-        } catch (error) {
-          if (abort.signal.aborted || isAbortError(error)) {
-            return;
-          }
-          if (
-            shouldRetryConfirmPaymentError(error) &&
-            Date.now() - startedAt < BILLING_CONFIRM_POLL_TIMEOUT_MS
-          ) {
-            try {
-              await sleep(BILLING_CONFIRM_POLL_INTERVAL_MS, abort.signal);
-              continue;
-            } catch (sleepError) {
-              if (isAbortError(sleepError)) {
-                return;
-              }
-            }
-          }
-          setConfirmError(error);
-          setConfirmingPayment(false);
+      try {
+        assertBrowserOnline();
+        const confirmation = await confirmBillingPayment(paymentId);
+        if (abort.signal.aborted) {
           return;
         }
-      }
 
-      if (abort.signal.aborted) {
-        return;
-      }
-
-      if (timedOut) {
+        const decision = decideBillingReturnConfirmation(confirmation);
         clearPendingBillingPaymentId();
         setPendingPaymentId(null);
-        setConfirmingPayment(false);
+        setConfirmError(null);
+
+        if (decision.action === "succeeded") {
+          await refreshBillingQueries();
+          if (!abort.signal.aborted) {
+            toast.success(t("billing.paymentSucceeded"));
+          }
+          return;
+        }
+        if (decision.action === "canceled") {
+          toast.info(t("billing.paymentCanceled"));
+          return;
+        }
+
         toast.info(t("billing.changeStillProcessing"));
         void queryClient.invalidateQueries({ queryKey: BILLING_SUMMARY_QUERY_KEY });
+      } catch (error) {
+        if (abort.signal.aborted) {
+          return;
+        }
+        setConfirmError(error);
       }
     })();
 
@@ -337,23 +269,12 @@ function BillingPage() {
     }
     setConfirmError(null);
     setPendingPaymentId(paymentId);
-    setConfirmingPayment(true);
     setConfirmAttempt((value) => value + 1);
   };
 
   return (
     <AppShell>
       <PageHeader title={t("side.billing")} subtitle={t("billing.subtitle")} />
-
-      {confirmingPayment && pendingPaymentId ? (
-        <Alert className="mb-6 border-primary/25 bg-card shadow-soft ring-1 ring-primary/10">
-          <Loader2 className="size-4 animate-spin text-primary" />
-          <AlertTitle className="text-foreground">{t("billing.checkingPayment")}</AlertTitle>
-          <AlertDescription className="text-muted-foreground">
-            {t("billing.paymentPending")}
-          </AlertDescription>
-        </Alert>
-      ) : null}
 
       {confirmError ? (
         <div className="mb-6">
@@ -389,9 +310,7 @@ function BillingPage() {
         </Alert>
       ) : null}
 
-      {confirmingPayment && !summary && !confirmError ? (
-        <BillingSkeleton />
-      ) : summaryQuery.isLoading && !confirmError ? (
+      {summaryQuery.isLoading && !confirmError ? (
         <BillingSkeleton />
       ) : summaryQuery.isError || !summary ? (
         confirmError ? null : (

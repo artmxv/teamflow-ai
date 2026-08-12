@@ -664,7 +664,7 @@ export function TaskDrawer({
                       rows={5}
                       aria-label={t("tasks.description")}
                       placeholder={t("tasks.descriptionPlaceholder")}
-                      className="min-h-[7.5rem] w-full min-w-0 max-w-full resize-y whitespace-pre-wrap break-words text-sm leading-relaxed [overflow-wrap:anywhere]"
+                      className="min-h-[7.5rem] w-full min-w-0 max-w-full resize-y whitespace-pre-wrap break-words text-base leading-relaxed md:text-sm [overflow-wrap:anywhere]"
                       onChange={(event) => setDraftDescription(event.target.value)}
                       onKeyDown={(event) => {
                         if (event.key === "Escape") {
