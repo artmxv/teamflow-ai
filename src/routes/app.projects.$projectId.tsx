@@ -130,6 +130,10 @@ import {
 
 export const Route = createFileRoute("/app/projects/$projectId")({
   beforeLoad: requireAuth,
+  validateSearch: (search: Record<string, unknown>): { taskId?: string } => ({
+    taskId:
+      typeof search.taskId === "string" && search.taskId.length > 0 ? search.taskId : undefined,
+  }),
   head: () => ({ meta: [{ title: "Project — TeamFlow AI" }] }),
   component: ProjectDetailPage,
 });
@@ -193,9 +197,10 @@ function ProjectDetailPage() {
   const workspaceId = me?.workspace?.id ?? null;
   const canManageProjects = isWorkspaceManager(me?.workspace?.role);
   const { projectId } = Route.useParams();
+  const { taskId: taskIdFromUrl } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   const projectsQuery = useQuery({
     queryKey: ["projects"],
@@ -215,7 +220,21 @@ function ProjectDetailPage() {
   const apiTasks = tasksQuery.data ?? [];
 
   const project = apiProjects.find((p) => p.id === projectId) ?? null;
-  const projectTasks = apiTasks.filter((t) => t.projectId === projectId);
+  const projectTasks = apiTasks.filter((task) => task.projectId === projectId);
+  const selectedApiTask = projectTasks.find((item) => item.id === taskIdFromUrl);
+  const selectedTask = useMemo(
+    () => (selectedApiTask ? mapApiTaskToTask(selectedApiTask, t) : null),
+    [selectedApiTask, t],
+  );
+
+  function updateTaskSearch(taskId: string | undefined) {
+    void navigate({ search: { taskId }, replace: true });
+  }
+
+  useEffect(() => {
+    if (!taskIdFromUrl || tasksQuery.isLoading || tasksQuery.isError || selectedTask) return;
+    void navigate({ search: { taskId: undefined }, replace: true });
+  }, [taskIdFromUrl, tasksQuery.isLoading, tasksQuery.isError, selectedTask, navigate]);
 
   const updateProjectMutation = useMutation({
     mutationFn: (input: {
@@ -268,7 +287,7 @@ function ProjectDetailPage() {
     mutationFn: deleteTask,
     onSuccess: async () => {
       await invalidateWorkspaceContentQueries(queryClient, workspaceId);
-      setSelectedTask(null);
+      updateTaskSearch(undefined);
       toast.success(t("tasks.deleted"));
     },
     onError: () => {
@@ -290,13 +309,9 @@ function ProjectDetailPage() {
         priority: TaskApiPriority;
       };
     }) => updateTask(id, input),
-    onSuccess: async (updated) => {
+    onSuccess: async () => {
       await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       invalidateNotifications(queryClient);
-      setSelectedTask((prev) => {
-        if (!prev || prev.id !== updated.id) return prev;
-        return mapApiTaskToTask(updated, t);
-      });
       toast.success(t("tasks.updated"));
     },
     onError: () => {
@@ -306,13 +321,9 @@ function ProjectDetailPage() {
   const updateDescriptionMutation = useMutation({
     mutationFn: ({ id, description }: { id: string; description: string | null }) =>
       updateTask(id, { description }),
-    onSuccess: async (updated) => {
+    onSuccess: async () => {
       await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       invalidateNotifications(queryClient);
-      setSelectedTask((prev) => {
-        if (!prev || prev.id !== updated.id) return prev;
-        return mapApiTaskToTask(updated, t);
-      });
       toast.success(t("tasks.updated"));
     },
     onError: () => {
@@ -402,7 +413,7 @@ function ProjectDetailPage() {
           projectTasks={projectTasks}
           isCreatingTask={createTaskMutation.isPending}
           onCreateTask={handleCreateTask}
-          onOpenTask={(task) => setSelectedTask(mapApiTaskToTask(task, t))}
+          onOpenTask={(task) => updateTaskSearch(task.id)}
           canManageMembers={canManageProjects}
         />
       )}
@@ -431,7 +442,7 @@ function ProjectDetailPage() {
           await updateDescriptionMutation.mutateAsync({ id: selectedTask.id, description });
         }}
         isSavingDescription={updateDescriptionMutation.isPending}
-        onOpenChange={(open) => !open && setSelectedTask(null)}
+        onOpenChange={(open) => !open && updateTaskSearch(undefined)}
         onDelete={(taskId) => deleteTaskMutation.mutate(taskId)}
         isDeleting={deleteTaskMutation.isPending}
       />
@@ -489,7 +500,7 @@ function EditProjectDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="brandSoft" size="sm" className="h-10 lg:h-8">
+        <Button variant="outline" size="sm" className="h-10 lg:h-8">
           {t("common.edit")}
         </Button>
       </DialogTrigger>
@@ -521,16 +532,18 @@ function EditProjectDialog({
           }}
         >
           <div className="space-y-1.5">
-            <Label>{t("projects.form.name")}</Label>
+            <Label htmlFor="edit-project-name">{t("projects.form.name")}</Label>
             <Input
+              id="edit-project-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t("projects.new.projectName")}
             />
           </div>
           <div className="space-y-1.5">
-            <Label>{t("projects.form.description")}</Label>
+            <Label htmlFor="edit-project-description">{t("projects.form.description")}</Label>
             <Textarea
+              id="edit-project-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t("projects.new.description")}
@@ -538,8 +551,11 @@ function EditProjectDialog({
           </div>
           <div className={projectDeadlineStatusDateTimeRowClassName}>
             <div className="flex min-w-0 flex-col gap-1.5">
-              <Label className="block h-4 leading-none">{t("projects.detail.status")}</Label>
+              <Label htmlFor="edit-project-status" className="block h-4 leading-none">
+                {t("projects.detail.status")}
+              </Label>
               <ProjectStatusSelect
+                id="edit-project-status"
                 value={apiStatusMap[status]}
                 onValueChange={(next) => setStatus(projectStatusToApi[next])}
                 getLabel={(statusKey) => projectStatusLabel(statusKey, t)}

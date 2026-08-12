@@ -267,7 +267,6 @@ function TasksPage() {
     assigneeFilterFromUrl(assigneeFromUrl),
   );
   const [sort, setSort] = useState<TaskSortState>(null);
-  const [selected, setSelected] = useState<Task | null>(null);
   const {
     data: apiTasks = [],
     error,
@@ -328,14 +327,10 @@ function TasksPage() {
         priority: TaskApiPriority;
       };
     }) => updateTask(id, input),
-    onSuccess: async (updated) => {
+    onSuccess: async () => {
       await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       invalidateNotifications(queryClient);
-      setSelected((prev) => {
-        if (!prev || prev.id !== updated.id) return prev;
-        return mapApiTaskToRow(updated);
-      });
-      setSelected(null);
+      updateUrlSearch({ taskId: undefined });
       toast.success(t("tasks.updated"));
     },
     onError: () => {
@@ -345,13 +340,9 @@ function TasksPage() {
   const updateDescriptionMutation = useMutation({
     mutationFn: ({ id, description }: { id: string; description: string | null }) =>
       updateTask(id, { description }),
-    onSuccess: async (updated) => {
+    onSuccess: async () => {
       await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       invalidateNotifications(queryClient);
-      setSelected((prev) => {
-        if (!prev || prev.id !== updated.id) return prev;
-        return mapApiTaskToRow(updated);
-      });
       toast.success(t("tasks.updated"));
     },
     onError: () => {
@@ -366,11 +357,15 @@ function TasksPage() {
       ),
     [apiTasks, workspaceMembers],
   );
+  const taskList = useMemo(() => apiTasks.map(mapApiTaskToRow), [apiTasks]);
+  const selected = useMemo(
+    () => taskList.find((task) => task.id === taskIdFromUrl) ?? null,
+    [taskIdFromUrl, taskList],
+  );
   const selectedAssignees = useMemo(
     () => (selected ? resolveTaskAssignees(apiTasks, selected.id) : []),
     [selected, apiTasks],
   );
-  const taskList = useMemo(() => apiTasks.map(mapApiTaskToRow), [apiTasks]);
 
   useEffect(() => {
     setStatus(taskListStatusFromUrl(statusFromUrl));
@@ -383,11 +378,11 @@ function TasksPage() {
   function updateUrlSearch(patch: Partial<TasksSearch>) {
     void navigate({
       search: {
-        taskId: patch.taskId !== undefined ? patch.taskId : urlSearch.taskId,
-        status: patch.status !== undefined ? patch.status : urlSearch.status,
-        due: patch.due !== undefined ? patch.due : urlSearch.due,
-        priority: patch.priority !== undefined ? patch.priority : urlSearch.priority,
-        assignee: patch.assignee !== undefined ? patch.assignee : urlSearch.assignee,
+        taskId: "taskId" in patch ? patch.taskId : urlSearch.taskId,
+        status: "status" in patch ? patch.status : urlSearch.status,
+        due: "due" in patch ? patch.due : urlSearch.due,
+        priority: "priority" in patch ? patch.priority : urlSearch.priority,
+        assignee: "assignee" in patch ? patch.assignee : urlSearch.assignee,
       },
       replace: true,
     });
@@ -407,10 +402,7 @@ function TasksPage() {
     mutationFn: deleteTask,
     onSuccess: async () => {
       await invalidateWorkspaceContentQueries(queryClient, workspaceId);
-      setSelected(null);
-      if (taskIdFromUrl) {
-        updateUrlSearch({ taskId: undefined });
-      }
+      updateUrlSearch({ taskId: undefined });
       toast.success(t("tasks.deleted"));
     },
     onError: () => {
@@ -419,23 +411,15 @@ function TasksPage() {
   });
 
   useEffect(() => {
-    if (!taskIdFromUrl || isLoading) return;
-    const task = taskList.find((item) => item.id === taskIdFromUrl);
-    if (task) {
-      setSelected(task);
-      return;
+    if (!taskIdFromUrl || isLoading || isError || selected) return;
+    if (!selected) {
+      void navigate({ search: { ...urlSearch, taskId: undefined }, replace: true });
     }
-    if (taskList.length > 0) {
-      updateUrlSearch({ taskId: undefined });
-    }
-  }, [taskIdFromUrl, taskList, isLoading]);
+  }, [taskIdFromUrl, isLoading, isError, selected, navigate, urlSearch]);
 
   function handleDrawerOpenChange(open: boolean) {
     if (!open) {
-      setSelected(null);
-      if (taskIdFromUrl) {
-        updateUrlSearch({ taskId: undefined });
-      }
+      updateUrlSearch({ taskId: undefined });
     }
   }
 
@@ -693,8 +677,20 @@ function TasksPage() {
               return (
                 <li
                   key={task.id}
-                  onClick={() => setSelected(task)}
-                  className="grid min-w-0 cursor-pointer grid-cols-2 items-start gap-3 px-4 py-4 text-sm transition hover:bg-muted/30 md:grid-cols-[minmax(0,1fr)_100px_100px_120px_100px_88px] md:items-center md:py-3"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${task.key} ${translateStarterTitle(task.title, lang)}`}
+                  onClick={() => updateUrlSearch({ taskId: task.id })}
+                  onKeyDown={(event) => {
+                    if (
+                      event.target === event.currentTarget &&
+                      (event.key === "Enter" || event.key === " ")
+                    ) {
+                      event.preventDefault();
+                      updateUrlSearch({ taskId: task.id });
+                    }
+                  }}
+                  className="grid min-w-0 cursor-pointer grid-cols-2 items-start gap-3 px-4 py-4 text-sm transition hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35 md:grid-cols-[minmax(0,1fr)_100px_100px_120px_100px_88px] md:items-center md:py-3"
                 >
                   <div className="col-span-2 min-w-0 md:col-span-1">
                     <div className="flex min-w-0 flex-wrap items-center gap-2 md:flex-nowrap">

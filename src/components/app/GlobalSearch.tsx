@@ -21,6 +21,14 @@ import { cn } from "@/lib/utils";
 const SEARCH_DEBOUNCE_MS = 280;
 const GLOBAL_SEARCH_QUERY_KEY = "global-search";
 
+function resultKey(result: GlobalSearchResult): string {
+  return `${result.type}:${result.id}`;
+}
+
+function resultOptionId(listboxId: string, result: GlobalSearchResult): string {
+  return `${listboxId}-${result.type}-${result.id}`;
+}
+
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
 
@@ -49,11 +57,17 @@ function SearchResultButton({
   result,
   project,
   label,
+  optionId,
+  active,
+  onActive,
   onSelect,
 }: {
   result: GlobalSearchResult;
   project?: ProjectApiItem;
   label: string;
+  optionId: string;
+  active: boolean;
+  onActive: (result: GlobalSearchResult) => void;
   onSelect: (result: GlobalSearchResult) => void;
 }) {
   const Icon = result.type === "project" ? FolderKanban : result.type === "task" ? ListTodo : User;
@@ -61,11 +75,18 @@ function SearchResultButton({
 
   return (
     <button
+      id={optionId}
       type="button"
       role="option"
-      aria-label={label}
-      className="flex w-full items-start gap-2.5 rounded-md px-2 py-2 text-left text-sm transition hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+      aria-label={`${label}: ${result.title}`}
+      aria-selected={active}
+      tabIndex={-1}
+      className={cn(
+        "flex w-full items-start gap-2.5 rounded-md px-2 py-2 text-left text-sm transition hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+        active && "bg-secondary/80",
+      )}
       onMouseDown={(event) => event.preventDefault()}
+      onMouseEnter={() => onActive(result)}
       onClick={() => onSelect(result)}
     >
       {result.type === "member" ? (
@@ -136,6 +157,9 @@ function SearchGroup({
   projectById,
   projectByName,
   openLabel,
+  listboxId,
+  activeResultKey,
+  onActive,
   onSelect,
 }: {
   title: string;
@@ -143,6 +167,9 @@ function SearchGroup({
   projectById?: ReadonlyMap<string, ProjectApiItem>;
   projectByName?: ReadonlyMap<string, ProjectApiItem>;
   openLabel: string;
+  listboxId: string;
+  activeResultKey: string | null;
+  onActive: (result: GlobalSearchResult) => void;
   onSelect: (result: GlobalSearchResult) => void;
 }) {
   if (results.length === 0) {
@@ -161,6 +188,9 @@ function SearchGroup({
               result={result}
               project={resolveResultProject(result, projectById, projectByName)}
               label={openLabel}
+              optionId={resultOptionId(listboxId, result)}
+              active={activeResultKey === resultKey(result)}
+              onActive={onActive}
               onSelect={onSelect}
             />
           </li>
@@ -194,6 +224,9 @@ function SearchResults({
   projectById,
   projectByName,
   labels,
+  listboxId,
+  activeResultKey,
+  onActive,
   onSelect,
   className,
 }: {
@@ -211,6 +244,9 @@ function SearchResults({
     people: string;
     open: string;
   };
+  listboxId: string;
+  activeResultKey: string | null;
+  onActive: (result: GlobalSearchResult) => void;
   onSelect: (result: GlobalSearchResult) => void;
   className?: string;
 }) {
@@ -238,6 +274,9 @@ function SearchResults({
         projectById={projectById}
         projectByName={projectByName}
         openLabel={labels.open}
+        listboxId={listboxId}
+        activeResultKey={activeResultKey}
+        onActive={onActive}
         onSelect={onSelect}
       />
       <SearchGroup
@@ -246,12 +285,18 @@ function SearchResults({
         projectById={projectById}
         projectByName={projectByName}
         openLabel={labels.open}
+        listboxId={listboxId}
+        activeResultKey={activeResultKey}
+        onActive={onActive}
         onSelect={onSelect}
       />
       <SearchGroup
         title={labels.people}
         results={data.members}
         openLabel={labels.open}
+        listboxId={listboxId}
+        activeResultKey={activeResultKey}
+        onActive={onActive}
         onSelect={onSelect}
       />
     </div>
@@ -270,6 +315,7 @@ export function GlobalSearch() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [activeResultKey, setActiveResultKey] = useState<string | null>(null);
   const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
 
   const trimmedQuery = query.trim();
@@ -305,6 +351,7 @@ export function GlobalSearch() {
     setOpen(false);
     setMobileOpen(false);
     setQuery("");
+    setActiveResultKey(null);
     desktopInputRef.current?.blur();
     mobileInputRef.current?.blur();
   }, []);
@@ -350,27 +397,71 @@ export function GlobalSearch() {
       }
     }
 
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        closeSearch();
-      }
-    }
-
     document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [showDesktopPanel, closeSearch]);
+  }, [showDesktopPanel]);
 
   const isDebouncing = trimmedQuery !== debouncedTrimmed;
   const isLoading = searchQuery.isLoading || searchQuery.isFetching || isDebouncing;
   const hasError = searchQuery.isError && !isLoading;
   const data = searchQuery.data;
-  const totalResults =
-    (data?.projects.length ?? 0) + (data?.tasks.length ?? 0) + (data?.members.length ?? 0);
+  const results = useMemo(
+    () => (data ? [...data.projects, ...data.tasks, ...data.members] : []),
+    [data],
+  );
+  const totalResults = results.length;
   const isEmpty = !isLoading && !hasError && totalResults === 0;
+  const activeResult =
+    !isLoading && !hasError
+      ? results.find((result) => resultKey(result) === activeResultKey)
+      : undefined;
+  const activeListboxId = showMobilePanel
+    ? mobileListboxId
+    : showDesktopPanel
+      ? desktopListboxId
+      : null;
+
+  useEffect(() => {
+    if (!activeResult || !activeListboxId) {
+      return;
+    }
+
+    document
+      .getElementById(resultOptionId(activeListboxId, activeResult))
+      ?.scrollIntoView({ block: "nearest" });
+  }, [activeListboxId, activeResult]);
+
+  function handleQueryChange(nextQuery: string) {
+    setQuery(nextQuery);
+    setActiveResultKey(null);
+  }
+
+  function handleSearchInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (
+      (event.key === "ArrowDown" || event.key === "ArrowUp") &&
+      !isLoading &&
+      !hasError &&
+      results.length > 0
+    ) {
+      event.preventDefault();
+      const currentIndex = results.findIndex((result) => resultKey(result) === activeResultKey);
+      const nextIndex =
+        currentIndex === -1
+          ? event.key === "ArrowDown"
+            ? 0
+            : results.length - 1
+          : (currentIndex + (event.key === "ArrowDown" ? 1 : -1) + results.length) % results.length;
+      setActiveResultKey(resultKey(results[nextIndex]));
+      return;
+    }
+
+    if (event.key === "Enter" && activeResult) {
+      event.preventDefault();
+      handleSelect(activeResult);
+    }
+  }
   const resultLabels = {
     error: t("top.searchError"),
     empty: t("top.searchNothingFound"),
@@ -423,11 +514,17 @@ export function GlobalSearch() {
               role="combobox"
               aria-expanded={showMobilePanel}
               aria-controls={showMobilePanel ? mobileListboxId : undefined}
+              aria-activedescendant={
+                showMobilePanel && activeResult
+                  ? resultOptionId(mobileListboxId, activeResult)
+                  : undefined
+              }
               aria-autocomplete="list"
               value={query}
               placeholder={t("top.search")}
               className="filter-search-input h-11 w-full appearance-none pl-9 pr-10 text-sm outline-none transition [&::-webkit-search-cancel-button]:appearance-none"
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => handleQueryChange(event.target.value)}
+              onKeyDown={handleSearchInputKeyDown}
             />
             {query ? (
               <button
@@ -435,7 +532,7 @@ export function GlobalSearch() {
                 aria-label={t("top.searchClear")}
                 className="absolute right-16 top-1/2 z-10 grid size-9 -translate-y-1/2 place-items-center rounded-md text-muted-foreground outline-none transition hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35"
                 onClick={() => {
-                  setQuery("");
+                  handleQueryChange("");
                   mobileInputRef.current?.focus();
                 }}
               >
@@ -457,6 +554,9 @@ export function GlobalSearch() {
                 projectById={projectById}
                 projectByName={projectByName}
                 labels={resultLabels}
+                listboxId={mobileListboxId}
+                activeResultKey={activeResultKey}
+                onActive={(result) => setActiveResultKey(resultKey(result))}
                 onSelect={handleSelect}
                 className="h-full max-h-none px-2 py-2"
               />
@@ -475,6 +575,12 @@ export function GlobalSearch() {
       <div
         ref={rootRef}
         className="relative hidden min-w-0 flex-1 lg:block lg:max-w-sm xl:max-w-md"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            closeSearch();
+          }
+        }}
       >
         <Search
           className="filter-search-icon pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2"
@@ -486,17 +592,23 @@ export function GlobalSearch() {
           role="combobox"
           aria-expanded={showDesktopPanel}
           aria-controls={showDesktopPanel ? desktopListboxId : undefined}
+          aria-activedescendant={
+            showDesktopPanel && activeResult
+              ? resultOptionId(desktopListboxId, activeResult)
+              : undefined
+          }
           aria-autocomplete="list"
           value={query}
           placeholder={t("top.search")}
           className="filter-search-input w-full appearance-none pl-9 pr-10 text-sm outline-none transition [&::-webkit-search-cancel-button]:appearance-none"
           onChange={(event) => {
-            setQuery(event.target.value);
+            handleQueryChange(event.target.value);
             if (!open) {
               setOpen(true);
             }
           }}
           onFocus={() => setOpen(true)}
+          onKeyDown={handleSearchInputKeyDown}
         />
 
         {query ? (
@@ -505,7 +617,7 @@ export function GlobalSearch() {
             aria-label={t("top.searchClear")}
             className="absolute right-2 top-1/2 z-10 grid size-7 -translate-y-1/2 place-items-center rounded-md text-muted-foreground outline-none transition hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35"
             onClick={() => {
-              setQuery("");
+              handleQueryChange("");
               setOpen(false);
               desktopInputRef.current?.focus();
             }}
@@ -528,6 +640,9 @@ export function GlobalSearch() {
               projectById={projectById}
               projectByName={projectByName}
               labels={resultLabels}
+              listboxId={desktopListboxId}
+              activeResultKey={activeResultKey}
+              onActive={(result) => setActiveResultKey(resultKey(result))}
               onSelect={handleSelect}
             />
           </div>

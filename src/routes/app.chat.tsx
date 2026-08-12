@@ -2013,7 +2013,7 @@ function ConversationMessagePane({
                     disabled={sendMutation.isPending}
                     rows={1}
                     maxLength={CHAT_MESSAGE_MAX_LENGTH + 50}
-                    className="min-h-10 max-h-40 resize-none overflow-x-hidden overflow-y-auto border-0 bg-transparent py-2 leading-5 shadow-none break-words hover:bg-transparent focus-visible:ring-0 [overflow-wrap:anywhere]"
+                    className="min-h-10 max-h-40 resize-none overflow-x-hidden overflow-y-auto border-0 bg-transparent px-2 py-2 leading-5 shadow-none break-words placeholder:whitespace-nowrap hover:bg-transparent focus-visible:ring-0 sm:px-3 [overflow-wrap:anywhere]"
                   />
                   {showComposerMeta ? (
                     <div className="mt-1 flex items-center justify-between gap-2 px-0.5">
@@ -2035,7 +2035,7 @@ function ConversationMessagePane({
                   type="submit"
                   variant="brand"
                   disabled={!canSend || sendMutation.isPending}
-                  className="mb-0.5 h-10 shrink-0 rounded-xl px-3.5 shadow-glow sm:min-w-28"
+                  className="mb-0.5 h-10 w-10 shrink-0 rounded-xl px-0 shadow-glow sm:w-auto sm:min-w-28 sm:px-3.5"
                   aria-label={t("chat.send")}
                   title={t("chat.send")}
                 >

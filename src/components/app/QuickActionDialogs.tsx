@@ -249,11 +249,24 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
           <DialogDescription>{t("projects.new.dialogDesc")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(submit)} className="space-y-4">
-          <Field label={t("projects.new.projectName")} error={errors.name?.message}>
-            <Input {...register("name")} placeholder={t("projects.new.namePlaceholder")} />
+          <Field
+            label={t("projects.new.projectName")}
+            htmlFor="new-project-name"
+            error={errors.name?.message}
+          >
+            <Input
+              id="new-project-name"
+              {...register("name")}
+              placeholder={t("projects.new.namePlaceholder")}
+            />
           </Field>
-          <Field label={t("projects.new.description")} error={errors.description?.message}>
+          <Field
+            label={t("projects.new.description")}
+            htmlFor="new-project-description"
+            error={errors.description?.message}
+          >
             <Textarea
+              id="new-project-description"
               {...register("description")}
               placeholder={t("projects.new.description")}
               rows={3}
@@ -263,6 +276,7 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
             <Field
               className="min-w-0"
               label={t("projects.new.status")}
+              htmlFor="new-project-status"
               error={errors.status?.message}
             >
               <Controller
@@ -270,6 +284,7 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
                 name="status"
                 render={({ field }) => (
                   <ProjectStatusSelect
+                    id="new-project-status"
                     value={(field.value ?? "planning") as ProjectStatus}
                     onValueChange={field.onChange}
                     getLabel={(status) => projectStatusLabel(status, t)}
@@ -544,7 +559,7 @@ export function NewTaskDialog({
         >
           <div className="app-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 pb-4 pt-1 sm:px-6">
             {showProjectSelect ? (
-              <Field label={t("tasks.selectProject")}>
+              <Field label={t("tasks.selectProject")} htmlFor="new-task-project">
                 <Select
                   value={projectSelectValue}
                   onValueChange={(value) => {
@@ -553,7 +568,7 @@ export function NewTaskDialog({
                     }
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="new-task-project">
                     <SelectValue placeholder={t("tasks.selectProject")}>
                       {selectedProjectOption ? (
                         <span className="inline-flex min-w-0 items-center gap-1.5">
@@ -589,11 +604,20 @@ export function NewTaskDialog({
               </Field>
             ) : null}
             <div className="space-y-3">
-              <Field label={t("tasks.task")} error={errors.title?.message}>
-                <Input {...register("title")} placeholder={t("tasks.new.titlePlaceholder")} />
+              <Field label={t("tasks.task")} htmlFor="new-task-title" error={errors.title?.message}>
+                <Input
+                  id="new-task-title"
+                  {...register("title")}
+                  placeholder={t("tasks.new.titlePlaceholder")}
+                />
               </Field>
               <div className={deadlineStatusDateTimeRowClassName}>
-                <Field className="min-w-0" label={t("tasks.status")} error={errors.status?.message}>
+                <Field
+                  className="min-w-0"
+                  label={t("tasks.status")}
+                  htmlFor="new-task-status"
+                  error={errors.status?.message}
+                >
                   <Controller
                     control={control}
                     name="status"
@@ -602,7 +626,7 @@ export function NewTaskDialog({
                         value={field.value ?? initialStatus}
                         onValueChange={(value) => field.onChange(value as TaskStatus)}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger id="new-task-status">
                           <SelectValue placeholder={t("tasks.new.selectStatus")}>
                             <TaskStatusIndicator
                               status={(field.value ?? initialStatus) as TaskStatus}
@@ -664,8 +688,13 @@ export function NewTaskDialog({
                   />
                 </Field>
               </div>
-              <Field label={t("tasks.description")} error={errors.description?.message}>
+              <Field
+                label={t("tasks.description")}
+                htmlFor="new-task-description"
+                error={errors.description?.message}
+              >
                 <Textarea
+                  id="new-task-description"
                   {...register("description")}
                   rows={2}
                   className="min-h-[52px] resize-none"
@@ -675,6 +704,7 @@ export function NewTaskDialog({
               <Field
                 className="max-w-xs"
                 label={t("tasks.priority")}
+                htmlFor="new-task-priority"
                 error={errors.priority?.message}
               >
                 <Controller
@@ -685,7 +715,7 @@ export function NewTaskDialog({
                       value={field.value ?? "medium"}
                       onValueChange={(value) => field.onChange(value as Priority)}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger id="new-task-priority">
                         <SelectValue placeholder={t("tasks.new.selectPriority")}>
                           <TaskPriorityIndicator priority={(field.value ?? "medium") as Priority}>
                             {priorityLabel((field.value ?? "medium") as Priority, t)}
@@ -744,12 +774,14 @@ export function NewTaskDialog({
 
 function Field({
   label,
+  htmlFor,
   error,
   children,
   className,
   labelClassName,
 }: {
   label: string;
+  htmlFor?: string;
   error?: string;
   children: ReactNode;
   className?: string;
@@ -757,7 +789,9 @@ function Field({
 }) {
   return (
     <div className={cn("flex flex-col items-stretch gap-1.5", className)}>
-      <Label className={cn("block h-4 leading-none", labelClassName)}>{label}</Label>
+      <Label htmlFor={htmlFor} className={cn("block h-4 leading-none", labelClassName)}>
+        {label}
+      </Label>
       {children}
       {error ? <p className="text-xs leading-4 text-destructive">{error}</p> : null}
     </div>

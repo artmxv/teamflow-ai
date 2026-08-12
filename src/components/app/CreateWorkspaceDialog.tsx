@@ -185,7 +185,7 @@ export function CreateWorkspaceDialog({ children }: CreateWorkspaceDialogProps) 
           </div>
 
           <div className="space-y-1.5">
-            <Label>{t("settings.teamSize")}</Label>
+            <Label htmlFor="workspace-team-size">{t("settings.teamSize")}</Label>
             <Select
               value={teamSize ? teamSize : TEAM_SIZE_SELECT_EMPTY}
               onValueChange={(value) =>
@@ -194,7 +194,7 @@ export function CreateWorkspaceDialog({ children }: CreateWorkspaceDialogProps) 
                 })
               }
             >
-              <SelectTrigger>
+              <SelectTrigger id="workspace-team-size">
                 <SelectValue placeholder={t("settings.teamSize")} />
               </SelectTrigger>
               <SelectContent>
