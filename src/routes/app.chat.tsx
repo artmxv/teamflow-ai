@@ -437,7 +437,7 @@ function WorkspaceChatPage() {
         <ChatRealtimeStatus status={socketStatus} />
       </div>
 
-      <div className="relative flex h-[calc(100dvh-8.5rem)] min-h-0 overflow-hidden rounded-2xl border border-border bg-card shadow-soft sm:h-[calc(100dvh-10.5rem)] md:h-[calc(100vh-11rem)] md:min-h-112">
+      <div className="relative flex h-[calc(100dvh-8.5rem)] min-h-0 overflow-hidden rounded-2xl border border-border bg-card shadow-soft sm:h-[calc(100dvh-10.5rem)] md:h-[calc(100dvh-11rem)] md:min-h-112">
         {conversationsQuery.isLoading ? (
           <ChatPageSkeleton />
         ) : conversationsQuery.isError ? (
@@ -723,7 +723,7 @@ function ConversationRow({
         <button
           type="button"
           className={cn(
-            "inline-flex size-10 shrink-0 items-center justify-center rounded-md text-muted-foreground transition sm:size-8",
+            "inline-flex size-10 shrink-0 items-center justify-center rounded-md text-muted-foreground transition lg:size-8",
             "opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100",
             conversation.isPinned && "text-primary md:opacity-100",
             "hover:bg-background/70 hover:text-foreground",
@@ -1953,7 +1953,7 @@ function ConversationMessagePane({
               <Button
                 type="button"
                 size="sm"
-                className="pointer-events-auto h-8 gap-1.5 rounded-full shadow-md"
+                className="pointer-events-auto h-10 gap-1.5 rounded-full shadow-md lg:h-8"
                 onClick={scrollToBottom}
               >
                 <ArrowDown className="size-3.5" aria-hidden="true" />

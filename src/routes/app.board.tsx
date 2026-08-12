@@ -482,7 +482,7 @@ function Board() {
                       <NewTaskDialog {...newTaskDialogProps}>
                         <button
                           type="button"
-                          className="rounded-md border border-transparent bg-transparent p-1 text-muted-foreground outline-none transition-[color,background-color,border-color,box-shadow] hover:border-primary/30 hover:bg-primary/8 hover:text-primary/80 focus-visible:border-primary/30 focus-visible:bg-primary/8 focus-visible:text-primary/80 focus-visible:ring-2 focus-visible:ring-primary/20"
+                          className="grid size-10 place-items-center rounded-md border border-transparent bg-transparent text-muted-foreground outline-none transition-[color,background-color,border-color,box-shadow] hover:border-primary/30 hover:bg-primary/8 hover:text-primary/80 focus-visible:border-primary/30 focus-visible:bg-primary/8 focus-visible:text-primary/80 focus-visible:ring-2 focus-visible:ring-primary/20 lg:size-7"
                           aria-label={`${t("common.newTask")} — ${columnTitle}`}
                         >
                           <Plus className="size-3.5" />
@@ -692,7 +692,7 @@ function BoardColumn({
   return (
     <div
       className={
-        "flex w-80 shrink-0 flex-col gap-3 rounded-2xl bg-muted/40 p-3 transition-colors " +
+        "flex w-[calc(100vw-3rem)] min-w-64 max-w-80 shrink-0 flex-col gap-3 rounded-2xl bg-muted/40 p-3 transition-colors sm:w-80 " +
         (isOver ? "bg-primary/10 ring-1 ring-primary/25" : "")
       }
     >

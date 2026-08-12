@@ -338,7 +338,7 @@ export function ChatPinnedMessagesHeaderButton({
       type="button"
       variant="ghost"
       size="icon"
-      className="size-10 shrink-0 sm:size-8"
+      className="size-10 shrink-0 lg:size-8"
       title={label}
       aria-label={label}
       aria-expanded={open}

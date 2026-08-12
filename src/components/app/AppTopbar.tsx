@@ -44,8 +44,17 @@ import {
   type NotificationItem,
 } from "@/lib/api/notifications";
 import { activateWorkspace } from "@/lib/workspace-queries";
+import type { Workspace } from "@/components/app/AppShell";
 
-export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | null }) {
+export function AppTopbar({
+  workspaceRole,
+  workspace,
+  workspaceLoading,
+}: {
+  workspaceRole?: WorkspaceRole | null;
+  workspace: Workspace | null;
+  workspaceLoading: boolean;
+}) {
   const { t, lang } = useI18n();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const router = useRouter();
@@ -160,13 +169,13 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
   });
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border/80 bg-background/95 px-3 backdrop-blur-sm sm:h-16 sm:gap-3 sm:px-6">
-      <MobileNav pathname={pathname} />
+    <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border/80 bg-background/95 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] backdrop-blur-sm sm:h-16 sm:gap-3 sm:px-6">
+      <MobileNav pathname={pathname} workspace={workspace} workspaceLoading={workspaceLoading} />
       <GlobalSearch />
 
-      <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1.5">
-        <LanguageSwitcher />
-        <ThemeToggle />
+      <div className="ml-auto flex shrink-0 items-center gap-0 sm:gap-1.5">
+        <LanguageSwitcher className="[&_button]:min-h-9 [&_button]:min-w-9 lg:[&_button]:min-h-0 lg:[&_button]:min-w-0" />
+        <ThemeToggle className="size-10 lg:size-9" />
         <DropdownMenu
           modal={false}
           open={notificationsOpen}
@@ -181,7 +190,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
             <button
               type="button"
               aria-label={bellLabel}
-              className="relative grid size-9 shrink-0 place-items-center rounded-lg text-muted-foreground outline-none transition hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35"
+              className="relative grid size-10 shrink-0 place-items-center rounded-lg text-muted-foreground outline-none transition hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35 lg:size-9"
             >
               <Bell className="size-4" />
               <span
@@ -199,7 +208,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="end"
-            className="flex w-80 flex-col overflow-hidden p-1"
+            className="flex w-80 max-w-[calc(100vw-1rem)] flex-col overflow-hidden p-1"
             onCloseAutoFocus={(event) => event.preventDefault()}
           >
             <DropdownMenuLabel className="flex shrink-0 items-center justify-between gap-2">
@@ -346,7 +355,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
         </DropdownMenu>
 
         {showProfilePlaceholder && (
-          <div className="flex items-center gap-2 rounded-lg p-1 pr-2" aria-hidden>
+          <div className="flex items-center gap-2 rounded-lg p-1 lg:pr-2" aria-hidden>
             <Skeleton className="size-8 rounded-md" />
             <span className="hidden space-y-1 xl:block">
               <Skeleton className="h-3.5 w-24" />
@@ -359,7 +368,7 @@ export function AppTopbar({ workspaceRole }: { workspaceRole?: WorkspaceRole | n
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="flex shrink-0 items-center gap-2 rounded-lg p-1 pr-2 outline-none transition hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring/35"
+                className="flex shrink-0 items-center gap-2 rounded-lg p-1 lg:pr-2 outline-none transition hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring/35"
               >
                 <UserAvatar
                   id={currentUser.id}

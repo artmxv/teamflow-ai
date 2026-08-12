@@ -91,7 +91,7 @@ export function NewDirectMessageDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="max-w-md gap-0 p-0">
+      <DialogContent className="flex max-h-[calc(100dvh-1rem)] min-h-0 max-w-md flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b border-border px-4 py-3">
           <DialogTitle>{t("chat.newMessage")}</DialogTitle>
           <DialogDescription className="sr-only">{t("chat.searchMembers")}</DialogDescription>
@@ -110,7 +110,7 @@ export function NewDirectMessageDialog({
           </div>
         </div>
 
-        <div className="max-h-80 overflow-y-auto p-2">
+        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
           {membersQuery.isLoading ? (
             <div className="space-y-2 p-2">
               {Array.from({ length: 5 }).map((_, index) => (

@@ -126,14 +126,16 @@ function WorkspaceSwitcherSectionLabel({ children }: { children: ReactNode }) {
   );
 }
 
-function WorkspaceSwitcher({
+export function WorkspaceSwitcher({
   workspace,
   loading,
   collapsed,
+  onNavigate,
 }: {
   workspace: Workspace | null;
   loading: boolean;
   collapsed: boolean;
+  onNavigate?: () => void;
 }) {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -151,6 +153,7 @@ function WorkspaceSwitcher({
       setSelectedWorkspaceId(selected.id);
       await invalidateWorkspaceScopedQueries(queryClient);
       toast.success(t("workspace.switched"));
+      onNavigate?.();
       void navigate({ to: "/app/dashboard" });
     },
     onError: () => {
@@ -335,7 +338,7 @@ export function AppSidebar({
       <aside
         data-collapsed={collapsed}
         className={cn(
-          "app-sidebar sticky top-0 hidden h-svh shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-[250ms] ease-in-out md:flex",
+          "app-sidebar sticky top-0 hidden h-dvh shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar transition-[width] duration-[250ms] ease-in-out lg:flex",
           collapsed ? "w-16" : "w-64",
         )}
       >

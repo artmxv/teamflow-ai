@@ -24,7 +24,7 @@ export function PublicPageShell({
   return (
     <div
       className={cn(
-        "public-site min-h-screen text-foreground",
+        "public-site min-h-dvh text-foreground",
         mode === "auth" && "public-auth-page",
         className,
       )}

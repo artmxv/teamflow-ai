@@ -35,12 +35,21 @@ export function SiteHeader() {
     };
   }, [open]);
 
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    const closeAtDesktop = () => {
+      if (desktop.matches) setOpen(false);
+    };
+    desktop.addEventListener("change", closeAtDesktop);
+    return () => desktop.removeEventListener("change", closeAtDesktop);
+  }, []);
+
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-[color-mix(in_oklch,var(--background)_92%,transparent)] backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:gap-6 sm:px-6">
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:gap-6 sm:px-6">
         <BrandLogo className="shrink-0" />
 
-        <nav className="ml-2 hidden items-center gap-7 text-sm text-muted-foreground md:flex">
+        <nav className="ml-2 hidden items-center gap-7 text-sm text-muted-foreground lg:flex">
           {NAV_LINKS.map((link) => (
             <a
               key={link.href}
@@ -52,26 +61,28 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
-          <LanguageSwitcher className="shrink-0" />
+        <div className="ml-auto flex min-w-0 items-center gap-1 sm:gap-3">
+          <LanguageSwitcher className="shrink-0 [&_button]:min-h-9 [&_button]:min-w-9 lg:[&_button]:min-h-0 lg:[&_button]:min-w-0" />
           <Link
             to="/signin"
             className="hidden shrink-0 px-1 text-sm font-medium text-muted-foreground outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:inline"
           >
             {t("nav.signin")}
           </Link>
-          <Button asChild size="sm" variant="brand" className="public-primary-button hidden shrink-0 sm:inline-flex">
+          <Button
+            asChild
+            size="sm"
+            variant="brand"
+            className="public-primary-button hidden shrink-0 sm:inline-flex"
+          >
             <Link to="/signup">
               {t("nav.start")}
               <ArrowRight className="size-3.5" />
             </Link>
           </Button>
-          <Button asChild size="sm" variant="brand" className="public-primary-button shrink-0 sm:hidden">
-            <Link to="/signup">{t("landing.cta.createAccountShort")}</Link>
-          </Button>
           <button
             type="button"
-            className="grid size-9 place-items-center rounded-md text-muted-foreground outline-none transition hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 md:hidden"
+            className="grid size-10 shrink-0 place-items-center rounded-md text-muted-foreground outline-none transition hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 lg:hidden"
             aria-expanded={open}
             aria-controls={menuId}
             aria-label={open ? t("nav.closeMenu") : t("nav.openMenu")}
@@ -86,7 +97,7 @@ export function SiteHeader() {
         id={menuId}
         hidden={!open}
         className={cn(
-          "border-t border-border/70 bg-[color-mix(in_oklch,var(--background)_96%,transparent)] md:hidden",
+          "border-t border-border/70 bg-[color-mix(in_oklch,var(--background)_96%,transparent)] lg:hidden",
           open && "block",
         )}
       >

@@ -288,7 +288,7 @@ export function ChatComposerEmojiPickerPanel({
         onChange={(event) => setSearch(event.target.value)}
         placeholder={searchPlaceholder}
         aria-label={searchPlaceholder}
-        className="z-10 mx-2 mt-2 h-9 shrink-0 appearance-none rounded-md border border-input bg-background px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+        className="z-10 mx-2 mt-2 h-10 shrink-0 appearance-none rounded-md border border-input bg-background px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/25 lg:h-9"
       />
 
       {!isSearching ? (
@@ -340,7 +340,7 @@ export function ChatComposerEmojiPickerPanel({
               <button
                 key={emoji}
                 type="button"
-                className="flex size-9 items-center justify-center rounded-md text-lg outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-primary/25"
+                className="flex size-10 items-center justify-center rounded-md text-lg outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-primary/25 lg:size-9"
                 aria-label={emoji}
                 onClick={() => handleEmojiSelect(emoji)}
               >
@@ -385,7 +385,7 @@ export function ChatComposerEmojiPickerPanel({
               <button
                 {...props}
                 type="button"
-                className="flex size-9 items-center justify-center rounded-md text-lg outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-primary/25 data-active:bg-accent"
+                className="flex size-10 items-center justify-center rounded-md text-lg outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-primary/25 data-active:bg-accent lg:size-9"
                 aria-label={emoji.label}
               >
                 <span aria-hidden="true">{emoji.emoji}</span>

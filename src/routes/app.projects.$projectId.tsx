@@ -489,7 +489,7 @@ function EditProjectDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="brandSoft" size="sm">
+        <Button variant="brandSoft" size="sm" className="h-10 lg:h-8">
           {t("common.edit")}
         </Button>
       </DialogTrigger>
@@ -608,7 +608,7 @@ function DeleteProjectDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="destructive" size="sm" disabled={isSubmitting}>
+        <Button variant="destructive" size="sm" className="h-10 lg:h-8" disabled={isSubmitting}>
           {t("common.delete")}
         </Button>
       </DialogTrigger>
@@ -673,14 +673,14 @@ function ProjectDetails({
 
   return (
     <div className="space-y-4">
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-4">
           <ProjectAccentSurface
             gradient={colorGradient}
             className="h-auto flex-none"
             contentClassName="flex-none px-5 pb-5 pt-8"
           >
-            <div className="flex min-w-0 items-start justify-between gap-4 pt-1">
+            <div className="flex min-w-0 flex-col items-start justify-between gap-4 pt-1 sm:flex-row">
               <div className="min-w-0">
                 <h2 className="break-words text-xl font-semibold tracking-tight [overflow-wrap:anywhere]">
                   {localizedProjectName}
@@ -689,7 +689,7 @@ function ProjectDetails({
                   {localizedProjectDescription ?? t("projects.detail.noDescription")}
                 </p>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
                 <ProjectMemberStack projectId={project.id} max={3} />
                 <Badge
                   variant="secondary"
@@ -705,8 +705,8 @@ function ProjectDetails({
               <Stat
                 label={t("projects.detail.dueDate")}
                 value={
-                  <span className="inline-flex items-center gap-1">
-                    <Calendar className="size-3.5 text-muted-foreground" /> {due}
+                  <span className="inline-flex min-w-0 items-start gap-1 break-words [overflow-wrap:anywhere]">
+                    <Calendar className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" /> {due}
                   </span>
                 }
               />
@@ -765,7 +765,7 @@ function ProjectDetails({
           <ProjectDocumentsCard projectId={project.id} />
         </div>
 
-        <div className="min-h-0 w-full lg:self-stretch">
+        <div className="min-h-0 min-w-0 w-full max-w-full lg:self-stretch">
           <div className="flex min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-soft lg:h-full">
             <div className="flex shrink-0 items-start justify-between gap-2 border-b border-border/70 bg-card px-5 py-4">
               <div className="min-w-0">
@@ -787,7 +787,7 @@ function ProjectDetails({
                   fixedProjectId={project.id}
                   onSubmit={onCreateTask}
                 >
-                  <Button size="sm" variant="brand" className="h-8 shrink-0 gap-1">
+                  <Button size="sm" variant="brand" className="h-10 shrink-0 gap-1 lg:h-8">
                     <Plus className="size-3.5" />
                     {t("common.newTask")}
                   </Button>
@@ -809,7 +809,7 @@ function ProjectDetails({
                         fixedProjectId={project.id}
                         onSubmit={onCreateTask}
                       >
-                        <Button size="sm" variant="brand" className="h-8 gap-1">
+                        <Button size="sm" variant="brand" className="h-10 gap-1 lg:h-8">
                           <Plus className="size-3.5" />
                           {t("common.newTask")}
                         </Button>
@@ -1077,7 +1077,7 @@ function ProjectMembersSection({
             type="button"
             size="sm"
             variant="brand"
-            className="h-8 gap-1.5"
+            className="h-10 gap-1.5 lg:h-8"
             onClick={() => onAddDialogOpenChange(true)}
           >
             <UserPlus className="size-3.5" />
@@ -1117,7 +1117,7 @@ function ProjectMembersSection({
                   type="button"
                   size="sm"
                   variant="brand"
-                  className="h-8 gap-1.5"
+                  className="h-10 gap-1.5 lg:h-8"
                   onClick={() => onAddDialogOpenChange(true)}
                 >
                   <UserPlus className="size-3.5" />
@@ -1171,7 +1171,7 @@ function ProjectMemberRow({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
+          className="size-10 shrink-0 text-muted-foreground hover:text-destructive lg:size-7"
           disabled={isRemoving}
           aria-label={`Remove ${member.user.name}`}
           onClick={onRemove}
@@ -1325,7 +1325,7 @@ function ProjectDocumentsSection({
             type="button"
             size="sm"
             variant="brand"
-            className="h-8 gap-1.5"
+            className="h-10 gap-1.5 lg:h-8"
             disabled={isUploading}
             onClick={onPickFile}
           >
@@ -1373,7 +1373,7 @@ function ProjectDocumentsSection({
                 type="button"
                 size="sm"
                 variant="brand"
-                className="h-8 gap-1.5"
+                className="h-10 gap-1.5 lg:h-8"
                 disabled={isUploading}
                 onClick={onPickFile}
               >
@@ -1564,7 +1564,7 @@ function ProjectDocumentRow({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 text-muted-foreground hover:text-foreground"
+          className="size-10 text-muted-foreground hover:text-foreground lg:size-7"
           disabled={openDisabled}
           aria-label={
             isImage
@@ -1581,7 +1581,7 @@ function ProjectDocumentRow({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 text-muted-foreground hover:text-foreground"
+          className="size-10 text-muted-foreground hover:text-foreground lg:size-7"
           disabled={isDeleting}
           aria-label={t("files.downloadDocument")}
           onClick={onDownload}
@@ -1592,7 +1592,7 @@ function ProjectDocumentRow({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 text-muted-foreground hover:text-destructive"
+          className="size-10 text-muted-foreground hover:text-destructive lg:size-7"
           disabled={isDeleting}
           aria-label={t("projects.detail.deleteDocumentAria")}
           onClick={onRequestDelete}
@@ -1614,11 +1614,11 @@ function formatDocumentDate(value: string) {
 
 function Stat({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="rounded-xl border border-border bg-muted/20 p-3">
+    <div className="min-w-0 rounded-xl border border-border bg-muted/20 p-3">
       <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </div>
-      <div className="mt-1 text-sm">{value}</div>
+      <div className="mt-1 min-w-0 break-words text-sm [overflow-wrap:anywhere]">{value}</div>
     </div>
   );
 }

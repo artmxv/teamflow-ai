@@ -245,7 +245,7 @@ export function ChatMessageReactionPicker({
           variant="ghost"
           size="icon"
           className={cn(
-            "size-7 shrink-0 text-muted-foreground/70 hover:text-foreground",
+            "size-10 shrink-0 text-muted-foreground/70 hover:text-foreground lg:size-7",
             !alwaysVisible &&
               "opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100",
             pickerOpen && "opacity-100",
@@ -277,7 +277,7 @@ export function ChatMessageReactionPicker({
                 key={emoji}
                 type="button"
                 className={cn(
-                  "inline-flex size-9 items-center justify-center rounded-md text-base transition hover:bg-muted",
+                  "inline-flex size-10 items-center justify-center rounded-md text-base transition hover:bg-muted lg:size-9",
                   reactedByMe && "bg-primary/15",
                 )}
                 aria-label={reactedByMe ? t("chat.removeReaction") : t("chat.addReaction")}

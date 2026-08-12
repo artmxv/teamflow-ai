@@ -79,6 +79,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Cell, Pie, PieChart } from "recharts";
+import { useIsCompactViewport } from "@/hooks/use-mobile";
 
 export const Route = createFileRoute("/app/dashboard")({
   beforeLoad: requireAuth,
@@ -382,7 +383,7 @@ function Dashboard() {
             onRetry={() => void refetch()}
           />
         ) : (
-          <div className="grid gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+          <div className="grid gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
             {stats.map((s) => (
               <StatCard
                 key={s.label}
@@ -408,7 +409,7 @@ function Dashboard() {
           {tasksLoading ? (
             <AnalyticsCardsSkeleton />
           ) : tasksError ? null : (
-            <div className="grid gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+            <div className="grid gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
               {analyticsCards.map((card) => (
                 <AnalyticsMetricCard
                   key={card.labelKey}
@@ -976,7 +977,7 @@ function DashboardAiInsightsCard({
           <Button
             variant="outline"
             size="sm"
-            className="w-full sm:w-auto"
+            className="h-10 w-full sm:w-auto lg:h-8"
             disabled={isFetching}
             onClick={() => void refetch()}
           >
@@ -1130,7 +1131,7 @@ function ProjectCardsSkeleton() {
 
 function StatCardSkeletons() {
   return (
-    <div className="grid gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+    <div className="grid gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
       {Array.from({ length: 4 }).map((_, index) => (
         <div key={index} className={cn(cardLinkClass, "pointer-events-none", metricCardStackClass)}>
           <div className={metricIconValueColumnClass}>
@@ -1250,6 +1251,7 @@ function TaskActivityChartSection({
   isError: boolean;
   t: (key: TKey) => string;
 }) {
+  const isCompactViewport = useIsCompactViewport();
   const chartData = buckets.map((bucket) => ({
     label: bucket.label,
     created: bucket.created,
@@ -1269,7 +1271,7 @@ function TaskActivityChartSection({
         </div>
         <div className="flex min-w-0 flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div
-            className="inline-flex max-w-full rounded-lg border border-border bg-muted/40 p-0.5"
+            className="inline-flex w-full max-w-full rounded-lg border border-border bg-muted/40 p-0.5 sm:w-auto"
             role="group"
             aria-label={t("dashboard.taskActivity")}
           >
@@ -1280,7 +1282,7 @@ function TaskActivityChartSection({
                 onClick={() => onPeriodChange(value)}
                 aria-pressed={period === value}
                 className={cn(
-                  "rounded-md px-2.5 py-1.5 text-xs font-medium transition sm:px-3",
+                  "min-h-10 flex-1 rounded-md px-2.5 py-1.5 text-xs font-medium transition sm:flex-none sm:px-3 lg:min-h-0",
                   period === value
                     ? "bg-card text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground",
@@ -1334,8 +1336,8 @@ function TaskActivityChartSection({
               dataKey="label"
               tickLine={false}
               axisLine={false}
-              interval={0}
-              minTickGap={4}
+              interval={isCompactViewport && period !== "week" ? "preserveStartEnd" : 0}
+              minTickGap={isCompactViewport ? 16 : 4}
               angle={0}
               textAnchor="middle"
               height={period === "month" ? 40 : period === "year" ? 36 : 28}
@@ -1416,9 +1418,12 @@ function AnalyticsMetricCard({
 
 function AnalyticsCardsSkeleton() {
   return (
-    <div className="grid gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+    <div className="grid gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
       {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} className={cn(analyticsCardLinkClass, "pointer-events-none", metricCardStackClass)}>
+        <div
+          key={index}
+          className={cn(analyticsCardLinkClass, "pointer-events-none", metricCardStackClass)}
+        >
           <div className={metricIconValueColumnClass}>
             <Skeleton className="size-7 shrink-0 rounded-lg sm:size-9 sm:rounded-xl" />
             <Skeleton className="mt-1.5 h-6 w-10 sm:mt-3 sm:h-8 sm:w-12" />

@@ -694,22 +694,26 @@ function TasksPage() {
                 <li
                   key={task.id}
                   onClick={() => setSelected(task)}
-                  className="grid cursor-pointer grid-cols-2 items-center gap-3 px-4 py-3 text-sm transition hover:bg-muted/30 md:grid-cols-[minmax(0,1fr)_100px_100px_120px_100px_88px]"
+                  className="grid min-w-0 cursor-pointer grid-cols-2 items-start gap-3 px-4 py-4 text-sm transition hover:bg-muted/30 md:grid-cols-[minmax(0,1fr)_100px_100px_120px_100px_88px] md:items-center md:py-3"
                 >
-                  <div className="col-span-2 md:col-span-1">
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                  <div className="col-span-2 min-w-0 md:col-span-1">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2 md:flex-nowrap">
+                      <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                         {task.key}
                       </span>
-                      <span className="font-medium">{translateStarterTitle(task.title, lang)}</span>
+                      <span className="min-w-0 break-words font-medium [overflow-wrap:anywhere] md:truncate">
+                        {translateStarterTitle(task.title, lang)}
+                      </span>
                     </div>
-                    <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/35 px-2 py-0.5 font-medium text-foreground/75">
+                    <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <span className="inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-full border border-border/60 bg-muted/35 px-2 py-0.5 font-medium text-foreground/75">
                         <span
-                          className={"size-1.5 rounded-full " + projectAccent.dot}
+                          className={"size-1.5 shrink-0 rounded-full " + projectAccent.dot}
                           aria-hidden
                         />
-                        {translateStarterProjectName(task.projectName, lang)}
+                        <span className="min-w-0 truncate">
+                          {translateStarterProjectName(task.projectName, lang)}
+                        </span>
                       </span>
                       {task.labels.slice(0, 2).map((label) => (
                         <Badge
@@ -722,7 +726,10 @@ function TasksPage() {
                       ))}
                     </div>
                   </div>
-                  <div className="flex justify-center">
+                  <div className="flex min-w-0 flex-col items-start gap-1 md:items-center">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground md:hidden">
+                      {t("tasks.status")}
+                    </span>
                     <span
                       className={
                         "inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold " +
@@ -734,7 +741,10 @@ function TasksPage() {
                       </TaskStatusIndicator>
                     </span>
                   </div>
-                  <div className="flex justify-center">
+                  <div className="flex min-w-0 flex-col items-start gap-1 md:items-center">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground md:hidden">
+                      {t("tasks.priority")}
+                    </span>
                     <span
                       className={
                         "inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold " +
@@ -746,19 +756,33 @@ function TasksPage() {
                       </TaskPriorityIndicator>
                     </span>
                   </div>
-                  <div className="flex items-center justify-center gap-2">
+                  <div className="flex min-w-0 flex-col items-start gap-1 md:items-center">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground md:hidden">
+                      {t("tasks.assignee")}
+                    </span>
                     <AssigneeAvatars
                       assignees={task.assigneeOptions}
                       showUnassignedLabel
                       maxVisible={2}
                     />
                   </div>
-                  <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                    <Calendar className="size-3.5" /> {formatDueDateTimeShort(task.dueDate)}
+                  <div className="flex min-w-0 flex-col items-start gap-1 md:items-center">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground md:hidden">
+                      {t("tasks.due")}
+                    </span>
+                    <span className="inline-flex min-w-0 items-center gap-1 break-words text-xs text-muted-foreground [overflow-wrap:anywhere]">
+                      <Calendar className="size-3.5 shrink-0" />{" "}
+                      {formatDueDateTimeShort(task.dueDate)}
+                    </span>
                   </div>
-                  <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                    <Paperclip className="size-3.5" />
-                    {task.attachmentsCount}
+                  <div className="flex min-w-0 flex-col items-start gap-1 md:items-center">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground md:hidden">
+                      {t("tasks.sectionAttachments")}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <Paperclip className="size-3.5" />
+                      {task.attachmentsCount}
+                    </span>
                   </div>
                 </li>
               );

@@ -243,7 +243,7 @@ export function NewProjectDialog({ children, workspaceId, onCreated }: NewProjec
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="max-h-[calc(100dvh-1rem)] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>{t("common.newProject")}</DialogTitle>
           <DialogDescription>{t("projects.new.dialogDesc")}</DialogDescription>
@@ -532,9 +532,9 @@ export function NewTaskDialog({
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent
         closeClassName="top-5 right-5"
-        className="flex max-h-[min(90vh,640px)] min-h-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-lg"
+        className="flex max-h-[min(calc(100dvh-1rem),640px)] min-h-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-lg"
       >
-        <DialogHeader className="shrink-0 space-y-1 px-6 pb-3 pt-7 pr-12">
+        <DialogHeader className="shrink-0 space-y-1 pb-3 pl-4 pr-14 pt-6 sm:px-6 sm:pb-3 sm:pt-7 sm:pr-12">
           <DialogTitle>{t("common.newTask")}</DialogTitle>
           <DialogDescription>{t("tasks.new.dialogDesc")}</DialogDescription>
         </DialogHeader>
@@ -542,7 +542,7 @@ export function NewTaskDialog({
           onSubmit={handleSubmit(submit)}
           className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <div className="app-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-6 pb-4 pt-1">
+          <div className="app-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 pb-4 pt-1 sm:px-6">
             {showProjectSelect ? (
               <Field label={t("tasks.selectProject")}>
                 <Select
@@ -723,7 +723,7 @@ export function NewTaskDialog({
               </Field>
             </div>
           </div>
-          <DialogFooter className="sticky bottom-0 shrink-0 border-t border-border bg-background px-6 py-3">
+          <DialogFooter className="sticky bottom-0 shrink-0 border-t border-border bg-background px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:px-6 sm:py-3">
             <Button type="button" variant="outline" className="h-10" onClick={() => setOpen(false)}>
               {t("common.cancel")}
             </Button>

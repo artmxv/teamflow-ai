@@ -82,8 +82,8 @@ export function NewChannelDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="max-w-lg gap-0 overflow-hidden p-0">
-        <DialogHeader className="border-b border-border px-5 py-4">
+      <DialogContent className="flex max-h-[calc(100dvh-1rem)] min-h-0 max-w-lg flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="shrink-0 border-b border-border px-4 py-4 sm:px-5">
           <DialogTitle className="flex items-center gap-2">
             <span className="grid size-8 place-items-center rounded-lg bg-primary/14 text-primary">
               <Users className="size-4" aria-hidden="true" />
@@ -93,7 +93,7 @@ export function NewChannelDialog({
           <DialogDescription>{t("chat.channelMembersHint")}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 px-5 py-4">
+        <div className="app-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
           <label className="grid gap-2 text-sm font-medium">
             {t("chat.channelName")}
             <Input
@@ -166,7 +166,7 @@ export function NewChannelDialog({
           </div>
         </div>
 
-        <DialogFooter className="border-t border-border bg-muted/20 px-5 py-3">
+        <DialogFooter className="shrink-0 border-t border-border bg-muted/20 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:px-5 sm:py-3">
           <Button
             variant="brand"
             disabled={!title.trim() || createMutation.isPending}

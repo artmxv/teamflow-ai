@@ -626,7 +626,7 @@ function SettingsPage() {
                   ) : (
                     <>
                       <Input value={workspaceSlugPreview} readOnly className="bg-muted/40" />
-                      <p className="mt-1.5 text-xs text-muted-foreground">
+                      <p className="mt-1.5 break-all text-xs text-muted-foreground">
                         {t("settings.workspaceUrlPreview")} {workspaceSlugPreview || "—"}
                       </p>
                     </>
@@ -681,7 +681,7 @@ function SettingsPage() {
 
         <TabsContent value="profile" className="mt-5">
           <Card title={t("settings.yourProfileTitle")} description={t("settings.yourProfileDesc")}>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col items-start gap-4 min-[420px]:flex-row min-[420px]:items-center">
               {isPending ? (
                 <Skeleton className="size-16 rounded-full" />
               ) : user ? (
@@ -694,7 +694,7 @@ function SettingsPage() {
                   className="rounded-2xl"
                 />
               ) : null}
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex w-full min-w-0 flex-wrap items-center gap-2 min-[420px]:w-auto">
                 <input
                   ref={avatarInputRef}
                   type="file"
@@ -707,7 +707,10 @@ function SettingsPage() {
                   variant="outline"
                   size="sm"
                   type="button"
-                  className={cn(FILTER_RESET_CLASSNAME, "w-auto")}
+                  className={cn(
+                    FILTER_RESET_CLASSNAME,
+                    "max-w-full max-[419px]:w-full min-[420px]:w-auto",
+                  )}
                   disabled={avatarBusy || isPending}
                   onClick={() => avatarInputRef.current?.click()}
                 >
@@ -727,6 +730,7 @@ function SettingsPage() {
                     variant="dangerSoft"
                     size="sm"
                     type="button"
+                    className="max-w-full max-[419px]:w-full"
                     disabled={avatarBusy || isPending}
                     onClick={handleRemoveAvatar}
                   >
@@ -997,10 +1001,12 @@ function Card({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
       <div className="mb-5">
-        <h2 className="text-base font-semibold">{title}</h2>
-        <p className="text-sm text-muted-foreground">{description}</p>
+        <h2 className="break-words text-base font-semibold [overflow-wrap:anywhere]">{title}</h2>
+        <p className="break-words text-sm text-muted-foreground [overflow-wrap:anywhere]">
+          {description}
+        </p>
       </div>
       {children}
     </div>

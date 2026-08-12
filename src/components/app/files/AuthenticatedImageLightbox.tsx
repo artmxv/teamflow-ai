@@ -197,7 +197,7 @@ function AuthenticatedImageLightboxDialog({
           {t("files.imagePreviewDescription")}
         </DialogDescription>
 
-        <div className="relative flex max-h-[min(90vh,900px)] min-h-[12rem] w-full flex-col items-center justify-center">
+        <div className="relative flex max-h-[min(90dvh,900px)] min-h-[12rem] w-full flex-col items-center justify-center">
           {isLoading ? (
             <div className="flex min-h-[12rem] items-center justify-center">
               <Loader2 className="size-8 animate-spin text-background" aria-hidden />
@@ -228,7 +228,7 @@ function AuthenticatedImageLightboxDialog({
               <img
                 src={objectUrl}
                 alt={filename || t("files.imagePreviewTitle")}
-                className="max-h-[min(85vh,820px)] w-full max-w-full object-contain"
+                className="max-h-[min(85dvh,820px)] w-full max-w-full object-contain"
                 onClick={(event) => {
                   event.stopPropagation();
                 }}
@@ -239,7 +239,7 @@ function AuthenticatedImageLightboxDialog({
                 </p>
               ) : null}
               {onDownload ? (
-                <div className="absolute bottom-3 right-3 z-10">
+                <div className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-[max(0.75rem,env(safe-area-inset-right))] z-10">
                   <Button
                     type="button"
                     variant="secondary"
