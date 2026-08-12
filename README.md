@@ -37,21 +37,13 @@ Public product and legal pages are available without authentication. The collabo
 
 ![Task management](docs/screenshots/tasks.png)
 
+### Chat
+
+![Team chat](docs/screenshots/chat.png)
+
 ### AI Copilot
 
 ![AI Copilot](docs/screenshots/ai.png)
-
-### Billing
-
-![Billing and plans](docs/screenshots/billing.png)
-
-### Settings
-
-![Workspace settings](docs/screenshots/settings.png)
-
-### Team
-
-![Team management](docs/screenshots/team.png)
 
 ## Key features
 
