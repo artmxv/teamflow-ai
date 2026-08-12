@@ -9,8 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SigninRouteImport } from './routes/signin'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as PersonalDataConsentRouteImport } from './routes/personal-data-consent'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
@@ -28,6 +31,11 @@ import { Route as AppAiRouteImport } from './routes/app.ai'
 import { Route as AppProjectsIndexRouteImport } from './routes/app.projects.index'
 import { Route as AppProjectsProjectIdRouteImport } from './routes/app.projects.$projectId'
 
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
@@ -36,6 +44,16 @@ const SignupRoute = SignupRouteImport.update({
 const SigninRoute = SigninRouteImport.update({
   id: '/signin',
   path: '/signin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PersonalDataConsentRoute = PersonalDataConsentRouteImport.update({
+  id: '/personal-data-consent',
+  path: '/personal-data-consent',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
@@ -122,8 +140,11 @@ const AppProjectsProjectIdRoute = AppProjectsProjectIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/personal-data-consent': typeof PersonalDataConsentRoute
+  '/privacy': typeof PrivacyRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
+  '/terms': typeof TermsRoute
   '/app/ai': typeof AppAiRoute
   '/app/billing': typeof AppBillingRoute
   '/app/board': typeof AppBoardRoute
@@ -142,8 +163,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/personal-data-consent': typeof PersonalDataConsentRoute
+  '/privacy': typeof PrivacyRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
+  '/terms': typeof TermsRoute
   '/app/ai': typeof AppAiRoute
   '/app/billing': typeof AppBillingRoute
   '/app/board': typeof AppBoardRoute
@@ -162,8 +186,11 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/personal-data-consent': typeof PersonalDataConsentRoute
+  '/privacy': typeof PrivacyRoute
   '/signin': typeof SigninRoute
   '/signup': typeof SignupRoute
+  '/terms': typeof TermsRoute
   '/app/ai': typeof AppAiRoute
   '/app/billing': typeof AppBillingRoute
   '/app/board': typeof AppBoardRoute
@@ -184,8 +211,11 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/forgot-password'
+    | '/personal-data-consent'
+    | '/privacy'
     | '/signin'
     | '/signup'
+    | '/terms'
     | '/app/ai'
     | '/app/billing'
     | '/app/board'
@@ -204,8 +234,11 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/forgot-password'
+    | '/personal-data-consent'
+    | '/privacy'
     | '/signin'
     | '/signup'
+    | '/terms'
     | '/app/ai'
     | '/app/billing'
     | '/app/board'
@@ -223,8 +256,11 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/forgot-password'
+    | '/personal-data-consent'
+    | '/privacy'
     | '/signin'
     | '/signup'
+    | '/terms'
     | '/app/ai'
     | '/app/billing'
     | '/app/board'
@@ -244,8 +280,11 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
+  PersonalDataConsentRoute: typeof PersonalDataConsentRoute
+  PrivacyRoute: typeof PrivacyRoute
   SigninRoute: typeof SigninRoute
   SignupRoute: typeof SignupRoute
+  TermsRoute: typeof TermsRoute
   AppAiRoute: typeof AppAiRoute
   AppBillingRoute: typeof AppBillingRoute
   AppBoardRoute: typeof AppBoardRoute
@@ -262,6 +301,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/signup': {
       id: '/signup'
       path: '/signup'
@@ -274,6 +320,20 @@ declare module '@tanstack/react-router' {
       path: '/signin'
       fullPath: '/signin'
       preLoaderRoute: typeof SigninRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/personal-data-consent': {
+      id: '/personal-data-consent'
+      path: '/personal-data-consent'
+      fullPath: '/personal-data-consent'
+      preLoaderRoute: typeof PersonalDataConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/forgot-password': {
@@ -408,8 +468,11 @@ const AppProjectsRouteWithChildren = AppProjectsRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
+  PersonalDataConsentRoute: PersonalDataConsentRoute,
+  PrivacyRoute: PrivacyRoute,
   SigninRoute: SigninRoute,
   SignupRoute: SignupRoute,
+  TermsRoute: TermsRoute,
   AppAiRoute: AppAiRoute,
   AppBillingRoute: AppBillingRoute,
   AppBoardRoute: AppBoardRoute,

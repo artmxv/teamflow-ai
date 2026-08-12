@@ -87,16 +87,35 @@ function SignIn() {
       title={t("auth.signInTitle")}
       subtitle={t("auth.signInSubtitle")}
       footer={
-        <>
-          {t("auth.newToTeamFlow")}{" "}
-          <Link
-            to="/signup"
-            search={redirectPath ? { redirect: redirectPath } : undefined}
-            className="font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/40"
+        <div className="space-y-3">
+          <p>
+            {t("auth.newToTeamFlow")}{" "}
+            <Link
+              to="/signup"
+              search={redirectPath ? { redirect: redirectPath } : undefined}
+              className="font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/40"
+            >
+              {t("auth.createAccount")}
+            </Link>
+          </p>
+          <nav
+            className="flex flex-wrap gap-x-4 gap-y-2 text-xs"
+            aria-label={t("auth.legal.signInLinks")}
           >
-            {t("auth.createAccount")}
-          </Link>
-        </>
+            <Link
+              to="/privacy"
+              className="outline-none hover:text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring/40"
+            >
+              {t("landing.footer.privacy")}
+            </Link>
+            <Link
+              to="/terms"
+              className="outline-none hover:text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring/40"
+            >
+              {t("landing.footer.terms")}
+            </Link>
+          </nav>
+        </div>
       }
     >
       <form

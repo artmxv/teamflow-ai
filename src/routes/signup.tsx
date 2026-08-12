@@ -66,6 +66,8 @@ function SignUp() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState<PasswordErrorCode | null>(null);
   const [confirmPasswordError, setConfirmPasswordError] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [personalDataConsent, setPersonalDataConsent] = useState(false);
 
   useEffect(() => {
     document.title = `${t("auth.createAccount")} — TeamFlow AI`;
@@ -92,6 +94,14 @@ function SignUp() {
     },
   });
 
+  const hasLegalAcknowledgements = () => {
+    if (termsAccepted && personalDataConsent) {
+      return true;
+    }
+    toast.error(t("auth.legal.required"));
+    return false;
+  };
+
   return (
     <AuthShell
       title={t("auth.signUpTitle")}
@@ -113,6 +123,9 @@ function SignUp() {
         className="auth-form auth-signup-form flex flex-col"
         onSubmit={(e) => {
           e.preventDefault();
+          if (!hasLegalAcknowledgements()) {
+            return;
+          }
           const name = `${firstName.trim()} ${lastName.trim()}`.trim();
           if (name.length < 2) {
             toast.error(t("auth.nameRequired"));
@@ -142,7 +155,11 @@ function SignUp() {
       >
         <GoogleAuthButton
           label={t("auth.continueWithGoogle")}
-          onClick={() => startGoogleAuth(redirectPath)}
+          onClick={() => {
+            if (hasLegalAcknowledgements()) {
+              startGoogleAuth(redirectPath);
+            }
+          }}
           disabled={registerMutation.isPending}
         />
         <div className="auth-divider relative my-2 text-center text-xs text-muted-foreground">
@@ -236,6 +253,57 @@ function SignUp() {
             <p className="text-xs text-destructive">{t("auth.password.mismatch")}</p>
           )}
         </div>
+        <div className="grid gap-3 rounded-md border border-border bg-card p-3.5 text-xs leading-relaxed text-muted-foreground">
+          <div className="flex items-start gap-2.5">
+            <input
+              id="accept-terms"
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={(event) => setTermsAccepted(event.target.checked)}
+              required
+              className="mt-0.5 size-4 shrink-0 cursor-pointer accent-primary"
+            />
+            <Label htmlFor="accept-terms" className="font-normal text-muted-foreground">
+              {t("auth.legal.termsPrefix")}{" "}
+              <Link
+                to="/terms"
+                className="font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/40"
+                onClick={(event) => event.stopPropagation()}
+              >
+                {t("auth.legal.termsLink")}
+              </Link>
+            </Label>
+          </div>
+          <div className="flex items-start gap-2.5">
+            <input
+              id="accept-personal-data"
+              type="checkbox"
+              checked={personalDataConsent}
+              onChange={(event) => setPersonalDataConsent(event.target.checked)}
+              required
+              className="mt-0.5 size-4 shrink-0 cursor-pointer accent-primary"
+            />
+            <Label htmlFor="accept-personal-data" className="font-normal text-muted-foreground">
+              {t("auth.legal.consentPrefix")}{" "}
+              <Link
+                to="/personal-data-consent"
+                className="font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/40"
+                onClick={(event) => event.stopPropagation()}
+              >
+                {t("auth.legal.consentLink")}
+              </Link>{" "}
+              {t("auth.legal.consentMiddle")}{" "}
+              <Link
+                to="/privacy"
+                className="font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/40"
+                onClick={(event) => event.stopPropagation()}
+              >
+                {t("auth.legal.privacyLink")}
+              </Link>
+              .
+            </Label>
+          </div>
+        </div>
         <Button
           type="submit"
           variant="brand"
@@ -244,9 +312,6 @@ function SignUp() {
         >
           {registerMutation.isPending ? t("auth.creatingAccount") : t("auth.createAccount")}
         </Button>
-        <p className="text-center text-[11px] leading-relaxed text-muted-foreground/75">
-          {t("auth.termsAgree")}
-        </p>
       </form>
     </AuthShell>
   );
