@@ -1,23 +1,18 @@
-import { ApiError } from "@/lib/api/client";
-import { isTransientApiError } from "@/lib/api-error";
 import {
   parseBillingReturnSearch,
   stripBillingReturnSearchParams,
 } from "@/lib/billing/billing-return-search";
 
 export {
-  decideConfirmPaymentPoll,
+  decideBillingReturnConfirmation,
   parseBillingReturnSearch,
   stripBillingReturnSearchParams,
+  type BillingReturnConfirmationDecision,
   type BillingReturnSearch,
-  type ConfirmPaymentPollDecision,
 } from "@/lib/billing/billing-return-search";
 
 /** Survives AppShell remounts and early query-param cleanup after YooKassa return. */
 export const BILLING_RETURN_PAYMENT_ID_KEY = "teamflow.billing.returnPaymentId";
-
-export const BILLING_CONFIRM_POLL_INTERVAL_MS = 2_000;
-export const BILLING_CONFIRM_POLL_TIMEOUT_MS = 60_000;
 
 export function getPendingBillingPaymentId(): string | null {
   if (typeof window === "undefined") {
@@ -99,12 +94,4 @@ export function clearBillingReturnQueryParams(
     window.history.replaceState(window.history.state, "", next);
   }
   return next;
-}
-
-/** Soft failures while YooKassa/webhook may still be catching up. */
-export function shouldRetryConfirmPaymentError(error: unknown): boolean {
-  if (isTransientApiError(error)) {
-    return true;
-  }
-  return error instanceof ApiError && error.code === "PAYMENT_NOT_READY";
 }

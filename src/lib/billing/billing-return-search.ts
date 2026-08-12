@@ -9,14 +9,12 @@ type ConfirmablePayment = {
   currentPlan: "FREE" | "TEAM" | "BUSINESS" | "ENTERPRISE";
 };
 
-export type ConfirmPaymentPollDecision =
+export type BillingReturnConfirmationDecision =
   | { action: "succeeded"; currentPlan: ConfirmablePayment["currentPlan"] }
   | { action: "canceled" }
-  | { action: "retry" };
+  | { action: "pending" };
 
-export function parseBillingReturnSearch(
-  search: string | URLSearchParams,
-): BillingReturnSearch {
+export function parseBillingReturnSearch(search: string | URLSearchParams): BillingReturnSearch {
   const params = typeof search === "string" ? new URLSearchParams(search) : search;
   const billing = params.get("billing");
   if (!billing) {
@@ -41,14 +39,14 @@ export function stripBillingReturnSearchParams(href: string, base = "http://loca
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
-export function decideConfirmPaymentPoll(
+export function decideBillingReturnConfirmation(
   confirmation: ConfirmablePayment,
-): ConfirmPaymentPollDecision {
+): BillingReturnConfirmationDecision {
   if (confirmation.status === "SUCCEEDED") {
     return { action: "succeeded", currentPlan: confirmation.currentPlan };
   }
   if (confirmation.status === "CANCELED") {
     return { action: "canceled" };
   }
-  return { action: "retry" };
+  return { action: "pending" };
 }

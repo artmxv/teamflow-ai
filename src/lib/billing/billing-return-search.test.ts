@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
-  decideConfirmPaymentPoll,
+  decideBillingReturnConfirmation,
   parseBillingReturnSearch,
   stripBillingReturnSearchParams,
 } from "./billing-return-search.js";
@@ -31,10 +31,10 @@ describe("parseBillingReturnSearch", () => {
   });
 });
 
-describe("decideConfirmPaymentPoll", () => {
+describe("decideBillingReturnConfirmation", () => {
   it("treats SUCCEEDED as terminal success", () => {
     assert.deepEqual(
-      decideConfirmPaymentPoll({
+      decideBillingReturnConfirmation({
         status: "SUCCEEDED",
         currentPlan: "ENTERPRISE",
       }),
@@ -42,23 +42,39 @@ describe("decideConfirmPaymentPoll", () => {
     );
   });
 
-  it("treats PENDING as retry without creating a new payment", () => {
+  it("treats PENDING as terminal for the current return check", () => {
     assert.deepEqual(
-      decideConfirmPaymentPoll({
+      decideBillingReturnConfirmation({
         status: "PENDING",
         currentPlan: "FREE",
       }),
-      { action: "retry" },
+      { action: "pending" },
     );
   });
 
   it("treats CANCELED as terminal cancel", () => {
     assert.deepEqual(
-      decideConfirmPaymentPoll({
+      decideBillingReturnConfirmation({
         status: "CANCELED",
         currentPlan: "FREE",
       }),
       { action: "canceled" },
+    );
+  });
+});
+
+describe("checkout exit return regression", () => {
+  it("handles the exact return URL with one non-success PENDING result", () => {
+    const returned = parseBillingReturnSearch(
+      "?billing=return&paymentId=payment-opened-but-not-paid",
+    );
+    assert.deepEqual(returned, {
+      kind: "return",
+      paymentId: "payment-opened-but-not-paid",
+    });
+    assert.deepEqual(
+      decideBillingReturnConfirmation({ status: "PENDING", currentPlan: "FREE" }),
+      { action: "pending" },
     );
   });
 });

@@ -179,7 +179,7 @@ export function CreateWorkspaceDialog({ children }: CreateWorkspaceDialogProps) 
               id="workspace-slug"
               {...register("slug")}
               placeholder="my-team"
-              className="font-mono text-sm"
+              className="font-mono text-base md:text-sm"
             />
             {errors.slug && <p className="text-xs text-destructive">{errors.slug.message}</p>}
           </div>

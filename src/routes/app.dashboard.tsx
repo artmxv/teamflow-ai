@@ -383,7 +383,7 @@ function Dashboard() {
             onRetry={() => void refetch()}
           />
         ) : (
-          <div className="grid gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
             {stats.map((s) => (
               <StatCard
                 key={s.label}
@@ -409,7 +409,7 @@ function Dashboard() {
           {tasksLoading ? (
             <AnalyticsCardsSkeleton />
           ) : tasksError ? null : (
-            <div className="grid gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
               {analyticsCards.map((card) => (
                 <AnalyticsMetricCard
                   key={card.labelKey}
@@ -1131,7 +1131,7 @@ function ProjectCardsSkeleton() {
 
 function StatCardSkeletons() {
   return (
-    <div className="grid gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
       {Array.from({ length: 4 }).map((_, index) => (
         <div key={index} className={cn(cardLinkClass, "pointer-events-none", metricCardStackClass)}>
           <div className={metricIconValueColumnClass}>
@@ -1418,7 +1418,7 @@ function AnalyticsMetricCard({
 
 function AnalyticsCardsSkeleton() {
   return (
-    <div className="grid gap-2 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
       {Array.from({ length: 4 }).map((_, index) => (
         <div
           key={index}

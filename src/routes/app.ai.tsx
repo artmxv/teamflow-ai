@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { requireAuth } from "@/lib/auth/route-guards";
-import { useCurrentWorkspace } from "@/lib/auth/use-current-user";
+import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { AppShell } from "@/components/app/AppShell";
 import { AiEntityResponse } from "@/components/app/AiEntityResponse";
 import { PageHeader } from "@/components/app/PageHeader";
@@ -15,6 +15,7 @@ import {
   Send,
   Target,
   CalendarClock,
+  Trash2,
   type LucideIcon,
 } from "lucide-react";
 import { useI18n, type Lang, type TKey } from "@/lib/i18n";
@@ -36,6 +37,12 @@ import { fetchTasks, type TaskApiItem } from "@/lib/api/tasks";
 import { effectiveDueDate } from "@/lib/due-datetime";
 import { getProjectAccent } from "@/lib/project-color";
 import { cn } from "@/lib/utils";
+import {
+  clearCopilotHistory,
+  copilotHistoryStorageKey,
+  readCopilotHistory,
+  writeCopilotHistory,
+} from "@/lib/ai/copilot-history";
 
 export const Route = createFileRoute("/app/ai")({
   beforeLoad: requireAuth,
@@ -48,8 +55,10 @@ export const Route = createFileRoute("/app/ai")({
 
 function AssistantPage() {
   const { t, lang } = useI18n();
-  const { data: currentWorkspace } = useCurrentWorkspace();
+  const { data: me } = useCurrentUser();
+  const currentWorkspace = me?.workspace;
   const workspaceId = currentWorkspace?.id ?? null;
+  const userId = me?.user.id ?? null;
   const summaryQueryKey = workspaceId
     ? workspaceAiSummaryQueryKey(workspaceId, lang)
     : (["workspace-ai-summary", null, lang] as const);
@@ -83,7 +92,13 @@ function AssistantPage() {
         />
 
         <div className="grid min-h-0 min-w-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_20.5rem] xl:items-stretch xl:overflow-hidden xl:gap-4">
-          <CopilotChat workspaceId={workspaceId} projects={projects} tasks={tasks} />
+          <CopilotChat
+            key={`${userId ?? "anonymous"}:${workspaceId ?? "no-workspace"}`}
+            userId={userId}
+            workspaceId={workspaceId}
+            projects={projects}
+            tasks={tasks}
+          />
           <AiInsightRail
             projects={projects}
             summary={data ?? null}
@@ -383,10 +398,12 @@ type CopilotUiMessage = AiCopilotHistoryMessage & {
 };
 
 function CopilotChat({
+  userId,
   workspaceId,
   projects,
   tasks,
 }: {
+  userId: string | null;
   workspaceId: string | null;
   projects: ProjectApiItem[];
   tasks: TaskApiItem[];
@@ -394,17 +411,33 @@ function CopilotChat({
   const { t, lang } = useI18n();
   const { ask } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
-  const [messages, setMessages] = useState<CopilotUiMessage[]>([]);
+  const historyStorageKey = copilotHistoryStorageKey(userId, workspaceId);
+  const [messages, setMessages] = useState<CopilotUiMessage[]>(() => {
+    if (typeof window === "undefined") return [];
+    return readCopilotHistory(window.localStorage, historyStorageKey).map((message, index) => ({
+      ...message,
+      id: index + 1,
+    }));
+  });
   const [draft, setDraft] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const nextMessageId = useRef(1);
+  const nextMessageId = useRef(messages.length + 1);
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const conversationMountedRef = useRef(false);
   const messagesRef = useRef(messages);
   const isSendingRef = useRef(isSending);
   messagesRef.current = messages;
   isSendingRef.current = isSending;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    writeCopilotHistory(
+      window.localStorage,
+      historyStorageKey,
+      messages.map(({ role, content }) => ({ role, content })),
+    );
+  }, [historyStorageKey, messages]);
 
   useEffect(() => {
     if (!conversationMountedRef.current) {
@@ -480,16 +513,36 @@ function CopilotChat({
     void sendMessage();
   }
 
+  function clearConversation() {
+    if (typeof window !== "undefined") {
+      clearCopilotHistory(window.localStorage, historyStorageKey);
+    }
+    setMessages([]);
+    setError(null);
+  }
+
   return (
     <section className="flex min-h-[28rem] min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-soft xl:h-full xl:min-h-0">
       <div className="flex shrink-0 items-start gap-3 border-b border-border px-4 py-3 sm:px-5 sm:py-3.5">
         <BrandMark className="size-9 rounded-xl" />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold">{t("ai.copilotTitle")}</h2>
           <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
             {t("ai.copilotDescription")}
           </p>
         </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-9 shrink-0 text-muted-foreground"
+          disabled={messages.length === 0 || isSending}
+          aria-label={t("ai.copilotClear")}
+          title={t("ai.copilotClear")}
+          onClick={clearConversation}
+        >
+          <Trash2 className="size-4" aria-hidden />
+        </Button>
       </div>
 
       <div
@@ -544,7 +597,7 @@ function CopilotChat({
       </div>
 
       <div className="shrink-0 border-t border-border p-3 sm:p-3.5">
-        <div className="mb-3 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mb-3 grid min-w-0 grid-cols-2 gap-2 xl:grid-cols-4">
           {COPILOT_SUGGESTION_KEYS.map((key) => {
             const suggestion = t(key);
             return (

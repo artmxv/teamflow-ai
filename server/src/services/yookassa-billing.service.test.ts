@@ -241,6 +241,10 @@ describe("yookassa-billing.service", () => {
       value: "990.00",
       currency: "RUB",
     });
+    assert.deepEqual(yookassaRequests[0]?.body?.confirmation, {
+      type: "redirect",
+      return_url: `http://localhost:5173/app/billing?billing=return&paymentId=${result.paymentId}`,
+    });
     assert.equal(getPlanAmountValue("TEAM"), "990.00");
     assert.equal(getPlanAmountValue("BUSINESS"), "2490.00");
 
@@ -1230,6 +1234,17 @@ describe("yookassa-billing.service", () => {
       (await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).plan,
       "FREE",
     );
+
+    const requestCountAfterCancellation = yookassaRequests.length;
+    const returned = await confirmBillingPayment({
+      userId: ownerId,
+      workspaceId,
+      role: "OWNER",
+      paymentId: created.paymentId,
+    });
+    assert.equal(returned.status, "CANCELED");
+    assert.equal(returned.currentPlan, "FREE");
+    assert.equal(yookassaRequests.length, requestCountAfterCancellation);
   });
 
   it("keeps plan unchanged while payment stays PENDING", async () => {
@@ -1247,6 +1262,7 @@ describe("yookassa-billing.service", () => {
     assert.equal(created.flow, "PAYMENT");
     if (created.flow !== "PAYMENT") return;
 
+    const requestCountBeforeReturnCheck = yookassaRequests.length;
     const pending = await confirmBillingPayment({
       userId: ownerId,
       workspaceId,
@@ -1255,6 +1271,11 @@ describe("yookassa-billing.service", () => {
     });
     assert.equal(pending.status, "PENDING");
     assert.equal(pending.currentPlan, "FREE");
+    assert.equal(yookassaRequests.length, requestCountBeforeReturnCheck + 1);
+    assert.equal(
+      (await prisma.billingPayment.findUniqueOrThrow({ where: { id: created.paymentId } })).status,
+      "PENDING",
+    );
     assert.equal(
       (await prisma.workspace.findUniqueOrThrow({ where: { id: workspaceId } })).plan,
       "FREE",

@@ -192,6 +192,7 @@ const dict = {
     "ai.copilotEmpty": "Ask what needs attention, what is overdue, or where work is blocked.",
     "ai.copilotPlaceholder": "Ask a question about this workspace…",
     "ai.copilotSend": "Send",
+    "ai.copilotClear": "Clear conversation",
     "ai.copilotSending": "Thinking…",
     "ai.copilotYou": "You",
     "ai.copilotName": "Copilot",
@@ -293,7 +294,7 @@ const dict = {
     "billing.paymentCanceled": "Payment was canceled. The plan was not changed.",
     "billing.changeConfirmed": "The plan and limits were updated.",
     "billing.changeStillProcessing":
-      "Confirmation is taking longer than expected. The plan will update after YooKassa confirmation.",
+      "Payment is not completed yet. The plan is unchanged and will update only after YooKassa confirms payment.",
     "billing.error.ownerOnly": "Only the workspace owner can change the plan.",
     "billing.error.notConfigured": "Online plan changes are not configured on the server.",
     "billing.error.alreadyCurrent": "This is already the current plan.",
@@ -1431,6 +1432,7 @@ const dict = {
       "Спросите, что требует внимания, что просрочено или где работа заблокирована.",
     "ai.copilotPlaceholder": "Задайте вопрос об этом пространстве…",
     "ai.copilotSend": "Отправить",
+    "ai.copilotClear": "Очистить диалог",
     "ai.copilotSending": "Думаю…",
     "ai.copilotYou": "Вы",
     "ai.copilotName": "Copilot",
@@ -1532,7 +1534,7 @@ const dict = {
     "billing.paymentCanceled": "Оплата отменена. Тариф не изменён.",
     "billing.changeConfirmed": "Тариф и лимиты обновлены.",
     "billing.changeStillProcessing":
-      "Подтверждение занимает больше времени. Тариф обновится после подтверждения ЮKassa.",
+      "Оплата пока не завершена. Тариф не изменён и обновится только после подтверждения ЮKassa.",
     "billing.error.ownerOnly": "Менять тариф может только владелец пространства.",
     "billing.error.notConfigured": "Онлайн-смена тарифа не настроена на сервере.",
     "billing.error.alreadyCurrent": "Этот тариф уже используется.",
