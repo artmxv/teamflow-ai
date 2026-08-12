@@ -42,6 +42,7 @@ export function WorkflowScene() {
   return (
     <ProductFrame title={t("landing.preview.kanbanTitle")} className="workflow-scene">
       <div className="workflow-scene__content">
+        <div className="workflow-scene__scroll app-scrollbar">
         <div className="workflow-toolbar">
           <div className="workflow-toolbar__label"><Filter />{t("board.filters")}</div>
           <div className="workflow-filter"><Flag /><span>{t("tasks.allPriorities")}</span><ChevronDown /></div>
@@ -92,6 +93,7 @@ export function WorkflowScene() {
             <span className="workflow-drag-demo__status"><i>{t("board.inProgress")}</i><i>{t("board.review")}</i></span>
             <div className="workflow-task__meta"><span><CalendarDays />12 Aug</span><span><MessageSquareText />6</span><span><Paperclip />1</span><b>DP</b></div>
           </div>
+        </div>
         </div>
       </div>
     </ProductFrame>

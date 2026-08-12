@@ -443,7 +443,7 @@ function BillingContent({
           {t("billing.overview")}
         </h2>
         <div className="grid gap-4 lg:grid-cols-3">
-          <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-card p-6 shadow-soft lg:col-span-2">
+          <div className="rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-card p-4 shadow-soft sm:p-6 lg:col-span-2">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -485,7 +485,7 @@ function BillingContent({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
+          <div className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
             <h3 className="text-base font-semibold">{t("billing.planUsage")}</h3>
             <div className="mt-5 space-y-5">
               <UsageRow

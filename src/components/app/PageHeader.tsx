@@ -50,7 +50,7 @@ export function PageHeader({
               <Button
                 variant="ghost"
                 size="sm"
-                className="-ml-2 h-8 gap-1 px-2 text-muted-foreground"
+                className="-ml-2 h-10 gap-1 px-2 text-muted-foreground lg:h-8"
                 asChild
               >
                 <Link to={backTo.to}>
@@ -90,11 +90,11 @@ export function PageHeader({
         ) : null}
 
         <div className="min-w-0">
-          <h1 className="truncate text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+          <h1 className="break-words text-xl font-semibold tracking-tight text-foreground [overflow-wrap:anywhere] sm:truncate sm:text-2xl">
             {title}
           </h1>
           {subtitle ? (
-            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            <p className="mt-1 max-w-2xl break-words text-sm leading-relaxed text-muted-foreground [overflow-wrap:anywhere]">
               {subtitle}
             </p>
           ) : null}

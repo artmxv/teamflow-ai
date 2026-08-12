@@ -222,7 +222,7 @@ function ProjectsIndexPage() {
           <NoResultsState />
         )
       ) : (
-        <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {filtered.map((p) => {
             const description = displayProjectDescription(p.description, lang);
             return (
@@ -268,12 +268,12 @@ function ProjectsIndexPage() {
                           style={{ width: p.progress + "%" }}
                         />
                       </div>
-                      <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
                           <ListTodo className="size-3" /> {p.openTasks} / {p.totalTasks}
                         </span>
-                        <span className="inline-flex items-center gap-1">
-                          <Calendar className="size-3" /> {t("projects.due")} {p.dueDate}
+                        <span className="inline-flex min-w-0 items-center gap-1 break-words [overflow-wrap:anywhere]">
+                          <Calendar className="size-3 shrink-0" /> {t("projects.due")} {p.dueDate}
                         </span>
                       </div>
                     </div>
@@ -316,7 +316,7 @@ function formatUpdatedAt(value: string | null) {
 
 function LoadingGrid() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
       {Array.from({ length: 6 }).map((_, index) => (
         <div key={index} className="rounded-2xl border border-border/80 bg-card p-5 shadow-soft">
           <Skeleton className="ml-auto h-5 w-16 rounded-full" />

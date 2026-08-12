@@ -75,7 +75,7 @@ function AssistantPage() {
 
   return (
     <AppShell>
-      <div className="flex min-h-0 flex-col xl:h-[calc(100svh-8.5rem)] xl:overflow-hidden">
+      <div className="flex min-h-0 flex-col xl:h-[calc(100dvh-8.5rem)] xl:overflow-hidden">
         <PageHeader
           title={t("ai.assistant")}
           subtitle={t("ai.groundedContext")}
@@ -512,7 +512,7 @@ function CopilotChat({
                   {message.role === "user" ? t("ai.copilotYou") : t("ai.copilotName")}
                 </div>
                 {message.role === "user" ? (
-                  <div className="whitespace-pre-wrap rounded-2xl rounded-tr-md bg-primary px-4 py-3 text-sm leading-relaxed text-primary-foreground">
+                  <div className="whitespace-pre-wrap break-words rounded-2xl rounded-tr-md bg-primary px-4 py-3 text-sm leading-relaxed text-primary-foreground [overflow-wrap:anywhere]">
                     {message.content}
                   </div>
                 ) : (
@@ -552,7 +552,7 @@ function CopilotChat({
                 key={key}
                 type="button"
                 disabled={!workspaceId || isSending}
-                className="min-w-0 rounded-lg border border-border bg-background px-2.5 py-2 text-center text-xs font-medium leading-snug text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+                className="min-h-10 min-w-0 rounded-lg border border-border bg-background px-2.5 py-2 text-center text-xs font-medium leading-snug text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35 lg:min-h-0"
                 onClick={() => {
                   if (!isSending) void sendMessage(suggestion);
                 }}
@@ -575,7 +575,7 @@ function CopilotChat({
             maxLength={COPILOT_MESSAGE_MAX_CHARS}
             rows={2}
             disabled={!workspaceId || isSending}
-            className="min-h-14 max-h-36 resize-y"
+            className="min-h-14 min-w-0 flex-1 max-h-36 resize-y"
           />
           <Button
             type="button"

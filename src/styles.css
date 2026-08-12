@@ -4719,6 +4719,33 @@ html.app-scrollbar.public-scrollbar::-webkit-scrollbar-thumb {
   padding: 0.65rem;
 }
 
+/* Responsive stage 2: keep intrinsic-width previews inside their own viewport. */
+.workflow-scene__scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 1023px) {
+  /* A reserved desktop scrollbar gutter removes usable pixels from mobile/tablet layouts. */
+  html.app-scrollbar {
+    scrollbar-gutter: auto;
+  }
+
+  .settings-tabs-trigger {
+    height: 2.5rem;
+    min-height: 2.5rem;
+  }
+
+  .billing-plan-card__cta {
+    height: 2.5rem;
+    min-height: 2.5rem;
+  }
+}
+
 .chat-list__search-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;

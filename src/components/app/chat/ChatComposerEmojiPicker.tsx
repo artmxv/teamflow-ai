@@ -152,7 +152,7 @@ export function ChatComposerEmojiPicker({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-9 shrink-0 text-muted-foreground"
+          className="size-10 shrink-0 text-muted-foreground lg:size-9"
           disabled={disabled}
           aria-label={t("chat.addEmoji")}
           aria-expanded={open}

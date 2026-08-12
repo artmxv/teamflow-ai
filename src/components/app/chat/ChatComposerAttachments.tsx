@@ -167,7 +167,7 @@ export function ChatAttachMenu({
             type="button"
             variant="ghost"
             size="icon"
-            className="size-9 shrink-0 text-muted-foreground"
+            className="size-10 shrink-0 text-muted-foreground lg:size-9"
             disabled={disabled}
             aria-label={t("chat.attach")}
           >
@@ -384,7 +384,7 @@ function EntityPickerDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="max-w-md gap-0 p-0">
+      <DialogContent className="flex max-h-[calc(100dvh-1rem)] min-h-0 max-w-md flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b border-border px-4 py-3">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription className="sr-only">{searchPlaceholder}</DialogDescription>
@@ -401,7 +401,7 @@ function EntityPickerDialog({
             />
           </div>
         </div>
-        <div className="max-h-72 overflow-y-auto p-2">
+        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
           {loading ? (
             <p className="px-2 py-6 text-center text-sm text-muted-foreground">
               {t("chat.loadingAttachments")}

@@ -9,6 +9,14 @@ import { UserAvatar } from "@/components/app/UserAvatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProjectAccent } from "@/lib/project-color";
 import { fetchProjects, type ProjectApiItem } from "@/lib/api/projects";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 const SEARCH_DEBOUNCE_MS = 280;
 const GLOBAL_SEARCH_QUERY_KEY = "global-search";
@@ -78,7 +86,7 @@ function SearchResultButton({
           {result.type === "project" && projectAccent ? (
             <span className={`size-2 shrink-0 rounded-full ${projectAccent.dot}`} aria-hidden />
           ) : null}
-          <span className="truncate">{result.title}</span>
+          <span className="break-words [overflow-wrap:anywhere] lg:truncate">{result.title}</span>
         </span>
         {(result.subtitle || result.projectName) && (
           <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
@@ -92,10 +100,14 @@ function SearchResultButton({
                     aria-hidden
                   />
                 ) : null}
-                <span className="truncate">{result.projectName}</span>
+                <span className="break-words [overflow-wrap:anywhere] lg:truncate">
+                  {result.projectName}
+                </span>
               </>
             ) : (
-              <span className="truncate">{result.subtitle ?? result.projectName}</span>
+              <span className="break-words [overflow-wrap:anywhere] lg:truncate">
+                {result.subtitle ?? result.projectName}
+              </span>
             )}
           </span>
         )}
@@ -174,20 +186,97 @@ function SearchDropdownSkeleton() {
   );
 }
 
+function SearchResults({
+  data,
+  isLoading,
+  hasError,
+  isEmpty,
+  projectById,
+  projectByName,
+  labels,
+  onSelect,
+  className,
+}: {
+  data: Awaited<ReturnType<typeof searchWorkspace>> | undefined;
+  isLoading: boolean;
+  hasError: boolean;
+  isEmpty: boolean;
+  projectById: ReadonlyMap<string, ProjectApiItem>;
+  projectByName: ReadonlyMap<string, ProjectApiItem>;
+  labels: {
+    error: string;
+    empty: string;
+    projects: string;
+    tasks: string;
+    people: string;
+    open: string;
+  };
+  onSelect: (result: GlobalSearchResult) => void;
+  className?: string;
+}) {
+  if (isLoading) {
+    return <SearchDropdownSkeleton />;
+  }
+
+  if (hasError) {
+    return <p className="px-3 py-4 text-center text-sm text-muted-foreground">{labels.error}</p>;
+  }
+
+  if (isEmpty) {
+    return <p className="px-3 py-4 text-center text-sm text-muted-foreground">{labels.empty}</p>;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return (
+    <div className={cn("app-scrollbar max-h-80 overflow-y-auto overscroll-contain p-1", className)}>
+      <SearchGroup
+        title={labels.projects}
+        results={data.projects}
+        projectById={projectById}
+        projectByName={projectByName}
+        openLabel={labels.open}
+        onSelect={onSelect}
+      />
+      <SearchGroup
+        title={labels.tasks}
+        results={data.tasks}
+        projectById={projectById}
+        projectByName={projectByName}
+        openLabel={labels.open}
+        onSelect={onSelect}
+      />
+      <SearchGroup
+        title={labels.people}
+        results={data.members}
+        openLabel={labels.open}
+        onSelect={onSelect}
+      />
+    </div>
+  );
+}
+
 export function GlobalSearch() {
   const { t } = useI18n();
   const router = useRouter();
-  const listboxId = useId();
+  const desktopListboxId = useId();
+  const mobileListboxId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const desktopInputRef = useRef<HTMLInputElement>(null);
+  const mobileInputRef = useRef<HTMLInputElement>(null);
 
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
 
   const trimmedQuery = query.trim();
   const debouncedTrimmed = debouncedQuery.trim();
-  const showPanel = open && trimmedQuery.length >= 2;
+  const showDesktopPanel = open && trimmedQuery.length >= 2;
+  const showMobilePanel = mobileOpen && trimmedQuery.length >= 2;
+  const showPanel = showDesktopPanel || showMobilePanel;
   const hasToken = typeof window !== "undefined" && !!getAuthToken();
   const { data: accessibleProjects = [] } = useQuery({
     queryKey: ["projects"],
@@ -214,8 +303,10 @@ export function GlobalSearch() {
 
   const closeSearch = useCallback(() => {
     setOpen(false);
+    setMobileOpen(false);
     setQuery("");
-    inputRef.current?.blur();
+    desktopInputRef.current?.blur();
+    mobileInputRef.current?.blur();
   }, []);
 
   const handleSelect = useCallback(
@@ -248,14 +339,14 @@ export function GlobalSearch() {
   );
 
   useEffect(() => {
-    if (!showPanel) {
+    if (!showDesktopPanel) {
       return;
     }
 
     function handlePointerDown(event: MouseEvent) {
       if (!rootRef.current?.contains(event.target as Node)) {
         setOpen(false);
-        inputRef.current?.blur();
+        desktopInputRef.current?.blur();
       }
     }
 
@@ -271,7 +362,7 @@ export function GlobalSearch() {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [showPanel, closeSearch]);
+  }, [showDesktopPanel, closeSearch]);
 
   const isDebouncing = trimmedQuery !== debouncedTrimmed;
   const isLoading = searchQuery.isLoading || searchQuery.isFetching || isDebouncing;
@@ -280,92 +371,168 @@ export function GlobalSearch() {
   const totalResults =
     (data?.projects.length ?? 0) + (data?.tasks.length ?? 0) + (data?.members.length ?? 0);
   const isEmpty = !isLoading && !hasError && totalResults === 0;
+  const resultLabels = {
+    error: t("top.searchError"),
+    empty: t("top.searchNothingFound"),
+    projects: t("top.searchProjects"),
+    tasks: t("top.searchTasks"),
+    people: t("top.searchPeople"),
+    open: t("top.searchOpenResult"),
+  };
 
   return (
-    <div ref={rootRef} className="relative hidden min-w-0 flex-1 lg:block lg:max-w-sm xl:max-w-md">
-      <Search
-        className="filter-search-icon pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2"
-        aria-hidden="true"
-      />
-      <input
-        ref={inputRef}
-        type="search"
-        role="combobox"
-        aria-expanded={showPanel}
-        aria-controls={showPanel ? listboxId : undefined}
-        aria-autocomplete="list"
-        value={query}
-        placeholder={t("top.search")}
-        className="filter-search-input w-full appearance-none pl-9 pr-10 text-sm outline-none transition [&::-webkit-search-cancel-button]:appearance-none"
-        onChange={(event) => {
-          setQuery(event.target.value);
-          if (!open) {
-            setOpen(true);
+    <>
+      <button
+        type="button"
+        aria-label={t("top.search")}
+        aria-haspopup="dialog"
+        aria-expanded={mobileOpen}
+        className="grid size-10 shrink-0 place-items-center rounded-lg text-muted-foreground outline-none transition hover:bg-secondary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35 lg:hidden"
+        onClick={() => setMobileOpen(true)}
+      >
+        <Search className="size-4.5" aria-hidden />
+      </button>
+
+      <Dialog
+        open={mobileOpen}
+        onOpenChange={(nextOpen) => {
+          if (nextOpen) {
+            setMobileOpen(true);
+          } else {
+            closeSearch();
           }
         }}
-        onFocus={() => setOpen(true)}
-      />
+      >
+        <DialogContent
+          closeLabel={t("nav.closeMenu")}
+          closeClassName="right-3 top-3 size-10"
+          className="top-2 flex h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-none translate-y-0 flex-col gap-0 overflow-hidden rounded-xl p-0"
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>{t("top.search")}</DialogTitle>
+            <DialogDescription>{t("top.search")}</DialogDescription>
+          </DialogHeader>
+          <div className="relative shrink-0 border-b border-border px-3 py-3 pr-14">
+            <Search
+              className="filter-search-icon pointer-events-none absolute left-6 top-1/2 z-10 size-4 -translate-y-1/2"
+              aria-hidden
+            />
+            <input
+              ref={mobileInputRef}
+              type="search"
+              role="combobox"
+              aria-expanded={showMobilePanel}
+              aria-controls={showMobilePanel ? mobileListboxId : undefined}
+              aria-autocomplete="list"
+              value={query}
+              placeholder={t("top.search")}
+              className="filter-search-input h-11 w-full appearance-none pl-9 pr-10 text-sm outline-none transition [&::-webkit-search-cancel-button]:appearance-none"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            {query ? (
+              <button
+                type="button"
+                aria-label={t("top.searchClear")}
+                className="absolute right-16 top-1/2 z-10 grid size-9 -translate-y-1/2 place-items-center rounded-md text-muted-foreground outline-none transition hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35"
+                onClick={() => {
+                  setQuery("");
+                  mobileInputRef.current?.focus();
+                }}
+              >
+                <X className="size-4" aria-hidden />
+              </button>
+            ) : null}
+          </div>
+          <div
+            id={showMobilePanel ? mobileListboxId : undefined}
+            role={showMobilePanel ? "listbox" : undefined}
+            className="min-h-0 flex-1 overflow-hidden bg-popover text-popover-foreground"
+          >
+            {showMobilePanel ? (
+              <SearchResults
+                data={data}
+                isLoading={isLoading}
+                hasError={hasError}
+                isEmpty={isEmpty}
+                projectById={projectById}
+                projectByName={projectByName}
+                labels={resultLabels}
+                onSelect={handleSelect}
+                className="h-full max-h-none px-2 py-2"
+              />
+            ) : (
+              <div className="flex h-full min-h-48 flex-col items-center justify-center gap-3 px-6 text-center text-sm text-muted-foreground">
+                <span className="grid size-12 place-items-center rounded-xl bg-muted/60">
+                  <Search className="size-5" aria-hidden />
+                </span>
+                <p>{t("top.search")}</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
-      {query ? (
-        <button
-          type="button"
-          aria-label={t("top.searchClear")}
-          className="absolute right-2 top-1/2 z-10 grid size-7 -translate-y-1/2 place-items-center rounded-md text-muted-foreground outline-none transition hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35"
-          onClick={() => {
-            setQuery("");
-            setOpen(false);
-            inputRef.current?.focus();
+      <div
+        ref={rootRef}
+        className="relative hidden min-w-0 flex-1 lg:block lg:max-w-sm xl:max-w-md"
+      >
+        <Search
+          className="filter-search-icon pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2"
+          aria-hidden="true"
+        />
+        <input
+          ref={desktopInputRef}
+          type="search"
+          role="combobox"
+          aria-expanded={showDesktopPanel}
+          aria-controls={showDesktopPanel ? desktopListboxId : undefined}
+          aria-autocomplete="list"
+          value={query}
+          placeholder={t("top.search")}
+          className="filter-search-input w-full appearance-none pl-9 pr-10 text-sm outline-none transition [&::-webkit-search-cancel-button]:appearance-none"
+          onChange={(event) => {
+            setQuery(event.target.value);
+            if (!open) {
+              setOpen(true);
+            }
           }}
-        >
-          <X className="size-3.5" aria-hidden />
-        </button>
-      ) : null}
+          onFocus={() => setOpen(true)}
+        />
 
-      {showPanel && (
-        <div
-          id={listboxId}
-          role="listbox"
-          className="absolute left-0 right-0 top-[calc(100%+0.375rem)] z-50 min-w-0 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-lg"
-        >
-          {isLoading && <SearchDropdownSkeleton />}
-          {hasError && (
-            <p className="px-3 py-4 text-center text-sm text-muted-foreground">
-              {t("top.searchError")}
-            </p>
-          )}
-          {isEmpty && (
-            <p className="px-3 py-4 text-center text-sm text-muted-foreground">
-              {t("top.searchNothingFound")}
-            </p>
-          )}
-          {!isLoading && !hasError && !isEmpty && data && (
-            <div className="app-scrollbar max-h-80 overflow-y-auto overscroll-contain p-1">
-              <SearchGroup
-                title={t("top.searchProjects")}
-                results={data.projects}
-                projectById={projectById}
-                projectByName={projectByName}
-                openLabel={t("top.searchOpenResult")}
-                onSelect={handleSelect}
-              />
-              <SearchGroup
-                title={t("top.searchTasks")}
-                results={data.tasks}
-                projectById={projectById}
-                projectByName={projectByName}
-                openLabel={t("top.searchOpenResult")}
-                onSelect={handleSelect}
-              />
-              <SearchGroup
-                title={t("top.searchPeople")}
-                results={data.members}
-                openLabel={t("top.searchOpenResult")}
-                onSelect={handleSelect}
-              />
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+        {query ? (
+          <button
+            type="button"
+            aria-label={t("top.searchClear")}
+            className="absolute right-2 top-1/2 z-10 grid size-7 -translate-y-1/2 place-items-center rounded-md text-muted-foreground outline-none transition hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/35"
+            onClick={() => {
+              setQuery("");
+              setOpen(false);
+              desktopInputRef.current?.focus();
+            }}
+          >
+            <X className="size-3.5" aria-hidden />
+          </button>
+        ) : null}
+
+        {showDesktopPanel && (
+          <div
+            id={desktopListboxId}
+            role="listbox"
+            className="absolute left-0 right-0 top-[calc(100%+0.375rem)] z-50 min-w-0 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-lg"
+          >
+            <SearchResults
+              data={data}
+              isLoading={isLoading}
+              hasError={hasError}
+              isEmpty={isEmpty}
+              projectById={projectById}
+              projectByName={projectByName}
+              labels={resultLabels}
+              onSelect={handleSelect}
+            />
+          </div>
+        )}
+      </div>
+    </>
   );
 }

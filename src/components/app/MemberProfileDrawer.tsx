@@ -191,7 +191,10 @@ export function MemberProfileDrawer({
           }
         }}
       >
-        <SheetContent side="right" className="app-scrollbar w-full overflow-y-auto sm:max-w-2xl">
+        <SheetContent
+          side="right"
+          className="app-scrollbar w-full overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:max-w-2xl sm:p-6"
+        >
           <SheetHeader className="space-y-1 border-b border-border pb-4">
             <SheetTitle>{t("team.memberProfileTitle")}</SheetTitle>
             <SheetDescription className="sr-only">
@@ -224,7 +227,7 @@ export function MemberProfileDrawer({
                       type="button"
                       variant="secondary"
                       size="icon"
-                      className="absolute -bottom-0.5 -right-0.5 size-6 rounded-full shadow-sm"
+                      className="absolute -bottom-1 -right-1 size-8 rounded-full shadow-sm lg:-bottom-0.5 lg:-right-0.5 lg:size-6"
                       aria-label={t("settings.viewPhoto")}
                       onClick={() => setPhotoPreviewOpen(true)}
                     >
@@ -234,7 +237,7 @@ export function MemberProfileDrawer({
                 </div>
                 <div className="min-w-0 flex-1">
                   <h2 className="text-lg font-semibold leading-snug">{profile.name}</h2>
-                  <p className="text-sm text-muted-foreground">{profile.email}</p>
+                  <p className="break-all text-sm text-muted-foreground">{profile.email}</p>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <Badge variant="secondary" className={cn(roleStyles[profile.role], "border-0")}>
                       {workspaceRoleLabel(profile.role, t)}
@@ -419,7 +422,7 @@ export function MemberProfileDrawer({
               key={previewSrc}
               src={previewSrc}
               alt={profile?.name ?? ""}
-              className="mx-auto h-auto max-h-[80vh] w-full max-w-[min(90vw,640px)] rounded-xl object-contain"
+              className="mx-auto h-auto max-h-[80dvh] w-full max-w-[min(90vw,640px)] rounded-xl object-contain"
               onError={() => {
                 if (upgradedPreviewSrc && previewSrc === upgradedPreviewSrc) {
                   setPreviewUpgradeFailed(true);

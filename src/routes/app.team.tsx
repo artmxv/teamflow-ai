@@ -360,7 +360,7 @@ function TeamPage() {
         <button
           type="button"
           aria-label={t("team.memberActionsAria").replace("{name}", member.name)}
-          className="grid size-8 place-items-center rounded-md border border-transparent text-muted-foreground transition outline-none hover:border-control-border hover:bg-control-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+          className="grid size-10 place-items-center rounded-md border border-transparent text-muted-foreground transition outline-none hover:border-control-border hover:bg-control-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 lg:size-8"
         >
           <MoreHorizontal className="size-4" />
         </button>
@@ -526,7 +526,7 @@ function TeamPage() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="w-full justify-center sm:w-auto"
+                        className="h-10 w-full justify-center sm:w-auto lg:h-8"
                         onClick={() => void handleCopyInviteLink(invite.acceptUrl)}
                       >
                         <Copy className="size-4" /> {t("team.copyInviteLink")}
@@ -535,7 +535,7 @@ function TeamPage() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="w-full justify-center sm:w-auto"
+                        className="h-10 w-full justify-center sm:w-auto lg:h-8"
                         disabled={
                           resendInviteMutation.isPending &&
                           resendInviteMutation.variables === invite.id
@@ -551,7 +551,7 @@ function TeamPage() {
                         type="button"
                         variant="destructive"
                         size="sm"
-                        className="w-full justify-center sm:w-auto"
+                        className="h-10 w-full justify-center sm:w-auto lg:h-8"
                         disabled={isRevokingInvite(invite.id)}
                         onClick={() => setRevokeInvite(invite)}
                       >

@@ -57,7 +57,7 @@ export function ChatConversationHeader({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-10 shrink-0 md:size-8"
+          className="size-10 shrink-0 lg:size-8"
           onClick={onBack}
           aria-label={t("chat.backToList")}
         >
@@ -121,7 +121,7 @@ export function ChatConversationHeader({
       />
 
       {/* Desktop: pin + rename visible */}
-      <div className="hidden items-center gap-0.5 sm:flex">
+      <div className="hidden items-center gap-0.5 lg:flex">
         {showRename ? (
           <Button
             type="button"
@@ -158,7 +158,7 @@ export function ChatConversationHeader({
             type="button"
             variant="ghost"
             size="icon"
-            className="size-10 shrink-0 sm:hidden"
+            className="size-10 shrink-0 lg:hidden"
             aria-label={t("chat.conversationActions")}
           >
             <MoreHorizontal className="size-4" aria-hidden="true" />

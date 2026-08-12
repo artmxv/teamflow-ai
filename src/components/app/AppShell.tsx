@@ -63,7 +63,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {isBootstrapping ? (
         <AppBootScreen />
       ) : isError && !me ? (
-        <div className="flex min-h-screen items-center justify-center bg-background p-6">
+        <div className="flex min-h-dvh items-center justify-center bg-background p-6">
           <ApiErrorState
             titleKey="loading.workspaceLoadErrorTitle"
             error={error}
@@ -73,7 +73,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       ) : (
         <AuthenticatedImageLightboxProvider>
-          <div className="app-shell-enter flex h-svh min-h-0 w-full overflow-hidden bg-background">
+          <div className="app-shell-enter flex h-dvh min-h-0 w-full overflow-hidden bg-background">
             <AppSidebar
               workspace={workspace}
               workspaceLoading={workspaceLoading}
@@ -81,7 +81,11 @@ export function AppShell({ children }: { children: ReactNode }) {
               onToggleCollapsed={toggleSidebarCollapsed}
             />
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-              <AppTopbar workspaceRole={me?.workspace?.role ?? null} />
+              <AppTopbar
+                workspaceRole={me?.workspace?.role ?? null}
+                workspace={workspace}
+                workspaceLoading={workspaceLoading}
+              />
               <main className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
                 <AppPage>{children}</AppPage>
               </main>

@@ -403,7 +403,7 @@ export function TaskDrawer({
       <Sheet open={!!task} onOpenChange={onOpenChange}>
         <SheetContent
           side="right"
-          className="flex h-full w-full min-w-0 max-w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
+          className="flex h-dvh w-full min-w-0 max-w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
           onOpenAutoFocus={(event) => {
             // Avoid autofocus on the close (X) button so it does not look hovered on open.
             event.preventDefault();
@@ -416,17 +416,19 @@ export function TaskDrawer({
             className="app-scrollbar min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pt-5 pb-4 sm:px-6 sm:pt-6 outline-none"
           >
             <SheetHeader className="space-y-2 border-b border-border pb-4 text-left">
-              <div className="flex items-center gap-2 pr-8 text-xs text-muted-foreground">
-                <span className="font-mono">{task.key}</span>
+              <div className="flex min-w-0 items-center gap-2 pr-10 text-xs text-muted-foreground sm:pr-8">
+                <span className="shrink-0 font-mono">{task.key}</span>
                 {projectName ? (
                   <>
                     <span>·</span>
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/35 px-2 py-0.5 font-medium text-foreground/75">
+                    <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-border/60 bg-muted/35 px-2 py-0.5 font-medium text-foreground/75">
                       <span
                         className={cn("size-1.5 shrink-0 rounded-full", projectAccent.dot)}
                         aria-hidden
                       />
-                      {displayProjectName(projectName, lang)}
+                      <span className="min-w-0 truncate">
+                        {displayProjectName(projectName, lang)}
+                      </span>
                     </span>
                   </>
                 ) : null}
@@ -454,7 +456,7 @@ export function TaskDrawer({
                   />
                 </div>
               ) : (
-                <div className="inline-flex max-w-full items-center gap-2 pr-8">
+                <div className="inline-flex max-w-full items-center gap-2 pr-10 sm:pr-8">
                   <SheetTitle className="min-w-0 text-xl leading-snug break-words [overflow-wrap:anywhere]">
                     {displayTaskTitle(canEditTask ? draftTitle || task.title : task.title, lang)}
                   </SheetTitle>
@@ -463,7 +465,7 @@ export function TaskDrawer({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-7 shrink-0 p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
+                      className="size-10 shrink-0 p-0 text-muted-foreground hover:bg-transparent hover:text-foreground lg:size-7"
                       aria-label={t("tasks.editTitle")}
                       disabled={isSaving}
                       onClick={() => {
@@ -641,7 +643,7 @@ export function TaskDrawer({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+                      className="size-10 shrink-0 text-muted-foreground hover:text-foreground lg:size-7"
                       aria-label={t("tasks.editDescription")}
                       onClick={() => {
                         setDraftDescription(displayTaskDescription(task.description, lang));
@@ -804,7 +806,7 @@ export function TaskDrawer({
           </div>
 
           {showFooter ? (
-            <div className="sticky bottom-0 z-10 flex w-full min-w-0 shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:px-6">
+            <div className="sticky bottom-0 z-10 flex w-full min-w-0 shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:px-6 sm:py-3">
               {onDelete ? (
                 <Button
                   type="button"
@@ -824,7 +826,7 @@ export function TaskDrawer({
                   ref={saveChangesButtonRef}
                   type="button"
                   variant="brand"
-                  className="h-10 min-w-[10.5rem]"
+                  className="h-10 min-w-0 flex-1 sm:min-w-[10.5rem] sm:flex-none"
                   disabled={!canSaveChanges || isSaving}
                   onClick={handleSaveChanges}
                 >
@@ -928,7 +930,7 @@ function TaskAttachmentsSection({
             type="button"
             size="sm"
             variant="outline"
-            className="h-8 gap-1.5 border-primary/25 bg-primary/8 px-2.5 text-xs text-primary hover:bg-primary/14"
+            className="h-10 gap-1.5 border-primary/25 bg-primary/8 px-2.5 text-xs text-primary hover:bg-primary/14 lg:h-8"
             disabled={isUploading}
             onClick={onPickFile}
           >
@@ -1148,7 +1150,7 @@ function TaskAttachmentRow({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 text-muted-foreground hover:text-foreground"
+          className="size-10 text-muted-foreground hover:text-foreground lg:size-7"
           disabled={openDisabled}
           aria-label={
             isImage
@@ -1165,7 +1167,7 @@ function TaskAttachmentRow({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 text-muted-foreground hover:text-foreground"
+          className="size-10 text-muted-foreground hover:text-foreground lg:size-7"
           disabled={isDeleting}
           aria-label={t("files.downloadAttachment")}
           onClick={onDownload}
@@ -1176,7 +1178,7 @@ function TaskAttachmentRow({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-7 text-muted-foreground hover:text-destructive"
+          className="size-10 text-muted-foreground hover:text-destructive lg:size-7"
           disabled={isDeleting}
           aria-label={t("tasks.deleteAttachmentAria")}
           onClick={onRequestDelete}

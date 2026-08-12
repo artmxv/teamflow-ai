@@ -98,7 +98,7 @@ function AuthCallbackPage() {
 
   if (status === "missing_token" || status === "error") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="flex min-h-dvh items-center justify-center bg-background px-4 py-8">
         <div className="max-w-sm text-center">
           <p className="text-sm text-muted-foreground">{t("auth.googleSignInFailed")}</p>
           <Link
@@ -114,7 +114,7 @@ function AuthCallbackPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="flex min-h-dvh items-center justify-center bg-background px-4 py-8">
       <p className="text-sm text-muted-foreground">{t("auth.completingSignIn")}</p>
     </div>
   );

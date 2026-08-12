@@ -29,7 +29,7 @@ export function ChatFileAttachmentCard({ attachment }: { attachment: ChatFileAtt
         type="button"
         variant="ghost"
         size="icon"
-        className="size-8 shrink-0"
+        className="size-10 shrink-0 lg:size-8"
         disabled={downloading}
         aria-label={t("chat.downloadFile")}
         onClick={() => {

@@ -19,7 +19,7 @@ export function AuthShell({
 
   return (
     <PublicPageShell mode="auth">
-      <div className="auth-layout grid min-h-[100svh] lg:grid-cols-[54fr_46fr]">
+      <div className="auth-layout grid min-h-dvh lg:grid-cols-[54fr_46fr]">
         <aside className="auth-story-panel relative hidden overflow-hidden lg:flex lg:flex-col">
           <div className="auth-story-panel__grid" aria-hidden />
           <div className="relative z-10 flex h-full flex-col px-10 py-8 xl:px-16 xl:py-10">
@@ -43,11 +43,11 @@ export function AuthShell({
           </div>
         </aside>
 
-        <main className="auth-form-panel flex min-h-[100svh] items-center justify-center px-4 py-6 sm:px-8 sm:py-10 lg:px-10">
+        <main className="auth-form-panel flex min-h-dvh items-center justify-center px-4 py-6 sm:px-8 sm:py-10 lg:px-10">
           <div className="auth-form-wrap w-full max-w-[410px]">
             <div className="mb-8 flex items-center justify-between gap-3 lg:justify-end">
               <BrandLogo className="lg:hidden" />
-              <LanguageSwitcher className="shrink-0" />
+              <LanguageSwitcher className="shrink-0 [&_button]:min-h-9 [&_button]:min-w-9 lg:[&_button]:min-h-0 lg:[&_button]:min-w-0" />
             </div>
             <div className="auth-card">
               <h1 className="text-3xl font-semibold tracking-[-0.035em]">{title}</h1>
