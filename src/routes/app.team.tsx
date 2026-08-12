@@ -427,12 +427,12 @@ function TeamPage() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label>{t("team.role")}</Label>
+                    <Label htmlFor="invite-role">{t("team.role")}</Label>
                     <Select
                       value={inviteRole}
                       onValueChange={(value) => setInviteRole(value as InviteRole)}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger id="invite-role">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -597,8 +597,19 @@ function TeamPage() {
                 members.map((member) => (
                   <tr
                     key={member.id}
-                    className="cursor-pointer transition hover:bg-muted/40"
+                    tabIndex={0}
+                    aria-label={member.name}
+                    className="cursor-pointer transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/35"
                     onClick={() => openMemberDrawer(member.id)}
+                    onKeyDown={(event) => {
+                      if (
+                        event.target === event.currentTarget &&
+                        (event.key === "Enter" || event.key === " ")
+                      ) {
+                        event.preventDefault();
+                        openMemberDrawer(member.id);
+                      }
+                    }}
                   >
                     <td className="px-5 py-3">
                       <div className="flex min-w-0 items-center gap-3">
@@ -711,12 +722,12 @@ function TeamPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5">
-            <Label>{t("team.role")}</Label>
+            <Label htmlFor="member-role">{t("team.role")}</Label>
             <Select
               value={roleSelection}
               onValueChange={(value) => setRoleSelection(value as ManageableRole)}
             >
-              <SelectTrigger>
+              <SelectTrigger id="member-role">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

@@ -227,7 +227,6 @@ export function WorkspaceSwitcher({
       <DropdownMenuContent
         align="start"
         sideOffset={8}
-        onCloseAutoFocus={(event) => event.preventDefault()}
         className="w-72 rounded-xl border border-border/80 bg-popover p-1.5 shadow-xl ring-1 ring-black/5 dark:border-border dark:bg-popover dark:ring-white/10"
         side={collapsed ? "right" : "bottom"}
       >

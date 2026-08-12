@@ -587,11 +587,12 @@ function SettingsPage() {
               <p className="mb-4 text-sm text-muted-foreground">{t("settings.viewOnlyRole")}</p>
             ) : null}
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label={t("settings.workspaceName")}>
+              <Field label={t("settings.workspaceName")} htmlFor="settings-workspace-name">
                 {isPending ? (
                   <Skeleton className="h-10 w-full rounded-md" />
                 ) : (
                   <Input
+                    id="settings-workspace-name"
                     value={workspaceForm?.name ?? ""}
                     onChange={(event) =>
                       setWorkspaceForm((current) =>
@@ -602,11 +603,12 @@ function SettingsPage() {
                   />
                 )}
               </Field>
-              <Field label={t("settings.workspaceSlug")}>
+              <Field label={t("settings.workspaceSlug")} htmlFor="settings-workspace-slug">
                 {isPending ? (
                   <Skeleton className="h-10 w-full rounded-md" />
                 ) : (
                   <Input
+                    id="settings-workspace-slug"
                     value={workspaceForm?.slug ?? ""}
                     onChange={(event) =>
                       setWorkspaceForm((current) =>
@@ -620,12 +622,17 @@ function SettingsPage() {
                 )}
               </Field>
               <div className="sm:col-span-2">
-                <Field label={t("settings.workspaceUrl")}>
+                <Field label={t("settings.workspaceUrl")} htmlFor="settings-workspace-url">
                   {isPending ? (
                     <Skeleton className="h-10 w-full rounded-md" />
                   ) : (
                     <>
-                      <Input value={workspaceSlugPreview} readOnly className="bg-muted/40" />
+                      <Input
+                        id="settings-workspace-url"
+                        value={workspaceSlugPreview}
+                        readOnly
+                        className="bg-muted/40"
+                      />
                       <p className="mt-1.5 break-all text-xs text-muted-foreground">
                         {t("settings.workspaceUrlPreview")} {workspaceSlugPreview || "—"}
                       </p>
@@ -633,8 +640,9 @@ function SettingsPage() {
                   )}
                 </Field>
               </div>
-              <Field label={t("settings.industry")}>
+              <Field label={t("settings.industry")} htmlFor="settings-workspace-industry">
                 <Input
+                  id="settings-workspace-industry"
                   value={workspaceForm?.industry ?? ""}
                   onChange={(event) =>
                     setWorkspaceForm((current) =>
@@ -645,8 +653,9 @@ function SettingsPage() {
                   placeholder={t("settings.industryPlaceholder")}
                 />
               </Field>
-              <Field label={t("settings.teamSize")}>
+              <Field label={t("settings.teamSize")} htmlFor="settings-workspace-team-size">
                 <WorkspaceTeamSizeSelect
+                  id="settings-workspace-team-size"
                   value={workspaceForm?.teamSize ?? ""}
                   onChange={(teamSize) =>
                     setWorkspaceForm((current) => (current ? { ...current, teamSize } : current))
@@ -670,7 +679,8 @@ function SettingsPage() {
                 onCancel={handleWorkspaceCancel}
                 saveDisabled={!workspace || !workspaceForm || !workspaceHasUnsavedChanges}
                 cancelDisabled={!workspaceHasUnsavedChanges}
-                cancelVariant="brandSoft"
+                cancelVariant="outline"
+                cancelClassName={cn(FILTER_RESET_CLASSNAME, "w-auto")}
                 cancelLabel={t("settings.resetChanges")}
                 saveLabel={t("settings.saveWorkspace")}
                 savingLabel={t("settings.savingWorkspace")}
@@ -751,11 +761,12 @@ function SettingsPage() {
             </div>
             <div className="mt-5 max-w-3xl">
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label={t("settings.fullName")}>
+                <Field label={t("settings.fullName")} htmlFor="settings-profile-name">
                   {isPending ? (
                     <Skeleton className="h-10 w-full rounded-md" />
                   ) : (
                     <Input
+                      id="settings-profile-name"
                       value={profileForm?.name ?? ""}
                       onChange={(event) =>
                         setProfileForm((current) =>
@@ -766,11 +777,12 @@ function SettingsPage() {
                     />
                   )}
                 </Field>
-                <Field label={t("settings.displayName")}>
+                <Field label={t("settings.displayName")} htmlFor="settings-profile-display-name">
                   {isPending ? (
                     <Skeleton className="h-10 w-full rounded-md" />
                   ) : (
                     <Input
+                      id="settings-profile-display-name"
                       value={profileForm?.displayName ?? ""}
                       onChange={(event) =>
                         setProfileForm((current) =>
@@ -781,11 +793,12 @@ function SettingsPage() {
                     />
                   )}
                 </Field>
-                <Field label={t("settings.email")}>
+                <Field label={t("settings.email")} htmlFor="settings-profile-email">
                   {isPending ? (
                     <Skeleton className="h-10 w-full rounded-md" />
                   ) : (
                     <Input
+                      id="settings-profile-email"
                       key={user?.id ?? "user-email"}
                       value={user?.email ?? ""}
                       readOnly
@@ -804,8 +817,9 @@ function SettingsPage() {
                     )
                   }
                 />
-                <Field label={t("settings.position")}>
+                <Field label={t("settings.position")} htmlFor="settings-profile-position">
                   <Input
+                    id="settings-profile-position"
                     value={profileForm?.position ?? ""}
                     onChange={(event) =>
                       setProfileForm((current) =>
@@ -826,8 +840,9 @@ function SettingsPage() {
                   }
                 />
                 <div className="sm:col-span-2">
-                  <Field label={t("settings.bio")}>
+                  <Field label={t("settings.bio")} htmlFor="settings-profile-bio">
                     <Textarea
+                      id="settings-profile-bio"
                       value={profileForm?.bio ?? ""}
                       onChange={(event) =>
                         setProfileForm((current) =>
@@ -867,6 +882,7 @@ function SettingsPage() {
                       <button
                         key={mode}
                         type="button"
+                        aria-pressed={theme === mode}
                         onClick={() => setTheme(mode)}
                         className={`relative rounded-xl border p-4 text-left transition ${
                           theme === mode
@@ -902,6 +918,7 @@ function SettingsPage() {
                       <button
                         key={option.id}
                         type="button"
+                        aria-pressed={brandTheme === option.id}
                         onClick={() => setBrandTheme(option.id)}
                         className={`relative flex items-center gap-3 rounded-xl border p-3 text-left transition ${
                           brandTheme === option.id
@@ -1013,10 +1030,12 @@ function Card({
   );
 }
 function WorkspaceTeamSizeSelect({
+  id,
   value,
   onChange,
   disabled,
 }: {
+  id?: string;
   value: string;
   onChange: (teamSize: string) => void;
   disabled?: boolean;
@@ -1037,7 +1056,7 @@ function WorkspaceTeamSizeSelect({
       onValueChange={(next) => onChange(next === TEAM_SIZE_SELECT_EMPTY ? "" : next)}
       disabled={disabled}
     >
-      <SelectTrigger>
+      <SelectTrigger id={id}>
         <SelectValue placeholder={t("settings.teamSize")} />
       </SelectTrigger>
       <SelectContent>
@@ -1053,10 +1072,18 @@ function WorkspaceTeamSizeSelect({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
-      <Label>{label}</Label>
+      <Label htmlFor={htmlFor}>{label}</Label>
       {children}
     </div>
   );
@@ -1127,13 +1154,13 @@ function ProfileLocationField({
   const { t, lang } = useI18n();
 
   return (
-    <Field label={t("settings.country")}>
+    <Field label={t("settings.country")} htmlFor="settings-profile-country">
       <Select
         value={country}
         onValueChange={(value) => onChange(value as LocationFormCountry, other)}
         disabled={disabled}
       >
-        <SelectTrigger>
+        <SelectTrigger id="settings-profile-country">
           <SelectValue placeholder={t("settings.country")}>
             {country !== LOCATION_UNSET ? locationCountryLabel(country, lang as Lang) : null}
           </SelectValue>
@@ -1150,6 +1177,7 @@ function ProfileLocationField({
       {country === "OTHER" ? (
         <Input
           className="mt-2"
+          aria-label={t("settings.other")}
           value={other}
           onChange={(event) => onChange(country, event.target.value)}
           disabled={disabled}

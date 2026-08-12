@@ -209,7 +209,6 @@ export function AppTopbar({
           <DropdownMenuContent
             align="end"
             className="flex w-80 max-w-[calc(100vw-1rem)] flex-col overflow-hidden p-1"
-            onCloseAutoFocus={(event) => event.preventDefault()}
           >
             <DropdownMenuLabel className="flex shrink-0 items-center justify-between gap-2">
               <span>{t("top.notifications")}</span>
@@ -389,11 +388,7 @@ export function AppTopbar({
                 <ChevronDown className="hidden size-3.5 text-muted-foreground xl:block" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="w-56"
-              onCloseAutoFocus={(event) => event.preventDefault()}
-            >
+            <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>{currentUser.email}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>

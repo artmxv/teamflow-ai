@@ -76,6 +76,10 @@ import { taskStatusColumnDotClass } from "@/lib/task-status-theme";
 
 export const Route = createFileRoute("/app/board")({
   beforeLoad: requireAuth,
+  validateSearch: (search: Record<string, unknown>): { taskId?: string } => ({
+    taskId:
+      typeof search.taskId === "string" && search.taskId.length > 0 ? search.taskId : undefined,
+  }),
   head: () => ({ meta: [{ title: "Kanban — TeamFlow AI" }] }),
   component: Board,
 });
@@ -95,11 +99,12 @@ const apiPriorityMap: Record<TaskApiPriority, Priority> = {
 
 function Board() {
   const { t } = useI18n();
+  const { taskId: taskIdFromUrl } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const { data: me } = useCurrentUser();
   const workspaceId = me?.workspace?.id ?? null;
   const canManageProjects = isWorkspaceManager(me?.workspace?.role);
   const queryClient = useQueryClient();
-  const [selected, setSelected] = useState<Task | null>(null);
   const [priority, setPriority] = useState<Priority | "all">("all");
   const [assignee, setAssignee] = useState<string>("all");
   const {
@@ -180,7 +185,7 @@ function Board() {
     mutationFn: deleteTask,
     onSuccess: async () => {
       await invalidateWorkspaceContentQueries(queryClient, workspaceId);
-      setSelected(null);
+      updateTaskSearch(undefined);
       toast.success(t("tasks.deleted"));
     },
     onError: () => {
@@ -201,11 +206,10 @@ function Board() {
         priority: TaskApiPriority;
       };
     }) => updateTask(id, input),
-    onSuccess: async (updated) => {
+    onSuccess: async () => {
       await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       invalidateNotifications(queryClient);
-      setSelected((prev) => (prev?.id === updated.id ? mapApiTaskToTask(updated, t) : prev));
-      setSelected(null);
+      updateTaskSearch(undefined);
       toast.success(t("tasks.updated"));
     },
     onError: () => {
@@ -215,10 +219,9 @@ function Board() {
   const updateDescriptionMutation = useMutation({
     mutationFn: ({ id, description }: { id: string; description: string | null }) =>
       updateTask(id, { description }),
-    onSuccess: async (updated) => {
+    onSuccess: async () => {
       await invalidateWorkspaceContentQueries(queryClient, workspaceId);
       invalidateNotifications(queryClient);
-      setSelected((prev) => (prev?.id === updated.id ? mapApiTaskToTask(updated, t) : prev));
       toast.success(t("tasks.updated"));
     },
     onError: () => {
@@ -233,17 +236,30 @@ function Board() {
       ),
     [apiTasks, workspaceMembers],
   );
-  const selectedAssignees = useMemo(
-    () => (selected ? resolveTaskAssignees(apiTasks, selected.id) : []),
-    [selected, apiTasks],
-  );
   const updatingTaskId =
     updateTaskMutation.isPending && updateTaskMutation.variables
       ? updateTaskMutation.variables.id
       : null;
   const [activeDragTask, setActiveDragTask] = useState<Task | null>(null);
   const suppressCardClickRef = useRef(false);
-  const taskList = apiTasks.map((task) => mapApiTaskToTask(task, t));
+  const taskList = useMemo(() => apiTasks.map((task) => mapApiTaskToTask(task, t)), [apiTasks, t]);
+  const selected = useMemo(
+    () => taskList.find((task) => task.id === taskIdFromUrl) ?? null,
+    [taskIdFromUrl, taskList],
+  );
+  const selectedAssignees = useMemo(
+    () => (selected ? resolveTaskAssignees(apiTasks, selected.id) : []),
+    [selected, apiTasks],
+  );
+
+  function updateTaskSearch(taskId: string | undefined) {
+    void navigate({ search: { taskId }, replace: true });
+  }
+
+  useEffect(() => {
+    if (!taskIdFromUrl || isLoading || isError || selected) return;
+    void navigate({ search: { taskId: undefined }, replace: true });
+  }, [taskIdFromUrl, isLoading, isError, selected, navigate]);
 
   const dragSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -289,7 +305,7 @@ function Board() {
 
   function handleOpenTask(task: Task) {
     if (suppressCardClickRef.current) return;
-    setSelected(task);
+    updateTaskSearch(task.id);
   }
 
   async function handleCreateTask(values: TaskFormValues) {
@@ -558,7 +574,7 @@ function Board() {
           await updateDescriptionMutation.mutateAsync({ id: selected.id, description });
         }}
         isSavingDescription={updateDescriptionMutation.isPending}
-        onOpenChange={(o) => !o && setSelected(null)}
+        onOpenChange={(open) => !open && updateTaskSearch(undefined)}
         onDelete={(taskId) => deleteTaskMutation.mutate(taskId)}
         isDeleting={deleteTaskMutation.isPending}
       />
